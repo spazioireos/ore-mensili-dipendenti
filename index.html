@@ -1,0 +1,1154 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="author" content="Christian Canonica">
+<meta name="creator" content="Christian Canonica - Spazio Ireos Società Cooperativa Sociale">
+<title>Spazio Ireos — Report Ore mensile</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<style>
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:'Nunito',sans-serif; background:#eef2f5; color:#1f2937; }
+  .app-header { background:#0f2740; color:#fff; padding:10px 18px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; position:sticky; top:0; z-index:50; box-shadow:0 2px 6px rgba(0,0,0,.15); }
+  .app-header h1 { font-size:17px; margin:0; font-weight:800; letter-spacing:.3px; }
+  .app-header .sub { font-size:11px; opacity:.7; }
+  .spacer { flex:1; }
+  .btn { border:none; border-radius:8px; padding:8px 13px; font-family:inherit; font-weight:700; font-size:13px; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
+  .btn:disabled { opacity:.5; cursor:not-allowed; }
+  .btn-save { background:#16a34a; color:#fff; }
+  .btn-save.dirty { background:#dc2626; color:#fff; animation:pulse 1.6s infinite; }
+  @keyframes pulse { 0%,100%{ box-shadow:0 0 0 0 rgba(220,38,38,.5);} 50%{ box-shadow:0 0 0 6px rgba(220,38,38,0);} }
+  .btn-ghost { background:rgba(255,255,255,.14); color:#fff; }
+  .btn-ghost:hover { background:rgba(255,255,255,.24); }
+  .btn-blue { background:#2563eb; color:#fff; }
+  .btn-red { background:#dc2626; color:#fff; }
+  .btn-gray { background:#e5e7eb; color:#374151; }
+  .yearbar { display:flex; align-items:center; gap:8px; background:rgba(255,255,255,.12); border-radius:8px; padding:3px 6px; }
+  .yearbar button { background:none; border:none; color:#fff; font-size:16px; cursor:pointer; padding:2px 8px; border-radius:6px; }
+  .yearbar button:hover { background:rgba(255,255,255,.2); }
+  .yearbar .yr { font-weight:800; font-size:15px; min-width:52px; text-align:center; }
+  .tabs { display:flex; gap:4px; flex-wrap:wrap; padding:10px 16px 0; align-items:center; }
+  .tab { padding:7px 13px; border-radius:9px 9px 0 0; background:#d5dee6; color:#374151; font-weight:700; font-size:13px; cursor:pointer; }
+  .tab.active { background:#fff; color:#0f2740; box-shadow:0 -2px 4px rgba(0,0,0,.05); }
+  .tab.filled::after { content:'•'; color:#16a34a; margin-left:5px; }
+  .tab.rep { background:#0f2740; color:#fff; }
+  .tab.rep.active { background:#fff; color:#0f2740; }
+  .content { padding:16px; }
+  .toolbar { display:flex; gap:8px; align-items:center; margin-bottom:14px; flex-wrap:wrap; }
+  .emp-card { background:#fff; border-radius:12px; margin-bottom:18px; box-shadow:0 1px 4px rgba(0,0,0,.08); overflow:hidden; }
+  .emp-head { padding:9px 14px; display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+  .emp-head .nome { font-size:19px; font-weight:800; letter-spacing:.4px; }
+  .emp-head .pill { background:rgba(255,255,255,.6); border-radius:20px; padding:3px 11px; font-size:12px; font-weight:700; }
+  .emp-head .edit-mini { background:rgba(0,0,0,.16); color:#fff; border:none; border-radius:6px; width:26px; height:26px; cursor:pointer; font-size:13px; }
+  .grid-wrap { overflow-x:auto; padding:10px 12px 4px; }
+  table.cal { border-collapse:collapse; font-size:12px; }
+  table.cal td { border:1px solid #e2e8f0; text-align:center; }
+  td.wd { font-size:10px; color:#64748b; padding:2px 0; width:46px; }
+  td.wd.we { color:#c026d3; font-weight:700; }
+  td.wd.hol { color:#dc2626; font-weight:800; }
+  td.dn { font-size:11px; color:#334155; font-weight:700; padding:1px 0; background:#f8fafc; }
+  td.dn.we { background:#fdf4ff; color:#c026d3; }
+  td.dn.hol { background:#fee2e2; color:#dc2626; }
+  td.tot-h { font-size:10px; font-weight:800; color:#0f2740; background:#e2e8f0; padding:2px 6px; }
+  .cell-in { width:46px; height:30px; border:2px solid #f59e0b; background:#fffde7; text-align:center; font-family:inherit; font-weight:700; font-size:12px; padding:0 1px; border-radius:4px; }
+  .cell-in:focus { outline:2px solid #2563eb; outline-offset:-1px; }
+  td.tot-v { font-weight:800; font-size:14px; color:#0f2740; background:#eef2ff; padding:0 8px; min-width:54px; }
+  .minute-line { font-size:11px; color:#7c3aed; padding:2px 14px 0; min-height:16px; font-weight:600; }
+  .nota-line { padding:6px 14px 12px; display:flex; align-items:center; gap:8px; }
+  .nota-line label { font-size:11px; color:#64748b; font-weight:700; white-space:nowrap; }
+  .nota-in { flex:1; border:2px solid #f59e0b; background:#fffde7; border-radius:6px; padding:5px 8px; font-family:inherit; font-size:12px; }
+  .legend, .rep-box { background:#fff; border-radius:12px; padding:12px 16px; box-shadow:0 1px 4px rgba(0,0,0,.08); margin-bottom:16px; }
+  .legend h3, .rep-box h3 { margin:0 0 8px; font-size:14px; color:#0f2740; }
+  .legend-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:5px; }
+  .legend-item { display:flex; align-items:center; gap:7px; font-size:11px; }
+  .legend-code { min-width:56px; text-align:center; border-radius:4px; padding:2px 4px; font-weight:800; font-size:11px; }
+  table.rep { border-collapse:collapse; width:100%; font-size:12px; }
+  table.rep th, table.rep td { border:1px solid #e2e8f0; padding:5px 8px; text-align:center; }
+  table.rep th { background:#0f2740; color:#fff; font-size:11px; }
+  table.rep td.name { text-align:left; font-weight:700; white-space:nowrap; }
+  table.rep tr:nth-child(even) td { background:#f8fafc; }
+  table.rep td.tot { font-weight:800; background:#eef2ff; }
+  .rep-scroll { overflow-x:auto; }
+  .flag-red { color:#dc2626; font-weight:800; }
+  .flag-amber { color:#b45309; font-weight:800; }
+  .overlay { position:fixed; inset:0; background:rgba(15,39,64,.55); display:flex; align-items:center; justify-content:center; z-index:100; padding:16px; }
+  .modal { background:#fff; border-radius:14px; padding:22px; width:100%; max-width:440px; box-shadow:0 10px 40px rgba(0,0,0,.3); }
+  .modal h2 { margin:0 0 14px; font-size:17px; color:#0f2740; }
+  .field { margin-bottom:12px; }
+  .field label { display:block; font-size:12px; font-weight:700; color:#374151; margin-bottom:4px; }
+  .field input, .field select { width:100%; border:2px solid #f59e0b; background:#fffde7; border-radius:8px; padding:8px 10px; font-family:inherit; font-size:14px; }
+  .color-row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .swatch { width:28px; height:28px; border-radius:50%; cursor:pointer; border:3px solid transparent; }
+  .swatch.sel { border-color:#0f2740; }
+  .modal-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:18px; }
+  .login-box { max-width:400px; margin:8vh auto; background:#fff; border-radius:16px; padding:30px; box-shadow:0 8px 30px rgba(0,0,0,.15); text-align:center; }
+  .login-box .logo { font-size:22px; font-weight:800; color:#0f2740; }
+  .login-box .tag { font-size:12px; color:#64748b; margin-bottom:20px; }
+  .pin-in { letter-spacing:8px; text-align:center; font-size:22px !important; }
+  .banner { background:#fef3c7; color:#92400e; font-size:12px; padding:6px 16px; text-align:center; font-weight:700; }
+  .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:#0f2740; color:#fff; padding:11px 20px; border-radius:10px; font-size:13px; font-weight:700; z-index:200; box-shadow:0 6px 20px rgba(0,0,0,.3); }
+  .hidden-file { display:none; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef, useMemo } = React;
+
+/* =========================================================================
+   CONFIGURAZIONE FIREBASE  ← INCOLLA QUI la config del progetto per attivare
+   la sincronizzazione cloud + login email/password. Finché projectId è vuoto
+   l'app funziona in MODALITÀ LOCALE (localStorage) con accesso via PIN.
+   ========================================================================= */
+const firebaseConfig = {
+  apiKey: "AIzaSyA-xbQcfzd6YwMT8y-YV7WDBCw-iwFH__k",
+  authDomain: "spazio-ireos-foglio-ore.firebaseapp.com",
+  projectId: "spazio-ireos-foglio-ore",
+  storageBucket: "spazio-ireos-foglio-ore.firebasestorage.app",
+  messagingSenderId: "230937360062",
+  appId: "1:230937360062:web:5b10aa7246904ad13dd0ef"
+};
+const FB_COLLECTION = "report-ore-mensile";
+const FB_READY = firebaseConfig.projectId && firebaseConfig.apiKey;
+
+/* ELENCO ADMIN — solo queste email possono entrare nel Report.
+   (Il progetto Firebase è condiviso col Foglio Ore, che fa entrare tutti;
+   qui restringiamo l'accesso alla sola amministrazione.) */
+const ADMIN_EMAILS = ["spazioireos@gmail.com"];
+function isAdminEmail(email){
+  if (!email) return false;
+  const e = String(email).trim().toLowerCase();
+  for (let i = 0; i < ADMIN_EMAILS.length; i++){ if (ADMIN_EMAILS[i].toLowerCase() === e) return true; }
+  return false;
+}
+
+/* ============================ COSTANTI ================================== */
+const LS_KEY = "spazioireos_reportore_v1";     // dati (compat con ver1)
+const LS_PIN = "spazioireos_reportore_pin";    // PIN locale (separato dai dati)
+const APP_VER = "ver2";
+const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
+const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
+const MESE_ABBR_FILE = ["gen","feb","mar","apr","mag","giu","lug","ago","set","ott","nov","dic"];
+const WD = ["dom","lun","mar","mer","gio","ven","sab"];
+
+const CAT = {
+  lavoro:  { bg:"#ffffff", fg:"#1f2937" },
+  riposo:  { bg:"#f1f5f9", fg:"#64748b" },
+  ferie:   { bg:"#dbeafe", fg:"#1e40af" },
+  festivo: { bg:"#fef9c3", fg:"#854d0e" },
+  permesso:{ bg:"#e0e7ff", fg:"#3730a3" },
+  malattia:{ bg:"#fee2e2", fg:"#991b1b" },
+  maternita:{ bg:"#fce7f3", fg:"#9d174b" },
+  nonpag:  { bg:"#e5e7eb", fg:"#374151" }
+};
+// pay: true = assenza/voce retribuita ; false = non retribuita
+const CODICI = [
+  { c:"--",     l:"Domenica / riposo settimanale",     cat:"riposo",    pay:true },
+  { c:"AN",     l:"Giorno non lavorativo (part-time)",  cat:"riposo",    pay:true },
+  { c:"FERIE",  l:"Ferie",                              cat:"ferie",     pay:true },
+  { c:"FEST",   l:"Festività goduta",                   cat:"festivo",   pay:true },
+  { c:"FESTNG", l:"Festività non goduta",               cat:"festivo",   pay:true },
+  { c:"EXF",    l:"Permesso ex festività",              cat:"permesso",  pay:true },
+  { c:"FLEX",   l:"Uso flessibilità accantonata",       cat:"permesso",  pay:true },
+  { c:"LUTTO",  l:"Lutto / permesso lutto",             cat:"permesso",  pay:true },
+  { c:"ELEZ",   l:"Elezioni / permesso elettorale",     cat:"permesso",  pay:true },
+  { c:"ESAMI",  l:"Esame univ. / permesso esame",       cat:"permesso",  pay:true },
+  { c:"SIND",   l:"Permesso sindacale",                 cat:"permesso",  pay:true },
+  { c:"MATR",   l:"Licenza matrimoniale",               cat:"permesso",  pay:true },
+  { c:"CONGP",  l:"Congedo parentale",                  cat:"permesso",  pay:true },
+  { c:"MAL",    l:"Malattia",                           cat:"malattia",  pay:true },
+  { c:"MAL 0h", l:"Malattia non pagata",                cat:"malattia",  pay:false },
+  { c:"MALFG",  l:"Malattia figlio",                    cat:"malattia",  pay:true },
+  { c:"INFOR",  l:"Infortunio",                         cat:"malattia",  pay:true },
+  { c:"RICOV",  l:"Ricovero",                           cat:"malattia",  pay:true },
+  { c:"MAT-OBB",l:"Maternità obbligatoria",             cat:"maternita", pay:true },
+  { c:"MAT-FC", l:"Maternità facoltativa",              cat:"maternita", pay:true },
+  { c:"MAT-ANT",l:"Maternità anticipata",               cat:"maternita", pay:true },
+  { c:"ASP 0h", l:"Aspettativa non pagata",             cat:"nonpag",    pay:false },
+  { c:"CASSA",  l:"Cassa integrazione o simili",        cat:"nonpag",    pay:false }
+];
+const CODE_SET = {};
+CODICI.forEach(function(x){ CODE_SET[x.c] = x; });
+
+const PALETTE = ["#00B0F0","#7EC8A0","#F6C453","#EE8C6A","#B7A4D6","#9AD0C2","#F49AC2","#8FB9E0","#C3B091","#9CA3AF"];
+
+const DIP_INIZIALI = [
+  { nome:"BOCCALARI ELEONORA",        oreSett:18, contratto:"FINO AL 30/06/26", colore:"#00B0F0" },
+  { nome:"CHIODI MANUELA",            oreSett:12, contratto:"INDETERMINATO",    colore:"#7EC8A0" },
+  { nome:"DEL MASTRO MARIA",          oreSett:17, contratto:"INDETERMINATO",    colore:"#F6C453" },
+  { nome:"DE MAIO BARBARA",           oreSett:29, contratto:"FINO AL 31/12/26", colore:"#EE8C6A" },
+  { nome:"DI LECCE IVANA",            oreSett:38, contratto:"INDETERMINATO",    colore:"#B7A4D6" },
+  { nome:"FERRARI FEDERICA",          oreSett:19, contratto:"INDETERMINATO",    colore:"#9AD0C2" },
+  { nome:"FISICHELLA GIUSEPPE",       oreSett:15, contratto:"FINO AL 31/12/26", colore:"#F49AC2" },
+  { nome:"FRUTAZ RACHELE",            oreSett:19, contratto:"INDETERMINATO",    colore:"#8FB9E0" },
+  { nome:"GIUNCHIGLIA BENEDETTA",     oreSett:18, contratto:"FINO AL 07/08/26", colore:"#C3B091" },
+  { nome:"PANSERA ANTONIA ALFONSINA", oreSett:15, contratto:"FINO AL 31/12/26", colore:"#00B0F0" }
+];
+
+/* ============================ HELPER =================================== */
+function uid(){ return "d" + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function pad2(x){ return (x<10?"0":"") + x; }
+function monthKey(y, m){ return y + "-" + pad2(m); }         // m = 1..12
+function daysInMonth(y, m){ return new Date(y, m, 0).getDate(); }
+function weekdayOf(y, m, d){ return new Date(y, m - 1, d).getDay(); }
+
+function grp(num, dec){
+  const d = (dec === undefined) ? 2 : dec;
+  let n = Number(num);
+  if (isNaN(n)) n = 0;
+  const neg = n < 0;
+  n = Math.abs(n);
+  let s = n.toFixed(d);
+  let intPart = s, decPart = "";
+  if (d > 0){ const parts = s.split("."); intPart = parts[0]; decPart = parts[1]; }
+  let out = "";
+  for (let i = 0; i < intPart.length; i++){
+    if (i > 0 && (intPart.length - i) % 3 === 0) out += ".";
+    out += intPart[i];
+  }
+  if (d > 0 && decPart !== "00"){
+    let dp = decPart.replace(/0+$/, "");
+    if (dp !== "") out += "," + dp;
+  }
+  return (neg ? "-" : "") + out;
+}
+function parseHour(v){
+  if (v === null || v === undefined) return 0;
+  const s = String(v).trim();
+  if (s === "") return 0;
+  if (CODE_SET[s]) return 0;
+  const n = parseFloat(s.replace(",", "."));
+  return isNaN(n) ? 0 : n;
+}
+function decToHM(v){
+  const s = String(v === null || v === undefined ? "" : v).trim();
+  if (s === "" || CODE_SET[s]) return "";
+  const n = parseFloat(s.replace(",", "."));
+  if (isNaN(n)) return "";
+  const h = Math.floor(n);
+  const min = Math.round((n - h) * 60);
+  if (min === 0) return "";
+  return h + " h e " + min + " min";
+}
+// Pasqua (algoritmo di Meeus/Gauss) -> {m, d}
+function pasqua(anno){
+  const a = anno % 19, b = Math.floor(anno / 100), c = anno % 100;
+  const dd = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3), h = (19 * a + b - dd - g + 15) % 30;
+  const i = Math.floor(c / 4), k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const mese = Math.floor((h + l - 7 * m + 114) / 31);
+  const giorno = ((h + l - 7 * m + 114) % 31) + 1;
+  return { m: mese, d: giorno };
+}
+// insieme festività nazionali IT per l'anno -> { "m-d": true }
+function festivitaSet(anno){
+  const s = {};
+  const fissi = [[1,1],[1,6],[4,25],[5,1],[6,2],[8,15],[10,4],[11,1],[12,8],[12,25],[12,26]];
+  fissi.forEach(function(f){ s[f[0] + "-" + f[1]] = true; });
+  const pa = pasqua(anno);
+  s[pa.m + "-" + pa.d] = true; // Pasqua
+  const pd = new Date(anno, pa.m - 1, pa.d); pd.setDate(pd.getDate() + 1); // Lunedì dell'Angelo
+  s[(pd.getMonth() + 1) + "-" + pd.getDate()] = true;
+  return s;
+}
+function isFestivo(fset, m, d){ return fset[m + "-" + d] === true; }
+
+// hash leggero per PIN (gate locale, non crittografico)
+function hashPin(p){
+  let h = 5381;
+  for (let i = 0; i < p.length; i++){ h = ((h << 5) + h) + p.charCodeAt(i); h = h & 0xffffffff; }
+  return String(h >>> 0);
+}
+
+function emptyState(){
+  const dip = DIP_INIZIALI.map(function(x){
+    return { id:uid(), nome:x.nome, oreSett:x.oreSett, contratto:x.contratto, colore:x.colore };
+  });
+  return { version:2, dipendenti:dip, dati:{}, anni:[2026], updatedAt:new Date().toISOString() };
+}
+
+// migrazione ver1 (chiavi tipo "GEN26") -> ver2 (chiavi "2026-01")
+function migrate(obj){
+  if (!obj) return obj;
+  if (!obj.anni) obj.anni = [];
+  const oldRe = /^([A-Z]{3})(\d{2})$/;
+  const map = {};
+  MONTH_ABBR.forEach(function(a, i){ map[a] = i + 1; });
+  const nuovoDati = {};
+  const anniSet = {};
+  Object.keys(obj.dati || {}).forEach(function(k){
+    const mm = k.match(oldRe);
+    if (mm){
+      const mese = map[mm[1]];
+      const anno = 2000 + parseInt(mm[2], 10);
+      nuovoDati[monthKey(anno, mese)] = obj.dati[k];
+      anniSet[anno] = true;
+    } else {
+      nuovoDati[k] = obj.dati[k];
+      const p = k.split("-");
+      if (p.length === 2) anniSet[parseInt(p[0], 10)] = true;
+    }
+  });
+  obj.dati = nuovoDati;
+  Object.keys(anniSet).forEach(function(y){ if (obj.anni.indexOf(parseInt(y,10)) === -1) obj.anni.push(parseInt(y,10)); });
+  if (obj.anni.length === 0) obj.anni = [2026];
+  obj.anni.sort(function(a,b){ return a-b; });
+  // dipendenti: assicura colore
+  (obj.dipendenti || []).forEach(function(dp, idx){ if (!dp.colore) dp.colore = PALETTE[idx % PALETTE.length]; });
+  obj.version = 2;
+  return obj;
+}
+
+function loadLocal(){
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return null;
+    const obj = JSON.parse(raw);
+    if (!obj || !obj.dipendenti) return null;
+    return migrate(obj);
+  } catch (e) { console.error("loadLocal", e); return null; }
+}
+function saveLocal(state){
+  try { localStorage.setItem(LS_KEY, JSON.stringify(state)); return true; }
+  catch (e) { console.error("saveLocal", e); return false; }
+}
+function getRecFrom(state, y, m, dipId){
+  const mp = state.dati[monthKey(y, m)] || {};
+  return mp[dipId] || { giorni:{}, nota:"" };
+}
+function totOfRec(rec, y, m){
+  let t = 0;
+  const nd = daysInMonth(y, m);
+  for (let d = 1; d <= nd; d++) t += parseHour(rec.giorni[d]);
+  return Math.round(t * 100) / 100;
+}
+
+/* ============================ EXPORT EXCEL (anno) ====================== */
+function fileName(ext){
+  const now = new Date();
+  return "Spazio Ireos Report Ore mensile - " + pad2(now.getDate()) + MESE_ABBR_FILE[now.getMonth()] +
+    String(now.getFullYear()).slice(2) + " - " + APP_VER + " - " + pad2(now.getHours()) + "." + pad2(now.getMinutes()) + "." + ext;
+}
+function esportaExcel(state, anno){
+  const wb = XLSX.utils.book_new();
+  wb.Props = { Title:"Report Ore mensile " + anno, Author:"Christian Canonica",
+    Company:"Spazio Ireos Società Cooperativa Sociale", CreatedDate:new Date() };
+  const styH = { font:{ name:"Nunito", bold:true, sz:16, color:{rgb:"FF08344A"} },
+    fill:{ patternType:"solid", fgColor:{rgb:"FF00B0F0"} }, alignment:{ horizontal:"left", vertical:"center" } };
+  const styLbl = { font:{ name:"Nunito", bold:true, sz:10 } };
+  const styWD = { font:{ name:"Nunito", sz:9, color:{rgb:"FF64748B"} }, alignment:{horizontal:"center"} };
+  const styDN = { font:{ name:"Nunito", bold:true, sz:9 }, alignment:{horizontal:"center"}, fill:{ patternType:"solid", fgColor:{rgb:"FFF1F5F9"} } };
+  const styHour = { font:{ name:"Nunito", bold:true, sz:12 }, alignment:{horizontal:"center"},
+    border:{ top:{style:"thin",color:{rgb:"FFE2E8F0"}}, bottom:{style:"thin",color:{rgb:"FFE2E8F0"}}, left:{style:"thin",color:{rgb:"FFE2E8F0"}}, right:{style:"thin",color:{rgb:"FFE2E8F0"}} } };
+  const styTot = { font:{ name:"Nunito", bold:true, sz:13, color:{rgb:"FF0F2740"} }, alignment:{horizontal:"center"}, fill:{ patternType:"solid", fgColor:{rgb:"FFEEF2FF"} } };
+  const styNote = { font:{ name:"Nunito", italic:true, sz:10, color:{rgb:"FF7C3AED"} } };
+
+  for (let m = 1; m <= 12; m++){
+    const nd = daysInMonth(anno, m);
+    const rows = []; const merges = []; const styleMap = {};
+    let r = 0;
+    const put = function(rr, cc, val, st){
+      while (rows.length <= rr) rows.push([]);
+      const row = rows[rr];
+      while (row.length <= cc) row.push(null);
+      row[cc] = val;
+      if (st) styleMap[rr + "_" + cc] = st;
+    };
+    state.dipendenti.forEach(function(dp){
+      const rec = getRecFrom(state, anno, m, dp.id);
+      const base = r;
+      put(base, 0, dp.nome, styH);
+      put(base, 10, "ORE SETT", styLbl);
+      put(base, 11, dp.oreSett, styLbl);
+      put(base, 28, dp.contratto, styLbl);
+      merges.push({ s:{r:base,c:0}, e:{r:base,c:8} });
+      const rWD = base + 2, rDN = base + 3, rH = base + 4;
+      let tot = 0;
+      for (let d = 1; d <= nd; d++){
+        const cc = d - 1;
+        put(rWD, cc, WD[weekdayOf(anno, m, d)], styWD);
+        put(rDN, cc, d, styDN);
+        const val = (rec.giorni && rec.giorni[d] !== undefined) ? rec.giorni[d] : "";
+        const num = parseHour(val);
+        tot += num;
+        const cell = (val === "" ? null : (num !== 0 && !CODE_SET[String(val).trim()] ? num : val));
+        put(rH, cc, cell, styHour);
+      }
+      put(rDN, nd, "TOT", styDN);
+      put(rH, nd, Math.round(tot * 100) / 100, styTot);
+      if (rec.nota && rec.nota.trim() !== "") put(base + 5, 0, rec.nota, styNote);
+      r = base + 8;
+    });
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    Object.keys(styleMap).forEach(function(key){
+      const parts = key.split("_");
+      const ref = XLSX.utils.encode_cell({ r:parseInt(parts[0],10), c:parseInt(parts[1],10) });
+      if (ws[ref]) ws[ref].s = styleMap[key];
+    });
+    ws["!merges"] = merges;
+    const cols = [{wch:16}];
+    for (let i=1;i<=nd;i++) cols.push({wch:5});
+    ws["!cols"] = cols;
+    XLSX.utils.book_append_sheet(wb, ws, MONTH_ABBR[m-1] + String(anno).slice(2));
+  }
+  XLSX.writeFile(wb, fileName("xlsx"));
+}
+
+/* ============================ IMPORT EXCEL ============================= */
+function importaExcel(file, state, onDone){
+  const reader = new FileReader();
+  reader.onload = function(ev){
+    try {
+      const data = new Uint8Array(ev.target.result);
+      const wb = XLSX.read(data, { type:"array", cellDates:true });
+      const next = JSON.parse(JSON.stringify(state));
+      const byName = {};
+      next.dipendenti.forEach(function(d){ byName[d.nome.trim().toUpperCase()] = d.id; });
+      const sheetRe = /^([A-Z]{3})(\d{2})$/;
+      const mAbbr = {}; MONTH_ABBR.forEach(function(a,i){ mAbbr[a] = i + 1; });
+      wb.SheetNames.forEach(function(sn){
+        const mm = sn.trim().toUpperCase().match(sheetRe);
+        if (!mm || mAbbr[mm[1]] === undefined) return;
+        const mese = mAbbr[mm[1]];
+        const anno = 2000 + parseInt(mm[2], 10);
+        if (next.anni.indexOf(anno) === -1) next.anni.push(anno);
+        const ws = wb.Sheets[sn];
+        const aoa = XLSX.utils.sheet_to_json(ws, { header:1, raw:true });
+        for (let i = 0; i < aoa.length; i++){
+          const row = aoa[i] || [];
+          const nome = row[0];
+          if (typeof nome === "string" && String(row[10]).trim() === "ORE SETT"){
+            const key = nome.trim().toUpperCase();
+            let id = byName[key];
+            if (!id){
+              id = uid();
+              next.dipendenti.push({ id:id, nome:key, oreSett:Number(row[11])||0,
+                contratto: row[28] ? String(row[28]) : "", colore: PALETTE[next.dipendenti.length % PALETTE.length] });
+              byName[key] = id;
+            }
+            const hoursRow = aoa[i+4] || [];
+            const nd = daysInMonth(anno, mese);
+            const giorni = {};
+            for (let d = 1; d <= nd; d++){
+              const cell = hoursRow[d-1];
+              if (cell === undefined || cell === null || cell === "") continue;
+              giorni[d] = (typeof cell === "number") ? cell : String(cell).trim();
+            }
+            const notaRow = aoa[i+5] || [];
+            let nota = "";
+            const nv = notaRow[0];
+            if (typeof nv === "string" && nv.trim() !== "" && nv.indexOf("min") === -1) nota = nv.trim();
+            const mk = monthKey(anno, mese);
+            if (!next.dati[mk]) next.dati[mk] = {};
+            next.dati[mk][id] = { giorni:giorni, nota:nota };
+          }
+        }
+      });
+      next.anni.sort(function(a,b){ return a-b; });
+      next.updatedAt = new Date().toISOString();
+      onDone(next, null);
+    } catch (e) { console.error("importaExcel", e); onDone(null, "File non leggibile o formato non riconosciuto."); }
+  };
+  reader.onerror = function(){ onDone(null, "Errore di lettura del file."); };
+  reader.readAsArrayBuffer(file);
+}
+
+/* ============================ COMPONENTI ============================== */
+function Toast(props){
+  useEffect(function(){ const t = setTimeout(props.onDone, 2600); return function(){ clearTimeout(t); }; }, []);
+  return <div className="toast">{props.msg}</div>;
+}
+
+function EmployeeCard(props){
+  const dp = props.dp, rec = props.rec, y = props.anno, m = props.mese, fset = props.fset;
+  const nd = daysInMonth(y, m);
+  const days = []; for (let d = 1; d <= nd; d++) days.push(d);
+  const tot = useMemo(function(){ return totOfRec(rec, y, m); }, [rec, y, m]);
+  const catStyle = function(val){
+    const s = String(val === undefined ? "" : val).trim();
+    if (s === "") return { background:"#fffde7" };
+    if (CODE_SET[s]){ const cc = CAT[CODE_SET[s].cat]; return { background:cc.bg, color:cc.fg }; }
+    return { background:"#fffde7" };
+  };
+  const cellTitle = function(val){
+    const s = String(val === undefined ? "" : val).trim();
+    if (CODE_SET[s]) return CODE_SET[s].l;
+    if (s !== "" && !isNaN(parseFloat(s.replace(",",".")))) { const hm = decToHM(s); return hm !== "" ? hm : (s + " ore"); }
+    return "";
+  };
+  return (
+    <div className="emp-card">
+      <div className="emp-head" style={{ background: dp.colore || "#00B0F0" }}>
+        <span className="nome" style={{ color:"#08344a" }}>{dp.nome}</span>
+        <span className="pill">ORE SETT: {dp.oreSett}</span>
+        <span className="pill">{dp.contratto || "—"}</span>
+        <div className="spacer"></div>
+        <button className="edit-mini" title="Modifica anagrafica" onClick={function(){ props.onEditDip(dp); }}>✎</button>
+        <button className="edit-mini" title="Elimina dipendente" onClick={function(){ props.onDelDip(dp); }}>🗑</button>
+      </div>
+      <div className="grid-wrap">
+        <table className="cal"><tbody>
+          <tr>
+            {days.map(function(d){
+              const wd = weekdayOf(y, m, d);
+              const hol = isFestivo(fset, m, d);
+              const cls = "wd" + (hol ? " hol" : (wd === 0 ? " we" : ""));
+              return <td key={"w"+d} className={cls}>{WD[wd]}</td>;
+            })}
+            <td className="tot-h"></td>
+          </tr>
+          <tr>
+            {days.map(function(d){
+              const wd = weekdayOf(y, m, d);
+              const hol = isFestivo(fset, m, d);
+              const cls = "dn" + (hol ? " hol" : (wd === 0 ? " we" : ""));
+              return <td key={"d"+d} className={cls} title={hol ? "Festività nazionale" : ""}>{d}</td>;
+            })}
+            <td className="tot-h">TOT</td>
+          </tr>
+          <tr>
+            {days.map(function(d){
+              const val = rec.giorni[d] === undefined ? "" : rec.giorni[d];
+              return (
+                <td key={"c"+d} style={{ padding:"1px" }}>
+                  <input className="cell-in" style={catStyle(val)} list="codici-list" title={cellTitle(val)}
+                    value={val} onChange={function(e){ props.onCell(dp.id, d, e.target.value); }} />
+                </td>
+              );
+            })}
+            <td className="tot-v">{grp(tot)}</td>
+          </tr>
+        </tbody></table>
+      </div>
+      <div className="minute-line">
+        {days.map(function(d){ return decToHM(rec.giorni[d]); }).filter(function(x){ return x !== ""; }).join("  ·  ")}
+      </div>
+      <div className="nota-line">
+        <label>Nota mese:</label>
+        <input className="nota-in" value={rec.nota || ""} placeholder="(nessuna nota)"
+          onChange={function(e){ props.onNota(dp.id, e.target.value); }} />
+      </div>
+    </div>
+  );
+}
+
+function DipModal(props){
+  const editing = props.dip;
+  const [nome, setNome] = useState(editing ? editing.nome : "");
+  const [ore, setOre] = useState(editing ? editing.oreSett : "");
+  const [contr, setContr] = useState(editing ? editing.contratto : "INDETERMINATO");
+  const [colore, setColore] = useState(editing ? (editing.colore || PALETTE[0]) : PALETTE[0]);
+  const save = function(){
+    const n = nome.trim().toUpperCase();
+    if (n === "") return;
+    props.onSave({ id: editing ? editing.id : uid(), nome:n, oreSett: Number(ore)||0, contratto: contr.trim(), colore:colore });
+  };
+  return (
+    <div className="overlay" onClick={props.onClose}>
+      <div className="modal" onClick={function(e){ e.stopPropagation(); }}>
+        <h2>{editing ? "Modifica dipendente" : "Nuovo dipendente"}</h2>
+        <div className="field"><label>Nome (STAMPATELLO)</label>
+          <input value={nome} onChange={function(e){ setNome(e.target.value.toUpperCase()); }} placeholder="COGNOME NOME" /></div>
+        <div className="field"><label>Ore settimanali</label>
+          <input type="number" step="0.5" value={ore} onChange={function(e){ setOre(e.target.value); }} /></div>
+        <div className="field"><label>Contratto</label>
+          <input value={contr} onChange={function(e){ setContr(e.target.value); }} placeholder="INDETERMINATO oppure FINO AL gg/mm/aa" /></div>
+        <div className="field"><label>Colore scheda</label>
+          <div className="color-row">
+            {PALETTE.map(function(cx){
+              return <div key={cx} className={"swatch" + (cx === colore ? " sel" : "")} style={{ background:cx }}
+                onClick={function(){ setColore(cx); }}></div>;
+            })}
+            <input type="color" value={colore} onChange={function(e){ setColore(e.target.value); }}
+              style={{ width:"40px", height:"34px", padding:"0", border:"none", background:"none", cursor:"pointer" }} />
+          </div>
+        </div>
+        <div className="modal-actions">
+          <button className="btn btn-gray" onClick={props.onClose}>Annulla</button>
+          <button className="btn btn-blue" onClick={save}>Salva</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ConfirmModal(props){
+  return (
+    <div className="overlay" onClick={props.onClose}>
+      <div className="modal" onClick={function(e){ e.stopPropagation(); }}>
+        <h2>{props.title}</h2>
+        <p style={{ fontSize:"14px", color:"#374151" }}>{props.body}</p>
+        <div className="modal-actions">
+          <button className="btn btn-gray" onClick={props.onClose}>Annulla</button>
+          <button className="btn btn-red" onClick={props.onConfirm}>{props.confirmLabel || "Elimina"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================ RIEPILOGHI ============================== */
+function Riepiloghi(props){
+  const state = props.state;
+  const [anno, setAnno] = useState(props.anno);
+  const [scope, setScope] = useState("anno"); // "anno" o numero mese
+
+  const scopeMonths = scope === "anno" ? [1,2,3,4,5,6,7,8,9,10,11,12] : [parseInt(scope,10)];
+
+  // A) riepilogo TOT per mese
+  const tabAnnuo = state.dipendenti.map(function(dp){
+    const perMese = [];
+    let totAnno = 0;
+    for (let m = 1; m <= 12; m++){
+      const t = totOfRec(getRecFrom(state, anno, m, dp.id), anno, m);
+      perMese.push(t); totAnno += t;
+    }
+    return { dp:dp, perMese:perMese, tot:Math.round(totAnno*100)/100 };
+  });
+
+  // B) ore vs teoriche (anno)
+  const tabTeor = state.dipendenti.map(function(dp){
+    let lav = 0, teor = 0;
+    scopeMonths.forEach(function(m){
+      lav += totOfRec(getRecFrom(state, anno, m, dp.id), anno, m);
+      teor += dp.oreSett * daysInMonth(anno, m) / 7;
+    });
+    lav = Math.round(lav*100)/100; teor = Math.round(teor*100)/100;
+    return { dp:dp, lav:lav, teor:teor, scost:Math.round((lav-teor)*100)/100 };
+  });
+
+  // C) assenze per codice (giorni)
+  const codiciUsati = {};
+  state.dipendenti.forEach(function(dp){
+    scopeMonths.forEach(function(m){
+      const rec = getRecFrom(state, anno, m, dp.id);
+      Object.keys(rec.giorni).forEach(function(d){
+        const v = String(rec.giorni[d]).trim();
+        if (CODE_SET[v] && v !== "--" && v !== "AN") codiciUsati[v] = true;
+      });
+    });
+  });
+  const codeCols = CODICI.filter(function(c){ return codiciUsati[c.c]; }).map(function(c){ return c.c; });
+  const tabAssenze = state.dipendenti.map(function(dp){
+    const counts = {}; codeCols.forEach(function(c){ counts[c] = 0; });
+    scopeMonths.forEach(function(m){
+      const rec = getRecFrom(state, anno, m, dp.id);
+      Object.keys(rec.giorni).forEach(function(d){
+        const v = String(rec.giorni[d]).trim();
+        if (counts[v] !== undefined) counts[v] += 1;
+      });
+    });
+    return { dp:dp, counts:counts };
+  });
+
+  // D) retribuite vs non retribuite (giorni)
+  const tabPay = state.dipendenti.map(function(dp){
+    let ret = 0, non = 0;
+    scopeMonths.forEach(function(m){
+      const rec = getRecFrom(state, anno, m, dp.id);
+      Object.keys(rec.giorni).forEach(function(d){
+        const v = String(rec.giorni[d]).trim();
+        if (CODE_SET[v] && v !== "--" && v !== "AN"){ if (CODE_SET[v].pay) ret += 1; else non += 1; }
+      });
+    });
+    return { dp:dp, ret:ret, non:non };
+  });
+
+  // E) contratti in scadenza
+  const oggi = new Date();
+  const tabScad = [];
+  state.dipendenti.forEach(function(dp){
+    const mm = String(dp.contratto || "").match(/(\d{2})\/(\d{2})\/(\d{2})/);
+    if (mm){
+      const dt = new Date(2000 + parseInt(mm[3],10), parseInt(mm[2],10) - 1, parseInt(mm[1],10));
+      const gg = Math.round((dt - oggi) / 86400000);
+      tabScad.push({ dp:dp, data:mm[0], gg:gg });
+    }
+  });
+  tabScad.sort(function(a,b){ return a.gg - b.gg; });
+
+  // F) note del periodo
+  const tabNote = [];
+  state.dipendenti.forEach(function(dp){
+    scopeMonths.forEach(function(m){
+      const rec = getRecFrom(state, anno, m, dp.id);
+      if (rec.nota && rec.nota.trim() !== "") tabNote.push({ mese:MONTH_LABEL[m-1], dp:dp.nome, nota:rec.nota.trim() });
+    });
+  });
+
+  const esportaRiepiloghi = function(){
+    const wb = XLSX.utils.book_new();
+    wb.Props = { Title:"Riepiloghi " + anno, Author:"Christian Canonica", Company:"Spazio Ireos Società Cooperativa Sociale", CreatedDate:new Date() };
+    const hdr = { font:{ name:"Arial", bold:true, color:{rgb:"FFFFFFFF"} }, fill:{ patternType:"solid", fgColor:{rgb:"FF0F2740"} }, alignment:{horizontal:"center"} };
+    const mkSheet = function(name, aoa, styleFirstRow){
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+      if (styleFirstRow){
+        (aoa[0] || []).forEach(function(_, c){
+          const ref = XLSX.utils.encode_cell({ r:0, c:c });
+          if (ws[ref]) ws[ref].s = hdr;
+        });
+      }
+      XLSX.utils.book_append_sheet(wb, ws, name);
+    };
+    // Annuo
+    const aAnnuo = [["DIPENDENTE"].concat(MONTH_ABBR).concat(["TOT ANNO"])];
+    tabAnnuo.forEach(function(r){ aAnnuo.push([r.dp.nome].concat(r.perMese).concat([r.tot])); });
+    mkSheet("Annuo", aAnnuo, true);
+    // Teoriche
+    const aTeor = [["DIPENDENTE","ORE LAVORATE","ORE TEORICHE","SCOSTAMENTO"]];
+    tabTeor.forEach(function(r){ aTeor.push([r.dp.nome, r.lav, r.teor, r.scost]); });
+    mkSheet("Ore vs teoriche", aTeor, true);
+    // Assenze
+    const aAss = [["DIPENDENTE"].concat(codeCols)];
+    tabAssenze.forEach(function(r){ aAss.push([r.dp.nome].concat(codeCols.map(function(c){ return r.counts[c]; }))); });
+    mkSheet("Assenze per codice", aAss, true);
+    // Pay
+    const aPay = [["DIPENDENTE","GG RETRIBUITI","GG NON RETRIBUITI"]];
+    tabPay.forEach(function(r){ aPay.push([r.dp.nome, r.ret, r.non]); });
+    mkSheet("Retribuite vs non", aPay, true);
+    // Scadenze
+    const aScad = [["DIPENDENTE","SCADENZA","GG RESIDUI"]];
+    tabScad.forEach(function(r){ aScad.push([r.dp.nome, r.data, r.gg]); });
+    mkSheet("Contratti in scadenza", aScad, true);
+    // Note
+    const aNote = [["MESE","DIPENDENTE","NOTA"]];
+    tabNote.forEach(function(r){ aNote.push([r.mese, r.dp, r.nota]); });
+    mkSheet("Note", aNote, true);
+    XLSX.writeFile(wb, fileName("xlsx"));
+  };
+
+  return (
+    <div>
+      <div className="toolbar">
+        <strong style={{ fontSize:"15px", color:"#0f2740" }}>Riepiloghi</strong>
+        <label style={{ fontSize:"12px", fontWeight:"700", marginLeft:"10px" }}>Anno</label>
+        <select value={anno} onChange={function(e){ setAnno(parseInt(e.target.value,10)); }}
+          style={{ padding:"6px", borderRadius:"6px", border:"2px solid #f59e0b", background:"#fffde7" }}>
+          {state.anni.map(function(y){ return <option key={y} value={y}>{y}</option>; })}
+        </select>
+        <label style={{ fontSize:"12px", fontWeight:"700" }}>Ambito</label>
+        <select value={scope} onChange={function(e){ setScope(e.target.value); }}
+          style={{ padding:"6px", borderRadius:"6px", border:"2px solid #f59e0b", background:"#fffde7" }}>
+          <option value="anno">Tutto l'anno</option>
+          {MONTH_LABEL.map(function(lbl, i){ return <option key={i} value={String(i+1)}>{lbl}</option>; })}
+        </select>
+        <div className="spacer"></div>
+        <button className="btn btn-blue" onClick={esportaRiepiloghi}>📊 Esporta riepiloghi (Excel)</button>
+      </div>
+
+      <div className="rep-box">
+        <h3>Riepilogo annuo — ore lavorate per mese ({anno})</h3>
+        <div className="rep-scroll"><table className="rep"><thead><tr>
+          <th style={{textAlign:"left"}}>Dipendente</th>
+          {MONTH_ABBR.map(function(a){ return <th key={a}>{a}</th>; })}
+          <th>TOT</th>
+        </tr></thead><tbody>
+          {tabAnnuo.map(function(r){
+            return <tr key={r.dp.id}>
+              <td className="name">{r.dp.nome}</td>
+              {r.perMese.map(function(v, i){ return <td key={i}>{v === 0 ? "" : grp(v)}</td>; })}
+              <td className="tot">{grp(r.tot)}</td>
+            </tr>;
+          })}
+        </tbody></table></div>
+      </div>
+
+      <div className="rep-box">
+        <h3>Ore lavorate vs teoriche — {scope === "anno" ? "anno " + anno : MONTH_LABEL[parseInt(scope,10)-1] + " " + anno} <span style={{fontWeight:400, fontSize:"11px", color:"#64748b"}}>(teoriche = ORE SETT × giorni/7, approssimate)</span></h3>
+        <div className="rep-scroll"><table className="rep"><thead><tr>
+          <th style={{textAlign:"left"}}>Dipendente</th><th>Ore lavorate</th><th>Ore teoriche</th><th>Scostamento</th>
+        </tr></thead><tbody>
+          {tabTeor.map(function(r){
+            return <tr key={r.dp.id}>
+              <td className="name">{r.dp.nome}</td><td>{grp(r.lav)}</td><td>{grp(r.teor)}</td>
+              <td className={r.scost < 0 ? "flag-red" : ""}>{grp(r.scost)}</td>
+            </tr>;
+          })}
+        </tbody></table></div>
+      </div>
+
+      <div className="rep-box">
+        <h3>Assenze per codice (giorni) — {scope === "anno" ? "anno " + anno : MONTH_LABEL[parseInt(scope,10)-1] + " " + anno}</h3>
+        {codeCols.length === 0 ? <div style={{fontSize:"12px",color:"#64748b"}}>Nessuna assenza registrata nel periodo.</div> :
+        <div className="rep-scroll"><table className="rep"><thead><tr>
+          <th style={{textAlign:"left"}}>Dipendente</th>
+          {codeCols.map(function(c){ return <th key={c} title={CODE_SET[c].l}>{c}</th>; })}
+        </tr></thead><tbody>
+          {tabAssenze.map(function(r){
+            return <tr key={r.dp.id}><td className="name">{r.dp.nome}</td>
+              {codeCols.map(function(c){ return <td key={c}>{r.counts[c] === 0 ? "" : r.counts[c]}</td>; })}
+            </tr>;
+          })}
+        </tbody></table></div>}
+      </div>
+
+      <div className="rep-box">
+        <h3>Assenze retribuite vs non retribuite (giorni)</h3>
+        <div className="rep-scroll"><table className="rep"><thead><tr>
+          <th style={{textAlign:"left"}}>Dipendente</th><th>GG retribuiti</th><th>GG non retribuiti</th>
+        </tr></thead><tbody>
+          {tabPay.map(function(r){
+            return <tr key={r.dp.id}><td className="name">{r.dp.nome}</td><td>{r.ret===0?"":r.ret}</td>
+              <td className={r.non>0?"flag-amber":""}>{r.non===0?"":r.non}</td></tr>;
+          })}
+        </tbody></table></div>
+      </div>
+
+      <div className="rep-box">
+        <h3>Contratti a termine — scadenze</h3>
+        {tabScad.length === 0 ? <div style={{fontSize:"12px",color:"#64748b"}}>Nessun contratto a termine.</div> :
+        <div className="rep-scroll"><table className="rep"><thead><tr>
+          <th style={{textAlign:"left"}}>Dipendente</th><th>Scadenza</th><th>Giorni residui</th>
+        </tr></thead><tbody>
+          {tabScad.map(function(r){
+            const cls = r.gg < 0 ? "flag-red" : (r.gg <= 30 ? "flag-red" : (r.gg <= 60 ? "flag-amber" : ""));
+            return <tr key={r.dp.id}><td className="name">{r.dp.nome}</td><td>{r.data}</td>
+              <td className={cls}>{r.gg < 0 ? "scaduto" : r.gg}</td></tr>;
+          })}
+        </tbody></table></div>}
+      </div>
+
+      <div className="rep-box">
+        <h3>Note del periodo</h3>
+        {tabNote.length === 0 ? <div style={{fontSize:"12px",color:"#64748b"}}>Nessuna nota nel periodo.</div> :
+        <div className="rep-scroll"><table className="rep"><thead><tr>
+          <th>Mese</th><th style={{textAlign:"left"}}>Dipendente</th><th style={{textAlign:"left"}}>Nota</th>
+        </tr></thead><tbody>
+          {tabNote.map(function(r, i){ return <tr key={i}><td>{r.mese}</td><td className="name">{r.dp}</td>
+            <td style={{textAlign:"left"}}>{r.nota}</td></tr>; })}
+        </tbody></table></div>}
+      </div>
+    </div>
+  );
+}
+
+/* ============================ LOGIN =================================== */
+function Login(props){
+  // modalità: "pin" (locale) o "fb" (email/password)
+  const [mode, setMode] = useState(FB_READY ? "fb" : "pin");
+  const [pinSet] = useState(localStorage.getItem(LS_PIN) !== null);
+  const [pin, setPin] = useState("");
+  const [pin2, setPin2] = useState("");
+  const [email, setEmail] = useState("");
+  const [pwd, setPwd] = useState("");
+  const [err, setErr] = useState("");
+
+  const doFb = function(){
+    setErr("");
+    firebase.auth().signInWithEmailAndPassword(email, pwd).catch(function(e){
+      setErr("Accesso non riuscito. Verifica le credenziali."); console.error(e);
+    });
+  };
+  const doPin = function(){
+    setErr("");
+    if (!pinSet){
+      if (pin.length < 4){ setErr("Il PIN deve avere almeno 4 cifre."); return; }
+      if (pin !== pin2){ setErr("I due PIN non coincidono."); return; }
+      localStorage.setItem(LS_PIN, hashPin(pin));
+      props.onPinOk();
+    } else {
+      if (hashPin(pin) === localStorage.getItem(LS_PIN)) props.onPinOk();
+      else setErr("PIN errato.");
+    }
+  };
+
+  return (
+    <div className="login-box">
+      <div className="logo">Spazio Ireos</div>
+      <div className="tag">Report Ore mensile — accesso riservato</div>
+
+      {mode === "fb" && FB_READY ?
+        <div>
+          <div className="field"><label style={{textAlign:"left"}}>Email</label>
+            <input value={email} onChange={function(e){ setEmail(e.target.value); }} /></div>
+          <div className="field"><label style={{textAlign:"left"}}>Password</label>
+            <input type="password" value={pwd} onChange={function(e){ setPwd(e.target.value); }}
+              onKeyDown={function(e){ if (e.key === "Enter") doFb(); }} /></div>
+          {err ? <div style={{ color:"#dc2626", fontSize:"12px", marginBottom:"10px" }}>{err}</div> : null}
+          <button className="btn btn-blue" style={{ width:"100%", justifyContent:"center" }} onClick={doFb}>Entra</button>
+        </div>
+        :
+        <div>
+          {!pinSet ? <div style={{ fontSize:"12px", color:"#64748b", marginBottom:"10px" }}>Primo accesso: crea un PIN (min 4 cifre).</div> : null}
+          <div className="field"><label style={{textAlign:"left"}}>{pinSet ? "PIN" : "Nuovo PIN"}</label>
+            <input className="pin-in" type="password" inputMode="numeric" value={pin}
+              onChange={function(e){ setPin(e.target.value.replace(/\D/g,"")); }}
+              onKeyDown={function(e){ if (e.key === "Enter" && pinSet) doPin(); }} /></div>
+          {!pinSet ? <div className="field"><label style={{textAlign:"left"}}>Conferma PIN</label>
+            <input className="pin-in" type="password" inputMode="numeric" value={pin2}
+              onChange={function(e){ setPin2(e.target.value.replace(/\D/g,"")); }} /></div> : null}
+          {err ? <div style={{ color:"#dc2626", fontSize:"12px", marginBottom:"10px" }}>{err}</div> : null}
+          <button className="btn btn-blue" style={{ width:"100%", justifyContent:"center" }} onClick={doPin}>{pinSet ? "Entra" : "Crea PIN ed entra"}</button>
+        </div>
+      }
+    </div>
+  );
+}
+
+/* ============================ APP ==================================== */
+function App(){
+  const [authState, setAuthState] = useState(FB_READY ? "checking" : "gate");
+  const [denied, setDenied] = useState("");
+  const [state, setState] = useState(null);
+  const [anno, setAnno] = useState(2026);
+  const [vista, setVista] = useState("m1"); // "m1".."m12" oppure "rep"
+  const [dirty, setDirty] = useState(false);
+  const [toast, setToast] = useState("");
+  const [dipModal, setDipModal] = useState(null);
+  const [confirm, setConfirm] = useState(null);
+  const fileRef = useRef(null);
+  const dbRef = useRef(null);
+  const uidRef = useRef(null);
+
+  useEffect(function(){
+    if (!FB_READY){
+      const loc = loadLocal();
+      const st = loc || emptyState();
+      setState(st);
+      if (st.anni && st.anni.length) setAnno(st.anni[st.anni.length-1]);
+      return;
+    }
+    firebase.initializeApp(firebaseConfig);
+    dbRef.current = firebase.firestore();
+    firebase.auth().onAuthStateChanged(function(user){
+      if (user){
+        if (!isAdminEmail(user.email)){
+          setDenied(user.email || "");
+          firebase.auth().signOut();
+          return;
+        }
+        setDenied("");
+        uidRef.current = user.uid;
+        setAuthState("in");
+        dbRef.current.collection(FB_COLLECTION).doc(user.uid).get().then(function(snap){
+          let st;
+          if (snap.exists) st = migrate(snap.data());
+          else st = loadLocal() || emptyState();
+          setState(st);
+          if (st.anni && st.anni.length) setAnno(st.anni[st.anni.length-1]);
+        }).catch(function(e){ console.error(e); const st = loadLocal() || emptyState(); setState(st); });
+      } else { setAuthState("out"); }
+    });
+  }, []);
+
+  useEffect(function(){
+    const handler = function(e){ if (dirty){ e.preventDefault(); e.returnValue = ""; return ""; } };
+    window.addEventListener("beforeunload", handler);
+    return function(){ window.removeEventListener("beforeunload", handler); };
+  }, [dirty]);
+
+  const touch = function(next){ next.updatedAt = new Date().toISOString(); setState(next); setDirty(true); };
+  const fset = useMemo(function(){ return festivitaSet(anno); }, [anno]);
+
+  const mese = vista.charAt(0) === "m" ? parseInt(vista.slice(1), 10) : null;
+
+  const onCell = function(dipId, day, value){
+    const next = JSON.parse(JSON.stringify(state));
+    const mk = monthKey(anno, mese);
+    if (!next.dati[mk]) next.dati[mk] = {};
+    if (!next.dati[mk][dipId]) next.dati[mk][dipId] = { giorni:{}, nota:"" };
+    if (value === "") delete next.dati[mk][dipId].giorni[day];
+    else next.dati[mk][dipId].giorni[day] = value;
+    touch(next);
+  };
+  const onNota = function(dipId, value){
+    const next = JSON.parse(JSON.stringify(state));
+    const mk = monthKey(anno, mese);
+    if (!next.dati[mk]) next.dati[mk] = {};
+    if (!next.dati[mk][dipId]) next.dati[mk][dipId] = { giorni:{}, nota:"" };
+    next.dati[mk][dipId].nota = value;
+    touch(next);
+  };
+  const saveDip = function(dp){
+    const next = JSON.parse(JSON.stringify(state));
+    const idx = next.dipendenti.map(function(x){ return x.id; }).indexOf(dp.id);
+    if (idx >= 0) next.dipendenti[idx] = dp;
+    else { next.dipendenti.push(dp); next.dipendenti.sort(function(a,b){ return a.nome.localeCompare(b.nome); }); }
+    touch(next); setDipModal(null);
+    setToast(idx >= 0 ? "Anagrafica aggiornata" : "Dipendente aggiunto");
+  };
+  const askDelDip = function(dp){
+    setConfirm({ title:"Eliminare il dipendente?",
+      body:"Verrà rimosso " + dp.nome + " e TUTTI i suoi dati orari in tutti i mesi e anni. Azione definitiva finché non ricarichi un backup. Confermi?",
+      onConfirm:function(){
+        const next = JSON.parse(JSON.stringify(state));
+        next.dipendenti = next.dipendenti.filter(function(x){ return x.id !== dp.id; });
+        Object.keys(next.dati).forEach(function(mk){ if (next.dati[mk][dp.id]) delete next.dati[mk][dp.id]; });
+        touch(next); setConfirm(null); setToast("Dipendente eliminato");
+      } });
+  };
+  const addAnno = function(dir){
+    const next = JSON.parse(JSON.stringify(state));
+    const nuovo = (next.anni.length ? (dir > 0 ? next.anni[next.anni.length-1] + 1 : next.anni[0] - 1) : 2026);
+    if (next.anni.indexOf(nuovo) === -1){ next.anni.push(nuovo); next.anni.sort(function(a,b){ return a-b; }); touch(next); }
+    setAnno(nuovo);
+    setToast("Anno " + nuovo + " aggiunto");
+  };
+
+  const doSave = function(){
+    const okLocal = saveLocal(state);
+    if (FB_READY && uidRef.current && dbRef.current){
+      dbRef.current.collection(FB_COLLECTION).doc(uidRef.current).set(state).then(function(){
+        setDirty(false); setToast("Salvato (cloud + locale)");
+      }).catch(function(e){ console.error(e); setToast(okLocal ? "Cloud non raggiungibile — salvato in locale" : "Salvataggio non riuscito"); if (okLocal) setDirty(false); });
+    } else {
+      if (okLocal){ setDirty(false); setToast("Salvato in locale"); } else setToast("Salvataggio non riuscito");
+    }
+  };
+  const doBackup = function(){
+    const blob = new Blob([JSON.stringify(state, null, 2)], { type:"application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = fileName("json").replace(".json", "").replace("Report Ore mensile", "Report Ore backup") + ".json";
+    a.click(); URL.revokeObjectURL(url);
+    setToast("Backup JSON scaricato");
+  };
+  const onImportFile = function(e){
+    const file = e.target.files[0];
+    if (!file) return;
+    const name = (file.name || "").toLowerCase();
+    if (name.slice(-5) === ".json"){
+      const reader = new FileReader();
+      reader.onload = function(ev){
+        try {
+          let obj = JSON.parse(ev.target.result);
+          if (!obj || !obj.dipendenti) throw new Error("struttura non valida");
+          obj = migrate(obj);
+          touch(obj); if (obj.anni && obj.anni.length) setAnno(obj.anni[obj.anni.length-1]);
+          setToast("Backup JSON importato — ricorda di salvare 💾");
+        } catch (err) { console.error(err); setToast("Backup JSON non valido"); }
+      };
+      reader.readAsText(file);
+    } else {
+      importaExcel(file, state, function(next, errMsg){
+        if (errMsg){ setToast(errMsg); return; }
+        touch(next); if (next.anni && next.anni.length) setAnno(next.anni[next.anni.length-1]);
+        setToast("Excel importato — ricorda di salvare 💾");
+      });
+    }
+    e.target.value = "";
+  };
+  const changePin = function(){
+    const cur = window.prompt("PIN attuale:");
+    if (cur === null) return;
+    if (localStorage.getItem(LS_PIN) !== null && hashPin(cur) !== localStorage.getItem(LS_PIN)){ setToast("PIN attuale errato"); return; }
+    const nuovo = window.prompt("Nuovo PIN (min 4 cifre):");
+    if (nuovo === null) return;
+    if (String(nuovo).replace(/\D/g,"").length < 4){ setToast("PIN troppo corto"); return; }
+    localStorage.setItem(LS_PIN, hashPin(String(nuovo).replace(/\D/g,""))); setToast("PIN aggiornato");
+  };
+
+  if (FB_READY && authState === "checking") return <div style={{ padding:"40px", textAlign:"center" }}>Caricamento…</div>;
+  if (FB_READY && denied) return (
+    <div className="login-box">
+      <div className="logo">Spazio Ireos</div>
+      <div className="tag">Report Ore mensile</div>
+      <div style={{ background:"#fee2e2", color:"#991b1b", borderRadius:"10px", padding:"14px", fontSize:"13px", fontWeight:"700", marginBottom:"16px" }}>
+        Accesso non consentito per <b>{denied}</b>.<br/>Questa area è riservata all'amministrazione.
+      </div>
+      <button className="btn btn-blue" style={{ width:"100%", justifyContent:"center" }}
+        onClick={function(){ setDenied(""); }}>Accedi con un altro account</button>
+    </div>
+  );
+  if (FB_READY && authState === "out") return <Login />;
+  if (!FB_READY && authState === "gate") return <Login onPinOk={function(){ setAuthState("in"); }} />;
+  if (!state) return <div style={{ padding:"40px", textAlign:"center" }}>Caricamento dati…</div>;
+
+  return (
+    <div>
+      <datalist id="codici-list">
+        {CODICI.map(function(x){ return <option key={x.c} value={x.c}>{x.l}</option>; })}
+      </datalist>
+
+      <div className="app-header">
+        <div>
+          <h1>Spazio Ireos — Report Ore mensile</h1>
+          <div className="sub">{APP_VER}{FB_READY ? " · cloud" : " · locale"}</div>
+        </div>
+        <div className="yearbar">
+          <button title="Anno precedente" onClick={function(){ if (state.anni.indexOf(anno-1) === -1) addAnno(-1); else setAnno(anno-1); }}>◀</button>
+          <span className="yr">{anno}</span>
+          <button title="Anno successivo" onClick={function(){ if (state.anni.indexOf(anno+1) === -1) addAnno(1); else setAnno(anno+1); }}>▶</button>
+        </div>
+        <div className="spacer"></div>
+        <button className={"btn btn-save" + (dirty ? " dirty" : "")} onClick={doSave} disabled={!dirty}>💾 Salva</button>
+        <button className="btn btn-ghost" onClick={doBackup}>⬇ Backup JSON</button>
+        <button className="btn btn-ghost" onClick={function(){ fileRef.current.click(); }}>⬆ Importa</button>
+        <button className="btn btn-ghost" onClick={function(){ esportaExcel(state, anno); }}>📊 Export Excel</button>
+        {!FB_READY ? <button className="btn btn-ghost" onClick={changePin}>🔑 PIN</button> : null}
+        {FB_READY ? <button className="btn btn-ghost" onClick={function(){
+          if (dirty && !window.confirm("Ci sono modifiche non salvate. Uscire comunque?")) return;
+          firebase.auth().signOut();
+        }}>Esci</button> : null}
+        <input ref={fileRef} type="file" accept=".xlsx,.xls,.json" className="hidden-file" onChange={onImportFile} />
+      </div>
+
+      {!FB_READY ? <div className="banner">Modalità LOCALE (localStorage, accesso con PIN). Per il cloud + login email/password incolla la config Firebase in cima al file.</div> : null}
+
+      <div className="tabs">
+        {MONTH_ABBR.map(function(a, i){
+          const mk = monthKey(anno, i+1);
+          const d = state.dati[mk] || {};
+          const filled = Object.keys(d).some(function(k){ const rr=d[k]; return rr.giorni && Object.keys(rr.giorni).length>0; });
+          return <div key={a} className={"tab" + (vista==="m"+(i+1)?" active":"") + (filled?" filled":"")}
+            onClick={function(){ setVista("m"+(i+1)); }}>{a}</div>;
+        })}
+        <div className={"tab rep" + (vista==="rep"?" active":"")} onClick={function(){ setVista("rep"); }}>📊 Riepiloghi</div>
+      </div>
+
+      <div className="content">
+        {vista === "rep" ?
+          <Riepiloghi state={state} anno={anno} />
+          :
+          <div>
+            <div className="toolbar">
+              <strong style={{ fontSize:"15px", color:"#0f2740" }}>{MONTH_LABEL[mese-1]} {anno}</strong>
+              <div className="spacer"></div>
+              <button className="btn btn-blue" onClick={function(){ setDipModal({}); }}>+ Dipendente</button>
+            </div>
+            {state.dipendenti.length === 0 ?
+              <div style={{ padding:"30px", textAlign:"center", color:"#64748b" }}>Nessun dipendente. Aggiungine uno o importa il file Excel.</div>
+              :
+              state.dipendenti.map(function(dp){
+                return <EmployeeCard key={dp.id} dp={dp} rec={getRecFrom(state, anno, mese, dp.id)} anno={anno} mese={mese} fset={fset}
+                  onCell={onCell} onNota={onNota}
+                  onEditDip={function(d){ setDipModal({ dip:d }); }} onDelDip={askDelDip} />;
+              })
+            }
+            <div className="legend">
+              <h3>Legenda codici</h3>
+              <div className="legend-grid">
+                {CODICI.map(function(x){
+                  const cc = CAT[x.cat];
+                  return <div key={x.c} className="legend-item">
+                    <span className="legend-code" style={{ background:cc.bg, color:cc.fg }}>{x.c}</span>
+                    <span>{x.l}</span></div>;
+                })}
+                <div className="legend-item"><span className="legend-code" style={{ background:"#fee2e2", color:"#dc2626" }}>rosso</span><span>Festività nazionale (data in rosso)</span></div>
+              </div>
+            </div>
+          </div>
+        }
+      </div>
+
+      {dipModal ? <DipModal dip={dipModal.dip} onSave={saveDip} onClose={function(){ setDipModal(null); }} /> : null}
+      {confirm ? <ConfirmModal title={confirm.title} body={confirm.body} onConfirm={confirm.onConfirm} onClose={function(){ setConfirm(null); }} /> : null}
+      {toast ? <Toast msg={toast} onDone={function(){ setToast(""); }} /> : null}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
