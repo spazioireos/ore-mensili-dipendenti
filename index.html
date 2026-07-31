@@ -54,20 +54,33 @@
   .grid-wrap { overflow-x:auto; padding:10px 12px 4px; }
   table.cal { border-collapse:collapse; font-size:12px; }
   table.cal td { border:1px solid #e2e8f0; text-align:center; }
-  td.wd { font-size:10px; color:#64748b; padding:2px 0; width:48px; }
+  td.wd { font-size:10px; color:#64748b; padding:2px 0; width:60px; }
   td.wd.we { color:#c026d3; font-weight:700; }
   td.wd.hol { color:#fff; font-weight:800; background:rgba(178,34,34,0.75); }
   td.dn { font-size:14px; color:#0f2740; font-weight:800; padding:2px 0; background:#f8fafc; }
   td.dn.we { background:#fdf4ff; color:#c026d3; }
   td.dn.hol { background:rgba(178,34,34,0.75); color:#fff; }
   td.tot-h { font-size:10px; font-weight:800; color:#0f2740; background:#e2e8f0; padding:2px 6px; }
-  .cell-in { width:48px; height:32px; border:2px solid #f59e0b; background:#fffde7; text-align:center; font-family:inherit; padding:0 1px; border-radius:4px; }
-  .cell-in.is-num { font-weight:800; font-size:15px; }
+  .cell-in { width:60px; height:34px; border:2px solid #f59e0b; background:#fffde7; text-align:center; font-family:inherit; padding:0; border-radius:4px; }
+  .cell-in.is-num { font-weight:800; font-size:16px; }
   .cell-in.is-code { font-weight:700; font-size:9px; letter-spacing:-.3px; }
   .cell-in.blocked { border:1px dashed #cbd5e1; cursor:not-allowed; }
   .cell-in:focus { outline:2px solid #2563eb; outline-offset:-1px; }
   td.tot-v { font-weight:800; font-size:15px; color:#0f2740; background:#eef2ff; padding:0 8px; min-width:60px; }
-  .minute-line { font-size:11px; color:#7c3aed; padding:2px 14px 0; min-height:16px; font-weight:600; }
+  .foot-line { display:flex; align-items:center; gap:10px; padding:8px 14px 2px; flex-wrap:wrap; }
+  .foot-line .foot-tot { font-size:12px; color:#0f2740; font-weight:700; }
+  .foot-line label { font-size:12px; color:#64748b; font-weight:700; }
+  .dich-in { width:80px; border:2px solid #f59e0b; background:#fffde7; border-radius:6px; padding:4px 6px; font-family:inherit; font-size:14px; font-weight:800; text-align:center; }
+  .badge { border-radius:20px; padding:3px 12px; font-size:12px; font-weight:800; }
+  .badge.ok { background:#dcfce7; color:#166534; }
+  .badge.ko { background:#fef3c7; color:#b45309; }
+  .sost-box { margin:4px 14px 10px; background:#fafafa; border:1px dashed #cbd5e1; border-radius:8px; padding:8px 10px; }
+  .sost-head { font-size:11px; font-weight:800; color:#64748b; margin-bottom:6px; }
+  .sost-row { display:flex; align-items:center; gap:8px; margin-bottom:5px; flex-wrap:wrap; }
+  .sost-row select, .sost-row input { border:2px solid #f59e0b; background:#fffde7; border-radius:6px; padding:4px 6px; font-family:inherit; font-size:12px; }
+  .sost-row .lbl { font-size:11px; color:#64748b; font-weight:700; }
+  .btn-mini { border:none; border-radius:6px; padding:4px 10px; font-family:inherit; font-weight:700; font-size:12px; cursor:pointer; background:#e5e7eb; color:#374151; }
+  .btn-mini.del { background:#fee2e2; color:#991b1b; padding:4px 8px; }
   .nota-line { padding:6px 14px 12px; display:flex; align-items:center; gap:8px; }
   .nota-line label { font-size:11px; color:#64748b; font-weight:700; white-space:nowrap; }
   .nota-in { flex:1; border:2px solid #f59e0b; background:#fffde7; border-radius:6px; padding:5px 8px; font-family:inherit; font-size:12px; }
@@ -132,7 +145,7 @@ function isAdminEmail(email){
 /* ===================== COSTANTI ===================== */
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
-const APP_VER = "ver4";
+const APP_VER = "ver5";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
 const MESE_ABBR_FILE = ["gen","feb","mar","apr","mag","giu","lug","ago","set","ott","nov","dic"];
@@ -557,6 +570,35 @@ function CellInput(props){
   );
 }
 
+function SostRow(props){
+  const row = props.row;
+  const known = props.dipList.indexOf(row.p) !== -1;
+  const altro = (row.altro === true) || (!known && String(row.p || "") !== "");
+  const selVal = altro ? "__ALTRO__" : (known ? row.p : "");
+  const days = []; for (let d = 1; d <= props.nd; d++) days.push(d);
+  return (
+    <div className="sost-row">
+      <span className="lbl">Giorno</span>
+      <select value={row.g || 1} onChange={function(e){ props.onChange({ g:parseInt(e.target.value,10), p:row.p, altro:altro }); }}>
+        {days.map(function(d){ return <option key={d} value={d}>{d}</option>; })}
+      </select>
+      <span className="lbl">sostituisce</span>
+      <select value={selVal} onChange={function(e){
+        const v = e.target.value;
+        if (v === "__ALTRO__") props.onChange({ g:row.g||1, p:"", altro:true });
+        else props.onChange({ g:row.g||1, p:v, altro:false });
+      }}>
+        <option value="">— seleziona —</option>
+        {props.dipList.map(function(n){ return <option key={n} value={n}>{n}</option>; })}
+        <option value="__ALTRO__">Altro (nome esterno)…</option>
+      </select>
+      {altro ? <input value={row.p || ""} placeholder="NOME ESTERNO"
+        onChange={function(e){ props.onChange({ g:row.g||1, p:e.target.value.toUpperCase(), altro:true }); }} /> : null}
+      <button className="btn-mini del" title="Rimuovi" onClick={props.onDel}>🗑</button>
+    </div>
+  );
+}
+
 function EmployeeCard(props){
   const dp = props.dp, rec = props.rec, y = props.anno, m = props.mese, fset = props.fset;
   const nd = daysInMonth(y, m);
@@ -625,8 +667,29 @@ function EmployeeCard(props){
           </tr>
         </tbody></table>
       </div>
-      <div className="minute-line">
-        {days.map(function(d){ return decToHM(rec.giorni[d]); }).filter(function(x){ return x !== ""; }).join("  ·  ")}
+      <div className="foot-line">
+        <span className="foot-tot">TOT calcolato: <b>{fmt2(tot)}</b></span>
+        <label>Ore dichiarate (uso interno):</label>
+        <input className="dich-in" value={rec.dich || ""} placeholder="—"
+          onChange={function(e){ props.onDich(dp.id, e.target.value); }} />
+        {(function(){
+          const s = String(rec.dich === undefined ? "" : rec.dich).trim();
+          if (s === "") return null;
+          const dn = parseFloat(s.replace(",", "."));
+          if (isNaN(dn)) return <span className="badge ko">valore non valido</span>;
+          const diff = Math.round((tot - dn) * 100) / 100;
+          if (Math.abs(diff) <= 0.01) return <span className="badge ok">✓ torna</span>;
+          return <span className="badge ko">Δ {(diff>0?"+":"")}{fmt2(diff)} {diff<0?"(mancano ore)":"(ore in più)"}</span>;
+        })()}
+      </div>
+      <div className="sost-box">
+        <div className="sost-head">🔁 Sostituzioni (uso interno — non compaiono nei report)</div>
+        {(rec.sost || []).map(function(row, idx){
+          return <SostRow key={idx} row={row} nd={nd} dipList={props.dipList}
+            onChange={function(nr){ props.onSostChange(dp.id, idx, nr); }}
+            onDel={function(){ props.onSostDel(dp.id, idx); }} />;
+        })}
+        <button className="btn-mini" onClick={function(){ props.onSostAdd(dp.id); }}>+ Aggiungi sostituzione</button>
       </div>
       <div className="nota-line">
         <label>Nota mese:</label>
@@ -966,6 +1029,16 @@ function App(){
     next.dati[mk][dipId].nota = value; touch(next);
   };
   const onFestAlert = function(d){ showToast("⚠️ Stai inserendo ore in un giorno FESTIVO (" + d + "/" + mese + "/" + anno + ")", true); };
+  const ensureRec = function(next, dipId){ const mk = monthKey(anno, mese); if (!next.dati[mk]) next.dati[mk] = {}; if (!next.dati[mk][dipId]) next.dati[mk][dipId] = { giorni:{}, nota:"" }; return next.dati[mk][dipId]; };
+  const onDich = function(dipId, value){ const next = JSON.parse(JSON.stringify(state)); ensureRec(next, dipId).dich = value; touch(next); };
+  const onSostAdd = function(dipId){ const next = JSON.parse(JSON.stringify(state)); const rec = ensureRec(next, dipId); if (!rec.sost) rec.sost = []; rec.sost.push({ g:1, p:"", altro:false }); touch(next); };
+  const onSostChange = function(dipId, idx, nr){ const next = JSON.parse(JSON.stringify(state)); const rec = ensureRec(next, dipId); if (!rec.sost) rec.sost = []; rec.sost[idx] = nr; touch(next); };
+  const onSostDel = function(dipId, idx){
+    const next = JSON.parse(JSON.stringify(state)); const rec = ensureRec(next, dipId); if (!rec.sost) return;
+    const row = rec.sost[idx];
+    if (row && String(row.p || "").trim() !== ""){ if (!window.confirm("Rimuovere la sostituzione del giorno " + row.g + " (" + row.p + ")?")) return; }
+    rec.sost.splice(idx, 1); touch(next);
+  };
 
   const saveDip = function(dp){
     const next = JSON.parse(JSON.stringify(state));
@@ -1086,8 +1159,10 @@ function App(){
               <div style={{ padding:"30px", textAlign:"center", color:"#64748b" }}>Nessun dipendente. Aggiungine uno o importa il file Excel.</div>
               :
               dipSorted(state).map(function(dp){
+                const dipList = state.dipendenti.filter(function(x){ return x.id !== dp.id; }).map(function(x){ return x.nome; }).sort(function(a,b){ return a.localeCompare(b); });
                 return <EmployeeCard key={dp.id} dp={dp} rec={getRecFrom(state, anno, mese, dp.id)} anno={anno} mese={mese} fset={fset}
-                  onCell={onCell} onNota={onNota} onFestAlert={onFestAlert}
+                  dipList={dipList} onCell={onCell} onNota={onNota} onFestAlert={onFestAlert}
+                  onDich={onDich} onSostAdd={onSostAdd} onSostChange={onSostChange} onSostDel={onSostDel}
                   onEditDip={function(d){ setDipModal({ dip:d }); }} onDelDip={askDelDip} />;
               })
             }
