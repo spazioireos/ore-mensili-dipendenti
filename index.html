@@ -165,7 +165,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver13";
+const APP_VER = "ver14";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
 const MESE_ABBR_FILE = ["gen","feb","mar","apr","mag","giu","lug","ago","set","ott","nov","dic"];
@@ -535,6 +535,7 @@ function esportaPDF(state, pairs){
   const JsPDF = window.jspdf.jsPDF;
   const doc = new JsPDF({ orientation:"portrait", unit:"mm", format:"a4" });
   const dips = dipSorted(state);
+  const MAXCOL = 9; // massimo dipendenti per pagina A4 verticale
   let first = true;
   pairs.forEach(function(pr){
     const anno = pr.y, m = pr.m;
@@ -544,88 +545,96 @@ function esportaPDF(state, pairs){
     const haData = Object.keys(dati).some(function(k){ const rr=dati[k]; return rr.giorni && Object.keys(rr.giorni).length>0; });
     if (!haData) return;
     const nd = daysInMonth(anno, m);
-    if (!first) doc.addPage();
-    first = false;
-    doc.setFontSize(12); doc.setTextColor(15,39,64); doc.setFont(undefined,"bold");
-    doc.text("Spazio Ireos — Report Ore   ·   " + MONTH_LABEL[m-1] + " " + anno, 14, 12);
-    doc.setFont(undefined,"normal");
-    const head = [["Giorno"].concat(dips.map(function(dp){ return dp.nome; }))];
-    const body = [];
-    const permMese = [];
-    const noteMese = [];
-    const tot = dips.map(function(){ return 0; });
-    for (let d=1; d<=nd; d++){
-      const rosso = isRosso(fset, anno, m, d);
-      const row = [d + " " + WD[weekdayOf(anno, m, d)]];
-      dips.forEach(function(dp, i){
-        const rec = getRecFrom(state, anno, m, dp.id);
-        const v = rec.giorni[d];
-        const perm = (rec.permessi && rec.permessi[d]) ? rec.permessi[d] : null;
-        tot[i] += parseHour(v === undefined ? "" : v);
-        let txt;
-        if (v === undefined || v === "") txt = rosso ? "–" : "";
-        else if (CODE_SET[String(v).trim()]) txt = String(v).trim();
-        else txt = fmt2(v);
-        if (perm){ txt = (txt === "*" || txt === "" ? "*" : txt + "*"); permMese.push(dp.nome + " g." + d + " " + fmt2(perm.ore) + " h (" + perm.tipo + ")"); }
-        row.push(txt);
-      });
-      body.push(row);
-    }
-    const totRow = ["TOT"].concat(tot.map(function(t){ return fmt2(Math.round(t*100)/100); }));
-    body.push(totRow);
-    dips.forEach(function(dp){
-      const rec = getRecFrom(state, anno, m, dp.id);
-      if (rec.nota && rec.nota.trim() !== "") noteMese.push(dp.nome + ": " + rec.nota.trim());
-    });
-    doc.autoTable({
-      head: head, body: body, startY: 16, theme:"grid", margin:{ left:14, right:14 },
-      styles:{ fontSize:6, cellPadding:0.8, halign:"center", valign:"middle", lineColor:[210,210,210], lineWidth:0.1, overflow:"linebreak" },
-      headStyles:{ fillColor:[15,39,64], textColor:[255,255,255], fontSize:5.6, valign:"middle" },
-      columnStyles:{ 0:{ halign:"left", cellWidth:18, fontStyle:"bold" } },
-      didParseCell: function(data){
-        if (data.section !== "body") return;
-        const ri = data.row.index;
-        if (ri === nd){ data.cell.styles.fontStyle = "bold"; data.cell.styles.fillColor = [238,242,255]; return; }
-        const day = ri + 1;
-        if (data.column.index === 0){
-          if (isRosso(fset, anno, m, day)){ data.cell.styles.fillColor = [178,34,34]; data.cell.styles.textColor = [255,255,255]; }
-        } else {
-          const txt = String(data.cell.raw || "").trim().replace(/\*$/, "");
-          if (CODE_SET[txt]){
-            const hx = CODE_SET[txt].bg.replace("#","");
-            data.cell.styles.fillColor = [parseInt(hx.slice(0,2),16), parseInt(hx.slice(2,4),16), parseInt(hx.slice(4,6),16)];
-            data.cell.styles.textColor = lumaText(CODE_SET[txt].bg) === "#ffffff" ? [255,255,255] : [17,24,39];
+    // spezzo i dipendenti in blocchi da MAXCOL
+    const chunks = []; for (let i=0; i<dips.length; i+=MAXCOL) chunks.push(dips.slice(i, i+MAXCOL));
+    if (chunks.length === 0) chunks.push([]);
+    const permMese = []; const noteMese = [];
+    dips.forEach(function(dp){ const rec = getRecFrom(state, anno, m, dp.id); if (rec.nota && rec.nota.trim() !== "") noteMese.push(dp.nome + ": " + rec.nota.trim()); });
+
+    chunks.forEach(function(chunk, ci){
+      if (!first) doc.addPage();
+      first = false;
+      doc.setFontSize(12); doc.setTextColor(15,39,64); doc.setFont(undefined,"bold");
+      let titolo = "Spazio Ireos — Report Ore   ·   " + MONTH_LABEL[m-1] + " " + anno;
+      if (chunks.length > 1) titolo += "   (dipendenti " + (ci*MAXCOL+1) + "–" + (ci*MAXCOL+chunk.length) + " di " + dips.length + " · pag. " + (ci+1) + "/" + chunks.length + ")";
+      doc.text(titolo, 14, 12);
+      doc.setFont(undefined,"normal");
+      const head = [["Giorno"].concat(chunk.map(function(dp){ return dp.nome; }))];
+      const body = [];
+      const tot = chunk.map(function(){ return 0; });
+      for (let d=1; d<=nd; d++){
+        const rosso = isRosso(fset, anno, m, d);
+        const row = [d + " " + WD[weekdayOf(anno, m, d)]];
+        chunk.forEach(function(dp, i){
+          const rec = getRecFrom(state, anno, m, dp.id);
+          const v = rec.giorni[d];
+          const perm = (rec.permessi && rec.permessi[d]) ? rec.permessi[d] : null;
+          tot[i] += parseHour(v === undefined ? "" : v);
+          let txt;
+          if (v === undefined || v === "") txt = rosso ? "–" : "";
+          else if (CODE_SET[String(v).trim()]) txt = String(v).trim();
+          else txt = fmt2(v);
+          if (perm){ txt = (txt === "*" || txt === "" ? "*" : txt + "*"); permMese.push(dp.nome + " g." + d + " " + fmt2(perm.ore) + " h (" + perm.tipo + ")"); }
+          row.push(txt);
+        });
+        body.push(row);
+      }
+      const totRow = ["TOT"].concat(tot.map(function(t){ return fmt2(Math.round(t*100)/100); }));
+      body.push(totRow);
+      const ncols = 1 + chunk.length;
+      const colW = Math.round((182 / ncols) * 100) / 100; // stessa larghezza per tutte le colonne
+      doc.autoTable({
+        head: head, body: body, startY: 16, theme:"grid", margin:{ left:14, right:14 }, tableWidth: ncols*colW,
+        styles:{ fontSize:6, cellPadding:0.8, halign:"center", valign:"middle", lineColor:[210,210,210], lineWidth:0.1, overflow:"linebreak", cellWidth:colW, fontStyle:"bold" },
+        headStyles:{ fillColor:[15,39,64], textColor:[255,255,255], fontSize:5.6, valign:"middle", fontStyle:"bold", cellWidth:colW },
+        columnStyles:{ 0:{ halign:"left", fontStyle:"bold", cellWidth:colW } },
+        didParseCell: function(data){
+          if (data.section !== "body") return;
+          const ri = data.row.index;
+          if (ri === nd){ data.cell.styles.fontStyle = "bold"; data.cell.styles.fillColor = [238,242,255]; return; }
+          const day = ri + 1;
+          if (data.column.index === 0){
+            if (isRosso(fset, anno, m, day)){ data.cell.styles.fillColor = [178,34,34]; data.cell.styles.textColor = [255,255,255]; }
+          } else {
+            const txt = String(data.cell.raw || "").trim().replace(/\*$/, "");
+            if (CODE_SET[txt]){
+              const hx = CODE_SET[txt].bg.replace("#","");
+              data.cell.styles.fillColor = [parseInt(hx.slice(0,2),16), parseInt(hx.slice(2,4),16), parseInt(hx.slice(4,6),16)];
+              data.cell.styles.textColor = lumaText(CODE_SET[txt].bg) === "#ffffff" ? [255,255,255] : [17,24,39];
+            }
           }
+        }
+      });
+
+      if (ci === chunks.length - 1){
+        let yy = doc.lastAutoTable.finalY + 5;
+        const ensureY = function(h){ if (yy + h > 287){ doc.addPage(); yy = 18; } };
+        ensureY(6);
+        doc.setFontSize(7); doc.setTextColor(15,39,64); doc.setFont(undefined,"bold");
+        doc.text("Dettaglio dipendenti:", 14, yy); yy += 4; doc.setFont(undefined,"normal");
+        doc.setFontSize(6.5); doc.setTextColor(60,60,60);
+        dips.forEach(function(dp){
+          const contr = dp.tipoContratto === "determinato" ? ("Determinato scad. " + (dp.scadenza || "?")) : "Indeterminato";
+          const line = dp.nome + " — " + dp.oreSett + " h/sett · " + contr + (dp.livello ? " · Liv. " + dp.livello : "");
+          const ls = doc.splitTextToSize(line, 182); ensureY(ls.length * 3.2);
+          doc.text(ls, 14, yy); yy += ls.length * 3.2;
+        });
+        if (permMese.length > 0){
+          yy += 2; ensureY(4);
+          doc.setFontSize(6.5); doc.setTextColor(15,39,64); doc.setFont(undefined,"bold");
+          doc.text("Permessi orari (segnalati con *, non inclusi nel TOT):", 14, yy); yy += 3.4; doc.setFont(undefined,"normal");
+          doc.setFontSize(6); doc.setTextColor(70,70,70);
+          permMese.forEach(function(pp){ const ls = doc.splitTextToSize("•  " + pp, 182); ensureY(ls.length * 3); doc.text(ls, 14, yy); yy += ls.length * 3; });
+        }
+        if (noteMese.length > 0){
+          yy += 2; ensureY(4);
+          doc.setFontSize(6.5); doc.setTextColor(15,39,64); doc.setFont(undefined,"bold");
+          doc.text("Note del mese:", 14, yy); yy += 3.4; doc.setFont(undefined,"normal");
+          doc.setFontSize(6); doc.setTextColor(70,70,70);
+          noteMese.forEach(function(n){ const ls = doc.splitTextToSize("•  " + n, 182); ensureY(ls.length * 3); doc.text(ls, 14, yy); yy += ls.length * 3; });
         }
       }
     });
-    let yy = doc.lastAutoTable.finalY + 5;
-    const ensureY = function(h){ if (yy + h > 287){ doc.addPage(); yy = 18; } };
-    // dettaglio dipendenti (livello, ore sett., contratto/scadenza)
-    ensureY(6);
-    doc.setFontSize(7); doc.setTextColor(15,39,64); doc.setFont(undefined,"bold");
-    doc.text("Dettaglio dipendenti:", 14, yy); yy += 4; doc.setFont(undefined,"normal");
-    doc.setFontSize(6.5); doc.setTextColor(60,60,60);
-    dips.forEach(function(dp){
-      const contr = dp.tipoContratto === "determinato" ? ("Determinato scad. " + (dp.scadenza || "?")) : "Indeterminato";
-      const line = dp.nome + " — " + dp.oreSett + " h/sett · " + contr + (dp.livello ? " · Liv. " + dp.livello : "");
-      const ls = doc.splitTextToSize(line, 182); ensureY(ls.length * 3.2);
-      doc.text(ls, 14, yy); yy += ls.length * 3.2;
-    });
-    if (permMese.length > 0){
-      yy += 2; ensureY(4);
-      doc.setFontSize(6.5); doc.setTextColor(15,39,64); doc.setFont(undefined,"bold");
-      doc.text("Permessi orari (segnalati con *, non inclusi nel TOT):", 14, yy); yy += 3.4; doc.setFont(undefined,"normal");
-      doc.setFontSize(6); doc.setTextColor(70,70,70);
-      permMese.forEach(function(pp){ const ls = doc.splitTextToSize("•  " + pp, 182); ensureY(ls.length * 3); doc.text(ls, 14, yy); yy += ls.length * 3; });
-    }
-    if (noteMese.length > 0){
-      yy += 2; ensureY(4);
-      doc.setFontSize(6.5); doc.setTextColor(15,39,64); doc.setFont(undefined,"bold");
-      doc.text("Note del mese:", 14, yy); yy += 3.4; doc.setFont(undefined,"normal");
-      doc.setFontSize(6); doc.setTextColor(70,70,70);
-      noteMese.forEach(function(n){ const ls = doc.splitTextToSize("•  " + n, 182); ensureY(ls.length * 3); doc.text(ls, 14, yy); yy += ls.length * 3; });
-    }
   });
   if (first){ doc.setFontSize(12); doc.text("Nessun dato nel periodo selezionato", 14, 24); }
   doc.save(fileName("pdf"));
