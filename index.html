@@ -161,7 +161,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver10";
+const APP_VER = "ver11";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
 const MESE_ABBR_FILE = ["gen","feb","mar","apr","mag","giu","lug","ago","set","ott","nov","dic"];
@@ -394,7 +394,7 @@ function fileName(ext){
 }
 
 /* ===================== EXPORT EXCEL ===================== */
-function esportaExcel(state, anno){
+function esportaExcel(state, anno, months){
   const wb = XLSX.utils.book_new();
   wb.Props = { Title:"Report Ore mensile " + anno, Author:"Christian Canonica", Company:"Spazio Ireos Società Cooperativa Sociale", CreatedDate:new Date() };
   const F = "Nunito";
@@ -418,7 +418,7 @@ function esportaExcel(state, anno){
     return base;
   };
   const dips = dipSorted(state);
-  for (let m = 1; m <= 12; m++){
+  months.forEach(function(m){
     const nd = daysInMonth(anno, m);
     const rows = []; const merges = []; const styleMap = {}; const commentMap = {};
     const put = function(rr, cc, val, st){
@@ -491,22 +491,22 @@ function esportaExcel(state, anno){
     const cols = [{wch:11}]; for (let i=0;i<dips.length;i++) cols.push({wch:14}); ws["!cols"] = cols;
     const wrows = [{hpt:20},{hpt:46}]; ws["!rows"] = wrows;
     XLSX.utils.book_append_sheet(wb, ws, MONTH_ABBR[m-1] + String(anno).slice(2));
-  }
+  });
   XLSX.writeFile(wb, fileName("xlsx"));
 }
 
 /* ===================== EXPORT PDF A4 verticale (matrice) ===================== */
-function esportaPDF(state, anno){
+function esportaPDF(state, anno, months){
   const JsPDF = window.jspdf.jsPDF;
   const doc = new JsPDF({ orientation:"portrait", unit:"mm", format:"a4" });
   const fset = festivitaSet(anno);
   const dips = dipSorted(state);
   let first = true;
-  for (let m = 1; m <= 12; m++){
+  months.forEach(function(m){
     const mk = monthKey(anno, m);
     const dati = state.dati[mk] || {};
     const haData = Object.keys(dati).some(function(k){ const rr=dati[k]; return rr.giorni && Object.keys(rr.giorni).length>0; });
-    if (!haData) continue;
+    if (!haData) return;
     const nd = daysInMonth(anno, m);
     if (!first) doc.addPage();
     first = false;
@@ -576,19 +576,21 @@ function esportaPDF(state, anno){
       doc.text(ls, 14, yy); yy += ls.length * 3.2;
     });
     if (permMese.length > 0){
-      yy += 2; const s = "* Permessi orari (non inclusi nel TOT): " + permMese.join("   ·   ");
-      doc.setFontSize(6); doc.setTextColor(80,80,80);
-      const lines = doc.splitTextToSize(s, 182); ensureY(lines.length * 3);
-      doc.text(lines, 14, yy); yy += lines.length * 3 + 2;
+      yy += 2; ensureY(4);
+      doc.setFontSize(6.5); doc.setTextColor(15,39,64); doc.setFont(undefined,"bold");
+      doc.text("Permessi orari (segnalati con *, non inclusi nel TOT):", 14, yy); yy += 3.4; doc.setFont(undefined,"normal");
+      doc.setFontSize(6); doc.setTextColor(70,70,70);
+      permMese.forEach(function(pp){ const ls = doc.splitTextToSize("•  " + pp, 182); ensureY(ls.length * 3); doc.text(ls, 14, yy); yy += ls.length * 3; });
     }
     if (noteMese.length > 0){
-      yy += 2; const s = "Note del mese: " + noteMese.join("   ·   ");
-      doc.setFontSize(6); doc.setTextColor(80,80,80);
-      const lines = doc.splitTextToSize(s, 182); ensureY(lines.length * 3);
-      doc.text(lines, 14, yy);
+      yy += 2; ensureY(4);
+      doc.setFontSize(6.5); doc.setTextColor(15,39,64); doc.setFont(undefined,"bold");
+      doc.text("Note del mese:", 14, yy); yy += 3.4; doc.setFont(undefined,"normal");
+      doc.setFontSize(6); doc.setTextColor(70,70,70);
+      noteMese.forEach(function(n){ const ls = doc.splitTextToSize("•  " + n, 182); ensureY(ls.length * 3); doc.text(ls, 14, yy); yy += ls.length * 3; });
     }
-  }
-  if (first){ doc.setFontSize(12); doc.text("Nessun dato per l'anno " + anno, 14, 24); }
+  });
+  if (first){ doc.setFontSize(12); doc.text("Nessun dato nel periodo selezionato", 14, 24); }
   doc.save(fileName("pdf"));
 }
 
@@ -855,6 +857,53 @@ function DipModal(props){
           <span>
             <button className="btn btn-gray" onClick={props.onClose}>Annulla</button>
             <button className="btn btn-blue" style={{ marginLeft:"8px" }} onClick={save}>Salva</button>
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ExportModal(props){
+  const [mode, setMode] = useState("mese");
+  const [meseSel, setMeseSel] = useState(props.meseCorrente || 1);
+  const [da, setDa] = useState(1);
+  const [a, setA] = useState(12);
+  const opts = MONTH_LABEL.map(function(l, i){ return <option key={i} value={i+1}>{l}</option>; });
+  const genera = function(){
+    let months;
+    if (mode === "anno") months = [1,2,3,4,5,6,7,8,9,10,11,12];
+    else if (mode === "mese") months = [parseInt(meseSel,10)];
+    else { let d = parseInt(da,10), b = parseInt(a,10); if (d > b){ const t=d; d=b; b=t; } months = []; for (let x=d; x<=b; x++) months.push(x); }
+    props.onGenera(months);
+  };
+  return (
+    <div className="overlay" onClick={props.onClose}>
+      <div className="modal" onClick={function(e){ e.stopPropagation(); }} style={{ maxWidth:"440px" }}>
+        <h2>Esporta {props.kind} — periodo {props.anno}</h2>
+        <div style={{ display:"flex", flexDirection:"column", gap:"12px", margin:"6px 0 4px" }}>
+          <label style={{ display:"flex", alignItems:"center", gap:"8px", fontSize:"14px" }}>
+            <input type="radio" checked={mode==="mese"} onChange={function(){ setMode("mese"); }} />
+            <span>Mese singolo:</span>
+            <select value={meseSel} onChange={function(e){ setMeseSel(e.target.value); setMode("mese"); }}>{opts}</select>
+          </label>
+          <label style={{ display:"flex", alignItems:"center", gap:"8px", fontSize:"14px", flexWrap:"wrap" }}>
+            <input type="radio" checked={mode==="intervallo"} onChange={function(){ setMode("intervallo"); }} />
+            <span>Intervallo: da</span>
+            <select value={da} onChange={function(e){ setDa(e.target.value); setMode("intervallo"); }}>{opts}</select>
+            <span>a</span>
+            <select value={a} onChange={function(e){ setA(e.target.value); setMode("intervallo"); }}>{opts}</select>
+          </label>
+          <label style={{ display:"flex", alignItems:"center", gap:"8px", fontSize:"14px" }}>
+            <input type="radio" checked={mode==="anno"} onChange={function(){ setMode("anno"); }} />
+            <span>Tutto l'anno {props.anno} (12 mesi)</span>
+          </label>
+        </div>
+        <div className="modal-actions">
+          <span></span>
+          <span>
+            <button className="btn btn-gray" onClick={props.onClose}>Annulla</button>
+            <button className="btn btn-blue" style={{ marginLeft:"8px" }} onClick={genera}>Genera {props.kind}</button>
           </span>
         </div>
       </div>
@@ -1162,6 +1211,7 @@ function App(){
   const [dipModal, setDipModal] = useState(null);
   const [confirm, setConfirm] = useState(null);
   const [permModal, setPermModal] = useState(null);
+  const [exportModal, setExportModal] = useState(null);
   const fileRef = useRef(null); const dbRef = useRef(null); const uidRef = useRef(null);
 
   useEffect(function(){
@@ -1308,8 +1358,8 @@ function App(){
         <button className={"btn btn-save" + (dirty ? " dirty" : "")} onClick={doSave} disabled={!dirty}>💾 Salva</button>
         <button className="btn btn-ghost" onClick={doBackup}>⬇ Backup</button>
         <button className="btn btn-ghost" onClick={function(){ fileRef.current.click(); }}>⬆ Importa</button>
-        <button className="btn btn-ghost" onClick={function(){ esportaExcel(state, anno); }}>📊 Excel</button>
-        <button className="btn btn-ghost" onClick={function(){ esportaPDF(state, anno); }}>🖨️ PDF A4</button>
+        <button className="btn btn-ghost" onClick={function(){ setExportModal("Excel"); }}>📊 Excel</button>
+        <button className="btn btn-ghost" onClick={function(){ setExportModal("PDF"); }}>🖨️ PDF A4</button>
         {!FB_READY ? <button className="btn btn-ghost" onClick={changePin}>🔑 PIN</button> : null}
         {FB_READY ? <button className="btn btn-ghost" onClick={function(){ if (dirty && !window.confirm("Ci sono modifiche non salvate. Uscire comunque?")) return; firebase.auth().signOut(); }}>Esci</button> : null}
         <input ref={fileRef} type="file" accept=".xlsx,.xls,.json" className="hidden-file" onChange={onImportFile} />
@@ -1368,6 +1418,9 @@ function App(){
         }
       </div>
 
+      {exportModal ? <ExportModal kind={exportModal} anno={anno} meseCorrente={mese}
+        onGenera={function(months){ if (exportModal === "Excel") esportaExcel(state, anno, months); else esportaPDF(state, anno, months); setExportModal(null); }}
+        onClose={function(){ setExportModal(null); }} /> : null}
       {permModal ? (function(){
         const rc = getRecFrom(state, anno, mese, permModal.dipId);
         const cur = (rc.permessi && rc.permessi[permModal.day]) ? rc.permessi[permModal.day] : null;
