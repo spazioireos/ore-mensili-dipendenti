@@ -11,6 +11,8 @@
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
@@ -44,23 +46,27 @@
   .content { padding:16px; }
   .toolbar { display:flex; gap:8px; align-items:center; margin-bottom:14px; flex-wrap:wrap; }
   .emp-card { background:#fff; border-radius:12px; margin-bottom:18px; box-shadow:0 1px 4px rgba(0,0,0,.08); overflow:hidden; }
-  .emp-head { padding:9px 14px; display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+  .emp-head { padding:9px 14px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
   .emp-head .nome { font-size:19px; font-weight:800; letter-spacing:.4px; }
   .emp-head .pill { background:rgba(255,255,255,.6); border-radius:20px; padding:3px 11px; font-size:12px; font-weight:700; }
+  .emp-head .pill.cess { background:#7f1d1d; color:#fff; }
   .emp-head .edit-mini { background:rgba(0,0,0,.16); color:#fff; border:none; border-radius:6px; width:26px; height:26px; cursor:pointer; font-size:13px; }
   .grid-wrap { overflow-x:auto; padding:10px 12px 4px; }
   table.cal { border-collapse:collapse; font-size:12px; }
   table.cal td { border:1px solid #e2e8f0; text-align:center; }
-  td.wd { font-size:10px; color:#64748b; padding:2px 0; width:46px; }
+  td.wd { font-size:10px; color:#64748b; padding:2px 0; width:48px; }
   td.wd.we { color:#c026d3; font-weight:700; }
-  td.wd.hol { color:#dc2626; font-weight:800; }
-  td.dn { font-size:11px; color:#334155; font-weight:700; padding:1px 0; background:#f8fafc; }
+  td.wd.hol { color:#fff; font-weight:800; background:rgba(178,34,34,0.75); }
+  td.dn { font-size:14px; color:#0f2740; font-weight:800; padding:2px 0; background:#f8fafc; }
   td.dn.we { background:#fdf4ff; color:#c026d3; }
-  td.dn.hol { background:#fee2e2; color:#dc2626; }
+  td.dn.hol { background:rgba(178,34,34,0.75); color:#fff; }
   td.tot-h { font-size:10px; font-weight:800; color:#0f2740; background:#e2e8f0; padding:2px 6px; }
-  .cell-in { width:46px; height:30px; border:2px solid #f59e0b; background:#fffde7; text-align:center; font-family:inherit; font-weight:700; font-size:12px; padding:0 1px; border-radius:4px; }
+  .cell-in { width:48px; height:32px; border:2px solid #f59e0b; background:#fffde7; text-align:center; font-family:inherit; padding:0 1px; border-radius:4px; }
+  .cell-in.is-num { font-weight:800; font-size:15px; }
+  .cell-in.is-code { font-weight:700; font-size:9px; letter-spacing:-.3px; }
+  .cell-in.blocked { border:1px dashed #cbd5e1; cursor:not-allowed; }
   .cell-in:focus { outline:2px solid #2563eb; outline-offset:-1px; }
-  td.tot-v { font-weight:800; font-size:14px; color:#0f2740; background:#eef2ff; padding:0 8px; min-width:54px; }
+  td.tot-v { font-weight:800; font-size:15px; color:#0f2740; background:#eef2ff; padding:0 8px; min-width:60px; }
   .minute-line { font-size:11px; color:#7c3aed; padding:2px 14px 0; min-height:16px; font-weight:600; }
   .nota-line { padding:6px 14px 12px; display:flex; align-items:center; gap:8px; }
   .nota-line label { font-size:11px; color:#64748b; font-weight:700; white-space:nowrap; }
@@ -80,21 +86,22 @@
   .flag-red { color:#dc2626; font-weight:800; }
   .flag-amber { color:#b45309; font-weight:800; }
   .overlay { position:fixed; inset:0; background:rgba(15,39,64,.55); display:flex; align-items:center; justify-content:center; z-index:100; padding:16px; }
-  .modal { background:#fff; border-radius:14px; padding:22px; width:100%; max-width:440px; box-shadow:0 10px 40px rgba(0,0,0,.3); }
+  .modal { background:#fff; border-radius:14px; padding:22px; width:100%; max-width:460px; box-shadow:0 10px 40px rgba(0,0,0,.3); max-height:92vh; overflow:auto; }
   .modal h2 { margin:0 0 14px; font-size:17px; color:#0f2740; }
   .field { margin-bottom:12px; }
   .field label { display:block; font-size:12px; font-weight:700; color:#374151; margin-bottom:4px; }
   .field input, .field select { width:100%; border:2px solid #f59e0b; background:#fffde7; border-radius:8px; padding:8px 10px; font-family:inherit; font-size:14px; }
+  .frow { display:flex; gap:10px; } .frow .field { flex:1; }
   .color-row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
   .swatch { width:28px; height:28px; border-radius:50%; cursor:pointer; border:3px solid transparent; }
   .swatch.sel { border-color:#0f2740; }
-  .modal-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:18px; }
+  .modal-actions { display:flex; gap:8px; justify-content:space-between; margin-top:18px; align-items:center; }
   .login-box { max-width:400px; margin:8vh auto; background:#fff; border-radius:16px; padding:30px; box-shadow:0 8px 30px rgba(0,0,0,.15); text-align:center; }
   .login-box .logo { font-size:22px; font-weight:800; color:#0f2740; }
   .login-box .tag { font-size:12px; color:#64748b; margin-bottom:20px; }
-  .pin-in { letter-spacing:8px; text-align:center; font-size:22px !important; }
   .banner { background:#fef3c7; color:#92400e; font-size:12px; padding:6px 16px; text-align:center; font-weight:700; }
-  .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:#0f2740; color:#fff; padding:11px 20px; border-radius:10px; font-size:13px; font-weight:700; z-index:200; box-shadow:0 6px 20px rgba(0,0,0,.3); }
+  .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:#0f2740; color:#fff; padding:11px 20px; border-radius:10px; font-size:13px; font-weight:700; z-index:200; box-shadow:0 6px 20px rgba(0,0,0,.3); max-width:90%; text-align:center; }
+  .toast.warn { background:#b45309; }
   .hidden-file { display:none; }
 </style>
 </head>
@@ -103,11 +110,7 @@
 <script type="text/babel">
 const { useState, useEffect, useRef, useMemo } = React;
 
-/* =========================================================================
-   CONFIGURAZIONE FIREBASE  ← INCOLLA QUI la config del progetto per attivare
-   la sincronizzazione cloud + login email/password. Finché projectId è vuoto
-   l'app funziona in MODALITÀ LOCALE (localStorage) con accesso via PIN.
-   ========================================================================= */
+/* ===================== CONFIGURAZIONE FIREBASE ===================== */
 const firebaseConfig = {
   apiKey: "AIzaSyA-xbQcfzd6YwMT8y-YV7WDBCw-iwFH__k",
   authDomain: "spazio-ireos-foglio-ore.firebaseapp.com",
@@ -118,10 +121,6 @@ const firebaseConfig = {
 };
 const FB_COLLECTION = "report-ore-mensile";
 const FB_READY = firebaseConfig.projectId && firebaseConfig.apiKey;
-
-/* ELENCO ADMIN — solo queste email possono entrare nel Report.
-   (Il progetto Firebase è condiviso col Foglio Ore, che fa entrare tutti;
-   qui restringiamo l'accesso alla sola amministrazione.) */
 const ADMIN_EMAILS = ["spazioireos@gmail.com"];
 function isAdminEmail(email){
   if (!email) return false;
@@ -130,95 +129,84 @@ function isAdminEmail(email){
   return false;
 }
 
-/* ============================ COSTANTI ================================== */
-const LS_KEY = "spazioireos_reportore_v1";     // dati (compat con ver1)
-const LS_PIN = "spazioireos_reportore_pin";    // PIN locale (separato dai dati)
-const APP_VER = "ver2";
+/* ===================== COSTANTI ===================== */
+const LS_KEY = "spazioireos_reportore_v1";
+const LS_PIN = "spazioireos_reportore_pin";
+const APP_VER = "ver4";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
 const MESE_ABBR_FILE = ["gen","feb","mar","apr","mag","giu","lug","ago","set","ott","nov","dic"];
 const WD = ["dom","lun","mar","mer","gio","ven","sab"];
+const CRIMSON = "rgba(178,34,34,0.75)";  // #B22222 al 75%
 
-const CAT = {
-  lavoro:  { bg:"#ffffff", fg:"#1f2937" },
-  riposo:  { bg:"#f1f5f9", fg:"#64748b" },
-  ferie:   { bg:"#dbeafe", fg:"#1e40af" },
-  festivo: { bg:"#fef9c3", fg:"#854d0e" },
-  permesso:{ bg:"#e0e7ff", fg:"#3730a3" },
-  malattia:{ bg:"#fee2e2", fg:"#991b1b" },
-  maternita:{ bg:"#fce7f3", fg:"#9d174b" },
-  nonpag:  { bg:"#e5e7eb", fg:"#374151" }
-};
-// pay: true = assenza/voce retribuita ; false = non retribuita
+/* Codici con colore di sfondo IDENTICO al file Excel caricato */
 const CODICI = [
-  { c:"--",     l:"Domenica / riposo settimanale",     cat:"riposo",    pay:true },
-  { c:"AN",     l:"Giorno non lavorativo (part-time)",  cat:"riposo",    pay:true },
-  { c:"FERIE",  l:"Ferie",                              cat:"ferie",     pay:true },
-  { c:"FEST",   l:"Festività goduta",                   cat:"festivo",   pay:true },
-  { c:"FESTNG", l:"Festività non goduta",               cat:"festivo",   pay:true },
-  { c:"EXF",    l:"Permesso ex festività",              cat:"permesso",  pay:true },
-  { c:"FLEX",   l:"Uso flessibilità accantonata",       cat:"permesso",  pay:true },
-  { c:"LUTTO",  l:"Lutto / permesso lutto",             cat:"permesso",  pay:true },
-  { c:"ELEZ",   l:"Elezioni / permesso elettorale",     cat:"permesso",  pay:true },
-  { c:"ESAMI",  l:"Esame univ. / permesso esame",       cat:"permesso",  pay:true },
-  { c:"SIND",   l:"Permesso sindacale",                 cat:"permesso",  pay:true },
-  { c:"MATR",   l:"Licenza matrimoniale",               cat:"permesso",  pay:true },
-  { c:"CONGP",  l:"Congedo parentale",                  cat:"permesso",  pay:true },
-  { c:"MAL",    l:"Malattia",                           cat:"malattia",  pay:true },
-  { c:"MAL 0h", l:"Malattia non pagata",                cat:"malattia",  pay:false },
-  { c:"MALFG",  l:"Malattia figlio",                    cat:"malattia",  pay:true },
-  { c:"INFOR",  l:"Infortunio",                         cat:"malattia",  pay:true },
-  { c:"RICOV",  l:"Ricovero",                           cat:"malattia",  pay:true },
-  { c:"MAT-OBB",l:"Maternità obbligatoria",             cat:"maternita", pay:true },
-  { c:"MAT-FC", l:"Maternità facoltativa",              cat:"maternita", pay:true },
-  { c:"MAT-ANT",l:"Maternità anticipata",               cat:"maternita", pay:true },
-  { c:"ASP 0h", l:"Aspettativa non pagata",             cat:"nonpag",    pay:false },
-  { c:"CASSA",  l:"Cassa integrazione o simili",        cat:"nonpag",    pay:false }
+  { c:"--",     l:"Domenica / riposo settimanale",     pay:true,  bg:"#E7E6E6" },
+  { c:"AN",     l:"Giorno non lavorativo (part-time)",  pay:true,  bg:"#E7E6E6" },
+  { c:"FERIE",  l:"Ferie",                              pay:true,  bg:"#FFFF00" },
+  { c:"FEST",   l:"Festività goduta",                   pay:true,  bg:"#4474A0" },
+  { c:"FESTNG", l:"Festività non goduta",               pay:true,  bg:"#DEEBF7" },
+  { c:"EXF",    l:"Permesso ex festività",              pay:true,  bg:"#FFC000" },
+  { c:"FLEX",   l:"Uso flessibilità accantonata",       pay:true,  bg:"#FFD757" },
+  { c:"LUTTO",  l:"Lutto / permesso lutto",             pay:true,  bg:"#5F4879" },
+  { c:"ELEZ",   l:"Elezioni / permesso elettorale",     pay:true,  bg:"#00B04F" },
+  { c:"ESAMI",  l:"Esame univ. / permesso esame",       pay:true,  bg:"#006000" },
+  { c:"SIND",   l:"Permesso sindacale",                 pay:true,  bg:"#A4C163" },
+  { c:"MATR",   l:"Licenza matrimoniale",               pay:true,  bg:"#FEA59C" },
+  { c:"CONGP",  l:"Congedo parentale",                  pay:true,  bg:"#EADCF4" },
+  { c:"MAL",    l:"Malattia",                           pay:true,  bg:"#F8CBAD" },
+  { c:"MAL 0h", l:"Malattia non pagata",                pay:false, bg:"#763E18" },
+  { c:"MALFG",  l:"Malattia figlio",                    pay:true,  bg:"#800000" },
+  { c:"INFOR",  l:"Infortunio",                         pay:true,  bg:"#663300" },
+  { c:"RICOV",  l:"Ricovero",                           pay:true,  bg:"#EFE5F7" },
+  { c:"MAT-OBB",l:"Maternità obbligatoria",             pay:true,  bg:"#FF99CC" },
+  { c:"MAT-FC", l:"Maternità facoltativa",              pay:true,  bg:"#FF66CC" },
+  { c:"MAT-ANT",l:"Maternità anticipata",               pay:true,  bg:"#FF66CC" },
+  { c:"ASP 0h", l:"Aspettativa non pagata",             pay:false, bg:"#FF0066" },
+  { c:"CASSA",  l:"Cassa integrazione o simili",        pay:false, bg:"#CC3300" }
 ];
 const CODE_SET = {};
 CODICI.forEach(function(x){ CODE_SET[x.c] = x; });
 
-const PALETTE = ["#00B0F0","#7EC8A0","#F6C453","#EE8C6A","#B7A4D6","#9AD0C2","#F49AC2","#8FB9E0","#C3B091","#9CA3AF"];
+const PALETTE = ["#00B0F0","#CCFF66","#FFC000","#FFDDFF","#B7A4D6","#9AD0C2","#F49AC2","#8FB9E0","#C3B091","#9CA3AF"];
 
+/* Anagrafica precompilata (colori-barra e contratti come nel file Excel) */
 const DIP_INIZIALI = [
-  { nome:"BOCCALARI ELEONORA",        oreSett:18, contratto:"FINO AL 30/06/26", colore:"#00B0F0" },
-  { nome:"CHIODI MANUELA",            oreSett:12, contratto:"INDETERMINATO",    colore:"#7EC8A0" },
-  { nome:"DEL MASTRO MARIA",          oreSett:17, contratto:"INDETERMINATO",    colore:"#F6C453" },
-  { nome:"DE MAIO BARBARA",           oreSett:29, contratto:"FINO AL 31/12/26", colore:"#EE8C6A" },
-  { nome:"DI LECCE IVANA",            oreSett:38, contratto:"INDETERMINATO",    colore:"#B7A4D6" },
-  { nome:"FERRARI FEDERICA",          oreSett:19, contratto:"INDETERMINATO",    colore:"#9AD0C2" },
-  { nome:"FISICHELLA GIUSEPPE",       oreSett:15, contratto:"FINO AL 31/12/26", colore:"#F49AC2" },
-  { nome:"FRUTAZ RACHELE",            oreSett:19, contratto:"INDETERMINATO",    colore:"#8FB9E0" },
-  { nome:"GIUNCHIGLIA BENEDETTA",     oreSett:18, contratto:"FINO AL 07/08/26", colore:"#C3B091" },
-  { nome:"PANSERA ANTONIA ALFONSINA", oreSett:15, contratto:"FINO AL 31/12/26", colore:"#00B0F0" }
+  { nome:"BOCCALARI ELEONORA",        livello:"", oreSett:18, tipoContratto:"determinato",   scadenza:"30/06/26", dataAssunzione:"", dataCessazione:"", colore:"#00B0F0" },
+  { nome:"CHIODI MANUELA",            livello:"", oreSett:12, tipoContratto:"indeterminato", scadenza:"",         dataAssunzione:"", dataCessazione:"", colore:"#00B0F0" },
+  { nome:"DEL MASTRO MARIA",          livello:"", oreSett:17, tipoContratto:"indeterminato", scadenza:"",         dataAssunzione:"", dataCessazione:"", colore:"#CCFF66" },
+  { nome:"DE MAIO BARBARA",           livello:"", oreSett:29, tipoContratto:"determinato",   scadenza:"31/12/26", dataAssunzione:"", dataCessazione:"", colore:"#CCFF66" },
+  { nome:"DI LECCE IVANA",            livello:"", oreSett:38, tipoContratto:"indeterminato", scadenza:"",         dataAssunzione:"", dataCessazione:"", colore:"#00B0F0" },
+  { nome:"FERRARI FEDERICA",          livello:"", oreSett:19, tipoContratto:"indeterminato", scadenza:"",         dataAssunzione:"", dataCessazione:"", colore:"#FFC000" },
+  { nome:"FISICHELLA GIUSEPPE",       livello:"", oreSett:15, tipoContratto:"determinato",   scadenza:"31/12/26", dataAssunzione:"", dataCessazione:"", colore:"#FFDDFF" },
+  { nome:"FRUTAZ RACHELE",            livello:"", oreSett:19, tipoContratto:"indeterminato", scadenza:"",         dataAssunzione:"", dataCessazione:"", colore:"#FFC000" },
+  { nome:"GIUNCHIGLIA BENEDETTA",     livello:"", oreSett:18, tipoContratto:"determinato",   scadenza:"07/08/26", dataAssunzione:"", dataCessazione:"", colore:"#00B0F0" },
+  { nome:"PANSERA ANTONIA ALFONSINA", livello:"", oreSett:15, tipoContratto:"determinato",   scadenza:"31/12/26", dataAssunzione:"", dataCessazione:"", colore:"#CCFF66" }
 ];
 
-/* ============================ HELPER =================================== */
+/* Dati dei 6 mesi già compilati (estratti dal file Excel caricato) — chiave per NOME */
+const INITIAL_DATI = {"2026-01": {"BOCCALARI ELEONORA": {"giorni": {"1": "FEST", "2": 2.75, "3": "AN", "4": "--", "5": "AN", "6": "FEST", "7": 4, "8": 4.5, "9": 4, "10": "AN", "11": "--", "12": 4, "13": 4, "14": 4, "15": 4.5, "16": 4, "17": "AN", "18": "--", "19": 4, "20": 4, "21": 4, "22": 4.5, "23": 4, "24": "AN", "25": "--", "26": 4, "27": 4, "28": 4, "29": 4.5, "30": 4, "31": "AN"}, "nota": ""}, "CHIODI MANUELA": {"giorni": {"1": "FEST", "2": "AN", "3": "AN", "4": "--", "5": "AN", "6": "FEST", "7": 1.25, "8": 4, "9": 4, "10": "AN", "11": "--", "12": 4, "13": 4, "14": 4, "15": 4, "16": 4, "17": "AN", "18": "--", "19": 4, "20": 4, "21": 4, "22": 4, "23": 4, "24": "AN", "25": "--", "26": 4, "27": 4, "28": 4, "29": 4, "30": 4, "31": "AN"}, "nota": ""}, "DEL MASTRO MARIA": {"giorni": {"1": "FEST", "2": "AN", "3": "AN", "4": "--", "5": "AN", "6": "FEST", "7": 4, "8": 4.5, "9": 3.5, "10": "AN", "11": "--", "12": "AN", "13": 5, "14": 4, "15": 4.5, "16": 3.5, "17": "AN", "18": "--", "19": "AN", "20": 5, "21": 4, "22": "FERIE", "23": "FERIE", "24": "FERIE", "25": "--", "26": "FERIE", "27": "FERIE", "28": "FERIE", "29": "FERIE", "30": "FERIE", "31": "AN"}, "nota": ""}, "DE MAIO BARBARA": {"giorni": {"1": "FEST", "2": "AN", "3": "AN", "4": "--", "5": "AN", "6": "FEST", "7": 8, "8": 8, "9": 8, "10": "AN", "11": "--", "12": 3.75, "13": 8, "14": 8, "15": 8, "16": 8, "17": "AN", "18": "--", "19": 3.75, "20": 8, "21": "MAL 0h", "22": "MAL 0h", "23": "MAL 0h", "24": "MAL", "25": "MAL", "26": "MAL", "27": "MAL", "28": "MAL", "29": "MAL", "30": "MAL", "31": "MAL"}, "nota": ""}, "DI LECCE IVANA": {"giorni": {"1": "FEST", "2": 7, "3": "AN", "4": "--", "5": 1.33, "6": "FEST", "7": 8, "8": 8, "9": 8, "11": "--", "12": 8, "13": 8, "14": 8, "15": 8, "16": 8, "17": "AN", "18": "--", "19": 8, "20": 8, "21": 8, "22": 8, "23": 8, "24": "AN", "25": "--", "26": 8, "27": 8, "28": 8, "29": 8, "30": 8, "31": "AN"}, "nota": ""}, "FERRARI FEDERICA": {"giorni": {"1": "FEST", "2": "AN", "3": "AN", "4": "--", "5": "AN", "6": "FEST", "7": 4, "8": 4, "9": 4, "10": "AN", "11": "--", "12": 4, "13": 4, "14": 4, "15": 4, "16": 4, "17": "AN", "18": "--", "19": 4, "20": 4, "21": 4, "22": 4, "23": 4, "24": "AN", "25": "--", "26": 4, "27": 4, "28": 4, "29": 4, "30": 3, "31": "AN"}, "nota": ""}, "FRUTAZ RACHELE": {"giorni": {"1": "FEST", "2": "AN", "3": "AN", "4": "--", "5": "AN", "6": "FEST", "7": 3, "8": 3, "9": 3, "10": "AN", "11": "--", "12": 3, "13": 3, "14": 3, "15": 3, "16": 3, "17": "AN", "18": "--", "19": 4, "20": 4, "21": 8, "22": 8, "23": 8, "24": "AN", "25": "--", "26": 8, "27": 8, "28": 8, "29": 8, "30": 8, "31": "AN"}, "nota": ""}, "GIUNCHIGLIA BENEDETTA": {"giorni": {"1": "FEST", "2": "AN", "3": "AN", "4": "--", "5": "AN", "6": "FEST", "7": 4, "8": 4, "9": 4, "10": "AN", "11": "--", "12": 4, "13": 4, "14": 4, "15": 4, "16": 4, "17": "AN", "18": "--", "19": 4, "20": 4, "21": 4, "22": 4, "23": 4, "24": "AN", "25": "--", "26": 4, "27": 4, "28": 4, "29": 4, "30": 4, "31": "AN"}, "nota": ""}, "PANSERA ANTONIA ALFONSINA": {"giorni": {"1": "FEST", "2": "FERIE", "3": "AN", "4": "--", "5": "FERIE", "6": "FEST", "7": 3, "8": 3, "9": 3, "10": "AN", "11": "--", "12": 3, "13": 3, "14": 3, "15": 3, "16": 3, "17": "AN", "18": "--", "19": 3, "20": 3, "21": 3, "22": 3, "23": 3, "24": "AN", "25": "--", "26": 3, "27": 3, "28": 3, "29": 3, "30": 3, "31": "AN"}, "nota": ""}}, "2026-02": {"BOCCALARI ELEONORA": {"giorni": {"1": "--", "2": "AN", "3": 2.5, "4": 4, "5": 4.5, "6": 4, "7": "AN", "8": "--", "9": 4, "10": 4, "11": 4, "12": 4.5, "13": 4, "14": "AN", "15": "--", "16": 4, "17": 4, "18": 4, "19": 4.5, "20": 4, "21": "AN", "22": "--", "23": 4, "24": 4, "25": 4, "26": 4.5, "27": 4, "28": "AN"}, "nota": ""}, "CHIODI MANUELA": {"giorni": {"1": "--", "2": 2.75, "3": 2.75, "4": 2.75, "5": 4, "6": 4, "7": "AN", "8": "--", "9": 4, "10": 4, "11": 4, "12": 4, "13": 4, "14": "AN", "15": "--", "16": 4, "17": 4, "18": 4, "19": 4, "20": 4, "21": "AN", "22": "--", "23": 4, "24": 4, "25": 4, "26": 4, "27": 4, "28": "AN"}, "nota": ""}, "DEL MASTRO MARIA": {"giorni": {"1": "--", "2": "AN", "3": 5, "4": 4, "5": 4.5, "6": 3.5, "7": "AN", "8": "--", "9": "AN", "10": 5, "11": 4, "12": 4.5, "13": 3.5, "14": "AN", "15": "--", "16": "AN", "17": 5, "18": 4, "19": 4.5, "20": 3.5, "21": "AN", "22": "--", "23": "AN", "24": 5, "25": 4, "26": 4.5, "27": 3.5, "28": "AN"}, "nota": ""}, "DE MAIO BARBARA": {"giorni": {"1": "--", "2": 3.5, "3": 7.5, "4": 7.5, "5": 7.5, "6": 7.5, "7": "AN", "8": "--", "9": 3.5, "10": 7.5, "11": 7.5, "12": 7.5, "13": 7.5, "14": "AN", "15": "--", "16": 3.5, "17": 7.5, "18": 7.5, "19": 7.5, "20": 7.5, "21": "AN", "22": "--", "23": 3.5, "24": 7.5, "25": 7.5, "26": 7.5, "27": 7.5, "28": "AN"}, "nota": ""}, "DI LECCE IVANA": {"giorni": {"1": "--", "2": 7.75, "3": 7.5, "4": 7.5, "5": 7.5, "6": "FERIE", "7": "FERIE", "8": "--", "9": 7, "10": 7, "11": 7, "12": 7, "13": "FERIE", "14": "FERIE", "15": "--", "16": 7, "17": 7, "18": 7, "19": 7, "20": "FERIE", "21": "FERIE", "22": "--", "23": 7, "24": 7, "25": 7, "26": 7, "27": "FERIE", "28": "FERIE"}, "nota": ""}, "FERRARI FEDERICA": {"giorni": {"1": "--", "2": 4, "3": 4, "4": 4, "5": 4, "6": 4, "7": "AN", "8": "--", "9": 4, "10": 4, "11": 4, "12": 4, "13": 4, "14": "AN", "15": "--", "16": 4, "17": 4, "18": 4, "19": 4, "20": 4, "21": "AN", "22": "--", "23": 3, "24": 3, "25": 4, "26": 4.5, "27": 4, "28": "AN"}, "nota": ""}, "FRUTAZ RACHELE": {"giorni": {"1": "--", "2": 5, "3": 5, "4": 5, "5": 5, "6": 5, "7": "AN", "8": "--", "9": 5, "10": 5, "11": 5, "12": 5, "13": 5, "14": "AN", "15": "--", "16": 5, "17": 5, "18": 5, "19": 6, "20": 6, "21": "AN", "22": "--", "23": 6, "24": 6, "25": 6, "26": 6, "27": 6, "28": "AN"}, "nota": ""}, "GIUNCHIGLIA BENEDETTA": {"giorni": {"1": "--", "2": 4, "3": 4, "4": 4, "5": 4.5, "6": 4, "7": "AN", "8": "--", "9": 4, "10": 4, "11": 4, "12": 4.5, "13": 4, "14": "AN", "15": "--", "16": 4, "17": 4, "18": 4, "19": 4.5, "20": 4, "21": "AN", "22": "--", "23": 4, "24": 4, "25": 4, "26": 3.5, "27": "AN", "28": "AN"}, "nota": ""}, "PANSERA ANTONIA ALFONSINA": {"giorni": {"1": "--", "2": 3, "3": 3, "4": 3, "5": "AN", "6": "AN", "7": "AN", "8": "--", "9": 3, "10": 3, "11": 3, "12": 3, "13": 3, "15": "--", "16": 3, "17": 3, "18": 3, "19": 5, "20": 3, "22": "--", "23": 3, "24": 3, "25": 3, "26": 3, "27": 3, "28": "AN"}, "nota": ""}}, "2026-03": {"BOCCALARI ELEONORA": {"giorni": {"1": "--", "2": 4, "3": 4, "4": 4, "5": 4.5, "6": 4, "7": "AN", "8": "--", "9": 4, "10": 4, "11": 4, "12": 4.5, "13": 4, "14": "AN", "15": "--", "16": 4, "17": 4, "18": 4, "19": 4.5, "20": 4, "21": "AN", "22": "--", "23": 4, "24": 4, "25": 4, "26": 4.5, "27": 4, "28": "AN", "29": "--", "30": 4, "31": 4}, "nota": ""}, "CHIODI MANUELA": {"giorni": {"1": "--", "2": "FERIE", "3": "FERIE", "4": "FERIE", "5": 5.5, "6": 5.5, "7": "AN", "8": "--", "9": 4, "10": 4, "11": 4, "12": 4, "13": 4, "14": "AN", "15": "--", "16": 4, "17": 4, "18": 4, "19": 4, "20": 4, "21": "ELEZ", "22": "ELEZ", "23": "ELEZ", "24": "AN", "25": "AN", "26": 4, "27": 4, "28": "AN", "29": "--", "30": 4, "31": 4}, "nota": ""}, "DEL MASTRO MARIA": {"giorni": {"1": "--", "2": 5, "3": 5, "4": 4, "5": 4.5, "6": 3.5, "7": "AN", "8": "--", "9": 5, "10": 5, "11": 4, "12": 4.5, "13": 3.5, "14": "AN", "15": "--", "16": 5, "17": 5, "18": 4, "19": 4.5, "20": 3.5, "21": "AN", "22": "--", "23": 5, "24": 5, "25": 4, "26": 4.5, "27": 3.5, "28": "AN", "29": "--", "30": 7, "31": 7}, "nota": ""}, "DE MAIO BARBARA": {"giorni": {"1": "--", "2": 7.5, "3": 7.5, "4": 7.5, "5": 7.5, "6": 7.5, "7": "AN", "8": "--", "9": 4.25, "10": 7.5, "11": 7.5, "12": 7.5, "13": 7.5, "14": "AN", "15": "--", "16": 4.25, "17": 7.5, "18": 7.5, "19": 7.5, "20": 7.5, "21": "AN", "22": "--", "23": 4.25, "24": 7.5, "25": 7.5, "26": 7.5, "27": 7.5, "28": "AN", "29": "--", "30": 4.25, "31": 7.5}, "nota": ""}, "DI LECCE IVANA": {"giorni": {"1": "--", "2": 7.5, "3": 7.5, "4": 7.5, "5": 7.5, "6": 7.5, "7": "AN", "8": "--", "9": 7.5, "10": 7.5, "11": 7.5, "12": 7.5, "13": 7.5, "14": "AN", "15": "--", "16": 7.5, "17": 7.5, "18": 7.5, "19": 7.5, "20": 7.5, "21": "AN", "22": "--", "23": 7.5, "24": 7.5, "25": 7.5, "26": 7.5, "27": 7.5, "28": "AN", "29": "--", "30": 7.5, "31": 7.5}, "nota": ""}, "FERRARI FEDERICA": {"giorni": {"1": "--", "2": 3, "3": 3, "4": 3, "5": 3, "6": 3, "7": "AN", "8": "--", "9": 3, "10": 3, "11": 3, "12": 3, "13": 3, "14": "AN", "15": "--", "16": 3, "17": 3, "18": 3, "19": 3, "20": 3, "21": "AN", "22": "--", "23": 3, "24": 3, "25": 3, "26": 3, "27": 3, "28": "AN", "29": "--", "30": 3, "31": 3}, "nota": ""}, "FRUTAZ RACHELE": {"giorni": {"1": "--", "2": 5, "3": 5, "4": 5, "5": 5, "6": 5, "7": "AN", "8": "--", "9": 5, "10": 5, "11": 5, "12": 5, "13": 5, "14": "AN", "15": "--", "16": 5, "17": 5, "18": 5, "19": 5, "20": 5, "21": "AN", "22": "--", "23": 5, "24": 5, "25": 5, "26": 5, "27": 5, "28": "AN", "29": "--", "30": 5, "31": 5}, "nota": ""}, "GIUNCHIGLIA BENEDETTA": {"giorni": {"1": "--", "2": 4, "3": 4, "4": 4, "5": 4, "6": 4, "7": "AN", "8": "--", "9": 4, "10": 4, "11": 4, "12": 4.5, "13": 4, "14": "AN", "15": "--", "16": 4, "17": 4, "18": 4, "19": 4.5, "20": 4, "21": "AN", "22": "--", "23": 4, "24": 4, "25": 4, "26": 4.5, "27": 4, "28": "AN", "29": "--", "30": 4, "31": 4}, "nota": ""}, "PANSERA ANTONIA ALFONSINA": {"giorni": {"1": "--", "2": 3, "3": 3, "4": 3, "5": 3, "6": 3, "8": "--", "9": 3, "10": 3, "11": 3, "12": 3, "13": 3, "15": "--", "16": 3, "17": 3, "18": 3, "19": 3, "20": 3, "22": "--", "23": 3, "24": 3, "25": 3, "26": 3, "27": 3, "29": "--", "30": "AN", "31": "AN"}, "nota": ""}}, "2026-04": {"BOCCALARI ELEONORA": {"giorni": {"1": 4, "2": "AN", "3": "AN", "4": "AN", "5": "--", "6": "FEST", "7": 4.5, "8": 4.5, "9": 4.5, "10": 4.5, "11": "AN", "12": "--", "13": 4, "14": 4, "15": 4, "16": 4.5, "17": 4, "18": "AN", "19": "--", "20": 4, "21": 4, "22": 4, "23": 4.5, "24": 4, "25": "FEST", "26": "--", "27": 4, "28": 4, "29": 4, "30": 4.5}, "nota": ""}, "CHIODI MANUELA": {"giorni": {"1": 2.5, "2": "FERIE", "3": "FERIE", "4": "FERIE", "5": "--", "6": "FEST", "7": "FERIE", "8": 2.5, "9": 2.5, "10": 2.5, "11": "AN", "12": "--", "13": 2.5, "14": 3, "15": 3, "16": 3, "17": 3, "18": "AN", "19": "--", "20": 3, "21": 3, "22": 3, "23": 3, "24": 3, "25": "FEST", "26": "--", "27": 3, "28": 3, "29": 3, "30": 3}, "nota": ""}, "DEL MASTRO MARIA": {"giorni": {"1": 4, "2": 4.5, "3": 3.5, "4": "AN", "5": "--", "6": "FEST", "7": 5, "8": 4, "9": 4.5, "10": 3.5, "11": "AN", "12": "--", "13": "AN", "14": 5, "15": 4, "16": 4.5, "17": 3.5, "18": "AN", "19": "--", "20": "AN", "21": 5, "22": 4, "23": 4.5, "24": 3.5, "25": "FEST", "26": "--", "27": "AN", "28": 5, "29": 4, "30": 4.5}, "nota": ""}, "DE MAIO BARBARA": {"giorni": {"1": 7.5, "2": 7.5, "3": 7.5, "4": "AN", "5": "--", "6": "FEST", "7": 7.5, "8": 7.5, "9": 7.5, "10": 7.5, "11": "AN", "12": "--", "13": 4.25, "14": 7.5, "15": 7.5, "16": 7.5, "17": 7.5, "18": "AN", "19": "--", "20": 4.25, "21": 7.5, "22": 7.5, "23": 7.5, "24": 7.5, "25": "FEST", "26": "--", "27": 4.25, "28": 7.5, "29": 7.5, "30": 7.5}, "nota": ""}, "DI LECCE IVANA": {"giorni": {"1": 6.66, "2": "FERIE", "3": "FERIE", "4": "FERIE", "5": "--", "6": "FEST", "7": "FERIE", "8": "FERIE", "9": 8, "10": 8, "12": "--", "13": 7, "14": 7, "15": 7, "16": 7, "17": 7, "19": "--", "20": 7, "21": 7, "22": 7, "23": 7, "24": 7, "25": "FEST", "26": "--", "27": 7, "28": 7, "29": 7, "30": 7}, "nota": ""}, "FERRARI FEDERICA": {"giorni": {"1": 4.5, "2": 4.5, "3": 4.5, "4": "AN", "5": "--", "6": "FEST", "7": 4.5, "8": 2.5, "9": 2.5, "10": 2.5, "11": "AN", "12": "--", "13": 2.5, "14": 2.5, "15": 2.5, "16": 2.5, "17": 2.5, "18": "AN", "19": "--", "20": 2.5, "21": 2.5, "22": 2.5, "23": 2.5, "24": 2.5, "25": "FEST", "26": "--", "27": 2.5, "28": 2.5, "29": 2.5, "30": 2.5}, "nota": ""}, "FISICHELLA GIUSEPPE": {"giorni": {"1": "--", "2": "--", "3": "--", "4": "--", "5": "--", "6": "--", "7": "--", "8": "--", "9": "--", "10": "--", "11": "--", "12": "--", "13": "--", "14": "--", "15": "--", "16": "--", "17": "--", "18": "--", "19": "--", "20": 3, "21": 3, "22": 3, "23": 3, "24": 3, "25": "FEST", "26": "--", "27": 3, "28": 4, "29": 4, "30": 4}, "nota": ""}, "FRUTAZ RACHELE": {"giorni": {"1": 4, "2": 4, "3": 4, "4": "AN", "5": "--", "6": "FEST", "7": 4, "8": 4, "9": 4, "10": 4, "11": "AN", "12": "--", "13": 4, "14": 4, "15": 4, "16": 5, "17": 5, "18": "AN", "19": "--", "20": 5, "21": 5, "22": 5, "23": 5, "24": 5, "25": "FEST", "26": "--", "27": 5, "28": 5, "29": 5, "30": 5}, "nota": ""}, "GIUNCHIGLIA BENEDETTA": {"giorni": {"1": "AN", "2": "AN", "3": "AN", "4": "AN", "5": "--", "6": "FEST", "7": 4.5, "8": 4.5, "9": 4.5, "10": 4, "11": 4, "12": "--", "13": 4, "14": 4, "15": 4, "16": 4.5, "17": 4, "18": "AN", "19": "--", "20": "MAL 0h", "21": "MAL 0h", "22": "MAL 0h", "23": "MAL", "24": "MAL", "25": "FEST", "26": "--", "27": 4, "28": 4, "29": 4, "30": 4.5}, "nota": ""}, "PANSERA ANTONIA ALFONSINA": {"giorni": {"1": 7, "2": 3, "3": 3, "4": "AN", "5": "--", "6": "FEST", "7": 3, "8": 3, "9": 3, "10": 3, "11": "AN", "12": "--", "13": 3, "14": 3, "15": 3, "16": 3, "17": 3, "18": "AN", "19": "--", "20": 3, "21": 3, "22": 3, "23": 3, "24": 3, "25": "FEST", "26": "--", "27": 3, "28": 3, "29": 3, "30": 3}, "nota": ""}}, "2026-05": {"BOCCALARI ELEONORA": {"giorni": {"1": "FEST", "2": "AN", "3": "--", "4": 4, "5": 4, "6": 4, "7": 4.5, "8": 4, "9": "AN", "10": "--", "11": 4, "12": 4, "13": 4, "14": 4.5, "15": 4, "16": "AN", "17": "--", "18": 4, "19": 4, "20": 4, "21": 4.5, "22": 4, "23": "AN", "24": "--", "25": 4, "26": 4, "27": 4, "28": 4.5, "29": 1, "30": "AN", "31": "--"}, "nota": ""}, "CHIODI MANUELA": {"giorni": {"1": "FEST", "2": "AN", "3": "--", "4": 3, "5": 3, "6": 3, "7": 3, "8": 3, "9": "AN", "10": "--", "11": 3, "12": 3, "13": 3, "14": 3, "15": 3, "16": "AN", "17": "--", "18": 3, "19": 3, "20": 3, "21": 3, "22": 3, "23": "AN", "24": "--", "25": 3, "26": 3, "27": 2.5, "28": 2.5, "29": 2.5, "30": "AN", "31": "--"}, "nota": ""}, "DEL MASTRO MARIA": {"giorni": {"1": "FEST", "2": "AN", "3": "--", "4": "AN", "5": 3, "6": 4, "7": 4.5, "8": 3.5, "9": "AN", "10": "--", "11": "AN", "12": 3, "13": 4, "14": 4.5, "15": 3.5, "16": "AN", "17": "--", "18": "AN", "19": 3, "20": 4, "21": 4.5, "22": 3.5, "23": "AN", "24": "--", "25": "AN", "26": 3, "27": "EXF", "28": "EXF", "29": "EXF", "30": "AN", "31": "--"}, "nota": ""}, "DE MAIO BARBARA": {"giorni": {"1": "FEST", "2": "AN", "3": "--", "4": 7.5, "5": 7.5, "6": 7.5, "7": 7.5, "8": 7.5, "9": "AN", "10": "--", "11": 7.5, "12": 7.5, "13": 7.5, "14": 7.5, "15": 7.5, "16": "AN", "17": "--", "18": 7.5, "19": 7.5, "20": 7.5, "21": 7.5, "22": 7.5, "23": "AN", "24": "--", "25": "EXF", "26": 7.5, "27": 7.5, "28": 7.5, "29": 7.5, "30": "AN", "31": "--"}, "nota": ""}, "DI LECCE IVANA": {"giorni": {"1": "FEST", "2": "AN", "3": "--", "4": 8, "5": 8, "6": 8, "7": 8, "8": 8, "9": 2, "10": "--", "11": 8, "12": 8, "13": 8, "14": 8, "15": 8, "16": "AN", "17": "--", "18": 8, "19": 8, "20": 8, "21": 8, "22": 8, "23": "AN", "24": "--", "25": 8, "26": 8, "27": 8, "28": "EXF", "29": "EXF", "30": "AN", "31": "--"}, "nota": ""}, "FERRARI FEDERICA": {"giorni": {"1": "FEST", "2": "AN", "3": "--", "4": 4, "5": 4, "6": 4, "7": 4, "8": 4, "9": "AN", "10": "--", "11": 4, "12": 4, "13": 4, "14": 4, "15": 4, "16": "AN", "17": "--", "18": 4, "19": 4, "20": 4, "21": 4, "22": 4, "23": "AN", "24": "--", "25": 4, "26": 4, "27": 4, "28": 4, "29": 5, "30": "AN", "31": "--"}, "nota": ""}, "FISICHELLA GIUSEPPE": {"giorni": {"1": "FEST", "2": "AN", "3": "--", "4": 3, "5": "FERIE", "6": 3, "7": "FERIE", "8": 3, "9": "AN", "10": "--", "11": 3, "12": 3, "13": 3, "14": 3, "15": 3, "16": "AN", "17": "--", "18": 3, "19": 3, "20": 3, "21": 3, "22": 3, "23": "AN", "24": "--", "25": 3, "26": 3, "27": 3, "28": "AN", "29": "AN", "30": "AN", "31": "--"}, "nota": ""}, "FRUTAZ RACHELE": {"giorni": {"1": "FEST", "2": "AN", "3": "--", "4": 8, "5": 8, "6": 8, "7": 8, "8": 8, "9": "AN", "10": "--", "11": 6.5, "12": 6.5, "13": 6.5, "14": 5, "15": 5, "16": "AN", "17": "--", "18": 5, "19": 5, "20": 5, "21": 5, "22": 5, "23": "AN", "24": "--", "25": 5, "26": 5, "27": 5, "28": 5, "29": 5, "30": "AN", "31": "--"}, "nota": ""}, "GIUNCHIGLIA BENEDETTA": {"giorni": {"1": "FEST", "2": "AN", "3": "--", "4": 4, "5": 4, "6": 4, "7": 4.5, "8": 4, "9": "AN", "10": "--", "11": 4, "12": 4, "13": 4, "14": 4.5, "15": 4, "16": "AN", "17": "--", "18": 4, "19": 4, "20": 4, "21": 4.5, "22": 4, "23": "AN", "24": "--", "25": 4, "26": 4, "27": 4, "28": 4.5, "29": 7.5, "30": "AN", "31": "--"}, "nota": ""}, "PANSERA ANTONIA ALFONSINA": {"giorni": {"1": "FEST", "2": "AN", "3": "--", "4": 7.5, "5": 7.5, "6": 7.5, "7": 3, "8": 3, "9": "AN", "10": "--", "11": 3, "12": 3, "13": 3, "14": 3, "15": 3, "16": "AN", "17": "--", "18": 3, "19": 3, "20": 3, "21": 3, "22": 3, "23": "AN", "24": "--", "25": 3, "26": 3, "27": 3, "28": 3, "29": 3, "30": "AN", "31": "--"}, "nota": ""}}, "2026-06": {"BOCCALARI ELEONORA": {"giorni": {"1": "AN", "2": "FEST", "3": 4, "4": 4.5, "5": 4, "6": "AN", "7": "--", "8": 4, "9": 4, "10": 4, "11": 4.5, "12": 4, "13": "AN", "14": "--", "15": 4, "16": 4, "17": 4, "18": 4.5, "19": 4, "20": "AN", "21": "--", "22": 4, "23": 4, "24": 4, "25": 4.5, "26": 1, "27": "AN", "28": "--", "29": "AN", "30": "AN"}, "nota": ""}, "CHIODI MANUELA": {"giorni": {"1": "FERIE", "2": "FEST", "3": 4, "4": 4, "5": 4, "6": "AN", "7": "--", "8": 3, "9": 3, "10": 3, "11": 3, "12": 3, "13": "AN", "14": "--", "15": 3, "16": 3, "17": 3, "18": 3, "19": 3, "20": "AN", "21": "--", "22": 3, "23": 3, "24": 3, "25": 3, "26": 3, "27": "AN", "28": "--", "29": 3, "30": 3}, "nota": ""}, "DEL MASTRO MARIA": {"giorni": {"1": "AN", "2": "FEST", "3": 4, "4": 4.5, "5": 3.5, "7": "--", "8": "AN", "9": 3, "10": 4, "11": 4.5, "12": 3.5, "13": "AN", "14": "--", "15": "AN", "16": 3, "17": "AN", "18": "AN", "19": 3.5, "20": "AN", "21": "--", "22": "AN", "23": 3, "24": 4, "25": 4.5, "26": 3.5, "27": "AN", "28": "--", "29": "AN", "30": 3}, "nota": ""}, "DE MAIO BARBARA": {"giorni": {"1": "AN", "2": "FEST", "3": 7.5, "4": 7.5, "5": 7.5, "6": "AN", "7": "--", "8": "AN", "9": "AN", "10": 7.5, "11": 7.5, "12": 7.5, "13": "AN", "14": "--", "15": 7.5, "16": 7.5, "17": 7.5, "18": 7.5, "19": 7.5, "20": "AN", "21": "--", "22": 7.5, "23": 7.5, "24": 7.5, "25": 7.5, "26": 7.5, "27": "AN", "28": "--", "29": 7.5, "30": 7.5}, "nota": ""}, "DI LECCE IVANA": {"giorni": {"1": "FERIE", "2": "FEST", "3": 8, "4": 8, "5": 8, "6": "AN", "7": "--", "8": 8, "9": 8, "10": 8, "11": 8, "12": 8, "13": "AN", "14": "--", "15": 7.66, "16": 7.66, "17": 7.66, "18": 7.66, "19": 7.5, "20": "AN", "21": "--", "22": 7.5, "23": 7.5, "24": 7.5, "25": 7.5, "26": 7.5, "27": "AN", "28": "--", "29": "FERIE", "30": "FERIE"}, "nota": ""}, "FERRARI FEDERICA": {"giorni": {"1": "AN", "2": "FEST", "3": 4, "4": 4, "5": 4, "6": "AN", "7": "--", "8": 5.25, "9": 5.25, "10": "FERIE", "11": "FERIE", "12": "FERIE", "13": "FERIE", "14": "--", "15": "FERIE", "16": "FERIE", "17": "FERIE", "18": "FERIE", "19": "FERIE", "20": "FERIE", "21": "--", "22": "FERIE", "23": "FERIE", "24": "FERIE", "25": "FERIE", "26": 4, "27": "AN", "28": "--", "29": 4, "30": 4}, "nota": ""}, "FISICHELLA GIUSEPPE": {"giorni": {"1": "FERIE", "2": "FEST", "3": 3, "4": 3, "5": 3, "6": "AN", "7": "--", "8": 3, "9": 3, "10": "FERIE", "11": "MAL 0h", "12": "AN", "13": "AN", "14": "--", "15": 3, "16": 3, "17": 3, "18": 3, "19": 3, "20": "AN", "21": "--", "22": 3, "23": 3, "24": 3, "25": 3, "26": 3, "27": "AN", "28": "--", "29": 3, "30": 3}, "nota": ""}, "FRUTAZ RACHELE": {"giorni": {"1": "AN", "2": "FEST", "3": 4.5, "4": 4.5, "5": 4.5, "6": "AN", "7": "--", "8": 2.5, "9": 2.5, "10": 2.5, "11": 2.5, "12": 2.5, "13": "AN", "14": "--", "15": 2.5, "16": 2.5, "17": 4, "18": 4, "19": "AN", "20": "AN", "21": "--", "22": "AN", "23": "AN", "24": "AN", "25": "AN", "26": "AN", "27": "AN", "28": "--", "29": "AN", "30": "AN"}, "nota": ""}, "GIUNCHIGLIA BENEDETTA": {"giorni": {"1": "FERIE", "2": "FEST", "3": "FERIE", "4": "FERIE", "5": "FERIE", "6": "AN", "7": "--", "8": 4, "9": 4, "10": 2.5, "11": 2.5, "12": 2.5, "13": "AN", "14": "--", "15": 4, "16": 4, "17": 4, "18": 4.5, "19": 4, "20": "AN", "21": "--", "22": 4, "23": 4, "24": 4, "25": 4.5, "26": 4, "27": "AN", "28": "--", "29": 4, "30": 4}, "nota": ""}, "PANSERA ANTONIA ALFONSINA": {"giorni": {"1": 3, "2": "FEST", "3": 3, "4": 3, "5": 3, "6": "AN", "7": "--", "8": 3, "9": 3, "10": 3, "11": 3, "12": 6, "13": "AN", "14": "--", "15": 3, "16": 3, "17": 3, "18": 3, "19": 3, "20": "AN", "21": "--", "22": 3, "23": 3, "24": 3, "25": 3, "26": "AN", "27": "AN", "28": "--", "29": "AN", "30": "AN"}, "nota": ""}}};
+
+/* ===================== HELPER ===================== */
 function uid(){ return "d" + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 function pad2(x){ return (x<10?"0":"") + x; }
-function monthKey(y, m){ return y + "-" + pad2(m); }         // m = 1..12
+function monthKey(y, m){ return y + "-" + pad2(m); }
 function daysInMonth(y, m){ return new Date(y, m, 0).getDate(); }
 function weekdayOf(y, m, d){ return new Date(y, m - 1, d).getDay(); }
 
-function grp(num, dec){
-  const d = (dec === undefined) ? 2 : dec;
+// formatta un numero con ESATTAMENTE 2 decimali, separatori italiani
+function fmt2(num){
   let n = Number(num);
   if (isNaN(n)) n = 0;
-  const neg = n < 0;
-  n = Math.abs(n);
-  let s = n.toFixed(d);
-  let intPart = s, decPart = "";
-  if (d > 0){ const parts = s.split("."); intPart = parts[0]; decPart = parts[1]; }
+  const neg = n < 0; n = Math.abs(n);
+  const s = n.toFixed(2);
+  const parts = s.split(".");
   let out = "";
-  for (let i = 0; i < intPart.length; i++){
-    if (i > 0 && (intPart.length - i) % 3 === 0) out += ".";
-    out += intPart[i];
+  for (let i = 0; i < parts[0].length; i++){
+    if (i > 0 && (parts[0].length - i) % 3 === 0) out += ".";
+    out += parts[0][i];
   }
-  if (d > 0 && decPart !== "00"){
-    let dp = decPart.replace(/0+$/, "");
-    if (dp !== "") out += "," + dp;
-  }
-  return (neg ? "-" : "") + out;
+  return (neg ? "-" : "") + out + "," + parts[1];
 }
 function parseHour(v){
   if (v === null || v === undefined) return 0;
@@ -227,6 +215,11 @@ function parseHour(v){
   if (CODE_SET[s]) return 0;
   const n = parseFloat(s.replace(",", "."));
   return isNaN(n) ? 0 : n;
+}
+function isNumeric(v){
+  const s = String(v === null || v === undefined ? "" : v).trim();
+  if (s === "" || CODE_SET[s]) return false;
+  return !isNaN(parseFloat(s.replace(",", ".")));
 }
 function decToHM(v){
   const s = String(v === null || v === undefined ? "" : v).trim();
@@ -238,74 +231,99 @@ function decToHM(v){
   if (min === 0) return "";
   return h + " h e " + min + " min";
 }
-// Pasqua (algoritmo di Meeus/Gauss) -> {m, d}
-function pasqua(anno){
-  const a = anno % 19, b = Math.floor(anno / 100), c = anno % 100;
-  const dd = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25);
-  const g = Math.floor((b - f + 1) / 3), h = (19 * a + b - dd - g + 15) % 30;
-  const i = Math.floor(c / 4), k = c % 4;
-  const l = (32 + 2 * e + 2 * i - h - k) % 7;
-  const m = Math.floor((a + 11 * h + 22 * l) / 451);
-  const mese = Math.floor((h + l - 7 * m + 114) / 31);
-  const giorno = ((h + l - 7 * m + 114) % 31) + 1;
-  return { m: mese, d: giorno };
+// testo bianco o scuro in base alla luminanza del colore di sfondo
+function lumaText(hex){
+  let h = String(hex).replace("#","");
+  if (h.length === 3) h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+  const r = parseInt(h.slice(0,2),16), g = parseInt(h.slice(2,4),16), b = parseInt(h.slice(4,6),16);
+  const L = (0.299*r + 0.587*g + 0.114*b);
+  return L < 140 ? "#ffffff" : "#111827";
 }
-// insieme festività nazionali IT per l'anno -> { "m-d": true }
+function parseDMY(s){
+  if (!s) return null;
+  const mm = String(s).match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+  if (!mm) return null;
+  let y = parseInt(mm[3],10); if (y < 100) y += 2000;
+  return new Date(y, parseInt(mm[2],10)-1, parseInt(mm[1],10));
+}
+function isBlockedDay(dp, y, m, d){
+  const cur = new Date(y, m-1, d);
+  const a = parseDMY(dp.dataAssunzione);
+  const c = parseDMY(dp.dataCessazione);
+  if (a && cur < new Date(a.getFullYear(), a.getMonth(), a.getDate())) return true;
+  if (c && cur > new Date(c.getFullYear(), c.getMonth(), c.getDate())) return true;
+  return false;
+}
+// Pasqua (Meeus/Gauss)
+function pasqua(anno){
+  const a=anno%19,b=Math.floor(anno/100),c=anno%100,dd=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25);
+  const g=Math.floor((b-f+1)/3),h=(19*a+b-dd-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7;
+  const m=Math.floor((a+11*h+22*l)/451),mese=Math.floor((h+l-7*m+114)/31),giorno=((h+l-7*m+114)%31)+1;
+  return { m:mese, d:giorno };
+}
 function festivitaSet(anno){
   const s = {};
-  const fissi = [[1,1],[1,6],[4,25],[5,1],[6,2],[8,15],[10,4],[11,1],[12,8],[12,25],[12,26]];
-  fissi.forEach(function(f){ s[f[0] + "-" + f[1]] = true; });
-  const pa = pasqua(anno);
-  s[pa.m + "-" + pa.d] = true; // Pasqua
-  const pd = new Date(anno, pa.m - 1, pa.d); pd.setDate(pd.getDate() + 1); // Lunedì dell'Angelo
-  s[(pd.getMonth() + 1) + "-" + pd.getDate()] = true;
+  [[1,1],[1,6],[4,25],[5,1],[6,2],[8,15],[10,4],[11,1],[12,8],[12,25],[12,26]].forEach(function(f){ s[f[0]+"-"+f[1]] = true; });
+  const pa = pasqua(anno); s[pa.m+"-"+pa.d] = true;
+  const pd = new Date(anno, pa.m-1, pa.d); pd.setDate(pd.getDate()+1);
+  s[(pd.getMonth()+1)+"-"+pd.getDate()] = true;
   return s;
 }
-function isFestivo(fset, m, d){ return fset[m + "-" + d] === true; }
+function isFestivo(fset, m, d){ return fset[m+"-"+d] === true; }
+function hashPin(p){ let h=5381; for (let i=0;i<p.length;i++){ h=((h<<5)+h)+p.charCodeAt(i); h=h&0xffffffff; } return String(h>>>0); }
 
-// hash leggero per PIN (gate locale, non crittografico)
-function hashPin(p){
-  let h = 5381;
-  for (let i = 0; i < p.length; i++){ h = ((h << 5) + h) + p.charCodeAt(i); h = h & 0xffffffff; }
-  return String(h >>> 0);
+function contrLabel(dp){
+  if (dp.tipoContratto === "determinato") return "Determinato → " + (dp.scadenza || "?");
+  return "Indeterminato";
 }
 
 function emptyState(){
   const dip = DIP_INIZIALI.map(function(x){
-    return { id:uid(), nome:x.nome, oreSett:x.oreSett, contratto:x.contratto, colore:x.colore };
+    return { id:uid(), nome:x.nome, livello:x.livello, oreSett:x.oreSett, tipoContratto:x.tipoContratto,
+      scadenza:x.scadenza, dataAssunzione:x.dataAssunzione, dataCessazione:x.dataCessazione, colore:x.colore };
   });
-  return { version:2, dipendenti:dip, dati:{}, anni:[2026], updatedAt:new Date().toISOString() };
+  const byName = {}; dip.forEach(function(d){ byName[d.nome.trim().toUpperCase()] = d.id; });
+  const dati = {};
+  Object.keys(INITIAL_DATI).forEach(function(mk){
+    dati[mk] = {};
+    const perNome = INITIAL_DATI[mk];
+    Object.keys(perNome).forEach(function(nome){
+      const id = byName[nome.trim().toUpperCase()];
+      if (id) dati[mk][id] = perNome[nome];
+    });
+  });
+  return { version:4, dipendenti:dip, dati:dati, anni:[2026], updatedAt:new Date().toISOString() };
 }
 
-// migrazione ver1 (chiavi tipo "GEN26") -> ver2 (chiavi "2026-01")
 function migrate(obj){
   if (!obj) return obj;
   if (!obj.anni) obj.anni = [];
   const oldRe = /^([A-Z]{3})(\d{2})$/;
-  const map = {};
-  MONTH_ABBR.forEach(function(a, i){ map[a] = i + 1; });
-  const nuovoDati = {};
-  const anniSet = {};
+  const map = {}; MONTH_ABBR.forEach(function(a,i){ map[a] = i+1; });
+  const nuovoDati = {}; const anniSet = {};
   Object.keys(obj.dati || {}).forEach(function(k){
     const mm = k.match(oldRe);
-    if (mm){
-      const mese = map[mm[1]];
-      const anno = 2000 + parseInt(mm[2], 10);
-      nuovoDati[monthKey(anno, mese)] = obj.dati[k];
-      anniSet[anno] = true;
-    } else {
-      nuovoDati[k] = obj.dati[k];
-      const p = k.split("-");
-      if (p.length === 2) anniSet[parseInt(p[0], 10)] = true;
-    }
+    if (mm){ const mese=map[mm[1]], anno=2000+parseInt(mm[2],10); nuovoDati[monthKey(anno,mese)]=obj.dati[k]; anniSet[anno]=true; }
+    else { nuovoDati[k]=obj.dati[k]; const p=k.split("-"); if (p.length===2) anniSet[parseInt(p[0],10)]=true; }
   });
   obj.dati = nuovoDati;
-  Object.keys(anniSet).forEach(function(y){ if (obj.anni.indexOf(parseInt(y,10)) === -1) obj.anni.push(parseInt(y,10)); });
+  Object.keys(anniSet).forEach(function(y){ if (obj.anni.indexOf(parseInt(y,10))===-1) obj.anni.push(parseInt(y,10)); });
   if (obj.anni.length === 0) obj.anni = [2026];
   obj.anni.sort(function(a,b){ return a-b; });
-  // dipendenti: assicura colore
-  (obj.dipendenti || []).forEach(function(dp, idx){ if (!dp.colore) dp.colore = PALETTE[idx % PALETTE.length]; });
-  obj.version = 2;
+  (obj.dipendenti || []).forEach(function(dp, idx){
+    if (!dp.colore) dp.colore = PALETTE[idx % PALETTE.length];
+    if (dp.livello === undefined) dp.livello = "";
+    if (dp.dataAssunzione === undefined) dp.dataAssunzione = "";
+    if (dp.dataCessazione === undefined) dp.dataCessazione = "";
+    if (dp.tipoContratto === undefined){
+      const c = String(dp.contratto || "");
+      const mm = c.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})/);
+      if (/DETERM|FINO AL/i.test(c) || mm){ dp.tipoContratto = "determinato"; dp.scadenza = mm ? mm[1] : (dp.scadenza||""); }
+      else dp.tipoContratto = "indeterminato";
+    }
+    if (dp.scadenza === undefined) dp.scadenza = "";
+  });
+  obj.version = 4;
   return obj;
 }
 
@@ -327,66 +345,70 @@ function getRecFrom(state, y, m, dipId){
   return mp[dipId] || { giorni:{}, nota:"" };
 }
 function totOfRec(rec, y, m){
-  let t = 0;
-  const nd = daysInMonth(y, m);
+  let t = 0; const nd = daysInMonth(y, m);
   for (let d = 1; d <= nd; d++) t += parseHour(rec.giorni[d]);
   return Math.round(t * 100) / 100;
 }
-
-/* ============================ EXPORT EXCEL (anno) ====================== */
+function dipSorted(state){
+  const arr = state.dipendenti.slice();
+  arr.sort(function(a,b){ return a.nome.localeCompare(b.nome); });
+  return arr;
+}
 function fileName(ext){
   const now = new Date();
   return "Spazio Ireos Report Ore mensile - " + pad2(now.getDate()) + MESE_ABBR_FILE[now.getMonth()] +
     String(now.getFullYear()).slice(2) + " - " + APP_VER + " - " + pad2(now.getHours()) + "." + pad2(now.getMinutes()) + "." + ext;
 }
+
+/* ===================== EXPORT EXCEL ===================== */
 function esportaExcel(state, anno){
   const wb = XLSX.utils.book_new();
-  wb.Props = { Title:"Report Ore mensile " + anno, Author:"Christian Canonica",
-    Company:"Spazio Ireos Società Cooperativa Sociale", CreatedDate:new Date() };
-  const styH = { font:{ name:"Nunito", bold:true, sz:16, color:{rgb:"FF08344A"} },
-    fill:{ patternType:"solid", fgColor:{rgb:"FF00B0F0"} }, alignment:{ horizontal:"left", vertical:"center" } };
+  wb.Props = { Title:"Report Ore mensile " + anno, Author:"Christian Canonica", Company:"Spazio Ireos Società Cooperativa Sociale", CreatedDate:new Date() };
+  const styH = { font:{ name:"Nunito", bold:true, sz:16, color:{rgb:"FF08344A"} }, fill:{ patternType:"solid", fgColor:{rgb:"FF00B0F0"} }, alignment:{ horizontal:"left", vertical:"center" } };
   const styLbl = { font:{ name:"Nunito", bold:true, sz:10 } };
   const styWD = { font:{ name:"Nunito", sz:9, color:{rgb:"FF64748B"} }, alignment:{horizontal:"center"} };
-  const styDN = { font:{ name:"Nunito", bold:true, sz:9 }, alignment:{horizontal:"center"}, fill:{ patternType:"solid", fgColor:{rgb:"FFF1F5F9"} } };
-  const styHour = { font:{ name:"Nunito", bold:true, sz:12 }, alignment:{horizontal:"center"},
-    border:{ top:{style:"thin",color:{rgb:"FFE2E8F0"}}, bottom:{style:"thin",color:{rgb:"FFE2E8F0"}}, left:{style:"thin",color:{rgb:"FFE2E8F0"}}, right:{style:"thin",color:{rgb:"FFE2E8F0"}} } };
+  const styDN = { font:{ name:"Nunito", bold:true, sz:10 }, alignment:{horizontal:"center"}, fill:{ patternType:"solid", fgColor:{rgb:"FFF1F5F9"} } };
   const styTot = { font:{ name:"Nunito", bold:true, sz:13, color:{rgb:"FF0F2740"} }, alignment:{horizontal:"center"}, fill:{ patternType:"solid", fgColor:{rgb:"FFEEF2FF"} } };
   const styNote = { font:{ name:"Nunito", italic:true, sz:10, color:{rgb:"FF7C3AED"} } };
-
+  const hourStyle = function(val){
+    const s = String(val === undefined ? "" : val).trim();
+    const base = { font:{ name:"Nunito", bold:true, sz:12 }, alignment:{horizontal:"center"},
+      border:{ top:{style:"thin",color:{rgb:"FFE2E8F0"}}, bottom:{style:"thin",color:{rgb:"FFE2E8F0"}}, left:{style:"thin",color:{rgb:"FFE2E8F0"}}, right:{style:"thin",color:{rgb:"FFE2E8F0"}} } };
+    if (CODE_SET[s]){
+      base.fill = { patternType:"solid", fgColor:{ rgb:"FF"+CODE_SET[s].bg.replace("#","") } };
+      base.font = { name:"Nunito", bold:true, sz:9, color:{ rgb:"FF"+lumaText(CODE_SET[s].bg).replace("#","") } };
+    }
+    return base;
+  };
   for (let m = 1; m <= 12; m++){
     const nd = daysInMonth(anno, m);
-    const rows = []; const merges = []; const styleMap = {};
-    let r = 0;
+    const rows = []; const merges = []; const styleMap = {}; let r = 0;
     const put = function(rr, cc, val, st){
       while (rows.length <= rr) rows.push([]);
-      const row = rows[rr];
-      while (row.length <= cc) row.push(null);
-      row[cc] = val;
-      if (st) styleMap[rr + "_" + cc] = st;
+      const row = rows[rr]; while (row.length <= cc) row.push(null);
+      row[cc] = val; if (st) styleMap[rr+"_"+cc] = st;
     };
-    state.dipendenti.forEach(function(dp){
+    dipSorted(state).forEach(function(dp){
       const rec = getRecFrom(state, anno, m, dp.id);
       const base = r;
       put(base, 0, dp.nome, styH);
-      put(base, 10, "ORE SETT", styLbl);
-      put(base, 11, dp.oreSett, styLbl);
-      put(base, 28, dp.contratto, styLbl);
+      put(base, 10, "ORE SETT", styLbl); put(base, 11, dp.oreSett, styLbl);
+      put(base, 28, contrLabel(dp) + (dp.livello ? "  ·  Liv. "+dp.livello : ""), styLbl);
       merges.push({ s:{r:base,c:0}, e:{r:base,c:8} });
-      const rWD = base + 2, rDN = base + 3, rH = base + 4;
+      const rWD = base+2, rDN = base+3, rH = base+4;
       let tot = 0;
       for (let d = 1; d <= nd; d++){
-        const cc = d - 1;
+        const cc = d-1;
         put(rWD, cc, WD[weekdayOf(anno, m, d)], styWD);
         put(rDN, cc, d, styDN);
         const val = (rec.giorni && rec.giorni[d] !== undefined) ? rec.giorni[d] : "";
-        const num = parseHour(val);
-        tot += num;
+        const num = parseHour(val); tot += num;
         const cell = (val === "" ? null : (num !== 0 && !CODE_SET[String(val).trim()] ? num : val));
-        put(rH, cc, cell, styHour);
+        put(rH, cc, cell, hourStyle(val));
       }
       put(rDN, nd, "TOT", styDN);
-      put(rH, nd, Math.round(tot * 100) / 100, styTot);
-      if (rec.nota && rec.nota.trim() !== "") put(base + 5, 0, rec.nota, styNote);
+      put(rH, nd, Math.round(tot*100)/100, styTot);
+      if (rec.nota && rec.nota.trim() !== "") put(base+5, 0, rec.nota, styNote);
       r = base + 8;
     });
     const ws = XLSX.utils.aoa_to_sheet(rows);
@@ -395,16 +417,77 @@ function esportaExcel(state, anno){
       const ref = XLSX.utils.encode_cell({ r:parseInt(parts[0],10), c:parseInt(parts[1],10) });
       if (ws[ref]) ws[ref].s = styleMap[key];
     });
+    // formato numerico 2 decimali sulle celle ore numeriche
     ws["!merges"] = merges;
-    const cols = [{wch:16}];
-    for (let i=1;i<=nd;i++) cols.push({wch:5});
-    ws["!cols"] = cols;
+    const cols = [{wch:16}]; for (let i=1;i<=nd;i++) cols.push({wch:5}); ws["!cols"] = cols;
     XLSX.utils.book_append_sheet(wb, ws, MONTH_ABBR[m-1] + String(anno).slice(2));
   }
   XLSX.writeFile(wb, fileName("xlsx"));
 }
 
-/* ============================ IMPORT EXCEL ============================= */
+/* ===================== EXPORT PDF A4 orizzontale ===================== */
+function esportaPDF(state, anno){
+  const JsPDF = window.jspdf.jsPDF;
+  const doc = new JsPDF({ orientation:"landscape", unit:"mm", format:"a4" });
+  const fset = festivitaSet(anno);
+  let first = true;
+  for (let m = 1; m <= 12; m++){
+    const mk = monthKey(anno, m);
+    const dati = state.dati[mk] || {};
+    const haData = Object.keys(dati).some(function(k){ const rr=dati[k]; return rr.giorni && Object.keys(rr.giorni).length>0; });
+    if (!haData) continue;
+    const nd = daysInMonth(anno, m);
+    if (!first) doc.addPage();
+    first = false;
+    doc.setFontSize(13); doc.setTextColor(15,39,64);
+    doc.text("Spazio Ireos — Report Ore   ·   " + MONTH_LABEL[m-1] + " " + anno, 14, 12);
+    const head = [["DIPENDENTE"]];
+    for (let d=1; d<=nd; d++) head[0].push(String(d));
+    head[0].push("TOT");
+    const body = [];
+    dipSorted(state).forEach(function(dp){
+      const rec = getRecFrom(state, anno, m, dp.id);
+      const row = [dp.nome];
+      for (let d=1; d<=nd; d++){
+        const v = rec.giorni[d];
+        if (v === undefined || v === "") row.push("");
+        else if (CODE_SET[String(v).trim()]) row.push(String(v).trim());
+        else row.push(fmt2(v));
+      }
+      row.push(fmt2(totOfRec(rec, anno, m)));
+      body.push(row);
+    });
+    doc.autoTable({
+      head: head, body: body, startY: 16, theme:"grid",
+      styles:{ fontSize:5.4, cellPadding:0.7, halign:"center", valign:"middle", lineColor:[210,210,210], lineWidth:0.1 },
+      headStyles:{ fillColor:[15,39,64], textColor:[255,255,255], fontSize:5.4 },
+      columnStyles:{ 0:{ halign:"left", cellWidth:34, fontStyle:"bold" } },
+      didParseCell: function(data){
+        // colonna 0 è il nome; le colonne 1..nd sono i giorni
+        if (data.column.index >= 1 && data.column.index <= nd){
+          const giorno = data.column.index;
+          if (isFestivo(fset, m, giorno)){
+            data.cell.styles.fillColor = [197, 89, 89];
+            if (data.section === "head") data.cell.styles.textColor = [255,255,255];
+          }
+          if (data.section === "body"){
+            const txt = String(data.cell.raw || "").trim();
+            if (CODE_SET[txt]){
+              const hx = CODE_SET[txt].bg.replace("#","");
+              data.cell.styles.fillColor = [parseInt(hx.slice(0,2),16), parseInt(hx.slice(2,4),16), parseInt(hx.slice(4,6),16)];
+              const tc = lumaText(CODE_SET[txt].bg);
+              data.cell.styles.textColor = tc === "#ffffff" ? [255,255,255] : [17,24,39];
+            }
+          }
+        }
+      }
+    });
+  }
+  if (first){ doc.setFontSize(12); doc.text("Nessun dato per l'anno " + anno, 14, 24); }
+  doc.save(fileName("pdf"));
+}
+
+/* ===================== IMPORT EXCEL ===================== */
 function importaExcel(file, state, onDone){
   const reader = new FileReader();
   reader.onload = function(ev){
@@ -412,50 +495,34 @@ function importaExcel(file, state, onDone){
       const data = new Uint8Array(ev.target.result);
       const wb = XLSX.read(data, { type:"array", cellDates:true });
       const next = JSON.parse(JSON.stringify(state));
-      const byName = {};
-      next.dipendenti.forEach(function(d){ byName[d.nome.trim().toUpperCase()] = d.id; });
+      const byName = {}; next.dipendenti.forEach(function(d){ byName[d.nome.trim().toUpperCase()] = d.id; });
       const sheetRe = /^([A-Z]{3})(\d{2})$/;
-      const mAbbr = {}; MONTH_ABBR.forEach(function(a,i){ mAbbr[a] = i + 1; });
+      const mAbbr = {}; MONTH_ABBR.forEach(function(a,i){ mAbbr[a] = i+1; });
       wb.SheetNames.forEach(function(sn){
         const mm = sn.trim().toUpperCase().match(sheetRe);
         if (!mm || mAbbr[mm[1]] === undefined) return;
-        const mese = mAbbr[mm[1]];
-        const anno = 2000 + parseInt(mm[2], 10);
+        const mese = mAbbr[mm[1]], anno = 2000 + parseInt(mm[2],10);
         if (next.anni.indexOf(anno) === -1) next.anni.push(anno);
         const ws = wb.Sheets[sn];
         const aoa = XLSX.utils.sheet_to_json(ws, { header:1, raw:true });
         for (let i = 0; i < aoa.length; i++){
-          const row = aoa[i] || [];
-          const nome = row[0];
+          const row = aoa[i] || []; const nome = row[0];
           if (typeof nome === "string" && String(row[10]).trim() === "ORE SETT"){
-            const key = nome.trim().toUpperCase();
-            let id = byName[key];
-            if (!id){
-              id = uid();
-              next.dipendenti.push({ id:id, nome:key, oreSett:Number(row[11])||0,
-                contratto: row[28] ? String(row[28]) : "", colore: PALETTE[next.dipendenti.length % PALETTE.length] });
-              byName[key] = id;
-            }
-            const hoursRow = aoa[i+4] || [];
-            const nd = daysInMonth(anno, mese);
-            const giorni = {};
+            const key = nome.trim().toUpperCase(); let id = byName[key];
+            if (!id){ id = uid(); next.dipendenti.push({ id:id, nome:key, livello:"", oreSett:Number(row[11])||0, tipoContratto:"indeterminato", scadenza:"", dataAssunzione:"", dataCessazione:"", colore: PALETTE[next.dipendenti.length % PALETTE.length] }); byName[key] = id; }
+            const hoursRow = aoa[i+4] || []; const nd = daysInMonth(anno, mese); const giorni = {};
             for (let d = 1; d <= nd; d++){
               const cell = hoursRow[d-1];
               if (cell === undefined || cell === null || cell === "") continue;
               giorni[d] = (typeof cell === "number") ? cell : String(cell).trim();
             }
-            const notaRow = aoa[i+5] || [];
-            let nota = "";
-            const nv = notaRow[0];
+            const notaRow = aoa[i+5] || []; let nota = ""; const nv = notaRow[0];
             if (typeof nv === "string" && nv.trim() !== "" && nv.indexOf("min") === -1) nota = nv.trim();
-            const mk = monthKey(anno, mese);
-            if (!next.dati[mk]) next.dati[mk] = {};
-            next.dati[mk][id] = { giorni:giorni, nota:nota };
+            const mk = monthKey(anno, mese); if (!next.dati[mk]) next.dati[mk] = {}; next.dati[mk][id] = { giorni:giorni, nota:nota };
           }
         }
       });
-      next.anni.sort(function(a,b){ return a-b; });
-      next.updatedAt = new Date().toISOString();
+      next.anni.sort(function(a,b){ return a-b; }); next.updatedAt = new Date().toISOString();
       onDone(next, null);
     } catch (e) { console.error("importaExcel", e); onDone(null, "File non leggibile o formato non riconosciuto."); }
   };
@@ -463,10 +530,31 @@ function importaExcel(file, state, onDone){
   reader.readAsArrayBuffer(file);
 }
 
-/* ============================ COMPONENTI ============================== */
+/* ===================== COMPONENTI ===================== */
 function Toast(props){
-  useEffect(function(){ const t = setTimeout(props.onDone, 2600); return function(){ clearTimeout(t); }; }, []);
-  return <div className="toast">{props.msg}</div>;
+  useEffect(function(){ const t = setTimeout(props.onDone, props.warn ? 3600 : 2600); return function(){ clearTimeout(t); }; }, []);
+  return <div className={"toast" + (props.warn ? " warn" : "")}>{props.msg}</div>;
+}
+
+function CellInput(props){
+  const [foc, setFoc] = useState(false);
+  const val = (props.value === undefined || props.value === null) ? "" : props.value;
+  const s = String(val).trim();
+  const isCode = CODE_SET[s] !== undefined;
+  let display;
+  if (foc) display = String(val);
+  else if (s === "") display = "";
+  else if (isCode) display = s;
+  else if (isNumeric(s)) display = fmt2(s);
+  else display = String(val);
+  return (
+    <input className={"cell-in " + (isCode ? "is-code" : "is-num") + (props.disabled ? " blocked" : "")}
+      style={props.style} list="codici-list" title={props.title} disabled={props.disabled}
+      value={display}
+      onFocus={function(){ setFoc(true); }}
+      onBlur={function(e){ setFoc(false); if (props.onBlur) props.onBlur(e.target.value); }}
+      onChange={function(e){ props.onChange(e.target.value); }} />
+  );
 }
 
 function EmployeeCard(props){
@@ -474,59 +562,66 @@ function EmployeeCard(props){
   const nd = daysInMonth(y, m);
   const days = []; for (let d = 1; d <= nd; d++) days.push(d);
   const tot = useMemo(function(){ return totOfRec(rec, y, m); }, [rec, y, m]);
-  const catStyle = function(val){
+
+  const cellStyle = function(val, festivo, blocked){
     const s = String(val === undefined ? "" : val).trim();
-    if (s === "") return { background:"#fffde7" };
-    if (CODE_SET[s]){ const cc = CAT[CODE_SET[s].cat]; return { background:cc.bg, color:cc.fg }; }
+    if (CODE_SET[s]) return { background:CODE_SET[s].bg, color:lumaText(CODE_SET[s].bg) };
+    if (blocked && s === "") return { background:"repeating-linear-gradient(45deg,#f1f5f9,#f1f5f9 4px,#e2e8f0 4px,#e2e8f0 8px)", borderColor:"#cbd5e1", color:"#94a3b8" };
+    if (festivo && s === "") return { background:CRIMSON };
     return { background:"#fffde7" };
   };
-  const cellTitle = function(val){
+  const cellTitle = function(val, blocked, festivo){
+    if (blocked) return "Fuori dal periodo di rapporto (assunzione/cessazione)";
     const s = String(val === undefined ? "" : val).trim();
     if (CODE_SET[s]) return CODE_SET[s].l;
-    if (s !== "" && !isNaN(parseFloat(s.replace(",",".")))) { const hm = decToHM(s); return hm !== "" ? hm : (s + " ore"); }
+    if (festivo) return "Giorno festivo";
+    if (isNumeric(s)){ const hm = decToHM(s); return hm !== "" ? hm : (fmt2(s) + " ore"); }
     return "";
   };
+
   return (
     <div className="emp-card">
       <div className="emp-head" style={{ background: dp.colore || "#00B0F0" }}>
         <span className="nome" style={{ color:"#08344a" }}>{dp.nome}</span>
+        {dp.livello ? <span className="pill">Liv. {dp.livello}</span> : null}
         <span className="pill">ORE SETT: {dp.oreSett}</span>
-        <span className="pill">{dp.contratto || "—"}</span>
+        <span className="pill">{contrLabel(dp)}</span>
+        {dp.dataCessazione ? <span className="pill cess">CESSATO {dp.dataCessazione}</span> : null}
         <div className="spacer"></div>
         <button className="edit-mini" title="Modifica anagrafica" onClick={function(){ props.onEditDip(dp); }}>✎</button>
-        <button className="edit-mini" title="Elimina dipendente" onClick={function(){ props.onDelDip(dp); }}>🗑</button>
+        <button className="edit-mini" title="Elimina definitivamente" onClick={function(){ props.onDelDip(dp); }}>🗑</button>
       </div>
       <div className="grid-wrap">
         <table className="cal"><tbody>
           <tr>
             {days.map(function(d){
-              const wd = weekdayOf(y, m, d);
-              const hol = isFestivo(fset, m, d);
-              const cls = "wd" + (hol ? " hol" : (wd === 0 ? " we" : ""));
-              return <td key={"w"+d} className={cls}>{WD[wd]}</td>;
+              const wd = weekdayOf(y, m, d); const hol = isFestivo(fset, m, d);
+              return <td key={"w"+d} className={"wd" + (hol ? " hol" : (wd===0 ? " we" : ""))}>{WD[wd]}</td>;
             })}
             <td className="tot-h"></td>
           </tr>
           <tr>
             {days.map(function(d){
-              const wd = weekdayOf(y, m, d);
-              const hol = isFestivo(fset, m, d);
-              const cls = "dn" + (hol ? " hol" : (wd === 0 ? " we" : ""));
-              return <td key={"d"+d} className={cls} title={hol ? "Festività nazionale" : ""}>{d}</td>;
+              const wd = weekdayOf(y, m, d); const hol = isFestivo(fset, m, d);
+              return <td key={"d"+d} className={"dn" + (hol ? " hol" : (wd===0 ? " we" : ""))}>{d}</td>;
             })}
             <td className="tot-h">TOT</td>
           </tr>
           <tr>
             {days.map(function(d){
               const val = rec.giorni[d] === undefined ? "" : rec.giorni[d];
+              const hol = isFestivo(fset, m, d);
+              const blocked = isBlockedDay(dp, y, m, d);
               return (
                 <td key={"c"+d} style={{ padding:"1px" }}>
-                  <input className="cell-in" style={catStyle(val)} list="codici-list" title={cellTitle(val)}
-                    value={val} onChange={function(e){ props.onCell(dp.id, d, e.target.value); }} />
+                  <CellInput value={val} disabled={blocked} style={cellStyle(val, hol, blocked)}
+                    title={cellTitle(val, blocked, hol)}
+                    onChange={function(nv){ props.onCell(dp.id, d, nv); }}
+                    onBlur={function(nv){ if (hol && isNumeric(nv)) props.onFestAlert(d); }} />
                 </td>
               );
             })}
-            <td className="tot-v">{grp(tot)}</td>
+            <td className="tot-v">{fmt2(tot)}</td>
           </tr>
         </tbody></table>
       </div>
@@ -545,37 +640,59 @@ function EmployeeCard(props){
 function DipModal(props){
   const editing = props.dip;
   const [nome, setNome] = useState(editing ? editing.nome : "");
+  const [livello, setLivello] = useState(editing ? (editing.livello||"") : "");
   const [ore, setOre] = useState(editing ? editing.oreSett : "");
-  const [contr, setContr] = useState(editing ? editing.contratto : "INDETERMINATO");
-  const [colore, setColore] = useState(editing ? (editing.colore || PALETTE[0]) : PALETTE[0]);
+  const [tipo, setTipo] = useState(editing ? (editing.tipoContratto||"indeterminato") : "indeterminato");
+  const [scad, setScad] = useState(editing ? (editing.scadenza||"") : "");
+  const [assunz, setAssunz] = useState(editing ? (editing.dataAssunzione||"") : "");
+  const [cess, setCess] = useState(editing ? (editing.dataCessazione||"") : "");
+  const [colore, setColore] = useState(editing ? (editing.colore||PALETTE[0]) : PALETTE[0]);
   const save = function(){
     const n = nome.trim().toUpperCase();
     if (n === "") return;
-    props.onSave({ id: editing ? editing.id : uid(), nome:n, oreSett: Number(ore)||0, contratto: contr.trim(), colore:colore });
+    props.onSave({ id: editing ? editing.id : uid(), nome:n, livello:livello.trim(), oreSett:Number(ore)||0,
+      tipoContratto:tipo, scadenza: tipo==="determinato" ? scad.trim() : "", dataAssunzione:assunz.trim(), dataCessazione:cess.trim(), colore:colore });
   };
   return (
     <div className="overlay" onClick={props.onClose}>
       <div className="modal" onClick={function(e){ e.stopPropagation(); }}>
         <h2>{editing ? "Modifica dipendente" : "Nuovo dipendente"}</h2>
-        <div className="field"><label>Nome (STAMPATELLO)</label>
+        <div className="field"><label>Nominativo (STAMPATELLO: COGNOME NOME)</label>
           <input value={nome} onChange={function(e){ setNome(e.target.value.toUpperCase()); }} placeholder="COGNOME NOME" /></div>
-        <div className="field"><label>Ore settimanali</label>
-          <input type="number" step="0.5" value={ore} onChange={function(e){ setOre(e.target.value); }} /></div>
-        <div className="field"><label>Contratto</label>
-          <input value={contr} onChange={function(e){ setContr(e.target.value); }} placeholder="INDETERMINATO oppure FINO AL gg/mm/aa" /></div>
+        <div className="frow">
+          <div className="field"><label>Livello</label>
+            <input value={livello} onChange={function(e){ setLivello(e.target.value); }} placeholder="es. 3" /></div>
+          <div className="field"><label>Ore settimanali</label>
+            <input type="number" step="0.5" value={ore} onChange={function(e){ setOre(e.target.value); }} /></div>
+        </div>
+        <div className="frow">
+          <div className="field"><label>Tipo contratto</label>
+            <select value={tipo} onChange={function(e){ setTipo(e.target.value); }}>
+              <option value="indeterminato">Indeterminato</option>
+              <option value="determinato">Determinato</option>
+            </select></div>
+          {tipo === "determinato" ?
+            <div className="field"><label>Scadenza (gg/mm/aa)</label>
+              <input value={scad} onChange={function(e){ setScad(e.target.value); }} placeholder="31/12/26" /></div> : null}
+        </div>
+        <div className="frow">
+          <div className="field"><label>Data assunzione (blocca giorni prima)</label>
+            <input value={assunz} onChange={function(e){ setAssunz(e.target.value); }} placeholder="gg/mm/aa" /></div>
+          <div className="field"><label>Data cessazione (blocca giorni dopo)</label>
+            <input value={cess} onChange={function(e){ setCess(e.target.value); }} placeholder="gg/mm/aa" /></div>
+        </div>
         <div className="field"><label>Colore scheda</label>
           <div className="color-row">
-            {PALETTE.map(function(cx){
-              return <div key={cx} className={"swatch" + (cx === colore ? " sel" : "")} style={{ background:cx }}
-                onClick={function(){ setColore(cx); }}></div>;
-            })}
-            <input type="color" value={colore} onChange={function(e){ setColore(e.target.value); }}
-              style={{ width:"40px", height:"34px", padding:"0", border:"none", background:"none", cursor:"pointer" }} />
+            {PALETTE.map(function(cx){ return <div key={cx} className={"swatch" + (cx===colore ? " sel" : "")} style={{ background:cx }} onClick={function(){ setColore(cx); }}></div>; })}
+            <input type="color" value={colore} onChange={function(e){ setColore(e.target.value); }} style={{ width:"40px", height:"34px", padding:"0", border:"none", background:"none", cursor:"pointer" }} />
           </div>
         </div>
         <div className="modal-actions">
-          <button className="btn btn-gray" onClick={props.onClose}>Annulla</button>
-          <button className="btn btn-blue" onClick={save}>Salva</button>
+          <span style={{ fontSize:"11px", color:"#64748b" }}>{editing ? "Per cessare: imposta la data di cessazione." : ""}</span>
+          <span>
+            <button className="btn btn-gray" onClick={props.onClose}>Annulla</button>
+            <button className="btn btn-blue" style={{ marginLeft:"8px" }} onClick={save}>Salva</button>
+          </span>
         </div>
       </div>
     </div>
@@ -589,141 +706,85 @@ function ConfirmModal(props){
         <h2>{props.title}</h2>
         <p style={{ fontSize:"14px", color:"#374151" }}>{props.body}</p>
         <div className="modal-actions">
-          <button className="btn btn-gray" onClick={props.onClose}>Annulla</button>
-          <button className="btn btn-red" onClick={props.onConfirm}>{props.confirmLabel || "Elimina"}</button>
+          <span></span>
+          <span>
+            <button className="btn btn-gray" onClick={props.onClose}>Annulla</button>
+            <button className="btn btn-red" style={{ marginLeft:"8px" }} onClick={props.onConfirm}>{props.confirmLabel || "Elimina"}</button>
+          </span>
         </div>
       </div>
     </div>
   );
 }
 
-/* ============================ RIEPILOGHI ============================== */
+/* ===================== RIEPILOGHI ===================== */
 function Riepiloghi(props){
   const state = props.state;
   const [anno, setAnno] = useState(props.anno);
-  const [scope, setScope] = useState("anno"); // "anno" o numero mese
-
+  const [scope, setScope] = useState("anno");
+  const dips = dipSorted(state);
   const scopeMonths = scope === "anno" ? [1,2,3,4,5,6,7,8,9,10,11,12] : [parseInt(scope,10)];
 
-  // A) riepilogo TOT per mese
-  const tabAnnuo = state.dipendenti.map(function(dp){
-    const perMese = [];
-    let totAnno = 0;
-    for (let m = 1; m <= 12; m++){
-      const t = totOfRec(getRecFrom(state, anno, m, dp.id), anno, m);
-      perMese.push(t); totAnno += t;
-    }
+  const tabAnnuo = dips.map(function(dp){
+    const perMese = []; let totAnno = 0;
+    for (let m=1;m<=12;m++){ const t = totOfRec(getRecFrom(state, anno, m, dp.id), anno, m); perMese.push(t); totAnno += t; }
     return { dp:dp, perMese:perMese, tot:Math.round(totAnno*100)/100 };
   });
-
-  // B) ore vs teoriche (anno)
-  const tabTeor = state.dipendenti.map(function(dp){
-    let lav = 0, teor = 0;
-    scopeMonths.forEach(function(m){
-      lav += totOfRec(getRecFrom(state, anno, m, dp.id), anno, m);
-      teor += dp.oreSett * daysInMonth(anno, m) / 7;
-    });
-    lav = Math.round(lav*100)/100; teor = Math.round(teor*100)/100;
+  const tabTeor = dips.map(function(dp){
+    let lav=0, teor=0;
+    scopeMonths.forEach(function(m){ lav += totOfRec(getRecFrom(state, anno, m, dp.id), anno, m); teor += dp.oreSett * daysInMonth(anno, m) / 7; });
+    lav=Math.round(lav*100)/100; teor=Math.round(teor*100)/100;
     return { dp:dp, lav:lav, teor:teor, scost:Math.round((lav-teor)*100)/100 };
   });
-
-  // C) assenze per codice (giorni)
   const codiciUsati = {};
-  state.dipendenti.forEach(function(dp){
-    scopeMonths.forEach(function(m){
-      const rec = getRecFrom(state, anno, m, dp.id);
-      Object.keys(rec.giorni).forEach(function(d){
-        const v = String(rec.giorni[d]).trim();
-        if (CODE_SET[v] && v !== "--" && v !== "AN") codiciUsati[v] = true;
-      });
-    });
-  });
+  dips.forEach(function(dp){ scopeMonths.forEach(function(m){ const rec=getRecFrom(state,anno,m,dp.id);
+    Object.keys(rec.giorni).forEach(function(d){ const v=String(rec.giorni[d]).trim(); if (CODE_SET[v] && v!=="--" && v!=="AN") codiciUsati[v]=true; }); }); });
   const codeCols = CODICI.filter(function(c){ return codiciUsati[c.c]; }).map(function(c){ return c.c; });
-  const tabAssenze = state.dipendenti.map(function(dp){
-    const counts = {}; codeCols.forEach(function(c){ counts[c] = 0; });
-    scopeMonths.forEach(function(m){
-      const rec = getRecFrom(state, anno, m, dp.id);
-      Object.keys(rec.giorni).forEach(function(d){
-        const v = String(rec.giorni[d]).trim();
-        if (counts[v] !== undefined) counts[v] += 1;
-      });
-    });
+  const tabAssenze = dips.map(function(dp){
+    const counts = {}; codeCols.forEach(function(c){ counts[c]=0; });
+    scopeMonths.forEach(function(m){ const rec=getRecFrom(state,anno,m,dp.id);
+      Object.keys(rec.giorni).forEach(function(d){ const v=String(rec.giorni[d]).trim(); if (counts[v]!==undefined) counts[v]+=1; }); });
     return { dp:dp, counts:counts };
   });
-
-  // D) retribuite vs non retribuite (giorni)
-  const tabPay = state.dipendenti.map(function(dp){
-    let ret = 0, non = 0;
-    scopeMonths.forEach(function(m){
-      const rec = getRecFrom(state, anno, m, dp.id);
-      Object.keys(rec.giorni).forEach(function(d){
-        const v = String(rec.giorni[d]).trim();
-        if (CODE_SET[v] && v !== "--" && v !== "AN"){ if (CODE_SET[v].pay) ret += 1; else non += 1; }
-      });
-    });
+  const tabPay = dips.map(function(dp){
+    let ret=0, non=0;
+    scopeMonths.forEach(function(m){ const rec=getRecFrom(state,anno,m,dp.id);
+      Object.keys(rec.giorni).forEach(function(d){ const v=String(rec.giorni[d]).trim(); if (CODE_SET[v] && v!=="--" && v!=="AN"){ if (CODE_SET[v].pay) ret+=1; else non+=1; } }); });
     return { dp:dp, ret:ret, non:non };
   });
-
-  // E) contratti in scadenza
-  const oggi = new Date();
-  const tabScad = [];
-  state.dipendenti.forEach(function(dp){
-    const mm = String(dp.contratto || "").match(/(\d{2})\/(\d{2})\/(\d{2})/);
-    if (mm){
-      const dt = new Date(2000 + parseInt(mm[3],10), parseInt(mm[2],10) - 1, parseInt(mm[1],10));
-      const gg = Math.round((dt - oggi) / 86400000);
-      tabScad.push({ dp:dp, data:mm[0], gg:gg });
-    }
+  const oggi = new Date(); const tabScad = [];
+  dips.forEach(function(dp){
+    if (dp.tipoContratto !== "determinato") return;
+    const dt = parseDMY(dp.scadenza); if (!dt) return;
+    const gg = Math.round((dt - oggi)/86400000);
+    tabScad.push({ dp:dp, data:dp.scadenza, gg:gg });
   });
-  tabScad.sort(function(a,b){ return a.gg - b.gg; });
-
-  // F) note del periodo
+  tabScad.sort(function(a,b){ return a.gg-b.gg; });
   const tabNote = [];
-  state.dipendenti.forEach(function(dp){
-    scopeMonths.forEach(function(m){
-      const rec = getRecFrom(state, anno, m, dp.id);
-      if (rec.nota && rec.nota.trim() !== "") tabNote.push({ mese:MONTH_LABEL[m-1], dp:dp.nome, nota:rec.nota.trim() });
-    });
-  });
+  dips.forEach(function(dp){ scopeMonths.forEach(function(m){ const rec=getRecFrom(state,anno,m,dp.id);
+    if (rec.nota && rec.nota.trim()!=="") tabNote.push({ mese:MONTH_LABEL[m-1], dp:dp.nome, nota:rec.nota.trim() }); }); });
 
   const esportaRiepiloghi = function(){
     const wb = XLSX.utils.book_new();
-    wb.Props = { Title:"Riepiloghi " + anno, Author:"Christian Canonica", Company:"Spazio Ireos Società Cooperativa Sociale", CreatedDate:new Date() };
+    wb.Props = { Title:"Riepiloghi "+anno, Author:"Christian Canonica", Company:"Spazio Ireos Società Cooperativa Sociale", CreatedDate:new Date() };
     const hdr = { font:{ name:"Arial", bold:true, color:{rgb:"FFFFFFFF"} }, fill:{ patternType:"solid", fgColor:{rgb:"FF0F2740"} }, alignment:{horizontal:"center"} };
-    const mkSheet = function(name, aoa, styleFirstRow){
+    const mkSheet = function(name, aoa){
       const ws = XLSX.utils.aoa_to_sheet(aoa);
-      if (styleFirstRow){
-        (aoa[0] || []).forEach(function(_, c){
-          const ref = XLSX.utils.encode_cell({ r:0, c:c });
-          if (ws[ref]) ws[ref].s = hdr;
-        });
-      }
+      (aoa[0]||[]).forEach(function(_, c){ const ref=XLSX.utils.encode_cell({r:0,c:c}); if (ws[ref]) ws[ref].s=hdr; });
       XLSX.utils.book_append_sheet(wb, ws, name);
     };
-    // Annuo
-    const aAnnuo = [["DIPENDENTE"].concat(MONTH_ABBR).concat(["TOT ANNO"])];
-    tabAnnuo.forEach(function(r){ aAnnuo.push([r.dp.nome].concat(r.perMese).concat([r.tot])); });
-    mkSheet("Annuo", aAnnuo, true);
-    // Teoriche
-    const aTeor = [["DIPENDENTE","ORE LAVORATE","ORE TEORICHE","SCOSTAMENTO"]];
-    tabTeor.forEach(function(r){ aTeor.push([r.dp.nome, r.lav, r.teor, r.scost]); });
-    mkSheet("Ore vs teoriche", aTeor, true);
-    // Assenze
-    const aAss = [["DIPENDENTE"].concat(codeCols)];
-    tabAssenze.forEach(function(r){ aAss.push([r.dp.nome].concat(codeCols.map(function(c){ return r.counts[c]; }))); });
-    mkSheet("Assenze per codice", aAss, true);
-    // Pay
-    const aPay = [["DIPENDENTE","GG RETRIBUITI","GG NON RETRIBUITI"]];
-    tabPay.forEach(function(r){ aPay.push([r.dp.nome, r.ret, r.non]); });
-    mkSheet("Retribuite vs non", aPay, true);
-    // Scadenze
-    const aScad = [["DIPENDENTE","SCADENZA","GG RESIDUI"]];
-    tabScad.forEach(function(r){ aScad.push([r.dp.nome, r.data, r.gg]); });
-    mkSheet("Contratti in scadenza", aScad, true);
-    // Note
-    const aNote = [["MESE","DIPENDENTE","NOTA"]];
-    tabNote.forEach(function(r){ aNote.push([r.mese, r.dp, r.nota]); });
-    mkSheet("Note", aNote, true);
+    const aAnnuo=[["DIPENDENTE"].concat(MONTH_ABBR).concat(["TOT ANNO"])];
+    tabAnnuo.forEach(function(r){ aAnnuo.push([r.dp.nome].concat(r.perMese).concat([r.tot])); }); mkSheet("Annuo", aAnnuo);
+    const aTeor=[["DIPENDENTE","ORE LAVORATE","ORE TEORICHE","SCOSTAMENTO"]];
+    tabTeor.forEach(function(r){ aTeor.push([r.dp.nome, r.lav, r.teor, r.scost]); }); mkSheet("Ore vs teoriche", aTeor);
+    const aAss=[["DIPENDENTE"].concat(codeCols)];
+    tabAssenze.forEach(function(r){ aAss.push([r.dp.nome].concat(codeCols.map(function(c){ return r.counts[c]; }))); }); mkSheet("Assenze per codice", aAss);
+    const aPay=[["DIPENDENTE","GG RETRIBUITI","GG NON RETRIBUITI"]];
+    tabPay.forEach(function(r){ aPay.push([r.dp.nome, r.ret, r.non]); }); mkSheet("Retribuite vs non", aPay);
+    const aScad=[["DIPENDENTE","SCADENZA","GG RESIDUI"]];
+    tabScad.forEach(function(r){ aScad.push([r.dp.nome, r.data, r.gg]); }); mkSheet("Contratti in scadenza", aScad);
+    const aNote=[["MESE","DIPENDENTE","NOTA"]];
+    tabNote.forEach(function(r){ aNote.push([r.mese, r.dp, r.nota]); }); mkSheet("Note", aNote);
     XLSX.writeFile(wb, fileName("xlsx"));
   };
 
@@ -732,15 +793,13 @@ function Riepiloghi(props){
       <div className="toolbar">
         <strong style={{ fontSize:"15px", color:"#0f2740" }}>Riepiloghi</strong>
         <label style={{ fontSize:"12px", fontWeight:"700", marginLeft:"10px" }}>Anno</label>
-        <select value={anno} onChange={function(e){ setAnno(parseInt(e.target.value,10)); }}
-          style={{ padding:"6px", borderRadius:"6px", border:"2px solid #f59e0b", background:"#fffde7" }}>
+        <select value={anno} onChange={function(e){ setAnno(parseInt(e.target.value,10)); }} style={{ padding:"6px", borderRadius:"6px", border:"2px solid #f59e0b", background:"#fffde7" }}>
           {state.anni.map(function(y){ return <option key={y} value={y}>{y}</option>; })}
         </select>
         <label style={{ fontSize:"12px", fontWeight:"700" }}>Ambito</label>
-        <select value={scope} onChange={function(e){ setScope(e.target.value); }}
-          style={{ padding:"6px", borderRadius:"6px", border:"2px solid #f59e0b", background:"#fffde7" }}>
+        <select value={scope} onChange={function(e){ setScope(e.target.value); }} style={{ padding:"6px", borderRadius:"6px", border:"2px solid #f59e0b", background:"#fffde7" }}>
           <option value="anno">Tutto l'anno</option>
-          {MONTH_LABEL.map(function(lbl, i){ return <option key={i} value={String(i+1)}>{lbl}</option>; })}
+          {MONTH_LABEL.map(function(lbl,i){ return <option key={i} value={String(i+1)}>{lbl}</option>; })}
         </select>
         <div className="spacer"></div>
         <button className="btn btn-blue" onClick={esportaRiepiloghi}>📊 Esporta riepiloghi (Excel)</button>
@@ -749,46 +808,31 @@ function Riepiloghi(props){
       <div className="rep-box">
         <h3>Riepilogo annuo — ore lavorate per mese ({anno})</h3>
         <div className="rep-scroll"><table className="rep"><thead><tr>
-          <th style={{textAlign:"left"}}>Dipendente</th>
-          {MONTH_ABBR.map(function(a){ return <th key={a}>{a}</th>; })}
-          <th>TOT</th>
+          <th style={{textAlign:"left"}}>Dipendente</th>{MONTH_ABBR.map(function(a){ return <th key={a}>{a}</th>; })}<th>TOT</th>
         </tr></thead><tbody>
-          {tabAnnuo.map(function(r){
-            return <tr key={r.dp.id}>
-              <td className="name">{r.dp.nome}</td>
-              {r.perMese.map(function(v, i){ return <td key={i}>{v === 0 ? "" : grp(v)}</td>; })}
-              <td className="tot">{grp(r.tot)}</td>
-            </tr>;
-          })}
+          {tabAnnuo.map(function(r){ return <tr key={r.dp.id}><td className="name">{r.dp.nome}</td>
+            {r.perMese.map(function(v,i){ return <td key={i}>{v===0?"":fmt2(v)}</td>; })}<td className="tot">{fmt2(r.tot)}</td></tr>; })}
         </tbody></table></div>
       </div>
 
       <div className="rep-box">
-        <h3>Ore lavorate vs teoriche — {scope === "anno" ? "anno " + anno : MONTH_LABEL[parseInt(scope,10)-1] + " " + anno} <span style={{fontWeight:400, fontSize:"11px", color:"#64748b"}}>(teoriche = ORE SETT × giorni/7, approssimate)</span></h3>
+        <h3>Ore lavorate vs teoriche — {scope==="anno"?"anno "+anno:MONTH_LABEL[parseInt(scope,10)-1]+" "+anno} <span style={{fontWeight:400,fontSize:"11px",color:"#64748b"}}>(teoriche = ORE SETT × giorni/7, approssimate)</span></h3>
         <div className="rep-scroll"><table className="rep"><thead><tr>
           <th style={{textAlign:"left"}}>Dipendente</th><th>Ore lavorate</th><th>Ore teoriche</th><th>Scostamento</th>
         </tr></thead><tbody>
-          {tabTeor.map(function(r){
-            return <tr key={r.dp.id}>
-              <td className="name">{r.dp.nome}</td><td>{grp(r.lav)}</td><td>{grp(r.teor)}</td>
-              <td className={r.scost < 0 ? "flag-red" : ""}>{grp(r.scost)}</td>
-            </tr>;
-          })}
+          {tabTeor.map(function(r){ return <tr key={r.dp.id}><td className="name">{r.dp.nome}</td><td>{fmt2(r.lav)}</td><td>{fmt2(r.teor)}</td>
+            <td className={r.scost<0?"flag-red":""}>{fmt2(r.scost)}</td></tr>; })}
         </tbody></table></div>
       </div>
 
       <div className="rep-box">
-        <h3>Assenze per codice (giorni) — {scope === "anno" ? "anno " + anno : MONTH_LABEL[parseInt(scope,10)-1] + " " + anno}</h3>
-        {codeCols.length === 0 ? <div style={{fontSize:"12px",color:"#64748b"}}>Nessuna assenza registrata nel periodo.</div> :
+        <h3>Assenze per codice (giorni)</h3>
+        {codeCols.length===0? <div style={{fontSize:"12px",color:"#64748b"}}>Nessuna assenza registrata nel periodo.</div> :
         <div className="rep-scroll"><table className="rep"><thead><tr>
-          <th style={{textAlign:"left"}}>Dipendente</th>
-          {codeCols.map(function(c){ return <th key={c} title={CODE_SET[c].l}>{c}</th>; })}
+          <th style={{textAlign:"left"}}>Dipendente</th>{codeCols.map(function(c){ return <th key={c} title={CODE_SET[c].l}>{c}</th>; })}
         </tr></thead><tbody>
-          {tabAssenze.map(function(r){
-            return <tr key={r.dp.id}><td className="name">{r.dp.nome}</td>
-              {codeCols.map(function(c){ return <td key={c}>{r.counts[c] === 0 ? "" : r.counts[c]}</td>; })}
-            </tr>;
-          })}
+          {tabAssenze.map(function(r){ return <tr key={r.dp.id}><td className="name">{r.dp.nome}</td>
+            {codeCols.map(function(c){ return <td key={c}>{r.counts[c]===0?"":r.counts[c]}</td>; })}</tr>; })}
         </tbody></table></div>}
       </div>
 
@@ -797,83 +841,60 @@ function Riepiloghi(props){
         <div className="rep-scroll"><table className="rep"><thead><tr>
           <th style={{textAlign:"left"}}>Dipendente</th><th>GG retribuiti</th><th>GG non retribuiti</th>
         </tr></thead><tbody>
-          {tabPay.map(function(r){
-            return <tr key={r.dp.id}><td className="name">{r.dp.nome}</td><td>{r.ret===0?"":r.ret}</td>
-              <td className={r.non>0?"flag-amber":""}>{r.non===0?"":r.non}</td></tr>;
-          })}
+          {tabPay.map(function(r){ return <tr key={r.dp.id}><td className="name">{r.dp.nome}</td><td>{r.ret===0?"":r.ret}</td>
+            <td className={r.non>0?"flag-amber":""}>{r.non===0?"":r.non}</td></tr>; })}
         </tbody></table></div>
       </div>
 
       <div className="rep-box">
         <h3>Contratti a termine — scadenze</h3>
-        {tabScad.length === 0 ? <div style={{fontSize:"12px",color:"#64748b"}}>Nessun contratto a termine.</div> :
+        {tabScad.length===0? <div style={{fontSize:"12px",color:"#64748b"}}>Nessun contratto a termine.</div> :
         <div className="rep-scroll"><table className="rep"><thead><tr>
           <th style={{textAlign:"left"}}>Dipendente</th><th>Scadenza</th><th>Giorni residui</th>
         </tr></thead><tbody>
-          {tabScad.map(function(r){
-            const cls = r.gg < 0 ? "flag-red" : (r.gg <= 30 ? "flag-red" : (r.gg <= 60 ? "flag-amber" : ""));
-            return <tr key={r.dp.id}><td className="name">{r.dp.nome}</td><td>{r.data}</td>
-              <td className={cls}>{r.gg < 0 ? "scaduto" : r.gg}</td></tr>;
-          })}
+          {tabScad.map(function(r){ const cls=r.gg<0?"flag-red":(r.gg<=30?"flag-red":(r.gg<=60?"flag-amber":""));
+            return <tr key={r.dp.id}><td className="name">{r.dp.nome}</td><td>{r.data}</td><td className={cls}>{r.gg<0?"scaduto":r.gg}</td></tr>; })}
         </tbody></table></div>}
       </div>
 
       <div className="rep-box">
         <h3>Note del periodo</h3>
-        {tabNote.length === 0 ? <div style={{fontSize:"12px",color:"#64748b"}}>Nessuna nota nel periodo.</div> :
+        {tabNote.length===0? <div style={{fontSize:"12px",color:"#64748b"}}>Nessuna nota nel periodo.</div> :
         <div className="rep-scroll"><table className="rep"><thead><tr>
           <th>Mese</th><th style={{textAlign:"left"}}>Dipendente</th><th style={{textAlign:"left"}}>Nota</th>
         </tr></thead><tbody>
-          {tabNote.map(function(r, i){ return <tr key={i}><td>{r.mese}</td><td className="name">{r.dp}</td>
-            <td style={{textAlign:"left"}}>{r.nota}</td></tr>; })}
+          {tabNote.map(function(r,i){ return <tr key={i}><td>{r.mese}</td><td className="name">{r.dp}</td><td style={{textAlign:"left"}}>{r.nota}</td></tr>; })}
         </tbody></table></div>}
       </div>
     </div>
   );
 }
 
-/* ============================ LOGIN =================================== */
+/* ===================== LOGIN ===================== */
 function Login(props){
-  // modalità: "pin" (locale) o "fb" (email/password)
-  const [mode, setMode] = useState(FB_READY ? "fb" : "pin");
   const [pinSet] = useState(localStorage.getItem(LS_PIN) !== null);
-  const [pin, setPin] = useState("");
-  const [pin2, setPin2] = useState("");
-  const [email, setEmail] = useState("");
-  const [pwd, setPwd] = useState("");
+  const [pin, setPin] = useState(""); const [pin2, setPin2] = useState("");
+  const [email, setEmail] = useState(""); const [pwd, setPwd] = useState("");
   const [err, setErr] = useState("");
-
-  const doFb = function(){
-    setErr("");
-    firebase.auth().signInWithEmailAndPassword(email, pwd).catch(function(e){
-      setErr("Accesso non riuscito. Verifica le credenziali."); console.error(e);
-    });
-  };
+  const doFb = function(){ setErr(""); firebase.auth().signInWithEmailAndPassword(email, pwd).catch(function(e){ setErr("Accesso non riuscito. Verifica le credenziali."); console.error(e); }); };
   const doPin = function(){
     setErr("");
     if (!pinSet){
       if (pin.length < 4){ setErr("Il PIN deve avere almeno 4 cifre."); return; }
       if (pin !== pin2){ setErr("I due PIN non coincidono."); return; }
-      localStorage.setItem(LS_PIN, hashPin(pin));
-      props.onPinOk();
-    } else {
-      if (hashPin(pin) === localStorage.getItem(LS_PIN)) props.onPinOk();
-      else setErr("PIN errato.");
-    }
+      localStorage.setItem(LS_PIN, hashPin(pin)); props.onPinOk();
+    } else { if (hashPin(pin) === localStorage.getItem(LS_PIN)) props.onPinOk(); else setErr("PIN errato."); }
   };
-
   return (
     <div className="login-box">
       <div className="logo">Spazio Ireos</div>
       <div className="tag">Report Ore mensile — accesso riservato</div>
-
-      {mode === "fb" && FB_READY ?
+      {FB_READY ?
         <div>
           <div className="field"><label style={{textAlign:"left"}}>Email</label>
             <input value={email} onChange={function(e){ setEmail(e.target.value); }} /></div>
           <div className="field"><label style={{textAlign:"left"}}>Password</label>
-            <input type="password" value={pwd} onChange={function(e){ setPwd(e.target.value); }}
-              onKeyDown={function(e){ if (e.key === "Enter") doFb(); }} /></div>
+            <input type="password" value={pwd} onChange={function(e){ setPwd(e.target.value); }} onKeyDown={function(e){ if (e.key==="Enter") doFb(); }} /></div>
           {err ? <div style={{ color:"#dc2626", fontSize:"12px", marginBottom:"10px" }}>{err}</div> : null}
           <button className="btn btn-blue" style={{ width:"100%", justifyContent:"center" }} onClick={doFb}>Entra</button>
         </div>
@@ -881,61 +902,39 @@ function Login(props){
         <div>
           {!pinSet ? <div style={{ fontSize:"12px", color:"#64748b", marginBottom:"10px" }}>Primo accesso: crea un PIN (min 4 cifre).</div> : null}
           <div className="field"><label style={{textAlign:"left"}}>{pinSet ? "PIN" : "Nuovo PIN"}</label>
-            <input className="pin-in" type="password" inputMode="numeric" value={pin}
-              onChange={function(e){ setPin(e.target.value.replace(/\D/g,"")); }}
-              onKeyDown={function(e){ if (e.key === "Enter" && pinSet) doPin(); }} /></div>
+            <input type="password" inputMode="numeric" value={pin} onChange={function(e){ setPin(e.target.value.replace(/\D/g,"")); }} onKeyDown={function(e){ if (e.key==="Enter" && pinSet) doPin(); }} /></div>
           {!pinSet ? <div className="field"><label style={{textAlign:"left"}}>Conferma PIN</label>
-            <input className="pin-in" type="password" inputMode="numeric" value={pin2}
-              onChange={function(e){ setPin2(e.target.value.replace(/\D/g,"")); }} /></div> : null}
+            <input type="password" inputMode="numeric" value={pin2} onChange={function(e){ setPin2(e.target.value.replace(/\D/g,"")); }} /></div> : null}
           {err ? <div style={{ color:"#dc2626", fontSize:"12px", marginBottom:"10px" }}>{err}</div> : null}
           <button className="btn btn-blue" style={{ width:"100%", justifyContent:"center" }} onClick={doPin}>{pinSet ? "Entra" : "Crea PIN ed entra"}</button>
-        </div>
-      }
+        </div>}
     </div>
   );
 }
 
-/* ============================ APP ==================================== */
+/* ===================== APP ===================== */
 function App(){
   const [authState, setAuthState] = useState(FB_READY ? "checking" : "gate");
   const [denied, setDenied] = useState("");
   const [state, setState] = useState(null);
   const [anno, setAnno] = useState(2026);
-  const [vista, setVista] = useState("m1"); // "m1".."m12" oppure "rep"
+  const [vista, setVista] = useState("m1");
   const [dirty, setDirty] = useState(false);
-  const [toast, setToast] = useState("");
+  const [toast, setToast] = useState(null);
   const [dipModal, setDipModal] = useState(null);
   const [confirm, setConfirm] = useState(null);
-  const fileRef = useRef(null);
-  const dbRef = useRef(null);
-  const uidRef = useRef(null);
+  const fileRef = useRef(null); const dbRef = useRef(null); const uidRef = useRef(null);
 
   useEffect(function(){
-    if (!FB_READY){
-      const loc = loadLocal();
-      const st = loc || emptyState();
-      setState(st);
-      if (st.anni && st.anni.length) setAnno(st.anni[st.anni.length-1]);
-      return;
-    }
-    firebase.initializeApp(firebaseConfig);
-    dbRef.current = firebase.firestore();
+    if (!FB_READY){ const loc = loadLocal(); const st = loc || emptyState(); setState(st); if (st.anni && st.anni.length) setAnno(st.anni[st.anni.length-1]); return; }
+    firebase.initializeApp(firebaseConfig); dbRef.current = firebase.firestore();
     firebase.auth().onAuthStateChanged(function(user){
       if (user){
-        if (!isAdminEmail(user.email)){
-          setDenied(user.email || "");
-          firebase.auth().signOut();
-          return;
-        }
-        setDenied("");
-        uidRef.current = user.uid;
-        setAuthState("in");
+        if (!isAdminEmail(user.email)){ setDenied(user.email || ""); firebase.auth().signOut(); return; }
+        setDenied(""); uidRef.current = user.uid; setAuthState("in");
         dbRef.current.collection(FB_COLLECTION).doc(user.uid).get().then(function(snap){
-          let st;
-          if (snap.exists) st = migrate(snap.data());
-          else st = loadLocal() || emptyState();
-          setState(st);
-          if (st.anni && st.anni.length) setAnno(st.anni[st.anni.length-1]);
+          let st; if (snap.exists) st = migrate(snap.data()); else st = loadLocal() || emptyState();
+          setState(st); if (st.anni && st.anni.length) setAnno(st.anni[st.anni.length-1]);
         }).catch(function(e){ console.error(e); const st = loadLocal() || emptyState(); setState(st); });
       } else { setAuthState("out"); }
     });
@@ -949,12 +948,11 @@ function App(){
 
   const touch = function(next){ next.updatedAt = new Date().toISOString(); setState(next); setDirty(true); };
   const fset = useMemo(function(){ return festivitaSet(anno); }, [anno]);
-
-  const mese = vista.charAt(0) === "m" ? parseInt(vista.slice(1), 10) : null;
+  const mese = vista.charAt(0) === "m" ? parseInt(vista.slice(1),10) : null;
+  const showToast = function(msg, warn){ setToast({ msg:msg, warn:!!warn }); };
 
   const onCell = function(dipId, day, value){
-    const next = JSON.parse(JSON.stringify(state));
-    const mk = monthKey(anno, mese);
+    const next = JSON.parse(JSON.stringify(state)); const mk = monthKey(anno, mese);
     if (!next.dati[mk]) next.dati[mk] = {};
     if (!next.dati[mk][dipId]) next.dati[mk][dipId] = { giorni:{}, nota:"" };
     if (value === "") delete next.dati[mk][dipId].giorni[day];
@@ -962,102 +960,81 @@ function App(){
     touch(next);
   };
   const onNota = function(dipId, value){
-    const next = JSON.parse(JSON.stringify(state));
-    const mk = monthKey(anno, mese);
+    const next = JSON.parse(JSON.stringify(state)); const mk = monthKey(anno, mese);
     if (!next.dati[mk]) next.dati[mk] = {};
     if (!next.dati[mk][dipId]) next.dati[mk][dipId] = { giorni:{}, nota:"" };
-    next.dati[mk][dipId].nota = value;
-    touch(next);
+    next.dati[mk][dipId].nota = value; touch(next);
   };
+  const onFestAlert = function(d){ showToast("⚠️ Stai inserendo ore in un giorno FESTIVO (" + d + "/" + mese + "/" + anno + ")", true); };
+
   const saveDip = function(dp){
     const next = JSON.parse(JSON.stringify(state));
     const idx = next.dipendenti.map(function(x){ return x.id; }).indexOf(dp.id);
-    if (idx >= 0) next.dipendenti[idx] = dp;
-    else { next.dipendenti.push(dp); next.dipendenti.sort(function(a,b){ return a.nome.localeCompare(b.nome); }); }
-    touch(next); setDipModal(null);
-    setToast(idx >= 0 ? "Anagrafica aggiornata" : "Dipendente aggiunto");
+    if (idx >= 0) next.dipendenti[idx] = dp; else next.dipendenti.push(dp);
+    next.dipendenti.sort(function(a,b){ return a.nome.localeCompare(b.nome); });
+    touch(next); setDipModal(null); showToast(idx>=0 ? "Anagrafica aggiornata" : "Dipendente aggiunto");
   };
   const askDelDip = function(dp){
-    setConfirm({ title:"Eliminare il dipendente?",
-      body:"Verrà rimosso " + dp.nome + " e TUTTI i suoi dati orari in tutti i mesi e anni. Azione definitiva finché non ricarichi un backup. Confermi?",
+    setConfirm({ title:"Eliminare DEFINITIVAMENTE il dipendente?",
+      body:"Attenzione: verrà rimosso " + dp.nome + " e TUTTO il suo storico, in ogni mese e anno. Se il dipendente è semplicemente cessato, NON eliminarlo: chiudi e imposta la sua Data di cessazione (così mantieni lo storico). Procedere con l'eliminazione definitiva?",
       onConfirm:function(){
         const next = JSON.parse(JSON.stringify(state));
         next.dipendenti = next.dipendenti.filter(function(x){ return x.id !== dp.id; });
         Object.keys(next.dati).forEach(function(mk){ if (next.dati[mk][dp.id]) delete next.dati[mk][dp.id]; });
-        touch(next); setConfirm(null); setToast("Dipendente eliminato");
+        touch(next); setConfirm(null); showToast("Dipendente eliminato");
       } });
   };
   const addAnno = function(dir){
     const next = JSON.parse(JSON.stringify(state));
-    const nuovo = (next.anni.length ? (dir > 0 ? next.anni[next.anni.length-1] + 1 : next.anni[0] - 1) : 2026);
+    const nuovo = (next.anni.length ? (dir>0 ? next.anni[next.anni.length-1]+1 : next.anni[0]-1) : 2026);
     if (next.anni.indexOf(nuovo) === -1){ next.anni.push(nuovo); next.anni.sort(function(a,b){ return a-b; }); touch(next); }
-    setAnno(nuovo);
-    setToast("Anno " + nuovo + " aggiunto");
+    setAnno(nuovo); showToast("Anno " + nuovo + " aggiunto");
   };
-
   const doSave = function(){
     const okLocal = saveLocal(state);
     if (FB_READY && uidRef.current && dbRef.current){
-      dbRef.current.collection(FB_COLLECTION).doc(uidRef.current).set(state).then(function(){
-        setDirty(false); setToast("Salvato (cloud + locale)");
-      }).catch(function(e){ console.error(e); setToast(okLocal ? "Cloud non raggiungibile — salvato in locale" : "Salvataggio non riuscito"); if (okLocal) setDirty(false); });
-    } else {
-      if (okLocal){ setDirty(false); setToast("Salvato in locale"); } else setToast("Salvataggio non riuscito");
-    }
+      dbRef.current.collection(FB_COLLECTION).doc(uidRef.current).set(state).then(function(){ setDirty(false); showToast("Salvato (cloud + locale)"); })
+      .catch(function(e){ console.error(e); showToast(okLocal ? "Cloud non raggiungibile — salvato in locale" : "Salvataggio non riuscito"); if (okLocal) setDirty(false); });
+    } else { if (okLocal){ setDirty(false); showToast("Salvato in locale"); } else showToast("Salvataggio non riuscito"); }
   };
   const doBackup = function(){
     const blob = new Blob([JSON.stringify(state, null, 2)], { type:"application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = fileName("json").replace(".json", "").replace("Report Ore mensile", "Report Ore backup") + ".json";
-    a.click(); URL.revokeObjectURL(url);
-    setToast("Backup JSON scaricato");
+    const url = URL.createObjectURL(blob); const a = document.createElement("a");
+    a.href = url; a.download = fileName("json").replace("Report Ore mensile", "Report Ore backup");
+    a.click(); URL.revokeObjectURL(url); showToast("Backup JSON scaricato");
   };
   const onImportFile = function(e){
-    const file = e.target.files[0];
-    if (!file) return;
+    const file = e.target.files[0]; if (!file) return;
     const name = (file.name || "").toLowerCase();
     if (name.slice(-5) === ".json"){
       const reader = new FileReader();
       reader.onload = function(ev){
-        try {
-          let obj = JSON.parse(ev.target.result);
-          if (!obj || !obj.dipendenti) throw new Error("struttura non valida");
-          obj = migrate(obj);
-          touch(obj); if (obj.anni && obj.anni.length) setAnno(obj.anni[obj.anni.length-1]);
-          setToast("Backup JSON importato — ricorda di salvare 💾");
-        } catch (err) { console.error(err); setToast("Backup JSON non valido"); }
+        try { let obj = JSON.parse(ev.target.result); if (!obj || !obj.dipendenti) throw new Error("struttura non valida");
+          obj = migrate(obj); touch(obj); if (obj.anni && obj.anni.length) setAnno(obj.anni[obj.anni.length-1]); showToast("Backup JSON importato — ricorda di salvare 💾"); }
+        catch (err) { console.error(err); showToast("Backup JSON non valido"); }
       };
       reader.readAsText(file);
     } else {
-      importaExcel(file, state, function(next, errMsg){
-        if (errMsg){ setToast(errMsg); return; }
-        touch(next); if (next.anni && next.anni.length) setAnno(next.anni[next.anni.length-1]);
-        setToast("Excel importato — ricorda di salvare 💾");
-      });
+      importaExcel(file, state, function(next, errMsg){ if (errMsg){ showToast(errMsg); return; } touch(next); if (next.anni && next.anni.length) setAnno(next.anni[next.anni.length-1]); showToast("Excel importato — ricorda di salvare 💾"); });
     }
     e.target.value = "";
   };
   const changePin = function(){
-    const cur = window.prompt("PIN attuale:");
-    if (cur === null) return;
-    if (localStorage.getItem(LS_PIN) !== null && hashPin(cur) !== localStorage.getItem(LS_PIN)){ setToast("PIN attuale errato"); return; }
-    const nuovo = window.prompt("Nuovo PIN (min 4 cifre):");
-    if (nuovo === null) return;
-    if (String(nuovo).replace(/\D/g,"").length < 4){ setToast("PIN troppo corto"); return; }
-    localStorage.setItem(LS_PIN, hashPin(String(nuovo).replace(/\D/g,""))); setToast("PIN aggiornato");
+    const cur = window.prompt("PIN attuale:"); if (cur === null) return;
+    if (localStorage.getItem(LS_PIN) !== null && hashPin(cur) !== localStorage.getItem(LS_PIN)){ showToast("PIN attuale errato"); return; }
+    const nuovo = window.prompt("Nuovo PIN (min 4 cifre):"); if (nuovo === null) return;
+    if (String(nuovo).replace(/\D/g,"").length < 4){ showToast("PIN troppo corto"); return; }
+    localStorage.setItem(LS_PIN, hashPin(String(nuovo).replace(/\D/g,""))); showToast("PIN aggiornato");
   };
 
   if (FB_READY && authState === "checking") return <div style={{ padding:"40px", textAlign:"center" }}>Caricamento…</div>;
   if (FB_READY && denied) return (
     <div className="login-box">
-      <div className="logo">Spazio Ireos</div>
-      <div className="tag">Report Ore mensile</div>
+      <div className="logo">Spazio Ireos</div><div className="tag">Report Ore mensile</div>
       <div style={{ background:"#fee2e2", color:"#991b1b", borderRadius:"10px", padding:"14px", fontSize:"13px", fontWeight:"700", marginBottom:"16px" }}>
         Accesso non consentito per <b>{denied}</b>.<br/>Questa area è riservata all'amministrazione.
       </div>
-      <button className="btn btn-blue" style={{ width:"100%", justifyContent:"center" }}
-        onClick={function(){ setDenied(""); }}>Accedi con un altro account</button>
+      <button className="btn btn-blue" style={{ width:"100%", justifyContent:"center" }} onClick={function(){ setDenied(""); }}>Accedi con un altro account</button>
     </div>
   );
   if (FB_READY && authState === "out") return <Login />;
@@ -1066,50 +1043,39 @@ function App(){
 
   return (
     <div>
-      <datalist id="codici-list">
-        {CODICI.map(function(x){ return <option key={x.c} value={x.c}>{x.l}</option>; })}
-      </datalist>
+      <datalist id="codici-list">{CODICI.map(function(x){ return <option key={x.c} value={x.c}>{x.l}</option>; })}</datalist>
 
       <div className="app-header">
-        <div>
-          <h1>Spazio Ireos — Report Ore mensile</h1>
-          <div className="sub">{APP_VER}{FB_READY ? " · cloud" : " · locale"}</div>
-        </div>
+        <div><h1>Spazio Ireos — Report Ore mensile</h1><div className="sub">{APP_VER}{FB_READY ? " · cloud" : " · locale"}</div></div>
         <div className="yearbar">
-          <button title="Anno precedente" onClick={function(){ if (state.anni.indexOf(anno-1) === -1) addAnno(-1); else setAnno(anno-1); }}>◀</button>
+          <button title="Anno precedente" onClick={function(){ if (state.anni.indexOf(anno-1)===-1) addAnno(-1); else setAnno(anno-1); }}>◀</button>
           <span className="yr">{anno}</span>
-          <button title="Anno successivo" onClick={function(){ if (state.anni.indexOf(anno+1) === -1) addAnno(1); else setAnno(anno+1); }}>▶</button>
+          <button title="Anno successivo" onClick={function(){ if (state.anni.indexOf(anno+1)===-1) addAnno(1); else setAnno(anno+1); }}>▶</button>
         </div>
         <div className="spacer"></div>
         <button className={"btn btn-save" + (dirty ? " dirty" : "")} onClick={doSave} disabled={!dirty}>💾 Salva</button>
-        <button className="btn btn-ghost" onClick={doBackup}>⬇ Backup JSON</button>
+        <button className="btn btn-ghost" onClick={doBackup}>⬇ Backup</button>
         <button className="btn btn-ghost" onClick={function(){ fileRef.current.click(); }}>⬆ Importa</button>
-        <button className="btn btn-ghost" onClick={function(){ esportaExcel(state, anno); }}>📊 Export Excel</button>
+        <button className="btn btn-ghost" onClick={function(){ esportaExcel(state, anno); }}>📊 Excel</button>
+        <button className="btn btn-ghost" onClick={function(){ esportaPDF(state, anno); }}>🖨️ PDF A4</button>
         {!FB_READY ? <button className="btn btn-ghost" onClick={changePin}>🔑 PIN</button> : null}
-        {FB_READY ? <button className="btn btn-ghost" onClick={function(){
-          if (dirty && !window.confirm("Ci sono modifiche non salvate. Uscire comunque?")) return;
-          firebase.auth().signOut();
-        }}>Esci</button> : null}
+        {FB_READY ? <button className="btn btn-ghost" onClick={function(){ if (dirty && !window.confirm("Ci sono modifiche non salvate. Uscire comunque?")) return; firebase.auth().signOut(); }}>Esci</button> : null}
         <input ref={fileRef} type="file" accept=".xlsx,.xls,.json" className="hidden-file" onChange={onImportFile} />
       </div>
 
-      {!FB_READY ? <div className="banner">Modalità LOCALE (localStorage, accesso con PIN). Per il cloud + login email/password incolla la config Firebase in cima al file.</div> : null}
+      {!FB_READY ? <div className="banner">Modalità LOCALE (localStorage, accesso con PIN).</div> : null}
 
       <div className="tabs">
-        {MONTH_ABBR.map(function(a, i){
-          const mk = monthKey(anno, i+1);
-          const d = state.dati[mk] || {};
+        {MONTH_ABBR.map(function(a,i){
+          const d = state.dati[monthKey(anno, i+1)] || {};
           const filled = Object.keys(d).some(function(k){ const rr=d[k]; return rr.giorni && Object.keys(rr.giorni).length>0; });
-          return <div key={a} className={"tab" + (vista==="m"+(i+1)?" active":"") + (filled?" filled":"")}
-            onClick={function(){ setVista("m"+(i+1)); }}>{a}</div>;
+          return <div key={a} className={"tab" + (vista==="m"+(i+1)?" active":"") + (filled?" filled":"")} onClick={function(){ setVista("m"+(i+1)); }}>{a}</div>;
         })}
         <div className={"tab rep" + (vista==="rep"?" active":"")} onClick={function(){ setVista("rep"); }}>📊 Riepiloghi</div>
       </div>
 
       <div className="content">
-        {vista === "rep" ?
-          <Riepiloghi state={state} anno={anno} />
-          :
+        {vista === "rep" ? <Riepiloghi state={state} anno={anno} /> :
           <div>
             <div className="toolbar">
               <strong style={{ fontSize:"15px", color:"#0f2740" }}>{MONTH_LABEL[mese-1]} {anno}</strong>
@@ -1119,22 +1085,18 @@ function App(){
             {state.dipendenti.length === 0 ?
               <div style={{ padding:"30px", textAlign:"center", color:"#64748b" }}>Nessun dipendente. Aggiungine uno o importa il file Excel.</div>
               :
-              state.dipendenti.map(function(dp){
+              dipSorted(state).map(function(dp){
                 return <EmployeeCard key={dp.id} dp={dp} rec={getRecFrom(state, anno, mese, dp.id)} anno={anno} mese={mese} fset={fset}
-                  onCell={onCell} onNota={onNota}
+                  onCell={onCell} onNota={onNota} onFestAlert={onFestAlert}
                   onEditDip={function(d){ setDipModal({ dip:d }); }} onDelDip={askDelDip} />;
               })
             }
             <div className="legend">
               <h3>Legenda codici</h3>
               <div className="legend-grid">
-                {CODICI.map(function(x){
-                  const cc = CAT[x.cat];
-                  return <div key={x.c} className="legend-item">
-                    <span className="legend-code" style={{ background:cc.bg, color:cc.fg }}>{x.c}</span>
-                    <span>{x.l}</span></div>;
-                })}
-                <div className="legend-item"><span className="legend-code" style={{ background:"#fee2e2", color:"#dc2626" }}>rosso</span><span>Festività nazionale (data in rosso)</span></div>
+                {CODICI.map(function(x){ return <div key={x.c} className="legend-item">
+                  <span className="legend-code" style={{ background:x.bg, color:lumaText(x.bg) }}>{x.c}</span><span>{x.l}</span></div>; })}
+                <div className="legend-item"><span className="legend-code" style={{ background:CRIMSON, color:"#fff" }}>festivo</span><span>Festività nazionale (sfondo crimson)</span></div>
               </div>
             </div>
           </div>
@@ -1143,7 +1105,7 @@ function App(){
 
       {dipModal ? <DipModal dip={dipModal.dip} onSave={saveDip} onClose={function(){ setDipModal(null); }} /> : null}
       {confirm ? <ConfirmModal title={confirm.title} body={confirm.body} onConfirm={confirm.onConfirm} onClose={function(){ setConfirm(null); }} /> : null}
-      {toast ? <Toast msg={toast} onDone={function(){ setToast(""); }} /> : null}
+      {toast ? <Toast msg={toast.msg} warn={toast.warn} onDone={function(){ setToast(null); }} /> : null}
     </div>
   );
 }
