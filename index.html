@@ -550,6 +550,8 @@ function esportaPDF(state, pairs){
     if (chunks.length === 0) chunks.push([]);
     const permMese = []; const noteMese = [];
     dips.forEach(function(dp){ const rec = getRecFrom(state, anno, m, dp.id); if (rec.nota && rec.nota.trim() !== "") noteMese.push(dp.nome + ": " + rec.nota.trim()); });
+    // larghezza colonna UNICA per tutte le pagine (basata sul blocco più grande = min(dip, MAXCOL)+1 colonne)
+    const colW = Math.round((182 / (1 + Math.min(dips.length, MAXCOL))) * 100) / 100;
 
     chunks.forEach(function(chunk, ci){
       if (!first) doc.addPage();
@@ -582,7 +584,6 @@ function esportaPDF(state, pairs){
       const totRow = ["TOT"].concat(tot.map(function(t){ return fmt2(Math.round(t*100)/100); }));
       body.push(totRow);
       const ncols = 1 + chunk.length;
-      const colW = Math.round((182 / ncols) * 100) / 100; // stessa larghezza per tutte le colonne
       doc.autoTable({
         head: head, body: body, startY: 16, theme:"grid", margin:{ left:14, right:14 }, tableWidth: ncols*colW,
         styles:{ fontSize:6, cellPadding:0.8, halign:"center", valign:"middle", lineColor:[210,210,210], lineWidth:0.1, overflow:"linebreak", cellWidth:colW, fontStyle:"bold" },
