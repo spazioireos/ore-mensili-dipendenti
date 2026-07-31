@@ -54,6 +54,8 @@
   .tab.rep.active { background:#fff; color:#0f2740; }
   .content { padding:16px; }
   .toolbar { display:flex; gap:8px; align-items:center; margin-bottom:14px; flex-wrap:wrap; }
+  .lock-badge { background:#7f1d1d; color:#fff; font-size:12px; font-weight:700; padding:3px 10px; border-radius:6px; }
+  .lock-info { background:#fef2f2; border:1px solid #fca5a5; color:#7f1d1d; font-size:12px; padding:6px 12px; border-radius:8px; margin-bottom:12px; }
   .emp-card { background:#fff; border-radius:12px; margin-bottom:18px; box-shadow:0 1px 4px rgba(0,0,0,.08); overflow:hidden; }
   .emp-head { padding:9px 14px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
   .emp-head .nome { font-size:19px; font-weight:800; letter-spacing:.4px; }
@@ -75,6 +77,8 @@
   .cell-in.is-num { font-weight:700; font-size:20px; }
   .cell-in.is-code { font-weight:600; font-size:11px; letter-spacing:-.3px; }
   .cell-in.blocked { border:1px dashed #cbd5e1; cursor:not-allowed; }
+  .cell-in.trattino::placeholder { color:#b91c1c; opacity:1; font-weight:800; font-size:20px; }
+  .cell-in.trattino { color:#b91c1c; }
   .cell-wrap { position:relative; display:inline-block; line-height:0; }
   .perm-flag { position:absolute; top:1px; right:1px; width:11px; height:11px; border-radius:50%; border:2px solid #fff; background:#7c3aed; cursor:pointer; opacity:0.16; padding:0; box-shadow:0 0 2px rgba(0,0,0,.3); }
   .perm-flag.on { opacity:1; }
@@ -104,9 +108,9 @@
   .legend-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:5px; }
   .legend-item { display:flex; align-items:center; gap:7px; font-size:11px; }
   .legend-code { min-width:56px; text-align:center; border-radius:4px; padding:2px 4px; font-weight:800; font-size:11px; }
-  table.rep { border-collapse:collapse; width:100%; font-size:12px; }
-  table.rep th, table.rep td { border:1px solid #e2e8f0; padding:5px 8px; text-align:center; }
-  table.rep th { background:#0f2740; color:#fff; font-size:11px; }
+  table.rep { border-collapse:collapse; width:100%; font-size:14px; }
+  table.rep th, table.rep td { border:1px solid #e2e8f0; padding:7px 10px; text-align:center; }
+  table.rep th { background:#0f2740; color:#fff; font-size:13px; }
   table.rep td.name { text-align:left; font-weight:700; white-space:nowrap; }
   table.rep tr:nth-child(even) td { background:#f8fafc; }
   table.rep td.tot { font-weight:800; background:#eef2ff; }
@@ -161,7 +165,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver11";
+const APP_VER = "ver13";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
 const MESE_ABBR_FILE = ["gen","feb","mar","apr","mag","giu","lug","ago","set","ott","nov","dic"];
@@ -221,6 +225,14 @@ function uid(){ return "d" + Date.now().toString(36) + Math.random().toString(36
 function pad2(x){ return (x<10?"0":"") + x; }
 function monthKey(y, m){ return y + "-" + pad2(m); }
 function daysInMonth(y, m){ return new Date(y, m, 0).getDate(); }
+function monthsBetween(fy, fm, ty, tm){
+  if (fy > ty || (fy === ty && fm > tm)){ const ty2=fy, tm2=fm; fy=ty; fm=tm; ty=ty2; tm=tm2; }
+  const out = []; let y = fy, m = fm; let guard = 0;
+  while ((y < ty || (y === ty && m <= tm)) && guard < 400){ out.push({ y:y, m:m }); m++; if (m > 12){ m = 1; y++; } guard++; }
+  return out;
+}
+function mLabelY(y, m){ return MONTH_LABEL[m-1] + " " + y; }
+function mAbbrY(y, m){ return MONTH_ABBR[m-1] + " " + String(y).slice(2); }
 function weekdayOf(y, m, d){ return new Date(y, m - 1, d).getDay(); }
 
 // formatta un numero con ESATTAMENTE 2 decimali, separatori italiani
@@ -325,8 +337,17 @@ function emptyState(){
       if (id) dati[mk][id] = perNome[nome];
     });
   });
-  return { version:4, dipendenti:dip, dati:dati, anni:[2026], updatedAt:new Date().toISOString() };
+  return { version:4, dipendenti:dip, dati:dati, anni:[2026], locked:{}, updatedAt:new Date().toISOString() };
 }
+
+const NOTE_RECOVERY = {
+  "2026-01": {"DE MAIO BARBARA":"Verificare malattia 21/01-31/01  (3gg da non liquidare)","FERRARI FEDERICA":"Inserire rimborso km € 39,75","PANSERA ANTONIA ALFONSINA":"Trattenere € 74,54 in 11 rate a fronte di prestito effettuato in data 25/01 per € 820,00"},
+  "2026-02": {"FERRARI FEDERICA":"Inserire rimborso km € 39,75","PANSERA ANTONIA ALFONSINA":"Trattenere € 74,54 in 11 rate a fronte di prestito effettuato in data 25/01 per € 820,00"},
+  "2026-03": {"CHIODI MANUELA":"Inserire permesso per operazioni al seggio 21/3 - 22/3 e 23/3","FERRARI FEDERICA":"Inserire rimborso km € 39,75","PANSERA ANTONIA ALFONSINA":"Trattenere € 74,54 in 11 rate a fronte di prestito effettuato in data 25/01 per € 820,00"},
+  "2026-04": {"CHIODI MANUELA":"Dal 01/04 è al livello D2","FERRARI FEDERICA":"Inserire rimborso km € 35,00","GIUNCHIGLIA BENEDETTA":"Verificare malattia 20/04-24/04 (3gg da non liquidare)","PANSERA ANTONIA ALFONSINA":"Trattenere € 74,54 in 11 rate a fronte di prestito effettuato in data 25/01 per € 820,00"},
+  "2026-05": {"FERRARI FEDERICA":"Inserire rimborso km € 45,50"},
+  "2026-06": {"FERRARI FEDERICA":"Inserire rimborso km € 39,50","FISICHELLA GIUSEPPE":"Verificare malattia 11/06 (1gg) - Non pagare carenza","PANSERA ANTONIA ALFONSINA":"Trattenere € 74,54 in 11 rate a fronte di prestito effettuato in data 25/01 per € 820,00"}
+};
 
 function migrate(obj){
   if (!obj) return obj;
@@ -356,6 +377,19 @@ function migrate(obj){
     }
     if (dp.scadenza === undefined) dp.scadenza = "";
   });
+  if (!obj.noteRecuperate2026){
+    const byName = {}; (obj.dipendenti || []).forEach(function(d){ byName[String(d.nome).trim().toUpperCase()] = d.id; });
+    Object.keys(NOTE_RECOVERY).forEach(function(mk){
+      const rows = obj.dati[mk]; if (!rows) return;
+      Object.keys(NOTE_RECOVERY[mk]).forEach(function(nm){
+        const id = byName[nm.trim().toUpperCase()]; if (!id) return;
+        const rec = rows[id];
+        if (rec && (!rec.nota || String(rec.nota).trim() === "")) rec.nota = NOTE_RECOVERY[mk][nm];
+      });
+    });
+    obj.noteRecuperate2026 = true;
+  }
+  if (!obj.locked || typeof obj.locked !== "object") obj.locked = {};
   obj.version = 4;
   return obj;
 }
@@ -394,9 +428,9 @@ function fileName(ext){
 }
 
 /* ===================== EXPORT EXCEL ===================== */
-function esportaExcel(state, anno, months){
+function esportaExcel(state, pairs){
   const wb = XLSX.utils.book_new();
-  wb.Props = { Title:"Report Ore mensile " + anno, Author:"Christian Canonica", Company:"Spazio Ireos Società Cooperativa Sociale", CreatedDate:new Date() };
+  wb.Props = { Title:"Report Ore mensile", Author:"Christian Canonica", Company:"Spazio Ireos Società Cooperativa Sociale", CreatedDate:new Date() };
   const F = "Nunito";
   const styTitle = { font:{ name:F, bold:true, sz:14, color:{rgb:"FFFFFFFF"} }, fill:{ patternType:"solid", fgColor:{rgb:"FF0F2740"} }, alignment:{ horizontal:"left", vertical:"center" } };
   const styGiornoHead = { font:{ name:F, bold:true, sz:11, color:{rgb:"FFFFFFFF"} }, fill:{ patternType:"solid", fgColor:{rgb:"FF0F2740"} }, alignment:{ horizontal:"center", vertical:"center" } };
@@ -418,7 +452,8 @@ function esportaExcel(state, anno, months){
     return base;
   };
   const dips = dipSorted(state);
-  months.forEach(function(m){
+  pairs.forEach(function(pr){
+    const anno = pr.y, m = pr.m;
     const nd = daysInMonth(anno, m);
     const rows = []; const merges = []; const styleMap = {}; const commentMap = {};
     const put = function(rr, cc, val, st){
@@ -445,7 +480,7 @@ function esportaExcel(state, anno, months){
         const rec = getRecFrom(state, anno, m, dp.id);
         const val = (rec.giorni && rec.giorni[d] !== undefined) ? rec.giorni[d] : "";
         const num = parseHour(val); tot[i] += num;
-        const cell = (val === "" ? null : (num !== 0 && !CODE_SET[String(val).trim()] ? num : val));
+        const cell = (val === "" ? (rosso ? "–" : null) : (num !== 0 && !CODE_SET[String(val).trim()] ? num : val));
         put(rr, i+1, cell, hourStyle(val));
         const perm = (rec.permessi && rec.permessi[d]) ? rec.permessi[d] : null;
         if (perm){ commentMap[rr+"_"+(i+1)] = "Permesso orario: " + fmt2(perm.ore) + " h (" + perm.tipo + ")"; if (rows[rr][i+1] === null || rows[rr][i+1] === undefined) rows[rr][i+1] = ""; }
@@ -496,13 +531,14 @@ function esportaExcel(state, anno, months){
 }
 
 /* ===================== EXPORT PDF A4 verticale (matrice) ===================== */
-function esportaPDF(state, anno, months){
+function esportaPDF(state, pairs){
   const JsPDF = window.jspdf.jsPDF;
   const doc = new JsPDF({ orientation:"portrait", unit:"mm", format:"a4" });
-  const fset = festivitaSet(anno);
   const dips = dipSorted(state);
   let first = true;
-  months.forEach(function(m){
+  pairs.forEach(function(pr){
+    const anno = pr.y, m = pr.m;
+    const fset = festivitaSet(anno);
     const mk = monthKey(anno, m);
     const dati = state.dati[mk] || {};
     const haData = Object.keys(dati).some(function(k){ const rr=dati[k]; return rr.giorni && Object.keys(rr.giorni).length>0; });
@@ -519,6 +555,7 @@ function esportaPDF(state, anno, months){
     const noteMese = [];
     const tot = dips.map(function(){ return 0; });
     for (let d=1; d<=nd; d++){
+      const rosso = isRosso(fset, anno, m, d);
       const row = [d + " " + WD[weekdayOf(anno, m, d)]];
       dips.forEach(function(dp, i){
         const rec = getRecFrom(state, anno, m, dp.id);
@@ -526,10 +563,10 @@ function esportaPDF(state, anno, months){
         const perm = (rec.permessi && rec.permessi[d]) ? rec.permessi[d] : null;
         tot[i] += parseHour(v === undefined ? "" : v);
         let txt;
-        if (v === undefined || v === "") txt = "";
+        if (v === undefined || v === "") txt = rosso ? "–" : "";
         else if (CODE_SET[String(v).trim()]) txt = String(v).trim();
         else txt = fmt2(v);
-        if (perm){ txt = (txt === "" ? "*" : txt + "*"); permMese.push(dp.nome + " g." + d + " " + fmt2(perm.ore) + " h (" + perm.tipo + ")"); }
+        if (perm){ txt = (txt === "*" || txt === "" ? "*" : txt + "*"); permMese.push(dp.nome + " g." + d + " " + fmt2(perm.ore) + " h (" + perm.tipo + ")"); }
         row.push(txt);
       });
       body.push(row);
@@ -654,10 +691,11 @@ function CellInput(props){
   else if (isCode) display = s;
   else if (isNumeric(s)) display = fmt2(s);
   else display = String(val);
+  const showTrattino = (s === "" && props.rosso && !props.disabled);
   return (
-    <input className={"cell-in " + (isCode ? "is-code" : "is-num") + (props.disabled ? " blocked" : "")}
+    <input className={"cell-in " + (isCode ? "is-code" : "is-num") + (props.disabled ? " blocked" : "") + (showTrattino ? " trattino" : "")}
       style={props.style} list={foc ? "codici-list" : undefined} title={props.title} disabled={props.disabled}
-      value={display}
+      value={display} placeholder={showTrattino ? "–" : ""}
       onFocus={function(){ setFoc(true); }}
       onBlur={function(e){ setFoc(false); if (props.onBlur) props.onBlur(e.target.value); }}
       onChange={function(e){ props.onChange(e.target.value); }} />
@@ -699,11 +737,12 @@ function EmployeeCard(props){
   const days = []; for (let d = 1; d <= nd; d++) days.push(d);
   const tot = useMemo(function(){ return totOfRec(rec, y, m); }, [rec, y, m]);
 
+  const mLocked = props.mLocked;
   const cellStyle = function(val, festivo, blocked){
     const s = String(val === undefined ? "" : val).trim();
     if (CODE_SET[s]) return { background:CODE_SET[s].bg, color:lumaText(CODE_SET[s].bg) };
     if (blocked && s === "") return { background:"repeating-linear-gradient(45deg,#f1f5f9,#f1f5f9 4px,#e2e8f0 4px,#e2e8f0 8px)", borderColor:"#cbd5e1", color:"#94a3b8" };
-    if (festivo && s === "") return { background:CRIMSON };
+    if (festivo && s === "") return { background:"#fdecec", borderColor:"#e9a8a8" };
     return { background:"#fffde7" };
   };
   const cellTitle = function(val, blocked, rosso, perm){
@@ -749,16 +788,16 @@ function EmployeeCard(props){
             {days.map(function(d){
               const val = rec.giorni[d] === undefined ? "" : rec.giorni[d];
               const rosso = isRosso(fset, y, m, d);
-              const blocked = isBlockedDay(dp, y, m, d);
+              const blocked = isBlockedDay(dp, y, m, d) || mLocked;
               const perm = (rec.permessi && rec.permessi[d]) ? rec.permessi[d] : null;
               return (
                 <td key={"c"+d} style={{ padding:"1px" }}>
                   <div className="cell-wrap">
-                    <CellInput value={val} disabled={blocked} style={cellStyle(val, rosso, blocked)}
+                    <CellInput value={val} disabled={blocked} rosso={rosso} style={cellStyle(val, rosso, blocked)}
                       title={cellTitle(val, blocked, rosso, perm)}
                       onChange={function(nv){ props.onCell(dp.id, d, nv); }}
-                      onBlur={function(nv){ if (rosso && isNumeric(nv)) props.onFestAlert(d); }} />
-                    {!blocked ? <button className={"perm-flag" + (perm ? " on" : "")}
+                      onBlur={function(nv){ if (rosso && isNumeric(nv)) props.onFestConfirm(dp.id, d, nv); }} />
+                    {(!blocked) ? <button className={"perm-flag" + (perm ? " on" : "")}
                       title={perm ? ("Permesso orario " + fmt2(perm.ore) + " h (" + perm.tipo + ") — clic per modificare") : "Aggiungi permesso orario"}
                       onClick={function(){ props.onOpenPerm(dp.id, d); }}></button> : null}
                   </div>
@@ -772,7 +811,7 @@ function EmployeeCard(props){
       <div className="foot-line">
         <span className="foot-tot">TOT calcolato: <b>{fmt2(tot)}</b></span>
         <label>Ore dichiarate (uso interno):</label>
-        <input className="dich-in" value={rec.dich || ""} placeholder="—"
+        <input className="dich-in" value={rec.dich || ""} placeholder="—" disabled={mLocked}
           onChange={function(e){ props.onDich(dp.id, e.target.value); }} />
         {(function(){
           const s = String(rec.dich === undefined ? "" : rec.dich).trim();
@@ -791,11 +830,11 @@ function EmployeeCard(props){
             onChange={function(nr){ props.onSostChange(dp.id, idx, nr); }}
             onDel={function(){ props.onSostDel(dp.id, idx); }} />;
         })}
-        <button className="btn-mini" onClick={function(){ props.onSostAdd(dp.id); }}>+ Aggiungi sostituzione</button>
+        {!mLocked ? <button className="btn-mini" onClick={function(){ props.onSostAdd(dp.id); }}>+ Aggiungi sostituzione</button> : null}
       </div>
       <div className="nota-line">
         <label>Nota mese:</label>
-        <input className="nota-in" value={rec.nota || ""} placeholder="(nessuna nota)"
+        <input className="nota-in" value={rec.nota || ""} placeholder="(nessuna nota)" disabled={mLocked}
           onChange={function(e){ props.onNota(dp.id, e.target.value); }} />
       </div>
     </div>
@@ -865,40 +904,51 @@ function DipModal(props){
 }
 
 function ExportModal(props){
+  const yearsSet = {}; (props.anni || []).forEach(function(y){ yearsSet[y] = true; });
+  yearsSet[props.annoCorrente] = true; yearsSet[props.annoCorrente + 1] = true;
+  const anni = Object.keys(yearsSet).map(function(y){ return parseInt(y,10); }).sort(function(a,b){ return a-b; });
+  const yOpts = anni.map(function(y){ return <option key={y} value={y}>{y}</option>; });
+  const mOpts = MONTH_LABEL.map(function(l,i){ return <option key={i} value={i+1}>{l}</option>; });
   const [mode, setMode] = useState("mese");
-  const [meseSel, setMeseSel] = useState(props.meseCorrente || 1);
-  const [da, setDa] = useState(1);
-  const [a, setA] = useState(12);
-  const opts = MONTH_LABEL.map(function(l, i){ return <option key={i} value={i+1}>{l}</option>; });
+  const [msY, setMsY] = useState(props.annoCorrente); const [msM, setMsM] = useState(props.meseCorrente || 1);
+  const [faY, setFaY] = useState(props.annoCorrente); const [faM, setFaM] = useState(props.meseCorrente || 1);
+  const [taY, setTaY] = useState(props.annoCorrente); const [taM, setTaM] = useState(props.meseCorrente || 12);
+  const [annoY, setAnnoY] = useState(props.annoCorrente);
   const genera = function(){
-    let months;
-    if (mode === "anno") months = [1,2,3,4,5,6,7,8,9,10,11,12];
-    else if (mode === "mese") months = [parseInt(meseSel,10)];
-    else { let d = parseInt(da,10), b = parseInt(a,10); if (d > b){ const t=d; d=b; b=t; } months = []; for (let x=d; x<=b; x++) months.push(x); }
-    props.onGenera(months);
+    let pairs;
+    if (mode === "anno"){ pairs = []; for (let m=1;m<=12;m++) pairs.push({ y:parseInt(annoY,10), m:m }); }
+    else if (mode === "mese") pairs = [{ y:parseInt(msY,10), m:parseInt(msM,10) }];
+    else pairs = monthsBetween(parseInt(faY,10), parseInt(faM,10), parseInt(taY,10), parseInt(taM,10));
+    props.onGenera(pairs);
   };
   return (
     <div className="overlay" onClick={props.onClose}>
-      <div className="modal" onClick={function(e){ e.stopPropagation(); }} style={{ maxWidth:"440px" }}>
-        <h2>Esporta {props.kind} — periodo {props.anno}</h2>
+      <div className="modal" onClick={function(e){ e.stopPropagation(); }} style={{ maxWidth:"520px" }}>
+        <h2>Esporta {props.kind} — scegli il periodo</h2>
         <div style={{ display:"flex", flexDirection:"column", gap:"12px", margin:"6px 0 4px" }}>
-          <label style={{ display:"flex", alignItems:"center", gap:"8px", fontSize:"14px" }}>
+          <label style={{ display:"flex", alignItems:"center", gap:"6px", fontSize:"14px", flexWrap:"wrap" }}>
             <input type="radio" checked={mode==="mese"} onChange={function(){ setMode("mese"); }} />
             <span>Mese singolo:</span>
-            <select value={meseSel} onChange={function(e){ setMeseSel(e.target.value); setMode("mese"); }}>{opts}</select>
+            <select value={msM} onChange={function(e){ setMsM(e.target.value); setMode("mese"); }}>{mOpts}</select>
+            <select value={msY} onChange={function(e){ setMsY(e.target.value); setMode("mese"); }}>{yOpts}</select>
           </label>
-          <label style={{ display:"flex", alignItems:"center", gap:"8px", fontSize:"14px", flexWrap:"wrap" }}>
+          <label style={{ display:"flex", alignItems:"center", gap:"6px", fontSize:"14px", flexWrap:"wrap" }}>
             <input type="radio" checked={mode==="intervallo"} onChange={function(){ setMode("intervallo"); }} />
             <span>Intervallo: da</span>
-            <select value={da} onChange={function(e){ setDa(e.target.value); setMode("intervallo"); }}>{opts}</select>
+            <select value={faM} onChange={function(e){ setFaM(e.target.value); setMode("intervallo"); }}>{mOpts}</select>
+            <select value={faY} onChange={function(e){ setFaY(e.target.value); setMode("intervallo"); }}>{yOpts}</select>
             <span>a</span>
-            <select value={a} onChange={function(e){ setA(e.target.value); setMode("intervallo"); }}>{opts}</select>
+            <select value={taM} onChange={function(e){ setTaM(e.target.value); setMode("intervallo"); }}>{mOpts}</select>
+            <select value={taY} onChange={function(e){ setTaY(e.target.value); setMode("intervallo"); }}>{yOpts}</select>
           </label>
-          <label style={{ display:"flex", alignItems:"center", gap:"8px", fontSize:"14px" }}>
+          <label style={{ display:"flex", alignItems:"center", gap:"6px", fontSize:"14px", flexWrap:"wrap" }}>
             <input type="radio" checked={mode==="anno"} onChange={function(){ setMode("anno"); }} />
-            <span>Tutto l'anno {props.anno} (12 mesi)</span>
+            <span>Tutto l'anno</span>
+            <select value={annoY} onChange={function(e){ setAnnoY(e.target.value); setMode("anno"); }}>{yOpts}</select>
+            <span>(12 mesi)</span>
           </label>
         </div>
+        <div style={{ fontSize:"11px", color:"#64748b" }}>L'intervallo può attraversare più anni (es. da Settembre 2026 a Gennaio 2027).</div>
         <div className="modal-actions">
           <span></span>
           <span>
@@ -979,35 +1029,37 @@ function ConfirmModal(props){
 /* ===================== RIEPILOGHI ===================== */
 function Riepiloghi(props){
   const state = props.state;
-  const [anno, setAnno] = useState(props.anno);
-  const [scope, setScope] = useState("anno");
+  const anniDisp = (function(){ const o={}; (state.anni||[]).forEach(function(y){ o[y]=true; }); o[props.anno]=true; o[props.anno+1]=true; return Object.keys(o).map(function(y){ return parseInt(y,10); }).sort(function(a,b){ return a-b; }); })();
+  const [faY, setFaY] = useState(props.anno); const [faM, setFaM] = useState(1);
+  const [taY, setTaY] = useState(props.anno); const [taM, setTaM] = useState(12);
   const dips = dipSorted(state);
-  const scopeMonths = scope === "anno" ? [1,2,3,4,5,6,7,8,9,10,11,12] : [parseInt(scope,10)];
+  const scopePairs = monthsBetween(parseInt(faY,10), parseInt(faM,10), parseInt(taY,10), parseInt(taM,10));
+  const periodoLabel = scopePairs.length ? (mLabelY(scopePairs[0].y, scopePairs[0].m) + " → " + mLabelY(scopePairs[scopePairs.length-1].y, scopePairs[scopePairs.length-1].m)) : "";
 
-  const tabAnnuo = dips.map(function(dp){
-    const perMese = []; let totAnno = 0;
-    for (let m=1;m<=12;m++){ const t = totOfRec(getRecFrom(state, anno, m, dp.id), anno, m); perMese.push(t); totAnno += t; }
-    return { dp:dp, perMese:perMese, tot:Math.round(totAnno*100)/100 };
+  const tabPeriodo = dips.map(function(dp){
+    const perMese = scopePairs.map(function(pr){ return totOfRec(getRecFrom(state, pr.y, pr.m, dp.id), pr.y, pr.m); });
+    const tot = perMese.reduce(function(a,b){ return a+b; }, 0);
+    return { dp:dp, perMese:perMese, tot:Math.round(tot*100)/100 };
   });
   const tabTeor = dips.map(function(dp){
     let lav=0, teor=0;
-    scopeMonths.forEach(function(m){ lav += totOfRec(getRecFrom(state, anno, m, dp.id), anno, m); teor += dp.oreSett * daysInMonth(anno, m) / 7; });
+    scopePairs.forEach(function(pr){ lav += totOfRec(getRecFrom(state, pr.y, pr.m, dp.id), pr.y, pr.m); teor += dp.oreSett * daysInMonth(pr.y, pr.m) / 7; });
     lav=Math.round(lav*100)/100; teor=Math.round(teor*100)/100;
     return { dp:dp, lav:lav, teor:teor, scost:Math.round((lav-teor)*100)/100 };
   });
   const codiciUsati = {};
-  dips.forEach(function(dp){ scopeMonths.forEach(function(m){ const rec=getRecFrom(state,anno,m,dp.id);
+  dips.forEach(function(dp){ scopePairs.forEach(function(pr){ const rec=getRecFrom(state,pr.y,pr.m,dp.id);
     Object.keys(rec.giorni).forEach(function(d){ const v=String(rec.giorni[d]).trim(); if (CODE_SET[v] && v!=="--" && v!=="AN") codiciUsati[v]=true; }); }); });
   const codeCols = CODICI.filter(function(c){ return codiciUsati[c.c]; }).map(function(c){ return c.c; });
   const tabAssenze = dips.map(function(dp){
     const counts = {}; codeCols.forEach(function(c){ counts[c]=0; });
-    scopeMonths.forEach(function(m){ const rec=getRecFrom(state,anno,m,dp.id);
+    scopePairs.forEach(function(pr){ const rec=getRecFrom(state,pr.y,pr.m,dp.id);
       Object.keys(rec.giorni).forEach(function(d){ const v=String(rec.giorni[d]).trim(); if (counts[v]!==undefined) counts[v]+=1; }); });
     return { dp:dp, counts:counts };
   });
   const tabPay = dips.map(function(dp){
     let ret=0, non=0;
-    scopeMonths.forEach(function(m){ const rec=getRecFrom(state,anno,m,dp.id);
+    scopePairs.forEach(function(pr){ const rec=getRecFrom(state,pr.y,pr.m,dp.id);
       Object.keys(rec.giorni).forEach(function(d){ const v=String(rec.giorni[d]).trim(); if (CODE_SET[v] && v!=="--" && v!=="AN"){ if (CODE_SET[v].pay) ret+=1; else non+=1; } }); });
     return { dp:dp, ret:ret, non:non };
   });
@@ -1020,25 +1072,25 @@ function Riepiloghi(props){
   });
   tabScad.sort(function(a,b){ return a.gg-b.gg; });
   const tabNote = [];
-  dips.forEach(function(dp){ scopeMonths.forEach(function(m){ const rec=getRecFrom(state,anno,m,dp.id);
-    if (rec.nota && rec.nota.trim()!=="") tabNote.push({ mese:MONTH_LABEL[m-1], dp:dp.nome, nota:rec.nota.trim() }); }); });
+  dips.forEach(function(dp){ scopePairs.forEach(function(pr){ const rec=getRecFrom(state,pr.y,pr.m,dp.id);
+    if (rec.nota && rec.nota.trim()!=="") tabNote.push({ mese:mLabelY(pr.y,pr.m), dp:dp.nome, nota:rec.nota.trim() }); }); });
   const tabPerm = [];
-  dips.forEach(function(dp){ scopeMonths.forEach(function(m){ const rec=getRecFrom(state,anno,m,dp.id);
-    if (rec.permessi){ Object.keys(rec.permessi).forEach(function(d){ const pr=rec.permessi[d];
-      tabPerm.push({ dp:dp.nome, mese:MONTH_LABEL[m-1], giorno:parseInt(d,10), ore:pr.ore, tipo:pr.tipo }); }); } }); });
+  dips.forEach(function(dp){ scopePairs.forEach(function(pr){ const rec=getRecFrom(state,pr.y,pr.m,dp.id);
+    if (rec.permessi){ Object.keys(rec.permessi).forEach(function(d){ const prm=rec.permessi[d];
+      tabPerm.push({ dp:dp.nome, mese:mLabelY(pr.y,pr.m), giorno:parseInt(d,10), ore:prm.ore, tipo:prm.tipo }); }); } }); });
   tabPerm.sort(function(a,b){ if (a.dp!==b.dp) return a.dp.localeCompare(b.dp); return a.giorno-b.giorno; });
 
   const esportaRiepiloghi = function(){
     const wb = XLSX.utils.book_new();
-    wb.Props = { Title:"Riepiloghi "+anno, Author:"Christian Canonica", Company:"Spazio Ireos Società Cooperativa Sociale", CreatedDate:new Date() };
+    wb.Props = { Title:"Riepiloghi", Author:"Christian Canonica", Company:"Spazio Ireos Società Cooperativa Sociale", CreatedDate:new Date() };
     const hdr = { font:{ name:"Arial", bold:true, color:{rgb:"FFFFFFFF"} }, fill:{ patternType:"solid", fgColor:{rgb:"FF0F2740"} }, alignment:{horizontal:"center"} };
     const mkSheet = function(name, aoa){
       const ws = XLSX.utils.aoa_to_sheet(aoa);
       (aoa[0]||[]).forEach(function(_, c){ const ref=XLSX.utils.encode_cell({r:0,c:c}); if (ws[ref]) ws[ref].s=hdr; });
       XLSX.utils.book_append_sheet(wb, ws, name);
     };
-    const aAnnuo=[["DIPENDENTE"].concat(MONTH_ABBR).concat(["TOT ANNO"])];
-    tabAnnuo.forEach(function(r){ aAnnuo.push([r.dp.nome].concat(r.perMese).concat([r.tot])); }); mkSheet("Annuo", aAnnuo);
+    const aAnnuo=[["DIPENDENTE"].concat(scopePairs.map(function(pr){ return mAbbrY(pr.y,pr.m); })).concat(["TOT"])];
+    tabPeriodo.forEach(function(r){ aAnnuo.push([r.dp.nome].concat(r.perMese.map(function(v){ return Math.round(v*100)/100; })).concat([r.tot])); }); mkSheet("Per mese", aAnnuo);
     const aTeor=[["DIPENDENTE","ORE LAVORATE","ORE TEORICHE","SCOSTAMENTO"]];
     tabTeor.forEach(function(r){ aTeor.push([r.dp.nome, r.lav, r.teor, r.scost]); }); mkSheet("Ore vs teoriche", aTeor);
     const aAss=[["DIPENDENTE"].concat(codeCols)];
@@ -1054,35 +1106,35 @@ function Riepiloghi(props){
     XLSX.writeFile(wb, fileName("xlsx"));
   };
 
+  const mOpts = MONTH_LABEL.map(function(l,i){ return <option key={i} value={i+1}>{l}</option>; });
+  const yOpts = anniDisp.map(function(y){ return <option key={y} value={y}>{y}</option>; });
   return (
     <div>
       <div className="toolbar">
         <strong style={{ fontSize:"15px", color:"#0f2740" }}>Riepiloghi</strong>
-        <label style={{ fontSize:"12px", fontWeight:"700", marginLeft:"10px" }}>Anno</label>
-        <select value={anno} onChange={function(e){ setAnno(parseInt(e.target.value,10)); }} style={{ padding:"6px", borderRadius:"6px", border:"2px solid #f59e0b", background:"#fffde7" }}>
-          {state.anni.map(function(y){ return <option key={y} value={y}>{y}</option>; })}
-        </select>
-        <label style={{ fontSize:"12px", fontWeight:"700" }}>Ambito</label>
-        <select value={scope} onChange={function(e){ setScope(e.target.value); }} style={{ padding:"6px", borderRadius:"6px", border:"2px solid #f59e0b", background:"#fffde7" }}>
-          <option value="anno">Tutto l'anno</option>
-          {MONTH_LABEL.map(function(lbl,i){ return <option key={i} value={String(i+1)}>{lbl}</option>; })}
-        </select>
+        <label style={{ fontSize:"12px", fontWeight:"700", marginLeft:"10px" }}>Periodo: da</label>
+        <select value={faM} onChange={function(e){ setFaM(e.target.value); }} style={{ padding:"6px", borderRadius:"6px", border:"2px solid #f59e0b", background:"#fffde7" }}>{mOpts}</select>
+        <select value={faY} onChange={function(e){ setFaY(e.target.value); }} style={{ padding:"6px", borderRadius:"6px", border:"2px solid #f59e0b", background:"#fffde7" }}>{yOpts}</select>
+        <label style={{ fontSize:"12px", fontWeight:"700" }}>a</label>
+        <select value={taM} onChange={function(e){ setTaM(e.target.value); }} style={{ padding:"6px", borderRadius:"6px", border:"2px solid #f59e0b", background:"#fffde7" }}>{mOpts}</select>
+        <select value={taY} onChange={function(e){ setTaY(e.target.value); }} style={{ padding:"6px", borderRadius:"6px", border:"2px solid #f59e0b", background:"#fffde7" }}>{yOpts}</select>
         <div className="spacer"></div>
         <button className="btn btn-blue" onClick={esportaRiepiloghi}>📊 Esporta riepiloghi (Excel)</button>
       </div>
+      <div style={{ fontSize:"12px", color:"#64748b", marginBottom:"10px" }}>Fascia selezionata: <b>{periodoLabel}</b> ({scopePairs.length} mesi). L'intervallo può attraversare più anni.</div>
 
       <div className="rep-box">
-        <h3>Riepilogo annuo — ore lavorate per mese ({anno})</h3>
+        <h3>Riepilogo per mese — ore lavorate ({periodoLabel})</h3>
         <div className="rep-scroll"><table className="rep"><thead><tr>
-          <th style={{textAlign:"left"}}>Dipendente</th>{MONTH_ABBR.map(function(a){ return <th key={a}>{a}</th>; })}<th>TOT</th>
+          <th style={{textAlign:"left"}}>Dipendente</th>{scopePairs.map(function(pr,i){ return <th key={i}>{mAbbrY(pr.y,pr.m)}</th>; })}<th>TOT</th>
         </tr></thead><tbody>
-          {tabAnnuo.map(function(r){ return <tr key={r.dp.id}><td className="name">{r.dp.nome}</td>
+          {tabPeriodo.map(function(r){ return <tr key={r.dp.id}><td className="name">{r.dp.nome}</td>
             {r.perMese.map(function(v,i){ return <td key={i}>{v===0?"":fmt2(v)}</td>; })}<td className="tot">{fmt2(r.tot)}</td></tr>; })}
         </tbody></table></div>
       </div>
 
       <div className="rep-box">
-        <h3>Ore lavorate vs teoriche — {scope==="anno"?"anno "+anno:MONTH_LABEL[parseInt(scope,10)-1]+" "+anno} <span style={{fontWeight:400,fontSize:"11px",color:"#64748b"}}>(teoriche = ORE SETT × giorni/7, approssimate)</span></h3>
+        <h3>Ore lavorate vs teoriche — {periodoLabel} <span style={{fontWeight:400,fontSize:"11px",color:"#64748b"}}>(teoriche = ORE SETT × giorni/7, approssimate)</span></h3>
         <div className="rep-scroll"><table className="rep"><thead><tr>
           <th style={{textAlign:"left"}}>Dipendente</th><th>Ore lavorate</th><th>Ore teoriche</th><th>Scostamento</th>
         </tr></thead><tbody>
@@ -1254,7 +1306,26 @@ function App(){
     if (!next.dati[mk][dipId]) next.dati[mk][dipId] = { giorni:{}, nota:"" };
     next.dati[mk][dipId].nota = value; touch(next);
   };
-  const onFestAlert = function(d){ showToast("⚠️ Stai inserendo ore in un giorno FESTIVO/DOMENICA (" + d + "/" + mese + "/" + anno + ")", true); };
+  const onFestConfirm = function(dipId, d, value){
+    setConfirm({
+      title: "Giorno festivo / domenica",
+      body: "Il " + d + "/" + mese + "/" + anno + " è un giorno festivo o domenica. Vuoi davvero inserire ore lavorate (" + value + ")?",
+      confirmLabel: "Sì, inserisci",
+      onConfirm: function(){ setConfirm(null); },
+      onCancel: function(){ onCell(dipId, d, ""); setConfirm(null); }
+    });
+  };
+  const mk = mese ? monthKey(anno, mese) : null;
+  const mLocked = !!(mk && state && state.locked && state.locked[mk]);
+  const toggleLock = function(){
+    if (mLocked){
+      setConfirm({ title:"Sbloccare il mese?", body:"Sbloccando " + MONTH_LABEL[mese-1] + " " + anno + " le celle torneranno modificabili.", confirmLabel:"Sblocca",
+        onConfirm:function(){ const next=JSON.parse(JSON.stringify(state)); if(!next.locked) next.locked={}; delete next.locked[mk]; touch(next); setConfirm(null); showToast("Mese sbloccato"); },
+        onCancel:function(){ setConfirm(null); } });
+    } else {
+      const next=JSON.parse(JSON.stringify(state)); if(!next.locked) next.locked={}; next.locked[mk]=true; touch(next); showToast("🔒 Mese bloccato — ricorda di salvare 💾");
+    }
+  };
   const ensureRec = function(next, dipId){ const mk = monthKey(anno, mese); if (!next.dati[mk]) next.dati[mk] = {}; if (!next.dati[mk][dipId]) next.dati[mk][dipId] = { giorni:{}, nota:"" }; return next.dati[mk][dipId]; };
   const onOpenPerm = function(dipId, day){ setPermModal({ dipId:dipId, day:day }); };
   const onPermSave = function(dipId, day, obj){ const next = JSON.parse(JSON.stringify(state)); const rec = ensureRec(next, dipId); if (!rec.permessi) rec.permessi = {}; rec.permessi[day] = obj; touch(next); setPermModal(null); showToast("Permesso orario salvato"); };
@@ -1391,16 +1462,20 @@ function App(){
           <div>
             <div className="toolbar">
               <strong style={{ fontSize:"15px", color:"#0f2740" }}>{MONTH_LABEL[mese-1]} {anno}</strong>
+              {mLocked ? <span className="lock-badge">🔒 Mese bloccato</span> : null}
               <div className="spacer"></div>
-              <button className="btn btn-blue" onClick={function(){ setDipModal({}); }}>+ Dipendente</button>
+              <button className={"btn " + (mLocked ? "btn-red" : "btn-gray")} title={mLocked ? "Sblocca il mese per poterlo modificare" : "Blocca il mese: nessuna cella potrà più essere modificata"}
+                onClick={toggleLock}>{mLocked ? "🔓 Sblocca mese" : "🔒 Blocca mese"}</button>
+              <button className="btn btn-blue" disabled={mLocked} onClick={function(){ setDipModal({}); }}>+ Dipendente</button>
             </div>
+            {mLocked ? <div className="lock-info">Questo mese è bloccato: le celle non sono modificabili. Premi "Sblocca mese" per riaprirlo.</div> : null}
             {state.dipendenti.length === 0 ?
               <div style={{ padding:"30px", textAlign:"center", color:"#64748b" }}>Nessun dipendente. Aggiungine uno o importa il file Excel.</div>
               :
               dipSorted(state).map(function(dp){
                 const dipList = state.dipendenti.filter(function(x){ return x.id !== dp.id; }).map(function(x){ return x.nome; }).sort(function(a,b){ return a.localeCompare(b); });
-                return <EmployeeCard key={dp.id} dp={dp} rec={getRecFrom(state, anno, mese, dp.id)} anno={anno} mese={mese} fset={fset}
-                  dipList={dipList} onCell={onCell} onNota={onNota} onFestAlert={onFestAlert}
+                return <EmployeeCard key={dp.id} dp={dp} rec={getRecFrom(state, anno, mese, dp.id)} anno={anno} mese={mese} fset={fset} mLocked={mLocked}
+                  dipList={dipList} onCell={onCell} onNota={onNota} onFestConfirm={onFestConfirm}
                   onDich={onDich} onSostAdd={onSostAdd} onSostChange={onSostChange} onSostDel={onSostDel} onOpenPerm={onOpenPerm}
                   onEditDip={function(d){ setDipModal({ dip:d }); }} onDelDip={askDelDip} />;
               })
@@ -1418,8 +1493,8 @@ function App(){
         }
       </div>
 
-      {exportModal ? <ExportModal kind={exportModal} anno={anno} meseCorrente={mese}
-        onGenera={function(months){ if (exportModal === "Excel") esportaExcel(state, anno, months); else esportaPDF(state, anno, months); setExportModal(null); }}
+      {exportModal ? <ExportModal kind={exportModal} anni={state.anni} annoCorrente={anno} meseCorrente={mese}
+        onGenera={function(pairs){ if (exportModal === "Excel") esportaExcel(state, pairs); else esportaPDF(state, pairs); setExportModal(null); }}
         onClose={function(){ setExportModal(null); }} /> : null}
       {permModal ? (function(){
         const rc = getRecFrom(state, anno, mese, permModal.dipId);
@@ -1430,7 +1505,7 @@ function App(){
           onClose={function(){ setPermModal(null); }} />;
       })() : null}
       {dipModal ? <DipModal dip={dipModal.dip} onSave={saveDip} onClose={function(){ setDipModal(null); }} /> : null}
-      {confirm ? <ConfirmModal title={confirm.title} body={confirm.body} onConfirm={confirm.onConfirm} onClose={function(){ setConfirm(null); }} /> : null}
+      {confirm ? <ConfirmModal title={confirm.title} body={confirm.body} confirmLabel={confirm.confirmLabel} onConfirm={confirm.onConfirm} onClose={function(){ if (confirm.onCancel) confirm.onCancel(); else setConfirm(null); }} /> : null}
       {toast ? <Toast msg={toast.msg} warn={toast.warn} onDone={function(){ setToast(null); }} /> : null}
     </div>
   );
