@@ -161,7 +161,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver9";
+const APP_VER = "ver10";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
 const MESE_ABBR_FILE = ["gen","feb","mar","apr","mag","giu","lug","ago","set","ott","nov","dic"];
@@ -397,54 +397,82 @@ function fileName(ext){
 function esportaExcel(state, anno){
   const wb = XLSX.utils.book_new();
   wb.Props = { Title:"Report Ore mensile " + anno, Author:"Christian Canonica", Company:"Spazio Ireos Società Cooperativa Sociale", CreatedDate:new Date() };
-  const styH = { font:{ name:"Nunito", bold:true, sz:16, color:{rgb:"FF08344A"} }, fill:{ patternType:"solid", fgColor:{rgb:"FF00B0F0"} }, alignment:{ horizontal:"left", vertical:"center" } };
-  const styLbl = { font:{ name:"Nunito", bold:true, sz:10 } };
-  const styWD = { font:{ name:"Nunito", sz:9, color:{rgb:"FF64748B"} }, alignment:{horizontal:"center"} };
-  const styDN = { font:{ name:"Nunito", bold:true, sz:10 }, alignment:{horizontal:"center"}, fill:{ patternType:"solid", fgColor:{rgb:"FFF1F5F9"} } };
-  const styTot = { font:{ name:"Nunito", bold:true, sz:13, color:{rgb:"FF0F2740"} }, alignment:{horizontal:"center"}, fill:{ patternType:"solid", fgColor:{rgb:"FFEEF2FF"} } };
-  const styNote = { font:{ name:"Nunito", italic:true, sz:10, color:{rgb:"FF7C3AED"} } };
+  const F = "Nunito";
+  const styTitle = { font:{ name:F, bold:true, sz:14, color:{rgb:"FFFFFFFF"} }, fill:{ patternType:"solid", fgColor:{rgb:"FF0F2740"} }, alignment:{ horizontal:"left", vertical:"center" } };
+  const styGiornoHead = { font:{ name:F, bold:true, sz:11, color:{rgb:"FFFFFFFF"} }, fill:{ patternType:"solid", fgColor:{rgb:"FF0F2740"} }, alignment:{ horizontal:"center", vertical:"center" } };
+  const styEmpHead = { font:{ name:F, bold:true, sz:10, color:{rgb:"FFFFFFFF"} }, fill:{ patternType:"solid", fgColor:{rgb:"FF0F2740"} }, alignment:{ horizontal:"center", vertical:"center", wrapText:true } };
+  const styDay = { font:{ name:F, bold:true, sz:10, color:{rgb:"FF0F2740"} }, alignment:{ horizontal:"left", vertical:"center" }, fill:{ patternType:"solid", fgColor:{rgb:"FFF1F5F9"} } };
+  const styDayR = { font:{ name:F, bold:true, sz:10, color:{rgb:"FFFFFFFF"} }, alignment:{ horizontal:"left", vertical:"center" }, fill:{ patternType:"solid", fgColor:{rgb:"FFB22222"} } };
+  const styTotLbl = { font:{ name:F, bold:true, sz:11, color:{rgb:"FF0F2740"} }, alignment:{ horizontal:"left" }, fill:{ patternType:"solid", fgColor:{rgb:"FFEEF2FF"} } };
+  const styTot = { font:{ name:F, bold:true, sz:11, color:{rgb:"FF0F2740"} }, alignment:{ horizontal:"center" }, fill:{ patternType:"solid", fgColor:{rgb:"FFEEF2FF"} } };
+  const styNote = { font:{ name:F, italic:true, sz:10, color:{rgb:"FF7C3AED"} }, alignment:{ horizontal:"left", wrapText:true } };
+  const styPerm = { font:{ name:F, sz:10, color:{rgb:"FF6D28D9"} }, alignment:{ horizontal:"left", wrapText:true } };
   const hourStyle = function(val){
     const s = String(val === undefined ? "" : val).trim();
-    const base = { font:{ name:"Nunito", bold:true, sz:12 }, alignment:{horizontal:"center"},
+    const base = { font:{ name:F, bold:true, sz:11 }, alignment:{ horizontal:"center" },
       border:{ top:{style:"thin",color:{rgb:"FFE2E8F0"}}, bottom:{style:"thin",color:{rgb:"FFE2E8F0"}}, left:{style:"thin",color:{rgb:"FFE2E8F0"}}, right:{style:"thin",color:{rgb:"FFE2E8F0"}} } };
     if (CODE_SET[s]){
       base.fill = { patternType:"solid", fgColor:{ rgb:"FF"+CODE_SET[s].bg.replace("#","") } };
-      base.font = { name:"Nunito", bold:true, sz:9, color:{ rgb:"FF"+lumaText(CODE_SET[s].bg).replace("#","") } };
+      base.font = { name:F, bold:true, sz:9, color:{ rgb:"FF"+lumaText(CODE_SET[s].bg).replace("#","") } };
     }
     return base;
   };
+  const dips = dipSorted(state);
   for (let m = 1; m <= 12; m++){
     const nd = daysInMonth(anno, m);
-    const rows = []; const merges = []; const styleMap = {}; const commentMap = {}; let r = 0;
+    const rows = []; const merges = []; const styleMap = {}; const commentMap = {};
     const put = function(rr, cc, val, st){
       while (rows.length <= rr) rows.push([]);
       const row = rows[rr]; while (row.length <= cc) row.push(null);
       row[cc] = val; if (st) styleMap[rr+"_"+cc] = st;
     };
-    dipSorted(state).forEach(function(dp){
-      const rec = getRecFrom(state, anno, m, dp.id);
-      const base = r;
-      put(base, 0, dp.nome, styH);
-      put(base, 10, "ORE SETT", styLbl); put(base, 11, dp.oreSett, styLbl);
-      put(base, 28, contrLabel(dp) + (dp.livello ? "  ·  Liv. "+dp.livello : ""), styLbl);
-      merges.push({ s:{r:base,c:0}, e:{r:base,c:8} });
-      const rWD = base+2, rDN = base+3, rH = base+4;
-      let tot = 0;
-      for (let d = 1; d <= nd; d++){
-        const cc = d-1;
-        put(rWD, cc, WD[weekdayOf(anno, m, d)], styWD);
-        put(rDN, cc, d, styDN);
+    // titolo
+    put(0, 0, "Report Ore mensile — " + MONTH_LABEL[m-1] + " " + anno, styTitle);
+    merges.push({ s:{r:0,c:0}, e:{r:0,c:dips.length} });
+    // intestazioni
+    put(1, 0, "Giorno", styGiornoHead);
+    dips.forEach(function(dp, i){
+      const info = dp.oreSett + " h/sett · " + contrLabel(dp) + (dp.livello ? " · Liv. " + dp.livello : "");
+      put(1, i+1, dp.nome + "\n" + info, styEmpHead);
+    });
+    // giorni
+    const tot = dips.map(function(){ return 0; });
+    for (let d = 1; d <= nd; d++){
+      const rr = 1 + d;
+      const rosso = isRosso(festivitaSet(anno), anno, m, d);
+      put(rr, 0, d + " " + WD[weekdayOf(anno, m, d)], rosso ? styDayR : styDay);
+      dips.forEach(function(dp, i){
+        const rec = getRecFrom(state, anno, m, dp.id);
         const val = (rec.giorni && rec.giorni[d] !== undefined) ? rec.giorni[d] : "";
-        const num = parseHour(val); tot += num;
+        const num = parseHour(val); tot[i] += num;
         const cell = (val === "" ? null : (num !== 0 && !CODE_SET[String(val).trim()] ? num : val));
-        put(rH, cc, cell, hourStyle(val));
+        put(rr, i+1, cell, hourStyle(val));
         const perm = (rec.permessi && rec.permessi[d]) ? rec.permessi[d] : null;
-        if (perm){ commentMap[rH+"_"+cc] = "Permesso orario: " + fmt2(perm.ore) + " h (" + perm.tipo + ")"; if (rows[rH][cc] === null || rows[rH][cc] === undefined) rows[rH][cc] = ""; }
+        if (perm){ commentMap[rr+"_"+(i+1)] = "Permesso orario: " + fmt2(perm.ore) + " h (" + perm.tipo + ")"; if (rows[rr][i+1] === null || rows[rr][i+1] === undefined) rows[rr][i+1] = ""; }
+      });
+    }
+    // TOT
+    const rTot = 2 + nd;
+    put(rTot, 0, "TOT", styTotLbl);
+    dips.forEach(function(dp, i){ put(rTot, i+1, Math.round(tot[i]*100)/100, styTot); });
+    // note e permessi del mese, sotto
+    let rr = rTot + 2;
+    dips.forEach(function(dp){
+      const rec = getRecFrom(state, anno, m, dp.id);
+      if (rec.nota && rec.nota.trim() !== ""){
+        put(rr, 0, "Nota — " + dp.nome + ": " + rec.nota.trim(), styNote);
+        merges.push({ s:{r:rr,c:0}, e:{r:rr,c:dips.length} }); rr++;
       }
-      put(rDN, nd, "TOT", styDN);
-      put(rH, nd, Math.round(tot*100)/100, styTot);
-      if (rec.nota && rec.nota.trim() !== "") put(base+5, 0, rec.nota, styNote);
-      r = base + 8;
+    });
+    dips.forEach(function(dp){
+      const rec = getRecFrom(state, anno, m, dp.id);
+      if (rec.permessi){
+        Object.keys(rec.permessi).forEach(function(d){
+          const pr = rec.permessi[d];
+          put(rr, 0, "Permesso orario — " + dp.nome + " g." + d + ": " + fmt2(pr.ore) + " h (" + pr.tipo + ") — non incluso nel TOT", styPerm);
+          merges.push({ s:{r:rr,c:0}, e:{r:rr,c:dips.length} }); rr++;
+        });
+      }
     });
     const ws = XLSX.utils.aoa_to_sheet(rows);
     Object.keys(styleMap).forEach(function(key){
@@ -459,19 +487,20 @@ function esportaExcel(state, anno){
       ws[ref].c = [{ a:"Christian Canonica", t:commentMap[key] }];
       ws[ref].c.hidden = true;
     });
-    // formato numerico 2 decimali sulle celle ore numeriche
     ws["!merges"] = merges;
-    const cols = [{wch:16}]; for (let i=1;i<=nd;i++) cols.push({wch:5}); ws["!cols"] = cols;
+    const cols = [{wch:11}]; for (let i=0;i<dips.length;i++) cols.push({wch:14}); ws["!cols"] = cols;
+    const wrows = [{hpt:20},{hpt:46}]; ws["!rows"] = wrows;
     XLSX.utils.book_append_sheet(wb, ws, MONTH_ABBR[m-1] + String(anno).slice(2));
   }
   XLSX.writeFile(wb, fileName("xlsx"));
 }
 
-/* ===================== EXPORT PDF A4 orizzontale ===================== */
+/* ===================== EXPORT PDF A4 verticale (matrice) ===================== */
 function esportaPDF(state, anno){
   const JsPDF = window.jspdf.jsPDF;
-  const doc = new JsPDF({ orientation:"landscape", unit:"mm", format:"a4" });
+  const doc = new JsPDF({ orientation:"portrait", unit:"mm", format:"a4" });
   const fset = festivitaSet(anno);
+  const dips = dipSorted(state);
   let first = true;
   for (let m = 1; m <= 12; m++){
     const mk = monthKey(anno, m);
@@ -481,68 +510,81 @@ function esportaPDF(state, anno){
     const nd = daysInMonth(anno, m);
     if (!first) doc.addPage();
     first = false;
-    doc.setFontSize(13); doc.setTextColor(15,39,64);
+    doc.setFontSize(12); doc.setTextColor(15,39,64); doc.setFont(undefined,"bold");
     doc.text("Spazio Ireos — Report Ore   ·   " + MONTH_LABEL[m-1] + " " + anno, 14, 12);
-    const head = [["DIPENDENTE"]];
-    for (let d=1; d<=nd; d++) head[0].push(String(d));
-    head[0].push("TOT");
+    doc.setFont(undefined,"normal");
+    const head = [["Giorno"].concat(dips.map(function(dp){ return dp.nome; }))];
     const body = [];
     const permMese = [];
     const noteMese = [];
-    dipSorted(state).forEach(function(dp){
-      const rec = getRecFrom(state, anno, m, dp.id);
-      const contrPdf = dp.tipoContratto === "determinato" ? ("Determinato scad. " + (dp.scadenza || "?")) : "Indeterminato";
-      const info = dp.oreSett + " h/sett · " + contrPdf + (dp.livello ? " · Liv. " + dp.livello : "");
-      const row = [dp.nome + "\n" + info];
-      for (let d=1; d<=nd; d++){
+    const tot = dips.map(function(){ return 0; });
+    for (let d=1; d<=nd; d++){
+      const row = [d + " " + WD[weekdayOf(anno, m, d)]];
+      dips.forEach(function(dp, i){
+        const rec = getRecFrom(state, anno, m, dp.id);
         const v = rec.giorni[d];
         const perm = (rec.permessi && rec.permessi[d]) ? rec.permessi[d] : null;
+        tot[i] += parseHour(v === undefined ? "" : v);
         let txt;
         if (v === undefined || v === "") txt = "";
         else if (CODE_SET[String(v).trim()]) txt = String(v).trim();
         else txt = fmt2(v);
-        if (perm){ txt = (txt === "" ? "*" : txt + "*"); permMese.push(dp.nome + " · g." + d + " " + fmt2(perm.ore) + " h (" + perm.tipo + ")"); }
+        if (perm){ txt = (txt === "" ? "*" : txt + "*"); permMese.push(dp.nome + " g." + d + " " + fmt2(perm.ore) + " h (" + perm.tipo + ")"); }
         row.push(txt);
-      }
-      row.push(fmt2(totOfRec(rec, anno, m)));
+      });
       body.push(row);
+    }
+    const totRow = ["TOT"].concat(tot.map(function(t){ return fmt2(Math.round(t*100)/100); }));
+    body.push(totRow);
+    dips.forEach(function(dp){
+      const rec = getRecFrom(state, anno, m, dp.id);
       if (rec.nota && rec.nota.trim() !== "") noteMese.push(dp.nome + ": " + rec.nota.trim());
     });
     doc.autoTable({
-      head: head, body: body, startY: 16, theme:"grid",
-      styles:{ fontSize:5.4, cellPadding:0.7, halign:"center", valign:"middle", lineColor:[210,210,210], lineWidth:0.1 },
-      headStyles:{ fillColor:[15,39,64], textColor:[255,255,255], fontSize:5.4 },
-      columnStyles:{ 0:{ halign:"left", cellWidth:44, fontStyle:"bold", fontSize:5 } },
+      head: head, body: body, startY: 16, theme:"grid", margin:{ left:14, right:14 },
+      styles:{ fontSize:6, cellPadding:0.8, halign:"center", valign:"middle", lineColor:[210,210,210], lineWidth:0.1, overflow:"linebreak" },
+      headStyles:{ fillColor:[15,39,64], textColor:[255,255,255], fontSize:5.6, valign:"middle" },
+      columnStyles:{ 0:{ halign:"left", cellWidth:18, fontStyle:"bold" } },
       didParseCell: function(data){
-        if (data.column.index >= 1 && data.column.index <= nd){
-          const giorno = data.column.index;
-          if (isRosso(fset, anno, m, giorno)){
-            data.cell.styles.fillColor = [178, 34, 34];
-            data.cell.styles.textColor = [255, 255, 255];
-          }
-          if (data.section === "body"){
-            const txt = String(data.cell.raw || "").trim().replace(/\*$/, "");
-            if (CODE_SET[txt]){
-              const hx = CODE_SET[txt].bg.replace("#","");
-              data.cell.styles.fillColor = [parseInt(hx.slice(0,2),16), parseInt(hx.slice(2,4),16), parseInt(hx.slice(4,6),16)];
-              const tc = lumaText(CODE_SET[txt].bg);
-              data.cell.styles.textColor = tc === "#ffffff" ? [255,255,255] : [17,24,39];
-            }
+        if (data.section !== "body") return;
+        const ri = data.row.index;
+        if (ri === nd){ data.cell.styles.fontStyle = "bold"; data.cell.styles.fillColor = [238,242,255]; return; }
+        const day = ri + 1;
+        if (data.column.index === 0){
+          if (isRosso(fset, anno, m, day)){ data.cell.styles.fillColor = [178,34,34]; data.cell.styles.textColor = [255,255,255]; }
+        } else {
+          const txt = String(data.cell.raw || "").trim().replace(/\*$/, "");
+          if (CODE_SET[txt]){
+            const hx = CODE_SET[txt].bg.replace("#","");
+            data.cell.styles.fillColor = [parseInt(hx.slice(0,2),16), parseInt(hx.slice(2,4),16), parseInt(hx.slice(4,6),16)];
+            data.cell.styles.textColor = lumaText(CODE_SET[txt].bg) === "#ffffff" ? [255,255,255] : [17,24,39];
           }
         }
       }
     });
-    let yy = doc.lastAutoTable.finalY + 4;
+    let yy = doc.lastAutoTable.finalY + 5;
+    const ensureY = function(h){ if (yy + h > 287){ doc.addPage(); yy = 18; } };
+    // dettaglio dipendenti (livello, ore sett., contratto/scadenza)
+    ensureY(6);
+    doc.setFontSize(7); doc.setTextColor(15,39,64); doc.setFont(undefined,"bold");
+    doc.text("Dettaglio dipendenti:", 14, yy); yy += 4; doc.setFont(undefined,"normal");
+    doc.setFontSize(6.5); doc.setTextColor(60,60,60);
+    dips.forEach(function(dp){
+      const contr = dp.tipoContratto === "determinato" ? ("Determinato scad. " + (dp.scadenza || "?")) : "Indeterminato";
+      const line = dp.nome + " — " + dp.oreSett + " h/sett · " + contr + (dp.livello ? " · Liv. " + dp.livello : "");
+      const ls = doc.splitTextToSize(line, 182); ensureY(ls.length * 3.2);
+      doc.text(ls, 14, yy); yy += ls.length * 3.2;
+    });
     if (permMese.length > 0){
-      const s = "* Permessi orari (non inclusi nel TOT): " + permMese.join("   ·   ");
+      yy += 2; const s = "* Permessi orari (non inclusi nel TOT): " + permMese.join("   ·   ");
       doc.setFontSize(6); doc.setTextColor(80,80,80);
-      const lines = doc.splitTextToSize(s, 269);
-      doc.text(lines, 14, yy); yy += lines.length * 3 + 3;
+      const lines = doc.splitTextToSize(s, 182); ensureY(lines.length * 3);
+      doc.text(lines, 14, yy); yy += lines.length * 3 + 2;
     }
     if (noteMese.length > 0){
-      const s = "Note del mese: " + noteMese.join("   ·   ");
+      yy += 2; const s = "Note del mese: " + noteMese.join("   ·   ");
       doc.setFontSize(6); doc.setTextColor(80,80,80);
-      const lines = doc.splitTextToSize(s, 269);
+      const lines = doc.splitTextToSize(s, 182); ensureY(lines.length * 3);
       doc.text(lines, 14, yy);
     }
   }
