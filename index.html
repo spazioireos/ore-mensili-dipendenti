@@ -549,7 +549,7 @@ function esportaPDF(state, pairs){
     const chunks = []; for (let i=0; i<dips.length; i+=MAXCOL) chunks.push(dips.slice(i, i+MAXCOL));
     if (chunks.length === 0) chunks.push([]);
     const permMese = []; const noteMese = [];
-    dips.forEach(function(dp){ const rec = getRecFrom(state, anno, m, dp.id); if (rec.nota && rec.nota.trim() !== "") noteMese.push(dp.nome + ": " + rec.nota.trim()); });
+    dips.forEach(function(dp){ const rec = getRecFrom(state, anno, m, dp.id); if (rec.nota && rec.nota.trim() !== "") noteMese.push({ nome: dp.nome, testo: rec.nota.trim() }); });
     // larghezza colonna UNICA per tutte le pagine (basata sul blocco più grande = min(dip, MAXCOL)+1 colonne)
     const colW = Math.round((182 / (1 + Math.min(dips.length, MAXCOL))) * 100) / 100;
 
@@ -608,31 +608,37 @@ function esportaPDF(state, pairs){
       });
 
       if (ci === chunks.length - 1){
-        let yy = doc.lastAutoTable.finalY + 5;
+        let yy = doc.lastAutoTable.finalY + 6;
         const ensureY = function(h){ if (yy + h > 287){ doc.addPage(); yy = 18; } };
-        ensureY(6);
-        doc.setFontSize(7); doc.setTextColor(15,39,64); doc.setFont(undefined,"bold");
-        doc.text("Dettaglio dipendenti:", 14, yy); yy += 4; doc.setFont(undefined,"normal");
-        doc.setFontSize(6.5); doc.setTextColor(60,60,60);
-        dips.forEach(function(dp){
-          const contr = dp.tipoContratto === "determinato" ? ("Determinato scad. " + (dp.scadenza || "?")) : "Indeterminato";
-          const line = dp.nome + " — " + dp.oreSett + " h/sett · " + contr + (dp.livello ? " · Liv. " + dp.livello : "");
-          const ls = doc.splitTextToSize(line, 182); ensureY(ls.length * 3.2);
-          doc.text(ls, 14, yy); yy += ls.length * 3.2;
-        });
-        if (permMese.length > 0){
-          yy += 2; ensureY(4);
-          doc.setFontSize(6.5); doc.setTextColor(15,39,64); doc.setFont(undefined,"bold");
-          doc.text("Permessi orari (segnalati con *, non inclusi nel TOT):", 14, yy); yy += 3.4; doc.setFont(undefined,"normal");
-          doc.setFontSize(6); doc.setTextColor(70,70,70);
-          permMese.forEach(function(pp){ const ls = doc.splitTextToSize("•  " + pp, 182); ensureY(ls.length * 3); doc.text(ls, 14, yy); yy += ls.length * 3; });
-        }
+        // NOTE DEL MESE — ben visibili, subito sotto la tabella
         if (noteMese.length > 0){
-          yy += 2; ensureY(4);
-          doc.setFontSize(6.5); doc.setTextColor(15,39,64); doc.setFont(undefined,"bold");
-          doc.text("Note del mese:", 14, yy); yy += 3.4; doc.setFont(undefined,"normal");
-          doc.setFontSize(6); doc.setTextColor(70,70,70);
-          noteMese.forEach(function(n){ const ls = doc.splitTextToSize("•  " + n, 182); ensureY(ls.length * 3); doc.text(ls, 14, yy); yy += ls.length * 3; });
+          ensureY(10);
+          doc.setFillColor(255,249,224); doc.setDrawColor(245,158,11); doc.setLineWidth(0.4);
+          const boxH = 6.5 + noteMese.reduce(function(a,n){ return a + Math.max(1, doc.splitTextToSize(n.testo, 150).length) * 4.4; }, 0) + 2;
+          if (yy + boxH > 287){ doc.addPage(); yy = 18; }
+          doc.rect(13, yy - 4, 184, boxH, "FD");
+          doc.setFontSize(10.5); doc.setTextColor(146,64,14); doc.setFont(undefined,"bold");
+          doc.text("NOTE DEL MESE", 15, yy); yy += 5.5;
+          noteMese.forEach(function(n){
+            doc.setFontSize(8.2); doc.setFont(undefined,"bold"); doc.setTextColor(15,39,64);
+            const namePart = "•  " + n.nome + ":  ";
+            const nameW = doc.getTextWidth(namePart);
+            ensureY(4.6);
+            doc.text(namePart, 15, yy);
+            doc.setFont(undefined,"normal"); doc.setTextColor(40,40,40);
+            const avail = 196 - 15 - nameW;
+            const ls = doc.splitTextToSize(n.testo, avail > 40 ? avail : 150);
+            doc.text(ls[0] || "", 15 + nameW, yy); yy += 4.4;
+            for (let k=1; k<ls.length; k++){ ensureY(4.4); doc.text(ls[k], 19, yy); yy += 4.4; }
+          });
+          yy += 3;
+        }
+        if (permMese.length > 0){
+          yy += 1; ensureY(4);
+          doc.setFontSize(7); doc.setTextColor(15,39,64); doc.setFont(undefined,"bold");
+          doc.text("Permessi orari (segnalati con *, non inclusi nel TOT):", 14, yy); yy += 3.6; doc.setFont(undefined,"normal");
+          doc.setFontSize(6.5); doc.setTextColor(70,70,70);
+          permMese.forEach(function(pp){ const ls = doc.splitTextToSize("•  " + pp, 182); ensureY(ls.length * 3.2); doc.text(ls, 14, yy); yy += ls.length * 3.2; });
         }
       }
     });
