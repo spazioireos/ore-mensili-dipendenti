@@ -174,7 +174,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver16";
+const APP_VER = "ver17";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
 const MESE_ABBR_FILE = ["gen","feb","mar","apr","mag","giu","lug","ago","set","ott","nov","dic"];
@@ -339,7 +339,7 @@ function contrLabel(dp){
 function emptyState(){
   const dip = DIP_INIZIALI.map(function(x){
     return { id:uid(), nome:x.nome, livello:x.livello, oreSett:x.oreSett, tipoContratto:x.tipoContratto,
-      scadenza:x.scadenza, proroghe:[], dataAssunzione:x.dataAssunzione, dataCessazione:x.dataCessazione, colore:x.colore };
+      scadenza:x.scadenza, proroghe:[], ana:{}, dataAssunzione:x.dataAssunzione, dataCessazione:x.dataCessazione, colore:x.colore };
   });
   const byName = {}; dip.forEach(function(d){ byName[d.nome.trim().toUpperCase()] = d.id; });
   const dati = {};
@@ -373,6 +373,7 @@ const CAT_NOTE = [
   { c:"CHIUDERE ANCHE CON TFR", text:false }
 ];
 const CAT_SET = {}; CAT_NOTE.forEach(function(x){ CAT_SET[x.c] = x; });
+const ANAGRAFICA9 = {"BOCCALARI": {"cognome": "BOCCALARI", "nome": "ELEONORA", "luogoNascita": "TORTONA / AL", "dataNascita": "06/06/89", "cf": "BCCLNR89H46L304Q", "email": "ELEONORA.B03@GMAIL.COM", "indRes": "V. G. CAROZZI N. 5", "capRes": "20100", "luogoRes": "MILANO", "indDom": "V. G. CAROZZI N. 5", "capDom": "20100", "luogoDom": "MILANO", "dataContratto": "27/06/25", "partFull": "PART TIME", "orizz": "ORIZZONTALE", "qualifica": "ASSISTENTE EDUCATIVO/LUDICO-EDUCATIVO", "struttura": "CENTRO/I DI AGGREGAZIONE GIOVANILE", "locStruttura": "MILANO V. T. PINI", "giorniLav": "DA LUNEDI' A SABATO", "periodo": "TUTTO IL PERIODO CONTRATTUALE", "giorniProva": "30", "impBase": "9,73", "impSuper": "", "tipoSuper": "", "scatti": "", "impAltro": "0,25", "tipoAltro": "ETAR EDUCATORE", "note2": ""}, "CHIODI": {"cognome": "CHIODI", "nome": "MANUELA", "luogoNascita": "BRENO / BS", "dataNascita": "23/07/85", "cf": "CHDMNL85L63B149Z", "email": "MANUCHIODI@HOTMAIL.COM", "indRes": "V. OROMBELLI N. 1", "capRes": "20131", "luogoRes": "MILANO", "indDom": "V. OROMBELLI N. 1", "capDom": "20131", "luogoDom": "MILANO", "dataContratto": "31/01/23", "partFull": "PART TIME", "orizz": "ORIZZONTALE", "qualifica": "IMPIEGATO DI CONCETTO", "struttura": "CENTRI DI AGGREGAZIONE E/O DIDATTICI VARI TERRITORIO / MILANO", "locStruttura": "", "giorniLav": "DA LUNEDI' A SABATO", "periodo": "TUTTO IL PERIODO CONTRATTUALE (TEMPO DETERMINATO)", "giorniProva": "60", "impBase": "9,16", "impSuper": "0,00", "tipoSuper": "", "scatti": "", "impAltro": "0,00", "tipoAltro": "", "note2": ""}, "DEL MASTRO": {"cognome": "DEL MASTRO", "nome": "MARIA", "luogoNascita": "MILANO", "dataNascita": "05/08/85", "cf": "DLMMRA85M45F205I", "email": "MARIA.ARIA.GERMI@GMAIL.COM", "indRes": "V. CEFALONIA N. 11", "capRes": "20156", "luogoRes": "MILANO", "indDom": "V. CEFALONIA N. 11", "capDom": "20156", "luogoDom": "MILANO", "dataContratto": "02/01/25", "partFull": "PART TIME", "orizz": "ORIZZONTALE", "qualifica": "IMPIEGATO", "struttura": "CENTRO/I DI AGGREGAZIONE SOCIALE", "locStruttura": "MILANO V. S. MARCO", "giorniLav": "DA LUNEDI' A SABATO", "periodo": "TUTTO IL PERIODO CONTRATTUALE", "giorniProva": "60", "impBase": "9,73", "impSuper": "", "tipoSuper": "", "scatti": "", "impAltro": "0,50", "tipoAltro": "", "note2": ""}, "DE MAIO": {"cognome": "DE MAIO", "nome": "BARBARA", "luogoNascita": "MILANO", "dataNascita": "08/04/74", "cf": "DMEBBR74D48F205Q", "email": "FARDOTO@GMAIL.COM", "indRes": "V. E. BREDA N. 122", "capRes": "20100", "luogoRes": "MILANO", "indDom": "V. E. BREDA N. 122", "capDom": "20100", "luogoDom": "MILANO", "dataContratto": "28/02/25", "partFull": "PART TIME", "orizz": "ORIZZONTALE", "qualifica": "IMPIEGATO", "struttura": "CENTRO/I DI AGGREGAZIONE SOCIALE", "locStruttura": "MILANO V. G. STREHLER", "giorniLav": "DA LUNEDI' A SABATO", "periodo": "TUTTO IL PERIODO CONTRATTUALE", "giorniProva": "8", "impBase": "9,73", "impSuper": "", "tipoSuper": "", "scatti": "", "impAltro": "", "tipoAltro": "", "note2": ""}, "FERRARI": {"cognome": "FERRARI", "nome": "FEDERICA", "luogoNascita": "VERONA", "dataNascita": "04/11/89", "cf": "FRRFRC89S44L781M", "email": "FEDERICA.FERRARI89@GMAIL.COM", "indRes": "SALITA S. LUCIA N. 19/A", "capRes": "37137", "luogoRes": "VERONA", "indDom": "V. FRATELLI CALVI N. 2", "capDom": "24122", "luogoDom": "BERGAMO", "dataContratto": "13/10/23", "partFull": "PART TIME", "orizz": "MISTO", "qualifica": "ASSISTENTE IN AREA SOCIO-EDUCATIVA", "struttura": "ISTITUTI SCOLASTICI TERRITORIO / PROV. BERGAMO", "locStruttura": "", "giorniLav": "DA LUNEDI' A SABATO", "periodo": "NELL' ANNO SCOLASTICO SECONDO I CALENDARI PUBBLICATI (A TEMPO INDETERMINATO)", "giorniProva": "60", "impBase": "9,16", "impSuper": "0,00", "tipoSuper": "", "scatti": "", "impAltro": "0,00", "tipoAltro": "", "note2": ""}, "FISICHELLA": {"cognome": "FISICHELLA", "nome": "GIUSEPPE", "luogoNascita": "SARONNO / VA", "dataNascita": "23/10/84", "cf": "FSCGPP84R23I441R", "email": "GFISICHELLA2310@GMAIL.COM", "indRes": "V. DEI MILLE N. 68", "capRes": "20100", "luogoRes": "MILANO", "indDom": "V. DEI MILLE N. 68", "capDom": "20100", "luogoDom": "MILANO", "dataContratto": "17/04/26", "partFull": "PART TIME", "orizz": "ORIZZONTALE", "qualifica": "EDUCATORE", "struttura": "CENTRO/I DI AGGREGAZIONE GIOVANILE", "locStruttura": "MILANO V. PORPORA", "giorniLav": "DA LUNEDI' A SABATO", "periodo": "TUTTO IL PERIODO CONTRATTUALE", "giorniProva": "16", "impBase": "10,47", "impSuper": "0,00", "tipoSuper": "", "scatti": "", "impAltro": "0,00", "tipoAltro": "", "note2": ""}, "FRUTAZ": {"cognome": "FRUTAZ", "nome": "RACHELE", "luogoNascita": "AOSTA", "dataNascita": "25/07/75", "cf": "FRTRHL75L65A326C", "email": "RACHEL.RAF75@GMAIL.COM", "indRes": "V. G. CHAVEZ N. 20", "capRes": "20131", "luogoRes": "MILANO", "indDom": "V. G. CHAVEZ N. 20", "capDom": "20131", "luogoDom": "MILANO", "dataContratto": "12/09/25", "partFull": "PART TIME", "orizz": "MISTO", "qualifica": "ASSISTENTE EDUCATIVO E/O ALLA COMUNICAZIONE", "struttura": "ISTITUTO/I SCOLASTICO/I", "locStruttura": "MILANO", "giorniLav": "DA LUNEDI' A SABATO", "periodo": "NELL' ANNO SCOLASTICO SECONDO I CALENDARI PUBBLICATI DAGLI ENTI COMPETENTI", "giorniProva": "1", "impBase": "10,07", "impSuper": "", "tipoSuper": "", "scatti": "", "impAltro": "", "tipoAltro": "", "note2": ""}, "GIUNCHIGLIA": {"cognome": "GIUNCHIGLIA", "nome": "BENEDETTA", "luogoNascita": "MILANO", "dataNascita": "07/10/94", "cf": "GNCBDT94R47F205H", "email": "BENEDETTA.GIUNCHIGLIA94@GMAIL.COM", "indRes": "V. VILLA MARIA N. 8", "capRes": "38100", "luogoRes": "TRENTO", "indDom": "V. CONCILIO VATICANO II N. 6 C", "capDom": "20100", "luogoDom": "MILANO", "dataContratto": "03/11/25", "partFull": "PART TIME", "orizz": "ORIZZONTALE", "qualifica": "EDUCATORE", "struttura": "CENTRO/I DI AGGREGAZIONE GIOVANILE", "locStruttura": "MILANO MUNICIPIO 3", "giorniLav": "DA LUNEDI' A SABATO", "periodo": "TUTTO IL PERIODO CONTRATTUALE", "giorniProva": "18", "impBase": "10,47", "impSuper": "0,00", "tipoSuper": "", "scatti": "", "impAltro": "0,00", "tipoAltro": "", "note2": ""}, "PANSERA": {"cognome": "PANSERA", "nome": "ANTONIA ALFONSINA", "luogoNascita": "AOSTA", "dataNascita": "29/03/85", "cf": "PNSNNL85369A326W", "email": "ANTONIA.ALFONSINA.PANSERA@OUTLOOK.IT", "indRes": "V. PORTOFERRAIO N. 1", "capRes": "20141", "luogoRes": "MILANO", "indDom": "V. PORTOFERRAIO N. 1", "capDom": "20141", "luogoDom": "MILANO", "dataContratto": "13/01/25", "partFull": "PART TIME", "orizz": "ORIZZONTALE", "qualifica": "IMPIEGATO", "struttura": "CENTRO/I DI AGGREGAZIONE SOCIALE", "locStruttura": "MILANO V. SCALDASOLE", "giorniLav": "DA LUNEDI' A SABATO", "periodo": "TUTTO IL PERIODO CONTRATTUALE", "giorniProva": "15", "impBase": "9,73", "impSuper": "", "tipoSuper": "", "scatti": "", "impAltro": "", "tipoAltro": "", "note2": ""}};
 function vociLines(rec){
   const out = [];
   ((rec && rec.voci) || []).forEach(function(v){
@@ -475,7 +476,7 @@ function migrate(obj){
     obj.vociConvertite2026 = true;
   }
   if (!obj.locked || typeof obj.locked !== "object") obj.locked = {};
-  (obj.dipendenti || []).forEach(function(d){ if (!Array.isArray(d.proroghe)) d.proroghe = []; });
+  (obj.dipendenti || []).forEach(function(d){ if (!Array.isArray(d.proroghe)) d.proroghe = []; if (!d.ana || typeof d.ana !== "object") d.ana = {}; });
   obj.version = 4;
   return obj;
 }
@@ -1058,6 +1059,70 @@ function DipModal(props){
   );
 }
 
+const ANA_SHARED = { livello:1, oreSett:1, tipoContratto:1, scadenza:1, dataAssunzione:1, dataCessazione:1 };
+const ANA_SECTIONS = [
+  { t:"Dati anagrafici", f:[["cognome","Cognome"],["nome","Nome"],["luogoNascita","Luogo di nascita"],["dataNascita","Data di nascita (gg/mm/aaaa)"],["cf","Codice fiscale"],["email","Email"]] },
+  { t:"Residenza", f:[["indRes","Indirizzo residenza"],["capRes","CAP"],["luogoRes","Comune"]] },
+  { t:"Domicilio", f:[["indDom","Indirizzo domicilio"],["capDom","CAP"],["luogoDom","Comune"]] },
+  { t:"Contratto", f:[["dataContratto","Data contratto"],["dataAssunzione","Data avvio / assunzione"],["scadenza","Data conclusione / scadenza"],["tipoContratto","Tipo contratto","tipo"],["partFull","Part / Full time"],["orizz","Orizzontale / Verticale / Misto"],["qualifica","Qualifica"],["livello","Livello"],["struttura","Struttura e/o località e/o indirizzo"],["locStruttura","Località struttura"]] },
+  { t:"Orario", f:[["oreSett","Monte ore settimanali"],["giorniLav","Giorni di lavoro nella settimana"],["periodo","Periodo di lavoro nell'anno"],["giorniProva","Giorni di prova"]] },
+  { t:"Economico", f:[["impBase","Importo orario base €"],["impSuper","Superminimo €"],["tipoSuper","Superminimo: variante","super"],["scatti","Scatti di anzianità €"],["impAltro","Altro importo orario €"],["tipoAltro","Tipologia altro"],["impTot","Importo orario totale € (automatico)","auto"]] },
+  { t:"Note", f:[["note","Note"],["note2","Note 2"]] }
+];
+function anaNum(v){ const s=String(v==null?"":v).replace(",", "."); const n=parseFloat(s); return isNaN(n)?0:n; }
+function anaTot(dp){ const a=dp.ana||{}; return fmt2(anaNum(a.impBase)+anaNum(a.impSuper)+anaNum(a.scatti)+anaNum(a.impAltro)); }
+function anaVal(dp, key){ if (ANA_SHARED[key]) return dp[key]==null?"":dp[key]; return (dp.ana&&dp.ana[key]!=null)?dp.ana[key]:""; }
+
+function Anagrafica(props){
+  const state = props.state;
+  const dips = dipSorted(state);
+  const [selId, setSelId] = useState(dips.length ? dips[0].id : null);
+  const dp = dips.find(function(x){ return x.id===selId; }) || dips[0];
+  if (!dp) return <div style={{padding:"20px",color:"#64748b"}}>Nessun dipendente. Aggiungine uno dalla vista mensile.</div>;
+  return (
+    <div>
+      <div className="toolbar">
+        <strong style={{ fontSize:"15px", color:"#0f2740" }}>📇 Anagrafica dipendenti</strong>
+        <div className="spacer"></div>
+        <button className="btn btn-gray" onClick={props.onImportAna} title="Riempie i campi vuoti dei dipendenti presenti nell'elenco importato (non sovrascrive)">⤵ Importa anagrafiche</button>
+        <button className="btn btn-blue" onClick={props.onExportAna}>📊 Esporta Excel</button>
+      </div>
+      <div style={{ display:"flex", gap:"14px", alignItems:"flex-start" }}>
+        <div style={{ minWidth:"210px", display:"flex", flexDirection:"column", gap:"4px" }}>
+          {dips.map(function(x){ return (
+            <button key={x.id} onClick={function(){ setSelId(x.id); }}
+              style={{ textAlign:"left", padding:"8px 10px", borderRadius:"8px", border:"1px solid " + (x.id===dp.id?"#0f2740":"#e2e8f0"), background:(x.id===dp.id?"#0f2740":"#fff"), color:(x.id===dp.id?"#fff":"#0f2740"), fontWeight:700, fontSize:"13px", cursor:"pointer" }}>
+              {x.nome}
+            </button>
+          ); })}
+        </div>
+        <div style={{ flex:1, background:"#fff", border:"2px solid #94a3b8", borderRadius:"12px", padding:"14px" }}>
+          <div style={{ fontSize:"18px", fontWeight:800, color:"#0f2740", marginBottom:"10px" }}>{dp.nome}</div>
+          {ANA_SECTIONS.map(function(sec){ return (
+            <div key={sec.t} style={{ marginBottom:"12px" }}>
+              <div style={{ fontSize:"12px", fontWeight:800, color:"#92400e", textTransform:"uppercase", letterSpacing:".4px", marginBottom:"6px", borderBottom:"1px solid #fde68a", paddingBottom:"3px" }}>{sec.t}</div>
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(230px, 1fr))", gap:"8px" }}>
+                {sec.f.map(function(fld){
+                  const key=fld[0], lbl=fld[1], kind=fld[2];
+                  if (kind==="auto") return <div key={key} className="field" style={{margin:0}}><label>{lbl}</label><input value={anaTot(dp)} disabled style={{background:"#eef2ff",borderColor:"#c7d2fe",fontWeight:700}} /></div>;
+                  if (kind==="tipo") return <div key={key} className="field" style={{margin:0}}><label>{lbl}</label>
+                    <select value={anaVal(dp,"tipoContratto")||"indeterminato"} onChange={function(e){ props.onAnaField(dp.id,"tipoContratto",e.target.value); }}>
+                      <option value="indeterminato">Indeterminato</option><option value="determinato">Determinato</option></select></div>;
+                  if (kind==="super") return <div key={key} className="field" style={{margin:0}}><label>{lbl}</label>
+                    <select value={anaVal(dp,"tipoSuper")||""} onChange={function(e){ props.onAnaField(dp.id,"tipoSuper",e.target.value); }}>
+                      <option value="">—</option><option value="ASSORBIBILE">Assorbibile</option><option value="NON ASSORBIBILE">Non assorbibile</option></select></div>;
+                  return <div key={key} className="field" style={{margin:0}}><label>{lbl}</label>
+                    <input value={anaVal(dp,key)} onChange={function(e){ props.onAnaField(dp.id,key,e.target.value); }} /></div>;
+                })}
+              </div>
+            </div>
+          ); })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ExportModal(props){
   const yearsSet = {}; (props.anni || []).forEach(function(y){ yearsSet[y] = true; });
   yearsSet[props.annoCorrente] = true; yearsSet[props.annoCorrente + 1] = true;
@@ -1570,6 +1635,44 @@ function App(){
     const next = JSON.parse(JSON.stringify(state)); const rec = ensureRec(next, dipId);
     rec.voci.splice(idx, 1); touch(next);
   };
+  const onAnaField = function(dipId, field, value){
+    const next = JSON.parse(JSON.stringify(state));
+    const dp = next.dipendenti.find(function(d){ return d.id===dipId; }); if (!dp) return;
+    if (!dp.ana) dp.ana = {};
+    if (ANA_SHARED[field]){ dp[field] = (field==="oreSett") ? (Number(String(value).replace(",","."))||0) : value; }
+    else if (field==="cognome" || field==="nome"){ dp.ana[field]=value; const nn=((dp.ana.cognome||"")+" "+(dp.ana.nome||"")).trim().toUpperCase(); if (nn!=="") dp.nome=nn; }
+    else dp.ana[field]=value;
+    touch(next);
+  };
+  const onImportAna = function(){
+    const next = JSON.parse(JSON.stringify(state)); let count=0, matched=0;
+    next.dipendenti.forEach(function(dp){
+      const upper = String(dp.nome).trim().toUpperCase(); let src=null;
+      Object.keys(ANAGRAFICA9).forEach(function(key){ if (upper.indexOf(key)===0) src=ANAGRAFICA9[key]; });
+      if (!src) return; matched++;
+      if (!dp.ana) dp.ana={};
+      Object.keys(src).forEach(function(k){ if ((dp.ana[k]==null || String(dp.ana[k]).trim()==="") && src[k]!==""){ dp.ana[k]=src[k]; count++; } });
+    });
+    touch(next);
+    showToast("Anagrafiche importate: " + matched + " dipendenti, " + count + " campi riempiti (i vuoti). Premi 💾 per salvare.");
+  };
+  const onExportAna = function(){
+    const dips = dipSorted(state);
+    const cols = [];
+    ANA_SECTIONS.forEach(function(sec){ sec.f.forEach(function(f){ if (f[2]!=="auto") cols.push([f[0], f[1]]); }); });
+    cols.push(["impTot","Importo orario totale €"]);
+    const hdrStyle = { font:{ name:"Arial", bold:true, color:{rgb:"FFFFFFFF"} }, fill:{ patternType:"solid", fgColor:{rgb:"FF0F2740"} }, alignment:{horizontal:"center"} };
+    const aoa = [cols.map(function(c){ return c[1].toUpperCase(); })];
+    dips.forEach(function(dp){ aoa.push(cols.map(function(c){ return c[0]==="impTot" ? anaTot(dp) : String(anaVal(dp, c[0])); })); });
+    const wb = XLSX.utils.book_new();
+    wb.Props = { Title:"Anagrafica dipendenti", Author:"Christian Canonica", Company:"Spazio Ireos Società Cooperativa Sociale", CreatedDate:new Date() };
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    (aoa[0]||[]).forEach(function(_, c){ const ref=XLSX.utils.encode_cell({r:0,c:c}); if (ws[ref]) ws[ref].s=hdrStyle; });
+    ws["!cols"] = cols.map(function(){ return { wch:20 }; });
+    XLSX.utils.book_append_sheet(wb, ws, "Anagrafica");
+    const ora = new Date(); const p2=function(n){ return (n<10?"0":"")+n; };
+    XLSX.writeFile(wb, "Spazio Ireos Anagrafica dipendenti - " + p2(ora.getDate()) + MESE_ABBR_FILE[ora.getMonth()] + String(ora.getFullYear()).slice(2) + " - " + p2(ora.getHours()) + "." + p2(ora.getMinutes()) + ".xlsx");
+  };
   const onFestConfirm = function(dipId, d, value){
     setConfirm({
       title: "Giorno festivo / domenica",
@@ -1726,6 +1829,7 @@ function App(){
           return <div key={a} className={"tab" + (vista==="m"+(i+1)?" active":"") + (filled?" filled":"")} onClick={function(){ setVista("m"+(i+1)); }}>{a}</div>;
         })}
         <div className={"tab rep" + (vista==="rep"?" active":"")} onClick={function(){ setVista("rep"); }}>📊 Riepiloghi</div>
+        <div className={"tab rep" + (vista==="ana"?" active":"")} onClick={function(){ setVista("ana"); }}>📇 Anagrafica</div>
       </div>
 
       <div className="zoombar">
@@ -1740,6 +1844,7 @@ function App(){
 
       <div className="content" style={{ zoom: zoom / 100 }}>
         {vista === "rep" ? <Riepiloghi state={state} anno={anno} /> :
+         vista === "ana" ? <Anagrafica state={state} onAnaField={onAnaField} onImportAna={onImportAna} onExportAna={onExportAna} /> :
           <div>
             <div className="toolbar">
               <strong style={{ fontSize:"15px", color:"#0f2740" }}>{MONTH_LABEL[mese-1]} {anno}</strong>
