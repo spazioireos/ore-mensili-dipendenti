@@ -56,12 +56,14 @@
   .toolbar { display:flex; gap:8px; align-items:center; margin-bottom:14px; flex-wrap:wrap; }
   .lock-badge { background:#7f1d1d; color:#fff; font-size:12px; font-weight:700; padding:3px 10px; border-radius:6px; }
   .lock-info { background:#fef2f2; border:1px solid #fca5a5; color:#7f1d1d; font-size:12px; padding:6px 12px; border-radius:8px; margin-bottom:12px; }
-  .emp-card { background:#fff; border-radius:12px; margin-bottom:18px; box-shadow:0 1px 4px rgba(0,0,0,.08); overflow:hidden; }
+  .emp-card { background:#fff; border-radius:12px; margin-bottom:18px; box-shadow:0 3px 12px rgba(0,0,0,.14); overflow:hidden; border:2px solid #94a3b8; }
+  .monthstrip { flex-basis:100%; background:#12324f; margin:8px -18px -10px; padding:7px 18px; font-size:17px; font-weight:800; letter-spacing:.6px; color:#fff; border-top:2px solid rgba(255,255,255,.15); }
   .emp-head { padding:9px 14px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
   .emp-head .nome { font-size:19px; font-weight:800; letter-spacing:.4px; }
   .emp-head .pill { background:rgba(255,255,255,.6); border-radius:20px; padding:3px 11px; font-size:12px; font-weight:700; }
   .emp-head .pill.cess { background:#7f1d1d; color:#fff; }
   .emp-head .edit-mini { background:rgba(0,0,0,.16); color:#fff; border:none; border-radius:6px; width:26px; height:26px; cursor:pointer; font-size:13px; }
+  .emp-head .edit-mini.qf { width:auto; padding:0 10px; height:26px; background:#0f2740; font-weight:700; font-size:12px; }
   .grid-wrap { overflow-x:auto; padding:10px 12px 4px; }
   table.cal { border-collapse:collapse; font-size:12px; }
   table.cal td { border:1px solid #e2e8f0; text-align:center; }
@@ -165,7 +167,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver14";
+const APP_VER = "ver15";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
 const MESE_ABBR_FILE = ["gen","feb","mar","apr","mag","giu","lug","ago","set","ott","nov","dic"];
@@ -592,12 +594,15 @@ function esportaPDF(state, pairs){
         didParseCell: function(data){
           if (data.section !== "body") return;
           const ri = data.row.index;
-          if (ri === nd){ data.cell.styles.fontStyle = "bold"; data.cell.styles.fillColor = [238,242,255]; return; }
+          const raw = String(data.cell.raw || "").trim();
+          const isNum = /^\d+([.,]\d+)?\*?$/.test(raw); // numero ore (eventuale * permesso)
+          if (ri === nd){ data.cell.styles.fontStyle = "bold"; data.cell.styles.fillColor = [238,242,255]; if (data.column.index > 0) data.cell.styles.fontSize = 9; return; }
           const day = ri + 1;
           if (data.column.index === 0){
             if (isRosso(fset, anno, m, day)){ data.cell.styles.fillColor = [178,34,34]; data.cell.styles.textColor = [255,255,255]; }
           } else {
-            const txt = String(data.cell.raw || "").trim().replace(/\*$/, "");
+            if (isNum) data.cell.styles.fontSize = 9; // numeri ore più grandi
+            const txt = raw.replace(/\*$/, "");
             if (CODE_SET[txt]){
               const hx = CODE_SET[txt].bg.replace("#","");
               data.cell.styles.fillColor = [parseInt(hx.slice(0,2),16), parseInt(hx.slice(2,4),16), parseInt(hx.slice(4,6),16)];
@@ -781,6 +786,7 @@ function EmployeeCard(props){
         <span className="pill">{contrLabel(dp)}</span>
         {dp.dataCessazione ? <span className="pill cess">CESSATO {dp.dataCessazione}</span> : null}
         <div className="spacer"></div>
+        {!mLocked ? <button className="edit-mini qf" title="Compila velocemente il mese (ore o codice sui giorni scelti)" onClick={function(){ props.onQuickFill(dp); }}>⚡ Compila</button> : null}
         <button className="edit-mini" title="Modifica anagrafica" onClick={function(){ props.onEditDip(dp); }}>✎</button>
         <button className="edit-mini" title="Elimina definitivamente" onClick={function(){ props.onDelDip(dp); }}>🗑</button>
       </div>
@@ -970,6 +976,71 @@ function ExportModal(props){
           <span>
             <button className="btn btn-gray" onClick={props.onClose}>Annulla</button>
             <button className="btn btn-blue" style={{ marginLeft:"8px" }} onClick={genera}>Genera {props.kind}</button>
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function QuickFillModal(props){
+  const dp = props.dp, y = props.anno, m = props.mese, fset = props.fset, rec = props.rec;
+  const nd = daysInMonth(y, m);
+  const WDAYS = [{lbl:"Lun",gd:1},{lbl:"Mar",gd:2},{lbl:"Mer",gd:3},{lbl:"Gio",gd:4},{lbl:"Ven",gd:5},{lbl:"Sab",gd:6},{lbl:"Dom",gd:0}];
+  const [valore, setValore] = useState("");
+  const [sel, setSel] = useState({0:false,1:true,2:true,3:true,4:true,5:true,6:false});
+  const [skipFest, setSkipFest] = useState(true);
+  const [overwrite, setOverwrite] = useState(false);
+  const toggle = function(gd){ setSel(function(p){ const n=Object.assign({},p); n[gd]=!n[gd]; return n; }); };
+  const preset = function(list){ const n={0:false,1:false,2:false,3:false,4:false,5:false,6:false}; list.forEach(function(g){ n[g]=true; }); setSel(n); };
+  const target = [];
+  for (let d=1; d<=nd; d++){ const gd = weekdayOf(y,m,d); if (!sel[gd]) continue; if (skipFest && isRosso(fset,y,m,d)) continue; target.push(d); }
+  const occupied = target.filter(function(d){ const v=(rec.giorni||{})[d]; return v!==undefined && String(v).trim()!==""; }).length;
+  const vTrim = valore.trim();
+  const isCode = CODE_SET[vTrim.toUpperCase()] !== undefined;
+  const valNorm = isCode ? vTrim.toUpperCase() : vTrim.replace(".", ",");
+  const apply = function(){ if (vTrim === "") return; props.onApply({ dpId:dp.id, valore:valNorm, target:target, overwrite:overwrite, occupied:occupied }); };
+  return (
+    <div className="overlay" onClick={props.onClose}>
+      <div className="modal" onClick={function(e){ e.stopPropagation(); }} style={{ maxWidth:"560px" }}>
+        <h2>⚡ Compila veloce — {dp.nome}</h2>
+        <div style={{ fontSize:"12px", color:"#64748b", marginBottom:"10px" }}>Si applica solo a <b>{MONTH_LABEL[m-1]} {y}</b>.</div>
+        <div style={{ display:"flex", alignItems:"center", gap:"8px", flexWrap:"wrap", marginBottom:"10px" }}>
+          <label style={{ fontSize:"13px", fontWeight:"700" }}>Valore da inserire:</label>
+          <input value={valore} onChange={function(e){ setValore(e.target.value); }} list="codici-list" placeholder="es. 7  oppure  FERIE"
+            style={{ padding:"7px 9px", border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px", width:"160px", fontSize:"15px", fontWeight:"700" }} />
+          <span style={{ fontSize:"12px", color:"#64748b" }}>{vTrim==="" ? "" : (isCode ? "codice: " + CODE_SET[vTrim.toUpperCase()].l : "ore: " + valNorm)}</span>
+        </div>
+        <div style={{ marginBottom:"8px" }}>
+          <div style={{ fontSize:"13px", fontWeight:"700", marginBottom:"6px" }}>Giorni della settimana:</div>
+          <div style={{ display:"flex", gap:"6px", flexWrap:"wrap", marginBottom:"6px" }}>
+            {WDAYS.map(function(w){ return (
+              <label key={w.gd} style={{ display:"flex", alignItems:"center", gap:"4px", border:"1px solid #cbd5e1", borderRadius:"6px", padding:"4px 8px", fontSize:"13px", background: sel[w.gd] ? "#dbeafe" : "#fff", cursor:"pointer" }}>
+                <input type="checkbox" checked={!!sel[w.gd]} onChange={function(){ toggle(w.gd); }} /> {w.lbl}
+              </label>
+            ); })}
+          </div>
+          <div style={{ display:"flex", gap:"6px", flexWrap:"wrap" }}>
+            <button className="btn-mini" onClick={function(){ preset([1,2,3,4,5]); }}>Lun–Ven</button>
+            <button className="btn-mini" onClick={function(){ preset([1,2,3,4,5,6]); }}>Lun–Sab</button>
+            <button className="btn-mini" onClick={function(){ preset([3,4,5,6]); }}>Mer–Sab</button>
+            <button className="btn-mini" onClick={function(){ preset([0,1,2,3,4,5,6]); }}>Tutti</button>
+          </div>
+        </div>
+        <label style={{ display:"flex", alignItems:"center", gap:"8px", fontSize:"13px", marginBottom:"6px" }}>
+          <input type="checkbox" checked={skipFest} onChange={function(){ setSkipFest(!skipFest); }} /> Salta i giorni festivi e le domeniche (lasciali con il trattino)
+        </label>
+        <label style={{ display:"flex", alignItems:"center", gap:"8px", fontSize:"13px", marginBottom:"6px" }}>
+          <input type="checkbox" checked={overwrite} onChange={function(){ setOverwrite(!overwrite); }} /> Sovrascrivi anche i valori già presenti
+        </label>
+        <div style={{ fontSize:"12px", color: (overwrite && occupied>0) ? "#b45309" : "#64748b", background:"#f8fafc", border:"1px solid #e2e8f0", borderRadius:"8px", padding:"8px 10px", margin:"6px 0" }}>
+          Giorni interessati: <b>{target.length}</b>{overwrite && occupied>0 ? <span> — di cui <b>{occupied}</b> già compilati che verranno <b>sovrascritti</b> (ti chiederò conferma)</span> : (occupied>0 ? <span> — {occupied} già compilati verranno <b>lasciati intatti</b></span> : null)}
+        </div>
+        <div className="modal-actions">
+          <span></span>
+          <span>
+            <button className="btn btn-gray" onClick={props.onClose}>Annulla</button>
+            <button className="btn btn-blue" style={{ marginLeft:"8px" }} disabled={vTrim==="" || target.length===0} onClick={apply}>Compila {target.length} giorni</button>
           </span>
         </div>
       </div>
@@ -1280,6 +1351,7 @@ function App(){
   const [confirm, setConfirm] = useState(null);
   const [permModal, setPermModal] = useState(null);
   const [exportModal, setExportModal] = useState(null);
+  const [quickFill, setQuickFill] = useState(null);
   const fileRef = useRef(null); const dbRef = useRef(null); const uidRef = useRef(null);
 
   useEffect(function(){
@@ -1330,6 +1402,22 @@ function App(){
       onConfirm: function(){ setConfirm(null); },
       onCancel: function(){ onCell(dipId, d, ""); setConfirm(null); }
     });
+  };
+  const onQuickFill = function(dp){ setQuickFill(dp); };
+  const onQuickFillApply = function(cfg){
+    const doFill = function(overwriteAll){
+      const next = JSON.parse(JSON.stringify(state)); const mk2 = monthKey(anno, mese);
+      if (!next.dati[mk2]) next.dati[mk2] = {};
+      if (!next.dati[mk2][cfg.dpId]) next.dati[mk2][cfg.dpId] = { giorni:{}, nota:"" };
+      const g = next.dati[mk2][cfg.dpId].giorni; let n = 0;
+      cfg.target.forEach(function(d){ const cur = g[d]; const empty = (cur === undefined || String(cur).trim() === ""); if (overwriteAll || empty){ g[d] = cfg.valore; n++; } });
+      touch(next); setQuickFill(null);
+      showToast("⚡ Compilati " + n + " giorni — ricorda di salvare 💾");
+    };
+    if (cfg.overwrite && cfg.occupied > 0){
+      setConfirm({ title:"Sovrascrivere i valori esistenti?", body:"Nei giorni scelti ci sono " + cfg.occupied + " valori già inseriti. Sovrascriverli tutti con \"" + cfg.valore + "\"?", confirmLabel:"Sovrascrivi",
+        onConfirm:function(){ setConfirm(null); doFill(true); }, onCancel:function(){ setConfirm(null); } });
+    } else { doFill(false); }
   };
   const mk = mese ? monthKey(anno, mese) : null;
   const mLocked = !!(mk && state && state.locked && state.locked[mk]);
@@ -1450,6 +1538,7 @@ function App(){
         {!FB_READY ? <button className="btn btn-ghost" onClick={changePin}>🔑 PIN</button> : null}
         {FB_READY ? <button className="btn btn-ghost" onClick={function(){ if (dirty && !window.confirm("Ci sono modifiche non salvate. Uscire comunque?")) return; firebase.auth().signOut(); }}>Esci</button> : null}
         <input ref={fileRef} type="file" accept=".xlsx,.xls,.json" className="hidden-file" onChange={onImportFile} />
+        <div className="monthstrip">{vista === "rep" ? "📊 Riepiloghi" : ("📅 " + MONTH_LABEL[mese-1] + " " + anno + (mLocked ? "  🔒 bloccato" : ""))}</div>
       </div>
 
       {!FB_READY ? <div className="banner">Modalità LOCALE (localStorage, accesso con PIN).</div> : null}
@@ -1491,7 +1580,7 @@ function App(){
               dipSorted(state).map(function(dp){
                 const dipList = state.dipendenti.filter(function(x){ return x.id !== dp.id; }).map(function(x){ return x.nome; }).sort(function(a,b){ return a.localeCompare(b); });
                 return <EmployeeCard key={dp.id} dp={dp} rec={getRecFrom(state, anno, mese, dp.id)} anno={anno} mese={mese} fset={fset} mLocked={mLocked}
-                  dipList={dipList} onCell={onCell} onNota={onNota} onFestConfirm={onFestConfirm}
+                  dipList={dipList} onCell={onCell} onNota={onNota} onFestConfirm={onFestConfirm} onQuickFill={onQuickFill}
                   onDich={onDich} onSostAdd={onSostAdd} onSostChange={onSostChange} onSostDel={onSostDel} onOpenPerm={onOpenPerm}
                   onEditDip={function(d){ setDipModal({ dip:d }); }} onDelDip={askDelDip} />;
               })
@@ -1509,6 +1598,7 @@ function App(){
         }
       </div>
 
+      {quickFill ? <QuickFillModal dp={quickFill} rec={getRecFrom(state, anno, mese, quickFill.id)} anno={anno} mese={mese} fset={fset} onApply={onQuickFillApply} onClose={function(){ setQuickFill(null); }} /> : null}
       {exportModal ? <ExportModal kind={exportModal} anni={state.anni} annoCorrente={anno} meseCorrente={mese}
         onGenera={function(pairs){ if (exportModal === "Excel") esportaExcel(state, pairs); else esportaPDF(state, pairs); setExportModal(null); }}
         onClose={function(){ setExportModal(null); }} /> : null}
