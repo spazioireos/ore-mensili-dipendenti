@@ -105,6 +105,13 @@
   .nota-line { padding:6px 14px 12px; display:flex; align-items:center; gap:8px; }
   .nota-line label { font-size:11px; color:#64748b; font-weight:700; white-space:nowrap; }
   .nota-in { flex:1; border:2px solid #f59e0b; background:#fffde7; border-radius:6px; padding:5px 8px; font-family:inherit; font-size:12px; }
+  .note-box { margin:10px 14px 14px; padding:10px 12px; background:#fffbeb; border:2px solid #f59e0b; border-radius:10px; }
+  .note-head { font-size:13px; font-weight:800; color:#92400e; margin-bottom:8px; letter-spacing:.3px; }
+  .voce-row { display:flex; gap:8px; align-items:center; margin-bottom:6px; flex-wrap:wrap; }
+  .voce-cat { border:2px solid #f59e0b; background:#fff; border-radius:6px; padding:5px 7px; font-family:inherit; font-size:12px; font-weight:700; min-width:280px; }
+  .voce-txt { flex:1; min-width:160px; border:2px solid #f59e0b; background:#fffde7; border-radius:6px; padding:5px 8px; font-family:inherit; font-size:12px; }
+  .voce-txt:disabled { background:#f1f5f9; border-color:#cbd5e1; color:#94a3b8; }
+  .voce-del { border:none; background:#fee2e2; color:#b91c1c; border-radius:6px; width:22px; height:22px; cursor:pointer; font-weight:700; }
   .legend, .rep-box { background:#fff; border-radius:12px; padding:12px 16px; box-shadow:0 1px 4px rgba(0,0,0,.08); margin-bottom:16px; }
   .legend h3, .rep-box h3 { margin:0 0 8px; font-size:14px; color:#0f2740; }
   .legend-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:5px; }
@@ -167,7 +174,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver15";
+const APP_VER = "ver16";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
 const MESE_ABBR_FILE = ["gen","feb","mar","apr","mag","giu","lug","ago","set","ott","nov","dic"];
@@ -319,15 +326,20 @@ const PERM_CODES = ["EXF","FLEX","LUTTO","ELEZ","ESAMI","SIND","MATR","CONGP"];
 const PERM_TIPI = PERM_CODES.map(function(c){ return CODE_SET[c]; }).filter(function(x){ return x !== undefined; });
 function hashPin(p){ let h=5381; for (let i=0;i<p.length;i++){ h=((h<<5)+h)+p.charCodeAt(i); h=h&0xffffffff; } return String(h>>>0); }
 
+function prorogheList(dp){ return Array.isArray(dp.proroghe) ? dp.proroghe.filter(function(x){ return x && String(x).trim() !== ""; }) : []; }
+function scadEff(dp){ const pl = prorogheList(dp); return pl.length ? pl[pl.length-1] : (dp.scadenza || ""); }
 function contrLabel(dp){
-  if (dp.tipoContratto === "determinato") return "Determinato → " + (dp.scadenza || "?");
+  if (dp.tipoContratto === "determinato"){
+    const chain = [dp.scadenza || "?"].concat(prorogheList(dp));
+    return "Determinato → " + chain.join(" → ");
+  }
   return "Indeterminato";
 }
 
 function emptyState(){
   const dip = DIP_INIZIALI.map(function(x){
     return { id:uid(), nome:x.nome, livello:x.livello, oreSett:x.oreSett, tipoContratto:x.tipoContratto,
-      scadenza:x.scadenza, dataAssunzione:x.dataAssunzione, dataCessazione:x.dataCessazione, colore:x.colore };
+      scadenza:x.scadenza, proroghe:[], dataAssunzione:x.dataAssunzione, dataCessazione:x.dataCessazione, colore:x.colore };
   });
   const byName = {}; dip.forEach(function(d){ byName[d.nome.trim().toUpperCase()] = d.id; });
   const dati = {};
@@ -339,7 +351,57 @@ function emptyState(){
       if (id) dati[mk][id] = perNome[nome];
     });
   });
-  return { version:4, dipendenti:dip, dati:dati, anni:[2026], locked:{}, updatedAt:new Date().toISOString() };
+  Object.keys(dati).forEach(function(mk){
+    Object.keys(dati[mk]).forEach(function(id){
+      const rec = dati[mk][id]; if (!rec) return;
+      if (!Array.isArray(rec.voci)) rec.voci = [];
+      if (rec.nota && rec.nota.trim() !== "" && rec.voci.length === 0){
+        const r = notaToVoce(rec.nota);
+        if (r.voce){ rec.voci.push(r.voce); rec.nota = r.resto; }
+      }
+    });
+  });
+  return { version:4, dipendenti:dip, dati:dati, anni:[2026], locked:{}, noteRecuperate2026:true, vociConvertite2026:true, updatedAt:new Date().toISOString() };
+}
+
+const CAT_NOTE = [
+  { c:"GIORNI DI MALATTIA (PRIMI TRE DA NON PAGARE)", text:true },
+  { c:"GIORNI DI MALATTIA DA NON PAGARE", text:true },
+  { c:"INSERIRE RIMBORSO KM", text:true },
+  { c:"INSERIRE UNA TANTUM", text:true },
+  { c:"INSERIRE PREMIO", text:true },
+  { c:"CHIUDERE ANCHE CON TFR", text:false }
+];
+const CAT_SET = {}; CAT_NOTE.forEach(function(x){ CAT_SET[x.c] = x; });
+function vociLines(rec){
+  const out = [];
+  ((rec && rec.voci) || []).forEach(function(v){
+    if (!v.cat) return;
+    const def = CAT_SET[v.cat];
+    if (def && def.text === false) out.push(v.cat);
+    else out.push(v.cat + (v.testo && v.testo.trim() !== "" ? ": " + v.testo.trim() : ""));
+  });
+  if (rec && rec.nota && rec.nota.trim() !== "") out.push(rec.nota.trim());
+  return out;
+}
+// converte una nota libera in {voce:{cat,testo}, resto} — non distruttivo, usato una-tantum
+function notaToVoce(nota){
+  const s = String(nota || "").trim();
+  if (s === "") return { voce:null, resto:"" };
+  const low = s.toLowerCase();
+  if (low.indexOf("rimborso km") !== -1){
+    const mm = s.match(/€\s*[0-9.,]+/);
+    return { voce:{ cat:"INSERIRE RIMBORSO KM", testo: mm ? mm[0] : s }, resto:"" };
+  }
+  if (low.indexOf("malattia") !== -1 && (low.indexOf("primi tre") !== -1 || low.indexOf("3gg") !== -1 || low.indexOf("3 gg") !== -1 || low.indexOf("non liquidare") !== -1)){
+    const mm = s.match(/[0-9]{1,2}\/[0-9]{1,2}(\s*-\s*[0-9]{1,2}\/[0-9]{1,2})?/);
+    return { voce:{ cat:"GIORNI DI MALATTIA (PRIMI TRE DA NON PAGARE)", testo: mm ? mm[0] : s.replace(/verificare malattia/i,"").trim() }, resto:"" };
+  }
+  if (low.indexOf("malattia") !== -1 && (low.indexOf("carenza") !== -1 || low.indexOf("non pagare") !== -1)){
+    const mm = s.match(/[0-9]{1,2}\/[0-9]{1,2}[^-]*/);
+    return { voce:{ cat:"GIORNI DI MALATTIA DA NON PAGARE", testo: mm ? mm[0].trim() : s.replace(/verificare malattia/i,"").trim() }, resto:"" };
+  }
+  return { voce:null, resto:s };
 }
 
 const NOTE_RECOVERY = {
@@ -391,7 +453,29 @@ function migrate(obj){
     });
     obj.noteRecuperate2026 = true;
   }
+  // inizializzo le voci strutturate e converto una-tantum le note libere esistenti
+  Object.keys(obj.dati || {}).forEach(function(mk){
+    const rows = obj.dati[mk]; if (!rows) return;
+    Object.keys(rows).forEach(function(id){
+      const rec = rows[id]; if (!rec) return;
+      if (!Array.isArray(rec.voci)) rec.voci = [];
+    });
+  });
+  if (!obj.vociConvertite2026){
+    Object.keys(obj.dati || {}).forEach(function(mk){
+      const rows = obj.dati[mk]; if (!rows) return;
+      Object.keys(rows).forEach(function(id){
+        const rec = rows[id]; if (!rec) return;
+        if (rec.nota && rec.nota.trim() !== "" && rec.voci.length === 0){
+          const r = notaToVoce(rec.nota);
+          if (r.voce){ rec.voci.push(r.voce); rec.nota = r.resto; }
+        }
+      });
+    });
+    obj.vociConvertite2026 = true;
+  }
   if (!obj.locked || typeof obj.locked !== "object") obj.locked = {};
+  (obj.dipendenti || []).forEach(function(d){ if (!Array.isArray(d.proroghe)) d.proroghe = []; });
   obj.version = 4;
   return obj;
 }
@@ -496,10 +580,11 @@ function esportaExcel(state, pairs){
     let rr = rTot + 2;
     dips.forEach(function(dp){
       const rec = getRecFrom(state, anno, m, dp.id);
-      if (rec.nota && rec.nota.trim() !== ""){
-        put(rr, 0, "Nota — " + dp.nome + ": " + rec.nota.trim(), styNote);
+      const vl = vociLines(rec);
+      vl.forEach(function(line){
+        put(rr, 0, "Nota — " + dp.nome + ": " + line, styNote);
         merges.push({ s:{r:rr,c:0}, e:{r:rr,c:dips.length} }); rr++;
-      }
+      });
     });
     dips.forEach(function(dp){
       const rec = getRecFrom(state, anno, m, dp.id);
@@ -551,7 +636,7 @@ function esportaPDF(state, pairs){
     const chunks = []; for (let i=0; i<dips.length; i+=MAXCOL) chunks.push(dips.slice(i, i+MAXCOL));
     if (chunks.length === 0) chunks.push([]);
     const permMese = []; const noteMese = [];
-    dips.forEach(function(dp){ const rec = getRecFrom(state, anno, m, dp.id); if (rec.nota && rec.nota.trim() !== "") noteMese.push({ nome: dp.nome, testo: rec.nota.trim() }); });
+    dips.forEach(function(dp){ const rec = getRecFrom(state, anno, m, dp.id); const vl = vociLines(rec); if (vl.length > 0) noteMese.push({ nome: dp.nome, righe: vl }); });
     // larghezza colonna UNICA per tutte le pagine (basata sul blocco più grande = min(dip, MAXCOL)+1 colonne)
     const colW = Math.round((182 / (1 + Math.min(dips.length, MAXCOL))) * 100) / 100;
 
@@ -619,24 +704,22 @@ function esportaPDF(state, pairs){
         if (noteMese.length > 0){
           ensureY(10);
           doc.setFillColor(255,249,224); doc.setDrawColor(245,158,11); doc.setLineWidth(0.4);
-          const boxH = 6.5 + noteMese.reduce(function(a,n){ return a + Math.max(1, doc.splitTextToSize(n.testo, 150).length) * 4.4; }, 0) + 2;
+          const boxH = 6.5 + noteMese.reduce(function(a,n){ return a + 4.6 + n.righe.reduce(function(b,rg){ return b + Math.max(1, doc.splitTextToSize(rg, 165).length) * 4.2; }, 0); }, 0) + 3;
           if (yy + boxH > 287){ doc.addPage(); yy = 18; }
           doc.rect(13, yy - 4, 184, boxH, "FD");
           doc.setFontSize(10.5); doc.setTextColor(146,64,14); doc.setFont(undefined,"bold");
-          doc.text("NOTE DEL MESE", 15, yy); yy += 5.5;
+          doc.text("NOTE DEL MESE", 15, yy); yy += 6;
           noteMese.forEach(function(n){
-            doc.setFontSize(8.2); doc.setFont(undefined,"bold"); doc.setTextColor(15,39,64);
-            const namePart = "•  " + n.nome + ":  ";
-            const nameW = doc.getTextWidth(namePart);
-            ensureY(4.6);
-            doc.text(namePart, 15, yy);
-            doc.setFont(undefined,"normal"); doc.setTextColor(40,40,40);
-            const avail = 196 - 15 - nameW;
-            const ls = doc.splitTextToSize(n.testo, avail > 40 ? avail : 150);
-            doc.text(ls[0] || "", 15 + nameW, yy); yy += 4.4;
-            for (let k=1; k<ls.length; k++){ ensureY(4.4); doc.text(ls[k], 19, yy); yy += 4.4; }
+            doc.setFontSize(8.4); doc.setFont(undefined,"bold"); doc.setTextColor(15,39,64);
+            ensureY(4.6); doc.text("•  " + n.nome, 15, yy); yy += 4.4;
+            doc.setFont(undefined,"normal"); doc.setTextColor(40,40,40); doc.setFontSize(8);
+            n.righe.forEach(function(rg){
+              const ls = doc.splitTextToSize(rg, 165);
+              ls.forEach(function(line){ ensureY(4.2); doc.text(line, 20, yy); yy += 4.2; });
+            });
+            yy += 1;
           });
-          yy += 3;
+          yy += 2;
         }
         if (permMese.length > 0){
           yy += 1; ensureY(4);
@@ -854,10 +937,35 @@ function EmployeeCard(props){
         })}
         {!mLocked ? <button className="btn-mini" onClick={function(){ props.onSostAdd(dp.id); }}>+ Aggiungi sostituzione</button> : null}
       </div>
-      <div className="nota-line">
-        <label>Nota mese:</label>
-        <input className="nota-in" value={rec.nota || ""} placeholder="(nessuna nota)" disabled={mLocked}
-          onChange={function(e){ props.onNota(dp.id, e.target.value); }} />
+      <div className="note-box">
+        <div className="note-head">🗒️ Note del mese</div>
+        {(function(){
+          const vociDisp = (rec.voci || []).slice();
+          while (vociDisp.length < 2) vociDisp.push({ cat:"", testo:"" });
+          return vociDisp.map(function(v, i){
+            const catDef = CAT_SET[v.cat];
+            const noText = !!(catDef && catDef.text === false);
+            return (
+              <div className="voce-row" key={i}>
+                <select className="voce-cat" value={v.cat || ""} disabled={mLocked}
+                  onChange={function(e){ const nc = e.target.value; props.onVoceSet(dp.id, i, { cat:nc, testo: (CAT_SET[nc] && CAT_SET[nc].text === false) ? "" : (v.testo || "") }); }}>
+                  <option value="">— seleziona categoria —</option>
+                  {CAT_NOTE.map(function(c){ return <option key={c.c} value={c.c}>{c.c}</option>; })}
+                </select>
+                <input className="voce-txt" value={v.testo || ""} disabled={mLocked || v.cat === "" || noText}
+                  placeholder={v.cat === "" ? "" : (noText ? "(nessun dettaglio richiesto)" : "dettaglio…")}
+                  onChange={function(e){ props.onVoceSet(dp.id, i, { testo:e.target.value }); }} />
+                {(i >= 2 && !mLocked) ? <button className="voce-del" title="Rimuovi voce" onClick={function(){ props.onVoceDel(dp.id, i); }}>✕</button> : <span style={{ width:"22px", display:"inline-block" }}></span>}
+              </div>
+            );
+          });
+        })()}
+        {!mLocked ? <button className="btn-mini" onClick={function(){ props.onVoceAdd(dp.id); }}>+ Aggiungi voce</button> : null}
+        <div className="nota-line" style={{ marginTop:"9px" }}>
+          <label>Altre note (testo libero):</label>
+          <input className="nota-in" value={rec.nota || ""} placeholder="(nessuna nota)" disabled={mLocked}
+            onChange={function(e){ props.onNota(dp.id, e.target.value); }} />
+        </div>
       </div>
     </div>
   );
@@ -870,14 +978,19 @@ function DipModal(props){
   const [ore, setOre] = useState(editing ? editing.oreSett : "");
   const [tipo, setTipo] = useState(editing ? (editing.tipoContratto||"indeterminato") : "indeterminato");
   const [scad, setScad] = useState(editing ? (editing.scadenza||"") : "");
+  const [proroghe, setProroghe] = useState(editing && Array.isArray(editing.proroghe) ? editing.proroghe.slice() : []);
+  const [nuovaPro, setNuovaPro] = useState("");
+  const addPro = function(){ const v = nuovaPro.trim(); if (v === "") return; setProroghe(proroghe.concat([v])); setNuovaPro(""); };
+  const delPro = function(i){ setProroghe(proroghe.filter(function(_, k){ return k !== i; })); };
   const [assunz, setAssunz] = useState(editing ? (editing.dataAssunzione||"") : "");
   const [cess, setCess] = useState(editing ? (editing.dataCessazione||"") : "");
   const [colore, setColore] = useState(editing ? (editing.colore||PALETTE[0]) : PALETTE[0]);
   const save = function(){
     const n = nome.trim().toUpperCase();
     if (n === "") return;
+    const pro = tipo === "determinato" ? proroghe.filter(function(x){ return x && x.trim() !== ""; }) : [];
     props.onSave({ id: editing ? editing.id : uid(), nome:n, livello:livello.trim(), oreSett:Number(ore)||0,
-      tipoContratto:tipo, scadenza: tipo==="determinato" ? scad.trim() : "", dataAssunzione:assunz.trim(), dataCessazione:cess.trim(), colore:colore });
+      tipoContratto:tipo, scadenza: tipo==="determinato" ? scad.trim() : "", proroghe:pro, dataAssunzione:assunz.trim(), dataCessazione:cess.trim(), colore:colore });
   };
   return (
     <div className="overlay" onClick={props.onClose}>
@@ -898,9 +1011,29 @@ function DipModal(props){
               <option value="determinato">Determinato</option>
             </select></div>
           {tipo === "determinato" ?
-            <div className="field"><label>Scadenza (gg/mm/aa)</label>
+            <div className="field"><label>Scadenza originale (gg/mm/aa)</label>
               <input value={scad} onChange={function(e){ setScad(e.target.value); }} placeholder="31/12/26" /></div> : null}
         </div>
+        {tipo === "determinato" ?
+          <div className="field" style={{ background:"#f8fafc", border:"1px solid #e2e8f0", borderRadius:"8px", padding:"10px" }}>
+            <label style={{ fontWeight:800 }}>Proroghe (storico) — la scadenza originale resta invariata</label>
+            {proroghe.length === 0 ? <div style={{ fontSize:"12px", color:"#64748b", margin:"4px 0" }}>Nessuna proroga.</div> :
+              <div style={{ margin:"6px 0" }}>
+                {proroghe.map(function(pp, i){ return (
+                  <div key={i} style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"4px", fontSize:"13px" }}>
+                    <span style={{ fontWeight:700 }}>{i+1}ª proroga → {pp}</span>
+                    <button className="voce-del" title="Rimuovi proroga" onClick={function(){ delPro(i); }}>✕</button>
+                  </div>
+                ); })}
+                <div style={{ fontSize:"12px", color:"#0f2740", marginTop:"4px" }}>Scadenza effettiva: <b>{proroghe[proroghe.length-1]}</b></div>
+              </div>}
+            <div style={{ display:"flex", gap:"8px", alignItems:"center", marginTop:"4px" }}>
+              <input value={nuovaPro} onChange={function(e){ setNuovaPro(e.target.value); }} placeholder="gg/mm/aa"
+                onKeyDown={function(e){ if (e.key === "Enter"){ e.preventDefault(); addPro(); } }}
+                style={{ padding:"6px 8px", border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px", width:"140px" }} />
+              <button className="btn btn-blue" onClick={addPro}>+ Aggiungi proroga</button>
+            </div>
+          </div> : null}
         <div className="frow">
           <div className="field"><label>Data assunzione (blocca giorni prima)</label>
             <input value={assunz} onChange={function(e){ setAssunz(e.target.value); }} placeholder="gg/mm/aa" /></div>
@@ -1024,6 +1157,8 @@ function QuickFillModal(props){
             <button className="btn-mini" onClick={function(){ preset([1,2,3,4,5]); }}>Lun–Ven</button>
             <button className="btn-mini" onClick={function(){ preset([1,2,3,4,5,6]); }}>Lun–Sab</button>
             <button className="btn-mini" onClick={function(){ preset([3,4,5,6]); }}>Mer–Sab</button>
+            <button className="btn-mini" onClick={function(){ preset([6]); }}>Solo Sab</button>
+            <button className="btn-mini" onClick={function(){ preset([0]); }}>Solo Dom</button>
             <button className="btn-mini" onClick={function(){ preset([0,1,2,3,4,5,6]); }}>Tutti</button>
           </div>
         </div>
@@ -1153,19 +1288,30 @@ function Riepiloghi(props){
   const oggi = new Date(); const tabScad = [];
   dips.forEach(function(dp){
     if (dp.tipoContratto !== "determinato") return;
-    const dt = parseDMY(dp.scadenza); if (!dt) return;
+    const eff = scadEff(dp);
+    const dt = parseDMY(eff); if (!dt) return;
     const gg = Math.round((dt - oggi)/86400000);
-    tabScad.push({ dp:dp, data:dp.scadenza, gg:gg });
+    const pl = prorogheList(dp);
+    tabScad.push({ dp:dp, orig:dp.scadenza || "", prorog: pl.length ? pl[pl.length-1] : "", eff:eff, gg:gg });
   });
   tabScad.sort(function(a,b){ return a.gg-b.gg; });
   const tabNote = [];
   dips.forEach(function(dp){ scopePairs.forEach(function(pr){ const rec=getRecFrom(state,pr.y,pr.m,dp.id);
-    if (rec.nota && rec.nota.trim()!=="") tabNote.push({ mese:mLabelY(pr.y,pr.m), dp:dp.nome, nota:rec.nota.trim() }); }); });
+    vociLines(rec).forEach(function(line){ tabNote.push({ mese:mLabelY(pr.y,pr.m), dp:dp.nome, nota:line }); }); }); });
   const tabPerm = [];
   dips.forEach(function(dp){ scopePairs.forEach(function(pr){ const rec=getRecFrom(state,pr.y,pr.m,dp.id);
     if (rec.permessi){ Object.keys(rec.permessi).forEach(function(d){ const prm=rec.permessi[d];
       tabPerm.push({ dp:dp.nome, mese:mLabelY(pr.y,pr.m), giorno:parseInt(d,10), ore:prm.ore, tipo:prm.tipo }); }); } }); });
   tabPerm.sort(function(a,b){ if (a.dp!==b.dp) return a.dp.localeCompare(b.dp); return a.giorno-b.giorno; });
+
+  // statistiche voci-categoria per ogni dipendente per ogni mese
+  const tabVoci = [];
+  const totVoci = {}; CAT_NOTE.forEach(function(c){ totVoci[c.c]=0; });
+  dips.forEach(function(dp){ scopePairs.forEach(function(pr){ const rec=getRecFrom(state,pr.y,pr.m,dp.id);
+    const counts={}; CAT_NOTE.forEach(function(c){ counts[c.c]=0; }); let tot=0;
+    ((rec && rec.voci)||[]).forEach(function(v){ if (v.cat && counts[v.cat]!==undefined){ counts[v.cat]+=1; totVoci[v.cat]+=1; tot++; } });
+    if (tot>0) tabVoci.push({ dp:dp.nome, mese:mLabelY(pr.y,pr.m), counts:counts, tot:tot });
+  }); });
 
   const esportaRiepiloghi = function(){
     const wb = XLSX.utils.book_new();
@@ -1184,12 +1330,15 @@ function Riepiloghi(props){
     tabAssenze.forEach(function(r){ aAss.push([r.dp.nome].concat(codeCols.map(function(c){ return r.counts[c]; }))); }); mkSheet("Assenze per codice", aAss);
     const aPay=[["DIPENDENTE","GG RETRIBUITI","GG NON RETRIBUITI"]];
     tabPay.forEach(function(r){ aPay.push([r.dp.nome, r.ret, r.non]); }); mkSheet("Retribuite vs non", aPay);
-    const aScad=[["DIPENDENTE","SCADENZA","GG RESIDUI"]];
-    tabScad.forEach(function(r){ aScad.push([r.dp.nome, r.data, r.gg]); }); mkSheet("Contratti in scadenza", aScad);
+    const aScad=[["DIPENDENTE","SCADENZA ORIGINALE","PROROGATO AL","SCADENZA EFFETTIVA","GG RESIDUI"]];
+    tabScad.forEach(function(r){ aScad.push([r.dp.nome, r.orig, r.prorog, r.eff, r.gg]); }); mkSheet("Contratti in scadenza", aScad);
     const aNote=[["MESE","DIPENDENTE","NOTA"]];
     tabNote.forEach(function(r){ aNote.push([r.mese, r.dp, r.nota]); }); mkSheet("Note", aNote);
     const aPerm=[["DIPENDENTE","MESE","GIORNO","ORE","TIPO"]];
     tabPerm.forEach(function(r){ aPerm.push([r.dp, r.mese, r.giorno, r.ore, r.tipo]); }); mkSheet("Permessi orari", aPerm);
+    const aVoci=[["DIPENDENTE","MESE"].concat(CAT_NOTE.map(function(c){ return c.c; })).concat(["TOT VOCI"])];
+    tabVoci.forEach(function(r){ aVoci.push([r.dp, r.mese].concat(CAT_NOTE.map(function(c){ return r.counts[c.c]; })).concat([r.tot])); });
+    aVoci.push(["TOTALE",""].concat(CAT_NOTE.map(function(c){ return totVoci[c.c]; })).concat([CAT_NOTE.reduce(function(a,c){ return a+totVoci[c.c]; },0)])); mkSheet("Voci note", aVoci);
     XLSX.writeFile(wb, fileName("xlsx"));
   };
 
@@ -1255,10 +1404,10 @@ function Riepiloghi(props){
         <h3>Contratti a termine — scadenze</h3>
         {tabScad.length===0? <div style={{fontSize:"12px",color:"#64748b"}}>Nessun contratto a termine.</div> :
         <div className="rep-scroll"><table className="rep"><thead><tr>
-          <th style={{textAlign:"left"}}>Dipendente</th><th>Scadenza</th><th>Giorni residui</th>
+          <th style={{textAlign:"left"}}>Dipendente</th><th>Scadenza originale</th><th>Prorogato al</th><th>Scadenza effettiva</th><th>Giorni residui</th>
         </tr></thead><tbody>
           {tabScad.map(function(r){ const cls=r.gg<0?"flag-red":(r.gg<=30?"flag-red":(r.gg<=60?"flag-amber":""));
-            return <tr key={r.dp.id}><td className="name">{r.dp.nome}</td><td>{r.data}</td><td className={cls}>{r.gg<0?"scaduto":r.gg}</td></tr>; })}
+            return <tr key={r.dp.id}><td className="name">{r.dp.nome}</td><td>{r.orig}</td><td>{r.prorog || "—"}</td><td style={{fontWeight:700}}>{r.eff}</td><td className={cls}>{r.gg<0?"scaduto":r.gg}</td></tr>; })}
         </tbody></table></div>}
       </div>
 
@@ -1269,6 +1418,19 @@ function Riepiloghi(props){
           <th>Mese</th><th style={{textAlign:"left"}}>Dipendente</th><th style={{textAlign:"left"}}>Nota</th>
         </tr></thead><tbody>
           {tabNote.map(function(r,i){ return <tr key={i}><td>{r.mese}</td><td className="name">{r.dp}</td><td style={{textAlign:"left"}}>{r.nota}</td></tr>; })}
+        </tbody></table></div>}
+      </div>
+
+      <div className="rep-box">
+        <h3>Voci note utilizzate <span style={{fontWeight:400,fontSize:"11px",color:"#64748b"}}>(conteggio categorie per dipendente e per mese)</span></h3>
+        {tabVoci.length===0? <div style={{fontSize:"12px",color:"#64748b"}}>Nessuna voce categoria utilizzata nel periodo.</div> :
+        <div className="rep-scroll"><table className="rep"><thead><tr>
+          <th style={{textAlign:"left"}}>Dipendente</th><th>Mese</th>{CAT_NOTE.map(function(c){ return <th key={c.c} style={{fontSize:"10px"}}>{c.c}</th>; })}<th>TOT</th>
+        </tr></thead><tbody>
+          {tabVoci.map(function(r,i){ return <tr key={i}><td className="name">{r.dp}</td><td>{r.mese}</td>
+            {CAT_NOTE.map(function(c){ return <td key={c.c}>{r.counts[c.c]===0?"":r.counts[c.c]}</td>; })}<td className="tot">{r.tot}</td></tr>; })}
+          <tr style={{fontWeight:800,background:"#eef2ff"}}><td className="name">TOTALE</td><td></td>
+            {CAT_NOTE.map(function(c){ return <td key={c.c}>{totVoci[c.c]}</td>; })}<td className="tot">{CAT_NOTE.reduce(function(a,c){ return a+totVoci[c.c]; },0)}</td></tr>
         </tbody></table></div>}
       </div>
 
@@ -1394,6 +1556,20 @@ function App(){
     if (!next.dati[mk][dipId]) next.dati[mk][dipId] = { giorni:{}, nota:"" };
     next.dati[mk][dipId].nota = value; touch(next);
   };
+  const onVoceSet = function(dipId, idx, patch){
+    const next = JSON.parse(JSON.stringify(state)); const rec = ensureRec(next, dipId);
+    while (rec.voci.length <= idx) rec.voci.push({ cat:"", testo:"" });
+    rec.voci[idx] = Object.assign({}, rec.voci[idx], patch);
+    touch(next);
+  };
+  const onVoceAdd = function(dipId){
+    const next = JSON.parse(JSON.stringify(state)); const rec = ensureRec(next, dipId);
+    rec.voci.push({ cat:"", testo:"" }); touch(next);
+  };
+  const onVoceDel = function(dipId, idx){
+    const next = JSON.parse(JSON.stringify(state)); const rec = ensureRec(next, dipId);
+    rec.voci.splice(idx, 1); touch(next);
+  };
   const onFestConfirm = function(dipId, d, value){
     setConfirm({
       title: "Giorno festivo / domenica",
@@ -1430,7 +1606,7 @@ function App(){
       const next=JSON.parse(JSON.stringify(state)); if(!next.locked) next.locked={}; next.locked[mk]=true; touch(next); showToast("🔒 Mese bloccato — ricorda di salvare 💾");
     }
   };
-  const ensureRec = function(next, dipId){ const mk = monthKey(anno, mese); if (!next.dati[mk]) next.dati[mk] = {}; if (!next.dati[mk][dipId]) next.dati[mk][dipId] = { giorni:{}, nota:"" }; return next.dati[mk][dipId]; };
+  const ensureRec = function(next, dipId){ const mk = monthKey(anno, mese); if (!next.dati[mk]) next.dati[mk] = {}; if (!next.dati[mk][dipId]) next.dati[mk][dipId] = { giorni:{}, nota:"", voci:[] }; if (!Array.isArray(next.dati[mk][dipId].voci)) next.dati[mk][dipId].voci = []; return next.dati[mk][dipId]; };
   const onOpenPerm = function(dipId, day){ setPermModal({ dipId:dipId, day:day }); };
   const onPermSave = function(dipId, day, obj){ const next = JSON.parse(JSON.stringify(state)); const rec = ensureRec(next, dipId); if (!rec.permessi) rec.permessi = {}; rec.permessi[day] = obj; touch(next); setPermModal(null); showToast("Permesso orario salvato"); };
   const onPermDelete = function(dipId, day){ const next = JSON.parse(JSON.stringify(state)); const rec = ensureRec(next, dipId); if (rec.permessi) delete rec.permessi[day]; touch(next); setPermModal(null); showToast("Permesso orario rimosso"); };
@@ -1581,6 +1757,7 @@ function App(){
                 const dipList = state.dipendenti.filter(function(x){ return x.id !== dp.id; }).map(function(x){ return x.nome; }).sort(function(a,b){ return a.localeCompare(b); });
                 return <EmployeeCard key={dp.id} dp={dp} rec={getRecFrom(state, anno, mese, dp.id)} anno={anno} mese={mese} fset={fset} mLocked={mLocked}
                   dipList={dipList} onCell={onCell} onNota={onNota} onFestConfirm={onFestConfirm} onQuickFill={onQuickFill}
+                  onVoceSet={onVoceSet} onVoceAdd={onVoceAdd} onVoceDel={onVoceDel}
                   onDich={onDich} onSostAdd={onSostAdd} onSostChange={onSostChange} onSostDel={onSostDel} onOpenPerm={onOpenPerm}
                   onEditDip={function(d){ setDipModal({ dip:d }); }} onDelDip={askDelDip} />;
               })
