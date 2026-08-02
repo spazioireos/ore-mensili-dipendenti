@@ -176,7 +176,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver23";
+const APP_VER = "ver24";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
 const MESE_ABBR_FILE = ["gen","feb","mar","apr","mag","giu","lug","ago","set","ott","nov","dic"];
@@ -1253,12 +1253,14 @@ function Anagrafica(props){
     <div>
       <div className="toolbar">
         <strong style={{ fontSize:"15px", color:"#0f2740" }}>📇 Anagrafica dipendenti</strong>
+        <button className={"btn btn-save" + (props.dirty ? " dirty" : "")} disabled={!props.dirty} onClick={props.onSave} style={{ marginLeft:"12px" }} title="Salva le modifiche (cloud + copia locale)">💾 Salva</button>
         <div className="spacer"></div>
         <button className="btn btn-blue" onClick={props.onAddDip} title="Crea un nuovo dipendente: comparirà anche nei mesi con il box ore">+ Aggiungi dipendente</button>
         <button className="btn btn-gray" onClick={props.onImportAna} title="Riempie i campi vuoti dei dipendenti presenti nell'elenco importato (non sovrascrive)">⤵ Importa anagrafiche</button>
         <button className="btn btn-blue" onClick={props.onExportAna}>📊 Esporta Excel</button>
       </div>
       <div style={{ display:"flex", gap:"8px", alignItems:"center", flexWrap:"wrap", marginBottom:"10px" }}>
+        <span style={{ fontSize:"11px", fontWeight:800, color:"#64748b", textTransform:"uppercase", letterSpacing:".4px" }}>Gestione modelli (avanzato):</span>
         <button className="btn btn-gray" onClick={function(){ tplRef.current.click(); }} title="Carica un nuovo modello Word (.docx) del contratto quando cambiano le norme">🔄 Aggiorna modello contratto</button>
         {templatePersonalizzato() ? <button className="btn btn-gray" onClick={function(){ ripristinaModello(); setMsg("↩️ Ripristinato il modello contratto originale incorporato."); }}>↩️ Ripristina contratto</button> : null}
         <button className="btn btn-gray" onClick={function(){ tplProRef.current.click(); }} title="Carica un nuovo modello Word (.docx) della proroga">🔄 Aggiorna modello proroga</button>
@@ -1278,11 +1280,15 @@ function Anagrafica(props){
           ); })}
         </div>
         <div style={{ flex:1, background:"#fff", border:"2px solid #94a3b8", borderRadius:"12px", padding:"14px" }}>
-          <div style={{ display:"flex", alignItems:"center", gap:"12px", marginBottom:"10px", flexWrap:"wrap" }}>
+          <div style={{ display:"flex", alignItems:"center", gap:"10px", marginBottom:"12px", flexWrap:"wrap" }}>
             <div style={{ fontSize:"18px", fontWeight:800, color:"#0f2740" }}>{dp.nome}</div>
+            <button className="btn btn-gray" onClick={function(){ props.onEditDip(dp); }} title="Modifica dati contrattuali e aggiungi/gestisci le proroghe">✎ Modifica dipendente</button>
             <div className="spacer"></div>
-            <button className="btn btn-blue" onClick={genera} title="Genera il contratto .docx identico al modello, con i dati di questa scheda">📄 Genera contratto</button>
-            <button className="btn btn-blue" onClick={generaPro} title="Genera la lettera di proroga .docx (richiede almeno una proroga nella scheda)">📄 Genera proroga</button>
+            <div style={{ display:"flex", alignItems:"center", gap:"8px", background:"#eff6ff", border:"1px solid #bfdbfe", borderRadius:"10px", padding:"6px 10px" }}>
+              <span style={{ fontSize:"12px", fontWeight:800, color:"#1e3a8a", whiteSpace:"nowrap" }}>Genera documento:</span>
+              <button className="btn btn-blue" onClick={genera} title="Genera il contratto .docx identico al modello, con i dati di questa scheda">📄 Contratto</button>
+              <button className="btn btn-blue" onClick={generaPro} title="Genera la lettera di proroga .docx (richiede almeno una proroga nella scheda)">📄 Proroga</button>
+            </div>
           </div>
           {ANA_SECTIONS.map(function(sec){ return (
             <div key={sec.t} style={{ marginBottom:"12px" }}>
@@ -2045,7 +2051,7 @@ function App(){
 
       <div className="content" style={{ zoom: zoom / 100 }}>
         {vista === "rep" ? <Riepiloghi state={state} anno={anno} /> :
-         vista === "ana" ? <Anagrafica state={state} onAnaField={onAnaField} onImportAna={onImportAna} onExportAna={onExportAna} onAddDip={function(){ setDipModal({}); }} /> :
+         vista === "ana" ? <Anagrafica state={state} onAnaField={onAnaField} onImportAna={onImportAna} onExportAna={onExportAna} onAddDip={function(){ setDipModal({}); }} onEditDip={function(d){ setDipModal({ dip:d }); }} onSave={doSave} dirty={dirty} /> :
           <div>
             <div className="toolbar">
               <strong style={{ fontSize:"15px", color:"#0f2740" }}>{MONTH_LABEL[mese-1]} {anno}</strong>
