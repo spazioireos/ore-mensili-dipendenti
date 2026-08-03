@@ -93,6 +93,11 @@
   .foot-line .foot-tot { font-size:12px; color:#0f2740; font-weight:700; }
   .foot-line label { font-size:12px; color:#64748b; font-weight:700; }
   .dich-in { width:80px; border:2px solid #f59e0b; background:#fffde7; border-radius:6px; padding:4px 6px; font-family:inherit; font-size:14px; font-weight:800; text-align:center; }
+  .provv-lbl { display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:700; color:#92400e; background:#fffbeb; border:1px solid #fcd34d; border-radius:6px; padding:3px 8px; cursor:pointer; }
+  .provv-base { font-size:12px; font-weight:700; border:1px solid #fcd34d; border-radius:6px; padding:3px 6px; background:#fff; }
+  .conguaglio-warn { display:inline-flex; align-items:center; gap:8px; font-size:13px; font-weight:800; color:#7c2d12; background:#ffedd5; border:2px solid #fb923c; border-radius:8px; padding:4px 10px; }
+  .congua-btn { border:none; background:#16a34a; color:#fff; border-radius:6px; padding:3px 8px; font-weight:700; font-size:12px; cursor:pointer; }
+  .congua-btn:disabled { background:#cbd5e1; cursor:default; }
   .badge { border-radius:20px; padding:3px 12px; font-size:12px; font-weight:800; }
   .badge.ok { background:#dcfce7; color:#166534; }
   .badge.ko { background:#fef3c7; color:#b45309; }
@@ -176,7 +181,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver24";
+const APP_VER = "ver25";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
 const MESE_ABBR_FILE = ["gen","feb","mar","apr","mag","giu","lug","ago","set","ott","nov","dic"];
@@ -933,6 +938,15 @@ function EmployeeCard(props){
           if (Math.abs(diff) <= 0.01) return <span className="badge ok">✓ torna</span>;
           return <span className="badge ko">Δ {(diff>0?"+":"")}{fmt2(diff)} {diff<0?"(mancano ore)":"(ore in più)"}</span>;
         })()}
+        <label className="provv-lbl" title="Spunta se hai attribuito ore non ancora dichiarate: te lo ricorderò il mese successivo per il conguaglio">
+          <input type="checkbox" checked={!!rec.provv} disabled={mLocked} onChange={function(e){ props.onProvv(dp.id, e.target.checked); }} /> ⏳ provvisorio (da conguagliare)
+        </label>
+        {rec.provv ? <select className="provv-base" value={rec.provvBase||"100%"} disabled={mLocked} onChange={function(e){ props.onProvvBase(dp.id, e.target.value); }}>
+          <option value="100%">base: 100% mese prec.</option><option value="80%">base: 80% mese prec.</option><option value="manuale">base: manuale</option>
+        </select> : null}
+        {props.prevProvv ? <span className="conguaglio-warn">⚠️ Conguaglia {props.prevLabel}
+          <button className="congua-btn" disabled={mLocked} onClick={function(){ props.onConguaglia(dp.id); }}>✓ conguagliato</button>
+        </span> : null}
       </div>
       <div className="sost-box">
         <div className="sost-head">🔁 Sostituzioni (uso interno — non compaiono nei report)</div>
@@ -1921,6 +1935,13 @@ function App(){
   const onPermSave = function(dipId, day, obj){ const next = JSON.parse(JSON.stringify(state)); const rec = ensureRec(next, dipId); if (!rec.permessi) rec.permessi = {}; rec.permessi[day] = obj; touch(next); setPermModal(null); showToast("Permesso orario salvato"); };
   const onPermDelete = function(dipId, day){ const next = JSON.parse(JSON.stringify(state)); const rec = ensureRec(next, dipId); if (rec.permessi) delete rec.permessi[day]; touch(next); setPermModal(null); showToast("Permesso orario rimosso"); };
   const onDich = function(dipId, value){ const next = JSON.parse(JSON.stringify(state)); ensureRec(next, dipId).dich = value; touch(next); };
+  const onProvv = function(dipId, val){ const next = JSON.parse(JSON.stringify(state)); const r = ensureRec(next, dipId); r.provv = val; if (val){ if (!r.provvBase) r.provvBase = "100%"; r.conguagliato = false; } touch(next); };
+  const onProvvBase = function(dipId, base){ const next = JSON.parse(JSON.stringify(state)); ensureRec(next, dipId).provvBase = base; touch(next); };
+  const onConguaglia = function(dipId){
+    let pvY = anno, pvM = mese - 1; if (pvM < 1){ pvM = 12; pvY = anno - 1; }
+    const pk = monthKey(pvY, pvM); const next = JSON.parse(JSON.stringify(state));
+    if (next.dati[pk] && next.dati[pk][dipId]){ next.dati[pk][dipId].provv = false; next.dati[pk][dipId].conguagliato = true; touch(next); showToast("✓ Conguaglio segnato per " + MONTH_LABEL[pvM-1] + " " + pvY + " — ricorda di aggiornare le ore reali e 💾 salvare."); }
+  };
   const onSostAdd = function(dipId){ const next = JSON.parse(JSON.stringify(state)); const rec = ensureRec(next, dipId); if (!rec.sost) rec.sost = []; rec.sost.push({ g:1, p:"", altro:false }); touch(next); };
   const onSostChange = function(dipId, idx, nr){ const next = JSON.parse(JSON.stringify(state)); const rec = ensureRec(next, dipId); if (!rec.sost) rec.sost = []; rec.sost[idx] = nr; touch(next); };
   const onSostDel = function(dipId, idx){
@@ -2067,10 +2088,15 @@ function App(){
               :
               dipSorted(state).map(function(dp){
                 const dipList = state.dipendenti.filter(function(x){ return x.id !== dp.id; }).map(function(x){ return x.nome; }).sort(function(a,b){ return a.localeCompare(b); });
+                let pvY = anno, pvM = mese - 1; if (pvM < 1){ pvM = 12; pvY = anno - 1; }
+                const prevRec = (state.dati[monthKey(pvY, pvM)] || {})[dp.id];
+                const prevProvv = !!(prevRec && prevRec.provv);
+                const prevLabel = MONTH_LABEL[pvM-1] + " " + pvY;
                 return <EmployeeCard key={dp.id} dp={dp} rec={getRecFrom(state, anno, mese, dp.id)} anno={anno} mese={mese} fset={fset} mLocked={mLocked}
                   dipList={dipList} onCell={onCell} onNota={onNota} onFestConfirm={onFestConfirm} onQuickFill={onQuickFill}
                   onVoceSet={onVoceSet} onVoceAdd={onVoceAdd} onVoceDel={onVoceDel}
-                  onDich={onDich} onSostAdd={onSostAdd} onSostChange={onSostChange} onSostDel={onSostDel} onOpenPerm={onOpenPerm}
+                  onDich={onDich} onProvv={onProvv} onProvvBase={onProvvBase} onConguaglia={onConguaglia} prevProvv={prevProvv} prevLabel={prevLabel}
+                  onSostAdd={onSostAdd} onSostChange={onSostChange} onSostDel={onSostDel} onOpenPerm={onOpenPerm}
                   onEditDip={function(d){ setDipModal({ dip:d }); }} onDelDip={askDelDip} />;
               })
             }
