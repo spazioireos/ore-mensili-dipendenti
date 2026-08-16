@@ -183,7 +183,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver30";
+const APP_VER = "ver31";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
 const MESE_ABBR_FILE = ["gen","feb","mar","apr","mag","giu","lug","ago","set","ott","nov","dic"];
@@ -634,6 +634,14 @@ function esportaExcel(state, pairs){
 }
 
 /* ===================== EXPORT PDF A4 verticale (matrice) ===================== */
+function pdfHM(v){
+  const n = parseFloat(String(v == null ? "" : v).replace(",", "."));
+  if (isNaN(n)) return String(v == null ? "" : v);
+  const neg = n < 0; const a = Math.abs(n);
+  let h = Math.floor(a); let mm = Math.round((a - h) * 60);
+  if (mm === 60){ h += 1; mm = 0; }
+  return (neg ? "-" : "") + h + "h" + (mm < 10 ? "0" : "") + mm + "m";
+}
 function esportaPDF(state, pairs){
   const JsPDF = window.jspdf.jsPDF;
   const doc = new JsPDF({ orientation:"portrait", unit:"mm", format:"a4" });
@@ -678,13 +686,13 @@ function esportaPDF(state, pairs){
           let txt;
           if (v === undefined || v === "") txt = rosso ? "–" : "";
           else if (CODE_SET[String(v).trim()]) txt = String(v).trim();
-          else txt = fmt2(v);
+          else txt = pdfHM(v);
           if (perm){ txt = (txt === "*" || txt === "" ? "*" : txt + "*"); permMese.push(dp.nome + " g." + d + " " + fmt2(perm.ore) + " h (" + perm.tipo + ")"); }
           row.push(txt);
         });
         body.push(row);
       }
-      const totRow = ["TOT"].concat(tot.map(function(t){ return fmt2(Math.round(t*100)/100); }));
+      const totRow = ["TOT"].concat(tot.map(function(t){ return pdfHM(Math.round(t*100)/100); }));
       body.push(totRow);
       const ncols = 1 + chunk.length;
       doc.autoTable({
@@ -696,7 +704,7 @@ function esportaPDF(state, pairs){
           if (data.section !== "body") return;
           const ri = data.row.index;
           const raw = String(data.cell.raw || "").trim();
-          const isNum = /^\d+([.,]\d+)?\*?$/.test(raw); // numero ore (eventuale * permesso)
+          const isNum = /^\d+h\d{2}m\*?$/.test(raw); // ore in formato XhYYm (eventuale * permesso)
           if (ri === nd){ data.cell.styles.fontStyle = "bold"; data.cell.styles.fillColor = [238,242,255]; if (data.column.index > 0) data.cell.styles.fontSize = 9; return; }
           const day = ri + 1;
           if (data.column.index === 0){
