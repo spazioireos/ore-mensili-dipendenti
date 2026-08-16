@@ -183,7 +183,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver31";
+const APP_VER = "ver32";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
 const MESE_ABBR_FILE = ["gen","feb","mar","apr","mag","giu","lug","ago","set","ott","nov","dic"];
@@ -640,7 +640,7 @@ function pdfHM(v){
   const neg = n < 0; const a = Math.abs(n);
   let h = Math.floor(a); let mm = Math.round((a - h) * 60);
   if (mm === 60){ h += 1; mm = 0; }
-  return (neg ? "-" : "") + h + "h" + (mm < 10 ? "0" : "") + mm + "m";
+  return (neg ? "-" : "") + h + " h e " + (mm < 10 ? "0" : "") + mm + " min";
 }
 function esportaPDF(state, pairs){
   const JsPDF = window.jspdf.jsPDF;
@@ -704,13 +704,15 @@ function esportaPDF(state, pairs){
           if (data.section !== "body") return;
           const ri = data.row.index;
           const raw = String(data.cell.raw || "").trim();
-          const isNum = /^\d+h\d{2}m\*?$/.test(raw); // ore in formato XhYYm (eventuale * permesso)
-          if (ri === nd){ data.cell.styles.fontStyle = "bold"; data.cell.styles.fillColor = [238,242,255]; if (data.column.index > 0) data.cell.styles.fontSize = 9; return; }
+          const isNum = /^\d+ h e \d{2} min\*?$/.test(raw); // ore in formato "H h e MM min"
+          const isWhole = /^\d+ h e 00 min\*?$/.test(raw); // ore intere -> "00 min" in grigio
+          if (data.column.index > 0 && isWhole){ data.cell.__hm00 = true; data.cell.text = [""]; }
+          if (ri === nd){ data.cell.styles.fontStyle = "bold"; data.cell.styles.fillColor = [238,242,255]; if (data.column.index > 0) data.cell.styles.fontSize = 7; return; }
           const day = ri + 1;
           if (data.column.index === 0){
             if (isRosso(fset, anno, m, day)){ data.cell.styles.fillColor = [178,34,34]; data.cell.styles.textColor = [255,255,255]; }
           } else {
-            if (isNum) data.cell.styles.fontSize = 9; // numeri ore più grandi
+            if (isNum) data.cell.styles.fontSize = 7; // ore in formato esteso: un filo più grandi ma su una riga
             const txt = raw.replace(/\*$/, "");
             if (CODE_SET[txt]){
               const hx = CODE_SET[txt].bg.replace("#","");
@@ -718,6 +720,24 @@ function esportaPDF(state, pairs){
               data.cell.styles.textColor = lumaText(CODE_SET[txt].bg) === "#ffffff" ? [255,255,255] : [17,24,39];
             }
           }
+        },
+        didDrawCell: function(data){
+          if (!data.cell.__hm00) return;
+          let raw = String(data.cell.raw || "").trim();
+          let star = ""; if (raw.slice(-1) === "*"){ star = "*"; raw = raw.slice(0, -1); }
+          const p2 = "00 min" + star;
+          const p1 = raw.slice(0, raw.length - "00 min".length);
+          const fs = data.cell.styles.fontSize || 9;
+          doc.setFontSize(fs); doc.setFont(undefined, "bold");
+          const w1 = doc.getTextWidth(p1); const w2 = doc.getTextWidth(p2);
+          const cx = data.cell.x + data.cell.width / 2;
+          const cy = data.cell.y + data.cell.height / 2;
+          const sx = cx - (w1 + w2) / 2;
+          const tc = data.cell.styles.textColor;
+          if (Array.isArray(tc)) doc.setTextColor(tc[0], tc[1], tc[2]); else doc.setTextColor(17, 24, 39);
+          doc.text(p1, sx, cy, { baseline:"middle" });
+          doc.setTextColor(180, 180, 180);
+          doc.text(p2, sx + w1, cy, { baseline:"middle" });
         }
       });
 
