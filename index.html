@@ -183,7 +183,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver32";
+const APP_VER = "ver34";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
 const MESE_ABBR_FILE = ["gen","feb","mar","apr","mag","giu","lug","ago","set","ott","nov","dic"];
@@ -662,7 +662,7 @@ function esportaPDF(state, pairs){
     const permMese = []; const noteMese = [];
     dips.forEach(function(dp){ const rec = getRecFrom(state, anno, m, dp.id); const vl = vociLines(rec); if (vl.length > 0) noteMese.push({ nome: dp.nome, righe: vl }); });
     // larghezza colonna UNICA per tutte le pagine (basata sul blocco più grande = min(dip, MAXCOL)+1 colonne)
-    const colW = Math.round((182 / (1 + Math.min(dips.length, MAXCOL))) * 100) / 100;
+    const colW = Math.round((182 / (2 + Math.min(dips.length, MAXCOL))) * 100) / 100;
 
     chunks.forEach(function(chunk, ci){
       if (!first) doc.addPage();
@@ -672,12 +672,13 @@ function esportaPDF(state, pairs){
       if (chunks.length > 1) titolo += "   (dipendenti " + (ci*MAXCOL+1) + "–" + (ci*MAXCOL+chunk.length) + " di " + dips.length + " · pag. " + (ci+1) + "/" + chunks.length + ")";
       doc.text(titolo, 14, 12);
       doc.setFont(undefined,"normal");
-      const head = [["Giorno"].concat(chunk.map(function(dp){ return dp.nome; }))];
+      const head = [["Giorno"].concat(chunk.map(function(dp){ return dp.nome; })).concat(["Giorno"])];
       const body = [];
       const tot = chunk.map(function(){ return 0; });
       for (let d=1; d<=nd; d++){
         const rosso = isRosso(fset, anno, m, d);
-        const row = [d + " " + WD[weekdayOf(anno, m, d)]];
+        const dayLabel = d + " " + WD[weekdayOf(anno, m, d)];
+        const row = [dayLabel];
         chunk.forEach(function(dp, i){
           const rec = getRecFrom(state, anno, m, dp.id);
           const v = rec.giorni[d];
@@ -690,26 +691,31 @@ function esportaPDF(state, pairs){
           if (perm){ txt = (txt === "*" || txt === "" ? "*" : txt + "*"); permMese.push(dp.nome + " g." + d + " " + fmt2(perm.ore) + " h (" + perm.tipo + ")"); }
           row.push(txt);
         });
+        row.push(dayLabel);
         body.push(row);
       }
-      const totRow = ["TOT"].concat(tot.map(function(t){ return pdfHM(Math.round(t*100)/100); }));
+      const totRow = ["TOT"].concat(tot.map(function(t){ return pdfHM(Math.round(t*100)/100); })).concat(["TOT"]);
       body.push(totRow);
-      const ncols = 1 + chunk.length;
+      const ncols = 2 + chunk.length;
+      const lastIdx = chunk.length + 1;
       doc.autoTable({
         head: head, body: body, startY: 16, theme:"grid", margin:{ left:14, right:14 }, tableWidth: ncols*colW,
         styles:{ fontSize:6, cellPadding:0.8, halign:"center", valign:"middle", lineColor:[210,210,210], lineWidth:0.1, overflow:"linebreak", cellWidth:colW, fontStyle:"bold" },
         headStyles:{ fillColor:[15,39,64], textColor:[255,255,255], fontSize:5.6, valign:"middle", fontStyle:"bold", cellWidth:colW },
-        columnStyles:{ 0:{ halign:"left", fontStyle:"bold", cellWidth:colW } },
+        columnStyles:(function(){ const cs={ 0:{ halign:"left", fontStyle:"bold", cellWidth:colW } }; cs[lastIdx]={ halign:"left", fontStyle:"bold", cellWidth:colW }; return cs; })(),
         didParseCell: function(data){
+          const ci = data.column.index;
+          const isDayCol = (ci === 0 || ci === lastIdx);
+          if (isDayCol){ data.cell.styles.lineColor = [15,39,64]; data.cell.styles.lineWidth = 0.5; }
           if (data.section !== "body") return;
           const ri = data.row.index;
           const raw = String(data.cell.raw || "").trim();
           const isNum = /^\d+ h e \d{2} min\*?$/.test(raw); // ore in formato "H h e MM min"
           const isWhole = /^\d+ h e 00 min\*?$/.test(raw); // ore intere -> "00 min" in grigio
-          if (data.column.index > 0 && isWhole){ data.cell.__hm00 = true; data.cell.text = [""]; }
-          if (ri === nd){ data.cell.styles.fontStyle = "bold"; data.cell.styles.fillColor = [238,242,255]; if (data.column.index > 0) data.cell.styles.fontSize = 7; return; }
+          if (!isDayCol && isWhole){ data.cell.__hm00 = true; data.cell.text = [""]; }
+          if (ri === nd){ data.cell.styles.fontStyle = "bold"; data.cell.styles.fillColor = [238,242,255]; if (!isDayCol) data.cell.styles.fontSize = 7; return; }
           const day = ri + 1;
-          if (data.column.index === 0){
+          if (isDayCol){
             if (isRosso(fset, anno, m, day)){ data.cell.styles.fillColor = [178,34,34]; data.cell.styles.textColor = [255,255,255]; }
           } else {
             if (isNum) data.cell.styles.fontSize = 7; // ore in formato esteso: un filo più grandi ma su una riga
@@ -722,6 +728,10 @@ function esportaPDF(state, pairs){
           }
         },
         didDrawCell: function(data){
+          if (data.section === "body" && data.row.index < nd && weekdayOf(anno, m, data.row.index + 1) === 0){
+            doc.setDrawColor(15, 39, 64); doc.setLineWidth(0.5);
+            doc.line(data.cell.x, data.cell.y + data.cell.height, data.cell.x + data.cell.width, data.cell.y + data.cell.height);
+          }
           if (!data.cell.__hm00) return;
           let raw = String(data.cell.raw || "").trim();
           let star = ""; if (raw.slice(-1) === "*"){ star = "*"; raw = raw.slice(0, -1); }
@@ -905,7 +915,7 @@ function EmployeeCard(props){
   };
 
   return (
-    <div className="emp-card">
+    <div className="emp-card" style={{ borderColor: dp.colore || "#00B0F0", borderWidth:"3px" }}>
       <div className="emp-head" style={{ background: dp.colore || "#00B0F0" }}>
         <span className="nome" style={{ color:"#08344a" }}>{dp.nome}</span>
         {dp.livello ? <span className="pill">Liv. {dp.livello}</span> : null}
