@@ -114,6 +114,13 @@
   .cong-bar { height:9px; background:rgba(0,0,0,.08); border-radius:999px; overflow:hidden; margin:2px 0 6px; }
   .cong-bar-fill { height:100%; background:currentColor; border-radius:999px; transition:width .2s; }
   .cong-res { font-size:12.5px; line-height:1.45; }
+  .cong-status { display:inline-flex; align-items:center; gap:6px; font-size:14px; font-weight:800; text-transform:uppercase; letter-spacing:.3px; padding:5px 14px; border-radius:8px; color:#fff; box-shadow:0 1px 4px rgba(0,0,0,.2); }
+  .cong-status b { font-size:17px; font-weight:900; }
+  .cong.warn .cong-status { background:#c2410c; }
+  .cong.over .cong-status { background:#1d4ed8; }
+  .cong.ok   .cong-status { background:#059669; }
+  .azzera-btn { border:none; background:#334155; color:#fff; border-radius:7px; padding:4px 10px; font-weight:700; font-size:12px; cursor:pointer; }
+  .azzera-btn.annulla { background:#94a3b8; }
   .congua-btn { border:none; background:#16a34a; color:#fff; border-radius:6px; padding:3px 8px; font-weight:700; font-size:12px; cursor:pointer; }
   .congua-btn:disabled { background:#cbd5e1; cursor:default; }
   .badge { border-radius:20px; padding:3px 12px; font-size:12px; font-weight:800; }
@@ -199,7 +206,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver36";
+const APP_VER = "ver38";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
 const MESE_ABBR_FILE = ["gen","feb","mar","apr","mag","giu","lug","ago","set","ott","nov","dic"];
@@ -535,16 +542,23 @@ function totOfRec(rec, y, m){
   return Math.round(t * 100) / 100;
 }
 function saldoPrec(state, anno, mese, dipId){
-  let s = 0;
+  const months = [];
   Object.keys(state.dati || {}).forEach(function(k){
     const mm = k.match(/^(\d{4})-(\d{1,2})$/); if (!mm) return;
     const y = parseInt(mm[1], 10), m = parseInt(mm[2], 10);
     if (y > anno || (y === anno && m >= mese)) return; // solo mesi precedenti
     const rec = state.dati[k][dipId]; if (!rec) return;
-    const d = String(rec.dich == null ? "" : rec.dich).trim(); if (d === "") return;
-    const D = parseFloat(d.replace(",", ".")); if (isNaN(D)) return;
-    s += (D - totOfRec(rec, y, m));
+    months.push({ y:y, m:m, rec:rec, key:y*100+m });
   });
+  months.sort(function(a,b){ return a.key - b.key; });
+  let startIdx = 0;
+  for (let i = 0; i < months.length; i++){ if (months[i].rec.saldoAzzerato) startIdx = i + 1; } // riparte dopo l'ultimo azzeramento
+  let s = 0;
+  for (let i = startIdx; i < months.length; i++){
+    const d = String(months[i].rec.dich == null ? "" : months[i].rec.dich).trim(); if (d === "") continue;
+    const D = parseFloat(d.replace(",", ".")); if (isNaN(D)) continue;
+    s += (D - totOfRec(months[i].rec, months[i].y, months[i].m));
+  }
   return Math.round(s * 100) / 100;
 }
 function dipSorted(state){
@@ -1015,23 +1029,36 @@ function EmployeeCard(props){
           const S = Math.round((props.saldoPrec || 0) * 100) / 100;
           const draw = String(rec.dich == null ? "" : rec.dich).trim();
           const P = tot;
-          if (draw === ""){
+          const azzerato = !!rec.saldoAzzerato;
+          const hasD = draw !== "" && !isNaN(parseFloat(draw.replace(",", ".")));
+          const D = hasD ? parseFloat(draw.replace(",", ".")) : 0;
+          const daPag = hasD ? Math.round((S + D) * 100) / 100 : S;
+          const manca = Math.round((daPag - P) * 100) / 100;
+          const azzeraBtn = (!mLocked) ? <button className="azzera-btn" title="Considera saldato il credito/debito fino a questo mese: dal mese dopo il saldo riparte da zero" onClick={function(){ props.onAzzeraSaldo(dp.id); }}>⊘ Azzera saldo</button> : null;
+          if (azzerato){
+            return <div className="cong ok">
+              <div className="cong-head">✓ Conguaglio ore — SALDO AZZERATO MANUALMENTE</div>
+              <div className="cong-row">
+                <span className="cong-status">Saldo azzerato ✓</span>
+                <span className="cong-chip">Chiuso questo mese: <b>{fmt2(Math.abs(manca))} ore</b> {manca > 0.005 ? "(erano a credito operatore)" : (manca < -0.005 ? "(erano a debito operatore)" : "")}</span>
+                {!mLocked ? <button className="azzera-btn annulla" title="Annulla l'azzeramento" onClick={function(){ props.onAnnullaAzzera(dp.id); }}>↩︎ Annulla azzeramento</button> : null}
+              </div>
+              <div className="cong-res">Dal mese successivo il saldo riparte da <b>zero</b>. I mesi precedenti restano invariati.</div>
+            </div>;
+          }
+          if (!hasD){
             if (Math.abs(S) <= 0.005) return null;
-            const daPag = S; const manca = Math.round((daPag - P) * 100) / 100;
-            const cls = manca > 0.005 ? "warn" : (manca < -0.005 ? "over" : "ok");
+            const cls = S > 0.005 ? "warn" : "over";
             return <div className={"cong " + cls}>
               <div className="cong-head">⚠️ Conguaglio ore — inserisci le “ore dichiarate” del mese</div>
               <div className="cong-row">
                 <span className="cong-chip">Saldo precedente <b>{fmt2(S)}</b></span>
                 <span className="cong-chip">Pagate finora <b>{fmt2(P)}</b></span>
-                <span className="cong-chip big">{manca >= 0 ? "Mancano" : "In più"} <b>{fmt2(Math.abs(manca))}</b></span>
+                <span className="cong-status">{manca >= 0 ? "A credito operatore — aggiungi" : "A debito operatore — togli"} <b>{fmt2(Math.abs(manca))} ore</b></span>
+                {azzeraBtn}
               </div>
             </div>;
           }
-          const D = parseFloat(draw.replace(",", "."));
-          if (isNaN(D)) return null;
-          const daPag = Math.round((S + D) * 100) / 100;
-          const manca = Math.round((daPag - P) * 100) / 100;
           if (Math.abs(S) <= 0.005 && Math.abs(manca) <= 0.005) return null;
           const pct = daPag > 0 ? Math.max(0, Math.min(100, Math.round(P / daPag * 100))) : (P > 0 ? 100 : 0);
           const cls = manca > 0.005 ? "warn" : (manca < -0.005 ? "over" : "ok");
@@ -1044,14 +1071,15 @@ function EmployeeCard(props){
               <span className="cong-op">=</span>
               <span className="cong-chip strong">Da pagare <b>{fmt2(daPag)}</b></span>
               <span className="cong-chip">Pagate <b>{fmt2(P)}</b></span>
-              <span className="cong-chip big">{manca > 0.005 ? "Mancano" : (manca < -0.005 ? "In più" : "Saldo")} <b>{manca >= -0.005 ? fmt2(Math.abs(manca)) : fmt2(Math.abs(manca))}</b></span>
+              <span className="cong-status">{manca > 0.005 ? "A credito operatore — aggiungi" : (manca < -0.005 ? "A debito operatore — togli" : "Saldo azzerato")}{Math.abs(manca) > 0.005 ? <b> {fmt2(Math.abs(manca))} ore</b> : <b> ✓</b>}</span>
+              {azzeraBtn}
             </div>
             <div className="cong-bar"><div className="cong-bar-fill" style={{ width: pct + "%" }}></div></div>
             <div className="cong-res">
               {manca > 0.005
-                ? <span>Pagate <b>{fmt2(P)}</b> su <b>{fmt2(daPag)}</b> → <b>mancano {fmt2(manca)}</b> ore. Il riporto al mese dopo sarà quel che resta a fine mese.</span>
+                ? <span>Pagate <b>{fmt2(P)}</b> su <b>{fmt2(daPag)}</b> → <b>aggiungi {fmt2(manca)} ore (a credito operatore)</b>. Il riporto al mese dopo sarà quel che resta a fine mese.</span>
                 : (manca < -0.005
-                  ? <span>Pagate <b>{fmt2(P)}</b> su <b>{fmt2(daPag)}</b> → <b>{fmt2(Math.abs(manca))} in più</b>: si riportano come <b>−{fmt2(Math.abs(manca))}</b> al mese dopo.</span>
+                  ? <span>Pagate <b>{fmt2(P)}</b> su <b>{fmt2(daPag)}</b> → <b>togli {fmt2(Math.abs(manca))} ore (a debito operatore)</b>: si riportano al mese dopo.</span>
                   : <span><b>✓ Saldo azzerato</b> — pagate <b>{fmt2(P)}</b> su <b>{fmt2(daPag)}</b>. Nessun riporto.</span>)}
             </div>
           </div>;
@@ -2142,6 +2170,14 @@ function App(){
   const onPermSave = function(dipId, day, obj){ const next = JSON.parse(JSON.stringify(state)); const rec = ensureRec(next, dipId); if (!rec.permessi) rec.permessi = {}; rec.permessi[day] = obj; touch(next); setPermModal(null); showToast("Permesso orario salvato"); };
   const onPermDelete = function(dipId, day){ const next = JSON.parse(JSON.stringify(state)); const rec = ensureRec(next, dipId); if (rec.permessi) delete rec.permessi[day]; touch(next); setPermModal(null); showToast("Permesso orario rimosso"); };
   const onDich = function(dipId, value){ const next = JSON.parse(JSON.stringify(state)); ensureRec(next, dipId).dich = value; touch(next); };
+  const onAzzeraSaldo = function(dipId){
+    const dp = state.dipendenti.find(function(x){ return x.id===dipId; });
+    const nome = dp ? dp.nome : "";
+    setConfirm({ title:"Azzerare il saldo di " + nome + "?", body:"Il credito/debito operatore maturato fino a " + MONTH_LABEL[mese-1] + " " + anno + " sarà considerato SALDATO. Dal mese successivo il saldo riparte da zero. I mesi precedenti e le ore non vengono modificati. Reversibile con “Annulla azzeramento”.", confirmLabel:"⊘ Azzera saldo",
+      onConfirm:function(){ setConfirm(null); const next = JSON.parse(JSON.stringify(state)); ensureRec(next, dipId).saldoAzzerato = true; touch(next); showToast("⊘ Saldo azzerato per " + nome + " a " + MONTH_LABEL[mese-1] + " " + anno + " — ricorda 💾."); },
+      onCancel:function(){ setConfirm(null); } });
+  };
+  const onAnnullaAzzera = function(dipId){ const next = JSON.parse(JSON.stringify(state)); const r = ensureRec(next, dipId); r.saldoAzzerato = false; touch(next); showToast("↩︎ Azzeramento annullato — il saldo torna a trascinarsi."); };
   const onSvuotaMese = function(dipId){
     const dp = state.dipendenti.find(function(x){ return x.id===dipId; });
     const nome = dp ? dp.nome : "";
@@ -2299,7 +2335,7 @@ function App(){
                 return <EmployeeCard key={dp.id} dp={dp} rec={getRecFrom(state, anno, mese, dp.id)} anno={anno} mese={mese} fset={fset} mLocked={mLocked}
                   dipList={dipList} onCell={onCell} onNota={onNota} onFestConfirm={onFestConfirm} onQuickFill={onQuickFill}
                   onVoceSet={onVoceSet} onVoceAdd={onVoceAdd} onVoceDel={onVoceDel}
-                  onDich={onDich} onSvuotaMese={onSvuotaMese} saldoPrec={saldoP}
+                  onDich={onDich} onSvuotaMese={onSvuotaMese} saldoPrec={saldoP} onAzzeraSaldo={onAzzeraSaldo} onAnnullaAzzera={onAnnullaAzzera}
                   onSostAdd={onSostAdd} onSostChange={onSostChange} onSostDel={onSostDel} onOpenPerm={onOpenPerm}
                   onEditDip={function(d){ setDipModal({ dip:d }); }} onDelDip={askDelDip} />;
               })
