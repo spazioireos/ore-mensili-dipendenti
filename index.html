@@ -98,6 +98,7 @@
   .provv-lbl { display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:700; color:#92400e; background:#fffbeb; border:1px solid #fcd34d; border-radius:6px; padding:3px 8px; cursor:pointer; }
   .provv-base { font-size:12px; font-weight:700; border:1px solid #fcd34d; border-radius:6px; padding:3px 6px; background:#fff; }
   .conguaglio-warn { display:inline-flex; align-items:center; gap:8px; font-size:13px; font-weight:800; color:#7c2d12; background:#ffedd5; border:2px solid #fb923c; border-radius:8px; padding:4px 10px; }
+  .conguaglio-box { flex-basis:100%; margin-top:2px; font-size:13px; line-height:1.5; color:#7c2d12; background:#fff7ed; border:2px solid #fb923c; border-radius:8px; padding:6px 12px; }
   .congua-btn { border:none; background:#16a34a; color:#fff; border-radius:6px; padding:3px 8px; font-weight:700; font-size:12px; cursor:pointer; }
   .congua-btn:disabled { background:#cbd5e1; cursor:default; }
   .badge { border-radius:20px; padding:3px 12px; font-size:12px; font-weight:800; }
@@ -183,7 +184,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver34";
+const APP_VER = "ver35";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
 const MESE_ABBR_FILE = ["gen","feb","mar","apr","mag","giu","lug","ago","set","ott","nov","dic"];
@@ -517,6 +518,19 @@ function totOfRec(rec, y, m){
   let t = 0; const nd = daysInMonth(y, m);
   for (let d = 1; d <= nd; d++) t += parseHour(rec.giorni[d]);
   return Math.round(t * 100) / 100;
+}
+function saldoPrec(state, anno, mese, dipId){
+  let s = 0;
+  Object.keys(state.dati || {}).forEach(function(k){
+    const mm = k.match(/^(\d{4})-(\d{1,2})$/); if (!mm) return;
+    const y = parseInt(mm[1], 10), m = parseInt(mm[2], 10);
+    if (y > anno || (y === anno && m >= mese)) return; // solo mesi precedenti
+    const rec = state.dati[k][dipId]; if (!rec) return;
+    const d = String(rec.dich == null ? "" : rec.dich).trim(); if (d === "") return;
+    const D = parseFloat(d.replace(",", ".")); if (isNaN(D)) return;
+    s += (D - totOfRec(rec, y, m));
+  });
+  return Math.round(s * 100) / 100;
 }
 function dipSorted(state){
   const arr = state.dipendenti.slice();
@@ -982,22 +996,29 @@ function EmployeeCard(props){
           if (Math.abs(diff) <= 0.01) return <span className="badge ok">✓ torna</span>;
           return <span className="badge ko">Δ {(diff>0?"+":"")}{fmt2(diff)} {diff<0?"(mancano ore)":"(ore in più)"}</span>;
         })()}
-        <label className="provv-lbl" title="Spunta se hai attribuito ore non ancora dichiarate: te lo ricorderò il mese successivo per il conguaglio">
-          <input type="checkbox" checked={!!rec.provv} disabled={mLocked} onChange={function(e){ props.onProvv(dp.id, e.target.checked); }} /> ⏳ da conguagliare
-        </label>
-        {props.prevProvv ? (function(){
-          const pd = String(props.prevDich==null?"":props.prevDich).trim();
-          if (pd === ""){
-            return <span className="conguaglio-warn">⚠️ Conguaglio da {props.prevLabel}: vai in {props.prevLabel} e inserisci le “ore dichiarate”
-              <button className="congua-btn gray" disabled={mLocked} onClick={function(){ props.onConguaglia(dp.id); }} title="Chiudi il promemoria senza conguaglio">togli avviso</button></span>;
+        {(function(){
+          const sgn = function(x){ return (x > 0 ? "+" : (x < 0 ? "-" : "")) + fmt2(Math.abs(x)); };
+          const S = Math.round((props.saldoPrec || 0) * 100) / 100;
+          const draw = String(rec.dich == null ? "" : rec.dich).trim();
+          if (draw === ""){
+            if (Math.abs(S) <= 0.005) return null;
+            return <div className="conguaglio-box">
+              <b>⚠️ Conguaglio ore</b> — Saldo dai mesi precedenti: <b>{sgn(S)}</b> ore {S > 0 ? "(pagate in meno)" : "(pagate in più)"}. Inserisci le “ore dichiarate” di questo mese: dovrai <b>{S > 0 ? "aggiungere" : "togliere"} {fmt2(Math.abs(S))}</b> ore.
+            </div>;
           }
-          const dn = parseFloat(pd.replace(",","."));
-          if (isNaN(dn)) return <span className="conguaglio-warn">⚠️ {props.prevLabel}: “ore dichiarate” non valide</span>;
-          const diff = Math.round((dn - props.prevPagate) * 100) / 100;
-          const azione = Math.abs(diff) <= 0.01 ? "nessuna differenza" : (diff > 0 ? ("aggiungi " + fmt2(diff) + " ore") : ("sottrai " + fmt2(Math.abs(diff)) + " ore"));
-          return <span className="conguaglio-warn">⚠️ Conguaglio da {props.prevLabel}: dichiarate {fmt2(dn)} / pagate {fmt2(props.prevPagate)} → <b>{azione}</b> alle dichiarate di questo mese
-            <button className="congua-btn" disabled={mLocked} onClick={function(){ props.onConguaglia(dp.id); }}>✓ conguagliato</button></span>;
-        })() : null}
+          const D = parseFloat(draw.replace(",", "."));
+          if (isNaN(D)) return null;
+          const P = tot;
+          const delta = Math.round((D - P) * 100) / 100;
+          const totale = Math.round((S + delta) * 100) / 100;
+          if (Math.abs(S) <= 0.005 && Math.abs(totale) <= 0.005) return null;
+          return <div className="conguaglio-box">
+            <b>⚠️ Conguaglio ore</b> — Saldo dai mesi precedenti: <b>{sgn(S)}</b> ore. Questo mese: dichiarate <b>{fmt2(D)}</b> / pagate <b>{fmt2(P)}</b> → delta <b>{sgn(delta)}</b>.{" "}
+            {Math.abs(totale) <= 0.005
+              ? <span>Totale da sistemare: <b>0</b> → le dichiarate di questo mese (<b>{fmt2(D)}</b>) restano <b>{fmt2(D)}</b>. ✓</span>
+              : <span>Totale da sistemare: <b>{sgn(totale)}</b> → devi <b>{totale > 0 ? "aggiungere" : "togliere"} {fmt2(Math.abs(totale))}</b> ore: le dichiarate di questo mese (<b>{fmt2(D)}</b>) diventano <b>{fmt2(Math.round((D + totale) * 100) / 100)}</b>.</span>}
+          </div>;
+        })()}
       </div>
       <div className="sost-box">
         <div className="sost-head">🔁 Sostituzioni (uso interno — non compaiono nei report)</div>
@@ -2084,16 +2105,10 @@ function App(){
   const onPermSave = function(dipId, day, obj){ const next = JSON.parse(JSON.stringify(state)); const rec = ensureRec(next, dipId); if (!rec.permessi) rec.permessi = {}; rec.permessi[day] = obj; touch(next); setPermModal(null); showToast("Permesso orario salvato"); };
   const onPermDelete = function(dipId, day){ const next = JSON.parse(JSON.stringify(state)); const rec = ensureRec(next, dipId); if (rec.permessi) delete rec.permessi[day]; touch(next); setPermModal(null); showToast("Permesso orario rimosso"); };
   const onDich = function(dipId, value){ const next = JSON.parse(JSON.stringify(state)); ensureRec(next, dipId).dich = value; touch(next); };
-  const onProvv = function(dipId, val){ const next = JSON.parse(JSON.stringify(state)); const r = ensureRec(next, dipId); r.provv = val; if (val){ r.conguagliato = false; } touch(next); };
-  const onConguaglia = function(dipId){
-    let pvY = anno, pvM = mese - 1; if (pvM < 1){ pvM = 12; pvY = anno - 1; }
-    const pk = monthKey(pvY, pvM); const next = JSON.parse(JSON.stringify(state));
-    if (next.dati[pk] && next.dati[pk][dipId]){ next.dati[pk][dipId].provv = false; next.dati[pk][dipId].conguagliato = true; touch(next); showToast("✓ Conguaglio di " + MONTH_LABEL[pvM-1] + " " + pvY + " segnato come fatto — ricorda 💾."); }
-  };
   const onSvuotaMese = function(dipId){
     const dp = state.dipendenti.find(function(x){ return x.id===dipId; });
     const nome = dp ? dp.nome : "";
-    setConfirm({ title:"Svuotare l'intero mese per " + nome + "?", body:"Verranno cancellati, SOLO per " + nome + " e SOLO per " + MONTH_LABEL[mese-1] + " " + anno + ": tutte le ore, le note, le voci, i permessi e il segno 'da conguagliare'. Gli altri mesi e gli altri dipendenti non vengono toccati. L'operazione si annulla solo NON salvando.", confirmLabel:"🗑 Svuota il mese",
+    setConfirm({ title:"Svuotare l'intero mese per " + nome + "?", body:"Verranno cancellati, SOLO per " + nome + " e SOLO per " + MONTH_LABEL[mese-1] + " " + anno + ": tutte le ore, le note, le voci e i permessi. Gli altri mesi e gli altri dipendenti non vengono toccati. L'operazione si annulla solo NON salvando.", confirmLabel:"🗑 Svuota il mese",
       onConfirm:function(){ setConfirm(null); const mk = monthKey(anno, mese); const next = JSON.parse(JSON.stringify(state)); if (next.dati[mk] && next.dati[mk][dipId]){ delete next.dati[mk][dipId]; touch(next); showToast("🗑 Mese " + MONTH_LABEL[mese-1] + " " + anno + " svuotato per " + nome + " — ricorda 💾."); } },
       onCancel:function(){ setConfirm(null); } });
   };
@@ -2243,17 +2258,11 @@ function App(){
               :
               dipSorted(state).map(function(dp){
                 const dipList = state.dipendenti.filter(function(x){ return x.id !== dp.id; }).map(function(x){ return x.nome; }).sort(function(a,b){ return a.localeCompare(b); });
-                let pvY = anno, pvM = mese - 1; if (pvM < 1){ pvM = 12; pvY = anno - 1; }
-                const prevRec = (state.dati[monthKey(pvY, pvM)] || {})[dp.id];
-                const prevProvv = !!(prevRec && prevRec.provv);
-                const prevDich = prevRec ? (prevRec.dich || "") : "";
-                const prevPagate = prevRec ? totOfRec(prevRec, pvY, pvM) : 0;
-                const prevLabel = MONTH_LABEL[pvM-1] + " " + pvY;
+                const saldoP = saldoPrec(state, anno, mese, dp.id);
                 return <EmployeeCard key={dp.id} dp={dp} rec={getRecFrom(state, anno, mese, dp.id)} anno={anno} mese={mese} fset={fset} mLocked={mLocked}
                   dipList={dipList} onCell={onCell} onNota={onNota} onFestConfirm={onFestConfirm} onQuickFill={onQuickFill}
                   onVoceSet={onVoceSet} onVoceAdd={onVoceAdd} onVoceDel={onVoceDel}
-                  onDich={onDich} onProvv={onProvv} onConguaglia={onConguaglia} onSvuotaMese={onSvuotaMese}
-                  prevProvv={prevProvv} prevDich={prevDich} prevPagate={prevPagate} prevLabel={prevLabel}
+                  onDich={onDich} onSvuotaMese={onSvuotaMese} saldoPrec={saldoP}
                   onSostAdd={onSostAdd} onSostChange={onSostChange} onSostDel={onSostDel} onOpenPerm={onOpenPerm}
                   onEditDip={function(d){ setDipModal({ dip:d }); }} onDelDip={askDelDip} />;
               })
