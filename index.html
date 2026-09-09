@@ -99,6 +99,21 @@
   .provv-base { font-size:12px; font-weight:700; border:1px solid #fcd34d; border-radius:6px; padding:3px 6px; background:#fff; }
   .conguaglio-warn { display:inline-flex; align-items:center; gap:8px; font-size:13px; font-weight:800; color:#7c2d12; background:#ffedd5; border:2px solid #fb923c; border-radius:8px; padding:4px 10px; }
   .conguaglio-box { flex-basis:100%; margin-top:2px; font-size:13px; line-height:1.5; color:#7c2d12; background:#fff7ed; border:2px solid #fb923c; border-radius:8px; padding:6px 12px; }
+  .cong { flex-basis:100%; margin-top:4px; border-radius:10px; padding:8px 12px; border:2px solid; }
+  .cong.warn { background:#fff7ed; border-color:#fb923c; color:#7c2d12; }
+  .cong.ok   { background:#ecfdf5; border-color:#34d399; color:#065f46; }
+  .cong.over { background:#eff6ff; border-color:#60a5fa; color:#1e3a8a; }
+  .cong-head { font-weight:800; font-size:13px; margin-bottom:6px; }
+  .cong-row { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-bottom:6px; }
+  .cong-chip { background:#fff; border:1px solid rgba(0,0,0,.15); border-radius:999px; padding:2px 10px; font-size:12px; font-weight:600; }
+  .cong-chip b { font-weight:800; font-size:13px; }
+  .cong-chip.strong { border-width:2px; border-color:currentColor; }
+  .cong-chip.big { font-size:13px; padding:3px 12px; }
+  .cong-chip.big b { font-size:16px; }
+  .cong-op { font-weight:800; font-size:15px; opacity:.7; }
+  .cong-bar { height:9px; background:rgba(0,0,0,.08); border-radius:999px; overflow:hidden; margin:2px 0 6px; }
+  .cong-bar-fill { height:100%; background:currentColor; border-radius:999px; transition:width .2s; }
+  .cong-res { font-size:12.5px; line-height:1.45; }
   .congua-btn { border:none; background:#16a34a; color:#fff; border-radius:6px; padding:3px 8px; font-weight:700; font-size:12px; cursor:pointer; }
   .congua-btn:disabled { background:#cbd5e1; cursor:default; }
   .badge { border-radius:20px; padding:3px 12px; font-size:12px; font-weight:800; }
@@ -184,7 +199,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver35";
+const APP_VER = "ver36";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
 const MESE_ABBR_FILE = ["gen","feb","mar","apr","mag","giu","lug","ago","set","ott","nov","dic"];
@@ -997,26 +1012,48 @@ function EmployeeCard(props){
           return <span className="badge ko">Δ {(diff>0?"+":"")}{fmt2(diff)} {diff<0?"(mancano ore)":"(ore in più)"}</span>;
         })()}
         {(function(){
-          const sgn = function(x){ return (x > 0 ? "+" : (x < 0 ? "-" : "")) + fmt2(Math.abs(x)); };
           const S = Math.round((props.saldoPrec || 0) * 100) / 100;
           const draw = String(rec.dich == null ? "" : rec.dich).trim();
+          const P = tot;
           if (draw === ""){
             if (Math.abs(S) <= 0.005) return null;
-            return <div className="conguaglio-box">
-              <b>⚠️ Conguaglio ore</b> — Saldo dai mesi precedenti: <b>{sgn(S)}</b> ore {S > 0 ? "(pagate in meno)" : "(pagate in più)"}. Inserisci le “ore dichiarate” di questo mese: dovrai <b>{S > 0 ? "aggiungere" : "togliere"} {fmt2(Math.abs(S))}</b> ore.
+            const daPag = S; const manca = Math.round((daPag - P) * 100) / 100;
+            const cls = manca > 0.005 ? "warn" : (manca < -0.005 ? "over" : "ok");
+            return <div className={"cong " + cls}>
+              <div className="cong-head">⚠️ Conguaglio ore — inserisci le “ore dichiarate” del mese</div>
+              <div className="cong-row">
+                <span className="cong-chip">Saldo precedente <b>{fmt2(S)}</b></span>
+                <span className="cong-chip">Pagate finora <b>{fmt2(P)}</b></span>
+                <span className="cong-chip big">{manca >= 0 ? "Mancano" : "In più"} <b>{fmt2(Math.abs(manca))}</b></span>
+              </div>
             </div>;
           }
           const D = parseFloat(draw.replace(",", "."));
           if (isNaN(D)) return null;
-          const P = tot;
-          const delta = Math.round((D - P) * 100) / 100;
-          const totale = Math.round((S + delta) * 100) / 100;
-          if (Math.abs(S) <= 0.005 && Math.abs(totale) <= 0.005) return null;
-          return <div className="conguaglio-box">
-            <b>⚠️ Conguaglio ore</b> — Saldo dai mesi precedenti: <b>{sgn(S)}</b> ore. Questo mese: dichiarate <b>{fmt2(D)}</b> / pagate <b>{fmt2(P)}</b> → delta <b>{sgn(delta)}</b>.{" "}
-            {Math.abs(totale) <= 0.005
-              ? <span>Totale da sistemare: <b>0</b> → le dichiarate di questo mese (<b>{fmt2(D)}</b>) restano <b>{fmt2(D)}</b>. ✓</span>
-              : <span>Totale da sistemare: <b>{sgn(totale)}</b> → devi <b>{totale > 0 ? "aggiungere" : "togliere"} {fmt2(Math.abs(totale))}</b> ore: le dichiarate di questo mese (<b>{fmt2(D)}</b>) diventano <b>{fmt2(Math.round((D + totale) * 100) / 100)}</b>.</span>}
+          const daPag = Math.round((S + D) * 100) / 100;
+          const manca = Math.round((daPag - P) * 100) / 100;
+          if (Math.abs(S) <= 0.005 && Math.abs(manca) <= 0.005) return null;
+          const pct = daPag > 0 ? Math.max(0, Math.min(100, Math.round(P / daPag * 100))) : (P > 0 ? 100 : 0);
+          const cls = manca > 0.005 ? "warn" : (manca < -0.005 ? "over" : "ok");
+          return <div className={"cong " + cls}>
+            <div className="cong-head">{manca > 0.005 ? "⚠️" : (manca < -0.005 ? "⚠️" : "✓")} Conguaglio ore</div>
+            <div className="cong-row">
+              <span className="cong-chip">Saldo prec. <b>{fmt2(S)}</b></span>
+              <span className="cong-op">+</span>
+              <span className="cong-chip">Dichiarate <b>{fmt2(D)}</b></span>
+              <span className="cong-op">=</span>
+              <span className="cong-chip strong">Da pagare <b>{fmt2(daPag)}</b></span>
+              <span className="cong-chip">Pagate <b>{fmt2(P)}</b></span>
+              <span className="cong-chip big">{manca > 0.005 ? "Mancano" : (manca < -0.005 ? "In più" : "Saldo")} <b>{manca >= -0.005 ? fmt2(Math.abs(manca)) : fmt2(Math.abs(manca))}</b></span>
+            </div>
+            <div className="cong-bar"><div className="cong-bar-fill" style={{ width: pct + "%" }}></div></div>
+            <div className="cong-res">
+              {manca > 0.005
+                ? <span>Pagate <b>{fmt2(P)}</b> su <b>{fmt2(daPag)}</b> → <b>mancano {fmt2(manca)}</b> ore. Il riporto al mese dopo sarà quel che resta a fine mese.</span>
+                : (manca < -0.005
+                  ? <span>Pagate <b>{fmt2(P)}</b> su <b>{fmt2(daPag)}</b> → <b>{fmt2(Math.abs(manca))} in più</b>: si riportano come <b>−{fmt2(Math.abs(manca))}</b> al mese dopo.</span>
+                  : <span><b>✓ Saldo azzerato</b> — pagate <b>{fmt2(P)}</b> su <b>{fmt2(daPag)}</b>. Nessun riporto.</span>)}
+            </div>
           </div>;
         })()}
       </div>
