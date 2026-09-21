@@ -206,7 +206,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver38";
+const APP_VER = "ver40";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
 const MESE_ABBR_FILE = ["gen","feb","mar","apr","mag","giu","lug","ago","set","ott","nov","dic"];
@@ -278,7 +278,7 @@ function weekdayOf(y, m, d){ return new Date(y, m - 1, d).getDay(); }
 
 // formatta un numero con ESATTAMENTE 2 decimali, separatori italiani
 function fmt2(num){
-  let n = Number(num);
+  let n = parseFloat(String(num).replace(",", "."));
   if (isNaN(n)) n = 0;
   const neg = n < 0; n = Math.abs(n);
   const s = n.toFixed(2);
@@ -687,9 +687,9 @@ function pdfHM(v){
 }
 function esportaPDF(state, pairs){
   const JsPDF = window.jspdf.jsPDF;
-  const doc = new JsPDF({ orientation:"portrait", unit:"mm", format:"a4" });
+  const doc = new JsPDF({ orientation:"landscape", unit:"mm", format:"a4" });
   const dips = dipSorted(state);
-  const MAXCOL = 9; // massimo dipendenti per pagina A4 verticale
+  const MAXCOL = 14; // massimo dipendenti per pagina A4 orizzontale
   let first = true;
   pairs.forEach(function(pr){
     const anno = pr.y, m = pr.m;
@@ -705,7 +705,7 @@ function esportaPDF(state, pairs){
     const permMese = []; const noteMese = [];
     dips.forEach(function(dp){ const rec = getRecFrom(state, anno, m, dp.id); const vl = vociLines(rec); if (vl.length > 0) noteMese.push({ nome: dp.nome, righe: vl }); });
     // larghezza colonna UNICA per tutte le pagine (basata sul blocco più grande = min(dip, MAXCOL)+1 colonne)
-    const colW = Math.round((182 / (2 + Math.min(dips.length, MAXCOL))) * 100) / 100;
+    const colW = Math.round((269 / (2 + Math.min(dips.length, MAXCOL))) * 100) / 100;
 
     chunks.forEach(function(chunk, ci){
       if (!first) doc.addPage();
@@ -823,7 +823,7 @@ function esportaPDF(state, pairs){
           doc.setFontSize(7); doc.setTextColor(15,39,64); doc.setFont(undefined,"bold");
           doc.text("Permessi orari (segnalati con *, non inclusi nel TOT):", 14, yy); yy += 3.6; doc.setFont(undefined,"normal");
           doc.setFontSize(6.5); doc.setTextColor(70,70,70);
-          permMese.forEach(function(pp){ const ls = doc.splitTextToSize("•  " + pp, 182); ensureY(ls.length * 3.2); doc.text(ls, 14, yy); yy += ls.length * 3.2; });
+          permMese.forEach(function(pp){ const ls = doc.splitTextToSize("•  " + pp, 269); ensureY(ls.length * 3.2); doc.text(ls, 14, yy); yy += ls.length * 3.2; });
         }
       }
     });
