@@ -206,7 +206,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver40";
+const APP_VER = "ver41";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
 const MESE_ABBR_FILE = ["gen","feb","mar","apr","mag","giu","lug","ago","set","ott","nov","dic"];
@@ -476,6 +476,12 @@ function migrate(obj){
       else dp.tipoContratto = "indeterminato";
     }
     if (dp.scadenza === undefined) dp.scadenza = "";
+    dp.dataAssunzione = expandDate(dp.dataAssunzione);
+    dp.scadenza = expandDate(dp.scadenza);
+    if (dp.dataCessazione) dp.dataCessazione = expandDate(dp.dataCessazione);
+    if (dp.ana){ dp.ana.dataNascita=expandDate(dp.ana.dataNascita); dp.ana.dataContratto=expandDate(dp.ana.dataContratto); if(dp.ana.dataProrogaAtto) dp.ana.dataProrogaAtto=expandDate(dp.ana.dataProrogaAtto); }
+    if (Array.isArray(dp.proroghe)) dp.proroghe = dp.proroghe.map(expandDate);
+    if (Array.isArray(dp.trasformazioni)) dp.trasformazioni = dp.trasformazioni.map(expandDate);
   });
   if (!obj.noteRecuperate2026){
     const byName = {}; (obj.dipendenti || []).forEach(function(d){ byName[String(d.nome).trim().toUpperCase()] = d.id; });
@@ -1241,13 +1247,19 @@ function DipModal(props){
 const QUALIFICHE = ["ADDETTO ALLA CUSTODIA","ADDETTO ALLE PULIZIE","ANIMATORE / ASSISTENTE EDUCATIVO","COORDINATORE EDUCATIVO / REFERENTE","EDUCATORE","FORMATORE","IMPIEGATO","IMPIEGATO DI CONCETTO / REFERENTE DI UNITÀ PRODUTTIVA","SUPERVISORE"];
 const LUOGHI_LAVORO = ["ISTITUTO/I SCOLASTICO/I","CENTRO/I DI AGGREGAZIONE","UFFICIO/I","ALTRO/I LUOGO/I DEL TERRITORIO"];
 const ANA_SHARED = { livello:1, oreSett:1, tipoContratto:1, scadenza:1, dataAssunzione:1, dataCessazione:1 };
+const ANA_DATALISTS = {
+  giorniLav:["DA LUNEDI' A SABATO","DA LUNEDI' A VENERDI'"],
+  periodo:["TUTTO IL PERIODO CONTRATTUALE","TUTTO IL PERIODO CONTRATTUALE (TEMPO DETERMINATO)","NELL' ANNO SCOLASTICO SECONDO I CALENDARI PUBBLICATI (A TEMPO INDETERMINATO)","NELL' ANNO SCOLASTICO SECONDO I CALENDARI PUBBLICATI DAGLI ENTI COMPETENTI"],
+  partFull:["PART TIME","FULL TIME"],
+  orizz:["ORIZZONTALE","VERTICALE","MISTO"]
+};
 const ANA_SECTIONS = [
-  { t:"Dati anagrafici", f:[["cognome","Cognome"],["nome","Nome"],["luogoNascita","Luogo di nascita"],["dataNascita","Data di nascita (gg/mm/aaaa)"],["cf","Codice fiscale"],["email","Email"]] },
+  { t:"Dati anagrafici", f:[["cognome","Cognome"],["nome","Nome"],["luogoNascita","Luogo di nascita"],["dataNascita","Data di nascita (gg/mm/aaaa)","date"],["cf","Codice fiscale"],["email","Email"]] },
   { t:"Residenza", f:[["indRes","Indirizzo residenza"],["capRes","CAP"],["luogoRes","Comune"]] },
   { t:"Domicilio", f:[["indDom","Indirizzo domicilio"],["capDom","CAP"],["luogoDom","Comune"]] },
-  { t:"Contratto", f:[["dataContratto","Data contratto"],["dataAssunzione","Data avvio / assunzione"],["scadenza","Data conclusione / scadenza"],["tipoContratto","Tipo contratto","tipo"],["partFull","Part / Full time"],["orizz","Orizzontale / Verticale / Misto"],["qualifica","Ruolo / qualifica","qual"],["livello","Livello di inquadramento"]] },
+  { t:"Contratto", f:[["dataContratto","Data contratto","date"],["dataAssunzione","Data avvio / assunzione","date"],["scadenza","Data conclusione / scadenza","date"],["tipoContratto","Tipo contratto","tipo"],["partFull","Part / Full time","list:partFull"],["orizz","Orizzontale / Verticale / Misto","list:orizz"],["qualifica","Ruolo / qualifica","qual"],["livello","Livello di inquadramento"]] },
   { t:"Luogo di lavoro", f:[["luogo","Luogo di lavoro","luogo"],["specificaStruttura","Specifica struttura (nome istituto/centro…)"],["ubicazione","Ubicazione / indirizzo"]] },
-  { t:"Orario", f:[["oreSett","Monte ore settimanali"],["giorniLav","Giorni di lavoro nella settimana"],["periodo","Periodo di lavoro nell'anno"],["giorniProva","Giorni di prova"]] },
+  { t:"Orario", f:[["oreSett","Monte ore settimanali"],["giorniLav","Giorni di lavoro nella settimana","list:giorniLav"],["periodo","Periodo di lavoro nell'anno","list:periodo"],["giorniProva","Giorni di prova"]] },
   { t:"Orari settimanali (per la tabella del contratto)", f:[["orarioLun","Lunedì"],["orarioMar","Martedì"],["orarioMer","Mercoledì"],["orarioGio","Giovedì"],["orarioVen","Venerdì"],["orarioSab","Sabato"]] },
   { t:"Economico", f:[["impBase","Importo orario base €"],["impSuper","Superminimo €"],["tipoSuper","Superminimo: variante","super"],["scatti","Scatti di anzianità €"],["impAltro","Altro importo orario €"],["tipoAltro","Tipologia altro"],["impTot","Importo orario totale € (automatico)","auto"]] },
   { t:"Note", f:[["note","Note"],["note2","Note 2"]] },
@@ -1273,6 +1285,10 @@ function dlong(s){
   if (mo < 1 || mo > 12) return String(s);
   return d + " " + MESI_LUNGHI[mo-1] + " " + y;
 }
+function expandDate(s){ const m=String(s==null?"":s).match(/^([0-9]{1,2})\/([0-9]{1,2})\/([0-9]{2,4})$/); if(!m) return (s==null?"":s); let d=parseInt(m[1],10),mo=parseInt(m[2],10),y=parseInt(m[3],10); if(y<100)y=(y>=40?1900+y:2000+y); return (d<10?"0":"")+d+"/"+(mo<10?"0":"")+mo+"/"+y; }
+function isRealDate(s){ const m=String(s==null?"":s).match(/^([0-9]{2})\/([0-9]{2})\/([0-9]{4})$/); if(!m) return false; const d=parseInt(m[1],10),mo=parseInt(m[2],10),y=parseInt(m[3],10); if(mo<1||mo>12||d<1) return false; const dim=new Date(y,mo,0).getDate(); return d<=dim; }
+function maskDate(v){ const x=String(v==null?"":v).replace(/[^0-9]/g,"").slice(0,8); let out=x.slice(0,2); if(x.length>2)out+="/"+x.slice(2,4); if(x.length>4)out+="/"+x.slice(4,8); return out; }
+function firstBadDate(dp){ const a=dp.ana||{}; const list=[a.dataNascita,a.dataContratto,a.dataProrogaAtto,dp.dataAssunzione,dp.scadenza].concat(prorogheList(dp)).concat(trasfList(dp)); for(let i=0;i<list.length;i++){ const s=String(list[i]==null?"":list[i]).trim(); if(s!=="" && !isRealDate(s)) return s; } return null; }
 function xmlEsc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 function b64ToU8(b64){ const bin=atob(b64); const u=new Uint8Array(bin.length); for (let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i); return u; }
 function getTemplateB64(){ try{ const t=localStorage.getItem(LS_TEMPLATE); if (t) return t; }catch(e){ } return window.TEMPLATE_CONTRATTO_B64; }
@@ -1297,6 +1313,7 @@ function contractValues(dp){
   };
 }
 function generaContratto(dp, onErr){
+  const _bd=firstBadDate(dp); if(_bd){ if(onErr) onErr(new Error('Data non valida: "'+_bd+'". Correggi le date in formato gg/mm/aaaa nella scheda prima di generare.')); return; }
   const vals=contractValues(dp);
   JSZip.loadAsync(b64ToU8(getTemplateB64())).then(function(zip){
     return zip.file("word/document.xml").async("string").then(function(xml){
@@ -1357,12 +1374,12 @@ function prorogaValues(dp){
   const modnr=(a.modNr && String(a.modNr).trim()!=="")?a.modNr:modNrFor(dp, nuova);
   return {
     "MOD_NR":modnr,
-    "DATA_CONTRATTO":dfull(a.dataContratto), "SCAD_PRECEDENTE":dfull(precedente), "SCAD_NUOVA":dfull(nuova),
+    "DATA_CONTRATTO":dlong(a.dataContratto), "SCAD_PRECEDENTE":dlong(precedente), "SCAD_NUOVA":dlong(nuova),
     "NOME":a.nome||"", "COGNOME":a.cognome||"", "IND_DOM":a.indDom||"", "CAP_DOM":a.capDom||"", "LUOGO_DOM":a.luogoDom||"",
-    "LUOGO_NASCITA":a.luogoNascita||"", "DATA_NASCITA":dfull(a.dataNascita), "LUOGO_RESIDENZA":a.luogoRes||"", "IND_RESIDENZA":a.indRes||"",
+    "LUOGO_NASCITA":a.luogoNascita||"", "DATA_NASCITA":dlong(a.dataNascita), "LUOGO_RESIDENZA":a.luogoRes||"", "IND_RESIDENZA":a.indRes||"",
     "CF":a.cf||"", "DETERMINATO":(dp.tipoContratto==="determinato"?"DETERMINATO":"INDETERMINATO"),
     "COMMITTENTE_FONDI":a.committenteFondi||"", "NUMERO_APPALTO":a.numeroAppalto||"",
-    "DATA_ATTO":a.dataProrogaAtto||""
+    "DATA_ATTO":dlong(a.dataProrogaAtto)
   };
 }
 function trasformazioneValues(dp){
@@ -1371,15 +1388,16 @@ function trasformazioneValues(dp){
   const precedente=chain.length>1?chain[chain.length-2]:(dp.scadenza||"");
   const modnr=(a.modNr && String(a.modNr).trim()!=="")?a.modNr:modNrFor(dp, a.dataProrogaAtto);
   return {
-    "MOD_NR":modnr, "DATA_CONTRATTO":dfull(a.dataContratto), "SCAD_PRECEDENTE":dfull(precedente),
+    "MOD_NR":modnr, "DATA_CONTRATTO":dlong(a.dataContratto), "SCAD_PRECEDENTE":dlong(precedente),
     "NOME":a.nome||"", "COGNOME":a.cognome||"", "IND_DOM":a.indDom||"", "CAP_DOM":a.capDom||"", "LUOGO_DOM":a.luogoDom||"",
-    "LUOGO_NASCITA":a.luogoNascita||"", "DATA_NASCITA":dfull(a.dataNascita), "LUOGO_RESIDENZA":a.luogoRes||"", "IND_RESIDENZA":a.indRes||"",
+    "LUOGO_NASCITA":a.luogoNascita||"", "DATA_NASCITA":dlong(a.dataNascita), "LUOGO_RESIDENZA":a.luogoRes||"", "IND_RESIDENZA":a.indRes||"",
     "CF":a.cf||"", "DETERMINATO":(dp.tipoContratto==="determinato"?"DETERMINATO":"INDETERMINATO"),
-    "CONTENUTO_MODIFICA":a.contenutoModifica||"", "DATA_ATTO":a.dataProrogaAtto||""
+    "CONTENUTO_MODIFICA":a.contenutoModifica||"", "DATA_ATTO":dlong(a.dataProrogaAtto)
   };
 }
 function generaProroga(dp, onErr){
   if (prorogheList(dp).length === 0){ if (onErr) onErr(new Error("Questo dipendente non ha proroghe: aggiungine una nella scheda (sezione Proroghe, dal tasto ✎) prima di generare la lettera di proroga.")); return; }
+  const _bd=firstBadDate(dp); if(_bd){ if(onErr) onErr(new Error('Data non valida: "'+_bd+'". Correggi le date in formato gg/mm/aaaa nella scheda prima di generare.')); return; }
   const vals=prorogaValues(dp);
   JSZip.loadAsync(b64ToU8(getTemplateProB64())).then(function(zip){
     return zip.file("word/document.xml").async("string").then(function(xml){
@@ -1421,6 +1439,7 @@ const LS_TEMPLATE_TRASF = "spazioireos_trasformazione_template_v1";
 function getTemplateTrasfB64(){ try{ const t=localStorage.getItem(LS_TEMPLATE_TRASF); if(t) return t; }catch(e){ } return window.TEMPLATE_TRASFORMAZIONE_B64; }
 function templateTrasfPersonalizzato(){ try{ return !!localStorage.getItem(LS_TEMPLATE_TRASF); }catch(e){ return false; } }
 function generaTrasformazione(dp, onErr){
+  const _bd=firstBadDate(dp); if(_bd){ if(onErr) onErr(new Error('Data non valida: "'+_bd+'". Correggi le date in formato gg/mm/aaaa nella scheda prima di generare.')); return; }
   const vals=trasformazioneValues(dp);
   JSZip.loadAsync(b64ToU8(getTemplateTrasfB64())).then(function(zip){
     return zip.file("word/document.xml").async("string").then(function(xml){
@@ -1465,10 +1484,12 @@ function Anagrafica(props){
   const dp = dips.find(function(x){ return x.id===selId; }) || dips[0];
   if (!dp) return <div style={{padding:"20px",color:"#64748b"}}>Nessun dipendente. Aggiungine uno dalla vista mensile o col pulsante qui sopra.</div>;
   const genera = function(){
+    if (firstBadDate(dp)){ setMsg("⚠️ Correggi le date in formato gg/mm/aaaa (evidenziate in rosso) prima di generare il documento."); return; }
     generaContratto(dp, function(e){ setMsg("⚠️ Errore nella generazione del contratto: " + (e && e.message ? e.message : e)); });
     setMsg("📄 Contratto generato per " + dp.nome + " (scaricato).");
   };
   const generaPro = function(){
+    if (firstBadDate(dp)){ setMsg("⚠️ Correggi le date in formato gg/mm/aaaa (evidenziate in rosso) prima di generare il documento."); return; }
     generaProroga(dp, function(e){ setMsg("⚠️ " + (e && e.message ? e.message : e)); });
     if (prorogheList(dp).length > 0) setMsg("📄 Proroga generata per " + dp.nome + " (scaricata).");
   };
@@ -1478,6 +1499,7 @@ function Anagrafica(props){
     aggiornaModelloProroga(f, function(err, n){ if (err) setMsg("⚠️ " + (err.message||err)); else setMsg("✅ Modello proroga aggiornato ("+n+" campi). Usato per le prossime proroghe su questo dispositivo."); });
   };
   const generaTrasf = function(){
+    if (firstBadDate(dp)){ setMsg("⚠️ Correggi le date in formato gg/mm/aaaa (evidenziate in rosso) prima di generare il documento."); return; }
     generaTrasformazione(dp, function(e){ setMsg("⚠️ " + (e && e.message ? e.message : e)); });
     setMsg("📄 Trasformazione generata per " + dp.nome + " (scaricata).");
   };
@@ -1542,6 +1564,7 @@ function Anagrafica(props){
           {ANA_SECTIONS.map(function(sec){ return (
             <div key={sec.t} style={{ marginBottom:"12px" }}>
               <div style={{ fontSize:"12px", fontWeight:800, color:"#92400e", textTransform:"uppercase", letterSpacing:".4px", marginBottom:"6px", borderBottom:"1px solid #fde68a", paddingBottom:"3px" }}>{sec.t}</div>
+              {sec.t==="Domicilio" ? <label style={{ display:"flex", alignItems:"center", gap:"6px", fontSize:"13px", marginBottom:"6px", cursor:"pointer" }}><input type="checkbox" checked={!!(dp.ana&&dp.ana.domUgualeRes)} onChange={function(e){ props.onAnaField(dp.id,"domUgualeRes",e.target.checked); }} /> Domicilio uguale alla residenza</label> : null}
               <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(230px, 1fr))", gap:"8px" }}>
                 {sec.f.map(function(fld){
                   const key=fld[0], lbl=fld[1], kind=fld[2];
@@ -1558,12 +1581,21 @@ function Anagrafica(props){
                   if (kind==="luogo") return <div key={key} className="field" style={{margin:0}}><label>{lbl}</label>
                     <select value={anaVal(dp,"luogo")||""} onChange={function(e){ props.onAnaField(dp.id,"luogo",e.target.value); }}>
                       <option value="">— seleziona —</option>{LUOGHI_LAVORO.map(function(q){ return <option key={q} value={q}>{q}</option>; })}</select></div>;
+                  if (kind==="date"){ const dv=anaVal(dp,key); const bad=String(dv).trim()!=="" && !isRealDate(dv);
+                    return <div key={key} className="field" style={{margin:0}}><label>{lbl}</label>
+                      <input value={dv} maxLength={10} placeholder="gg/mm/aaaa" inputMode="numeric" onChange={function(e){ props.onAnaField(dp.id,key,maskDate(e.target.value)); }} style={bad?{borderColor:"#dc2626",background:"#fef2f2"}:undefined} title={bad?"Data non valida: usa gg/mm/aaaa":""} />
+                      {bad?<div style={{color:"#dc2626",fontSize:"11px",marginTop:"2px",fontWeight:700}}>Formato richiesto: gg/mm/aaaa</div>:null}</div>; }
+                  if (kind && kind.indexOf("list:")===0){ const lname=kind.slice(5); const lopts=ANA_DATALISTS[lname]||[]; const lid="dl_"+lname;
+                    return <div key={key} className="field" style={{margin:0}}><label>{lbl}</label>
+                      <input value={anaVal(dp,key)} list={lid} onChange={function(e){ props.onAnaField(dp.id,key,e.target.value); }} />
+                      <datalist id={lid}>{lopts.map(function(o){ return <option key={o} value={o} />; })}</datalist></div>; }
                   if (kind==="textarea"){ const tv=(dp.ana&&dp.ana[key]!==undefined)?dp.ana[key]:"";
                     return <div key={key} className="field" style={{margin:0, gridColumn:"1 / -1"}}><label>{lbl}</label>
                       <textarea value={tv} rows={3} onChange={function(e){ props.onAnaField(dp.id,key,e.target.value); }}
                         style={{ border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px", padding:"6px 8px", fontFamily:"inherit", fontSize:"13px", resize:"vertical", width:"100%" }} /></div>; }
+                  const domLock = (sec.t==="Domicilio") && dp.ana && !!dp.ana.domUgualeRes;
                   return <div key={key} className="field" style={{margin:0}}><label>{lbl}</label>
-                    <input value={anaVal(dp,key)} onChange={function(e){ props.onAnaField(dp.id,key,e.target.value); }} /></div>;
+                    <input value={anaVal(dp,key)} disabled={domLock} onChange={function(e){ props.onAnaField(dp.id,key,e.target.value); }} style={domLock?{background:"#f1f5f9",borderColor:"#cbd5e1",color:"#64748b"}:undefined} /></div>;
                 })}
               </div>
             </div>
@@ -2033,16 +2065,16 @@ function App(){
   const fileRef = useRef(null); const dbRef = useRef(null); const uidRef = useRef(null);
 
   useEffect(function(){
-    if (!FB_READY){ const loc = loadLocal(); const st = loc || emptyState(); setState(st); if (st.anni && st.anni.length) setAnno(st.anni[st.anni.length-1]); return; }
+    if (!FB_READY){ const loc = loadLocal(); const st = migrate(loc || emptyState()); setState(st); if (st.anni && st.anni.length) setAnno(st.anni[st.anni.length-1]); return; }
     firebase.initializeApp(firebaseConfig); dbRef.current = firebase.firestore();
     firebase.auth().onAuthStateChanged(function(user){
       if (user){
         if (!isAdminEmail(user.email)){ setDenied(user.email || ""); firebase.auth().signOut(); return; }
         setDenied(""); uidRef.current = user.uid; setAuthState("in");
         dbRef.current.collection(FB_COLLECTION).doc(user.uid).get().then(function(snap){
-          let st; if (snap.exists) st = migrate(snap.data()); else st = loadLocal() || emptyState();
+          let st; if (snap.exists) st = migrate(snap.data()); else st = migrate(loadLocal() || emptyState());
           setState(st); if (st.anni && st.anni.length) setAnno(st.anni[st.anni.length-1]);
-        }).catch(function(e){ console.error(e); const st = loadLocal() || emptyState(); setState(st); });
+        }).catch(function(e){ console.error(e); const st = migrate(loadLocal() || emptyState()); setState(st); });
       } else { setAuthState("out"); }
     });
   }, []);
@@ -2090,6 +2122,8 @@ function App(){
     const next = JSON.parse(JSON.stringify(state));
     const dp = next.dipendenti.find(function(d){ return d.id===dipId; }); if (!dp) return;
     if (!dp.ana) dp.ana = {};
+    if (field==="domUgualeRes"){ dp.ana.domUgualeRes = !!value; if (value){ dp.ana.indDom=dp.ana.indRes||""; dp.ana.capDom=dp.ana.capRes||""; dp.ana.luogoDom=dp.ana.luogoRes||""; } touch(next); return; }
+    if ((field==="indRes"||field==="capRes"||field==="luogoRes") && dp.ana.domUgualeRes){ dp.ana[field]=value; const _mp={indRes:"indDom",capRes:"capDom",luogoRes:"luogoDom"}; dp.ana[_mp[field]]=value; touch(next); return; }
     if (ANA_SHARED[field]){ dp[field] = (field==="oreSett") ? (Number(String(value).replace(",","."))||0) : value; }
     else if (field==="cognome" || field==="nome"){ dp.ana[field]=value; const nn=((dp.ana.cognome||"")+" "+(dp.ana.nome||"")).trim().toUpperCase(); if (nn!=="") dp.nome=nn; }
     else dp.ana[field]=value;
@@ -2107,6 +2141,9 @@ function App(){
         if (k === "_livello"){ if ((dp.livello==null || String(dp.livello).trim()==="") && src[k]!==""){ dp.livello=src[k]; count++; } return; }
         if ((dp.ana[k]==null || String(dp.ana[k]).trim()==="") && src[k]!==""){ dp.ana[k]=src[k]; count++; }
       });
+      if(dp.ana.dataNascita) dp.ana.dataNascita=expandDate(dp.ana.dataNascita);
+      if(dp.ana.dataContratto) dp.ana.dataContratto=expandDate(dp.ana.dataContratto);
+      if(dp.dataAssunzione) dp.dataAssunzione=expandDate(dp.dataAssunzione);
     });
     touch(next);
     showToast("Anagrafiche importate: " + matched + " dipendenti, " + count + " campi riempiti (i vuoti). Premi 💾 per salvare.");
