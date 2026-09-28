@@ -206,7 +206,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver41";
+const APP_VER = "ver43";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
 const MESE_ABBR_FILE = ["gen","feb","mar","apr","mag","giu","lug","ago","set","ott","nov","dic"];
@@ -362,6 +362,28 @@ function prorogheList(dp){ return Array.isArray(dp.proroghe) ? dp.proroghe.filte
 function trasfList(dp){ return Array.isArray(dp.trasformazioni) ? dp.trasformazioni.filter(function(x){ return x && String(x).trim() !== ""; }) : []; }
 function ymdIt(s){ const m=String(s==null?"":s).match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/); if(!m) return 0; let d=parseInt(m[1],10),mo=parseInt(m[2],10),y=parseInt(m[3],10); if(y<100)y=(y>=40?1900+y:2000+y); return y*10000+mo*100+d; }
 function modNrFor(dp, docDate){ const dd=ymdIt(docDate); if(!dd) return ""; const all=prorogheList(dp).concat(trasfList(dp)); let before=0; all.forEach(function(x){ const v=ymdIt(x); if(v && v<dd) before++; }); return String(before+1); }
+function assunzInt(dp){ return ymdIt(dp.dataAssunzione); }
+function effEndInt(dp){ const cess=ymdIt(dp.dataCessazione); if(cess) return cess; if(String(dp.tipoContratto)==="determinato"){ let end=ymdIt(dp.scadenza); prorogheList(dp).forEach(function(p){ const v=ymdIt(p); if(v>end) end=v; }); return end||null; } return null; }
+function inForceAt(dp, D){ const a=assunzInt(dp); if(!a) return false; if(a>D) return false; const e=effEndInt(dp); if(e && e<D) return false; return true; }
+function intToIt(n){ if(!n) return ""; const y=Math.floor(n/10000), m=Math.floor((n%10000)/100), d=n%100; return pad2(d)+"/"+pad2(m)+"/"+y; }
+function cellCode(v){ const s=String(v==null?"":v).trim().toUpperCase(); if(s==="") return ""; if(isNumeric(v)) return ""; return s.split(/\s+/)[0]; }
+function sumOverRange(state, dipId, fromInt, toInt, what){ let total=0; let y=Math.floor(fromInt/10000), m=Math.floor((fromInt%10000)/100); const ty=Math.floor(toInt/10000), tm=Math.floor((toInt%10000)/100); while(y<ty || (y===ty && m<=tm)){ const rec=getRecFrom(state,y,m,dipId); if(rec && rec.giorni){ const dim=daysInMonth(y,m); for(let d=1; d<=dim; d++){ const di=y*10000+m*100+d; if(di<fromInt||di>toInt) continue; const v=rec.giorni[d]; if(v==null||v==="") continue; if(what==="ORE") total+=parseHour(v); else if(cellCode(v)===what) total+=1; } } m++; if(m>12){m=1;y++;} } return total; }
+function qExport(nome, aoa){ const wb=XLSX.utils.book_new(); wb.Props={ Title:"Query personale", Author:"Christian Canonica", Company:"Spazio Ireos Societa' Cooperativa Sociale", CreatedDate:new Date() }; const ws=XLSX.utils.aoa_to_sheet(aoa); XLSX.utils.book_append_sheet(wb, ws, "Query"); XLSX.writeFile(wb, nome); }
+function cfClean(s){ return String(s==null?"":s).toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^A-Z]/g,""); }
+function cfCons(s){ return s.replace(/[AEIOU]/g,""); }
+function cfVow(s){ return s.replace(/[^AEIOU]/g,""); }
+function cfSurname(s){ const c=cfClean(s); return (cfCons(c)+cfVow(c)+"XXX").slice(0,3); }
+function cfName(s){ const c=cfClean(s); const cons=cfCons(c); let t; if(cons.length>=4){ t=cons[0]+cons[2]+cons[3]; } else { t=(cons+cfVow(c)+"XXX"); } return t.slice(0,3); }
+var CF_MESI=["A","B","C","D","E","H","L","M","P","R","S","T"];
+function cfDateSex(dob, sex){ const m=String(dob).match(/^(\d{2})\/(\d{2})\/(\d{4})$/); if(!m) return null; const gg=parseInt(m[1],10), mm=parseInt(m[2],10), yyyy=m[3]; if(mm<1||mm>12) return null; let day=gg; if(String(sex).toUpperCase()==="F") day+=40; return yyyy.slice(2)+CF_MESI[mm-1]+(day<10?"0":"")+day; }
+var CF_ODD={"0":1,"1":0,"2":5,"3":7,"4":9,"5":13,"6":15,"7":17,"8":19,"9":21,"A":1,"B":0,"C":5,"D":7,"E":9,"F":13,"G":15,"H":17,"I":19,"J":21,"K":2,"L":4,"M":18,"N":20,"O":11,"P":3,"Q":6,"R":8,"S":12,"T":14,"U":16,"V":10,"W":22,"X":25,"Y":24,"Z":23};
+function cfEvenVal(ch){ if(ch>="0"&&ch<="9") return ch.charCodeAt(0)-48; return ch.charCodeAt(0)-65; }
+function cfCheck(fifteen){ let sum=0; for(let i=0;i<15;i++){ const ch=fifteen[i]; if((i+1)%2===1) sum+=CF_ODD[ch]; else sum+=cfEvenVal(ch); } return String.fromCharCode(65+(sum%26)); }
+function cfCompute(cognome,nome,dob,sex,belfiore){ const ds=cfDateSex(dob,sex); if(!ds||!belfiore||belfiore.length!==4) return null; const f15=cfSurname(cognome)+cfName(nome)+ds+belfiore.toUpperCase(); if(f15.length!==15) return null; return f15+cfCheck(f15); }
+function cfValid(cf){ const s=String(cf==null?"":cf).toUpperCase().trim(); if(!/^[A-Z0-9]{16}$/.test(s)) return false; return cfCheck(s.slice(0,15))===s[15]; }
+function cfSexFrom(cf){ const s=String(cf==null?"":cf).toUpperCase(); if(s.length<11) return ""; const dd=parseInt(s.slice(9,11),10); if(isNaN(dd)) return ""; return dd>40?"F":"M"; }
+var BELFIORE={ "MILANO":"F205","TORTONA":"L304","BRENO":"B149","VERONA":"L781","SARONNO":"I441","AOSTA":"A326","TRENTO":"L378","DESIO":"D286","MONZA":"F704","BERGAMO":"A794","COMO":"C933","VARESE":"L682","PAVIA":"G388","LODI":"E648","LECCO":"E507","CREMONA":"D150","BRESCIA":"B157","ROMA":"H501","TORINO":"L219","NAPOLI":"F839","GENOVA":"D969","BOLOGNA":"A944","FIRENZE":"D612" };
+function belfioreOf(luogo){ const key=String(luogo==null?"":luogo).split("/")[0].trim().toUpperCase(); return BELFIORE[key]||""; }
 function scadEff(dp){ const pl = prorogheList(dp); return pl.length ? pl[pl.length-1] : (dp.scadenza || ""); }
 function contrLabel(dp){
   if (dp.tipoContratto === "determinato"){
@@ -1254,7 +1276,7 @@ const ANA_DATALISTS = {
   orizz:["ORIZZONTALE","VERTICALE","MISTO"]
 };
 const ANA_SECTIONS = [
-  { t:"Dati anagrafici", f:[["cognome","Cognome"],["nome","Nome"],["luogoNascita","Luogo di nascita"],["dataNascita","Data di nascita (gg/mm/aaaa)","date"],["cf","Codice fiscale"],["email","Email"]] },
+  { t:"Dati anagrafici", f:[["cognome","Cognome"],["nome","Nome"],["luogoNascita","Luogo di nascita"],["dataNascita","Data di nascita (gg/mm/aaaa)","date"],["sesso","Sesso","sex"],["cf","Codice fiscale","cf"],["email","Email"]] },
   { t:"Residenza", f:[["indRes","Indirizzo residenza"],["capRes","CAP"],["luogoRes","Comune"]] },
   { t:"Domicilio", f:[["indDom","Indirizzo domicilio"],["capDom","CAP"],["luogoDom","Comune"]] },
   { t:"Contratto", f:[["dataContratto","Data contratto","date"],["dataAssunzione","Data avvio / assunzione","date"],["scadenza","Data conclusione / scadenza","date"],["tipoContratto","Tipo contratto","tipo"],["partFull","Part / Full time","list:partFull"],["orizz","Orizzontale / Verticale / Misto","list:orizz"],["qualifica","Ruolo / qualifica","qual"],["livello","Livello di inquadramento"]] },
@@ -1483,6 +1505,25 @@ function Anagrafica(props){
   const tplTrasfRef = React.useRef(null);
   const dp = dips.find(function(x){ return x.id===selId; }) || dips[0];
   if (!dp) return <div style={{padding:"20px",color:"#64748b"}}>Nessun dipendente. Aggiungine uno dalla vista mensile o col pulsante qui sopra.</div>;
+  const calcCF = function(){
+    const a = dp.ana || {};
+    let sesso = a.sesso || cfSexFrom(a.cf);
+    if (!sesso){ setMsg("⚠️ Per calcolare il CF scegli prima il Sesso (M/F)."); return; }
+    if (!a.dataNascita || !isRealDate(a.dataNascita)){ setMsg("⚠️ Inserisci una Data di nascita valida (gg/mm/aaaa) prima di calcolare il CF."); return; }
+    if (!a.cognome || !a.nome){ setMsg("⚠️ Servono Cognome e Nome per calcolare il CF."); return; }
+    let bel = belfioreOf(a.luogoNascita) || (a.belfiore || "");
+    const patch = {};
+    if (!bel || bel.length!==4){
+      const inp = window.prompt("Codice catastale (Belfiore) del comune di nascita \"" + (a.luogoNascita||"") + "\" — 4 caratteri (es. F205):", a.belfiore||"");
+      if (inp && String(inp).trim().length===4){ bel = String(inp).trim().toUpperCase(); patch.belfiore = bel; }
+      else { setMsg("⚠️ CF non calcolato: manca il codice catastale del comune di nascita."); return; }
+    }
+    const cf = cfCompute(a.cognome, a.nome, a.dataNascita, sesso, bel);
+    if (!cf){ setMsg("⚠️ CF non calcolato: controlla i dati inseriti."); return; }
+    patch.cf = cf; if (!a.sesso) patch.sesso = sesso;
+    props.onAnaSet(dp.id, patch);
+    setMsg("🧮 Codice fiscale calcolato: " + cf + "  (candidato: verifica in caso di omocodia).");
+  };
   const genera = function(){
     if (firstBadDate(dp)){ setMsg("⚠️ Correggi le date in formato gg/mm/aaaa (evidenziate in rosso) prima di generare il documento."); return; }
     generaContratto(dp, function(e){ setMsg("⚠️ Errore nella generazione del contratto: " + (e && e.message ? e.message : e)); });
@@ -1581,6 +1622,16 @@ function Anagrafica(props){
                   if (kind==="luogo") return <div key={key} className="field" style={{margin:0}}><label>{lbl}</label>
                     <select value={anaVal(dp,"luogo")||""} onChange={function(e){ props.onAnaField(dp.id,"luogo",e.target.value); }}>
                       <option value="">— seleziona —</option>{LUOGHI_LAVORO.map(function(q){ return <option key={q} value={q}>{q}</option>; })}</select></div>;
+                  if (kind==="sex") return <div key={key} className="field" style={{margin:0}}><label>{lbl}</label>
+                    <select value={anaVal(dp,"sesso")||""} onChange={function(e){ props.onAnaField(dp.id,"sesso",e.target.value); }}>
+                      <option value="">—</option><option value="M">M</option><option value="F">F</option></select></div>;
+                  if (kind==="cf"){ const cfv=anaVal(dp,"cf"); const okcf=cfv && cfValid(cfv);
+                    return <div key={key} className="field" style={{margin:0}}><label>{lbl}</label>
+                      <div style={{ display:"flex", gap:"6px" }}>
+                        <input value={cfv} onChange={function(e){ props.onAnaField(dp.id,"cf",e.target.value.toUpperCase()); }} style={{ flex:1, minWidth:0 }} />
+                        <button type="button" className="btn" onClick={calcCF} title="Calcola il codice fiscale dai dati anagrafici" style={{ whiteSpace:"nowrap" }}>🧮 Calcola</button>
+                      </div>
+                      {cfv ? <div style={{ fontSize:"11px", marginTop:"2px", fontWeight:700, color: okcf?"#15803d":"#dc2626" }}>{okcf?"✓ CF formalmente valido":"⚠︎ carattere di controllo non coerente"}</div> : null}</div>; }
                   if (kind==="date"){ const dv=anaVal(dp,key); const bad=String(dv).trim()!=="" && !isRealDate(dv);
                     return <div key={key} className="field" style={{margin:0}}><label>{lbl}</label>
                       <input value={dv} maxLength={10} placeholder="gg/mm/aaaa" inputMode="numeric" onChange={function(e){ props.onAnaField(dp.id,key,maskDate(e.target.value)); }} style={bad?{borderColor:"#dc2626",background:"#fef2f2"}:undefined} title={bad?"Data non valida: usa gg/mm/aaaa":""} />
@@ -1602,6 +1653,142 @@ function Anagrafica(props){
           ); })}
         </div>
       </div>
+    </div>
+  );
+}
+
+function QueryPanel(props){
+  const state = props.state;
+  const [mode, setMode] = useState("forza");
+  const [dForza, setDForza] = useState("");
+  const [bFrom, setBFrom] = useState("");
+  const [bTo, setBTo] = useState("");
+  const [bWhat, setBWhat] = useState("ORE");
+  const [bChi, setBChi] = useState("__ALL__");
+  const now = new Date();
+  const annoDefault = (state.anni && state.anni.length) ? state.anni[state.anni.length-1] : now.getFullYear();
+  const [cAnno, setCAnno] = useState(String(annoDefault));
+  const [openCell, setOpenCell] = useState("");
+  const dips = dipSorted(state);
+  const tipoLabel = function(t){ return String(t)==="determinato" ? "Determinato" : "Indeterminato"; };
+  const nomeOf = function(dp){ return dp.nome || (dp.ana ? ((dp.ana.cognome||"")+" "+(dp.ana.nome||"")).trim() : ""); };
+  const yInput = { border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px", padding:"6px 8px", fontSize:"13px", fontFamily:"inherit" };
+  const th = { background:"#0f2740", color:"#fff", padding:"6px 10px", fontSize:"12px", textAlign:"left" };
+  const td = { borderBottom:"1px solid #e2e8f0", padding:"5px 10px", fontSize:"13px" };
+  const codeOpts = [{v:"ORE",l:"Ore lavorate"}].concat(CODICI.map(function(c){ return { v:c.c, l:(c.l||c.c) }; }));
+  function modeBtn(id, label){ const on = mode===id; return <button onClick={function(){ setMode(id); setOpenCell(""); }} style={{ padding:"8px 14px", borderRadius:"8px", border:"2px solid "+(on?"#0f2740":"#cbd5e1"), background:on?"#0f2740":"#fff", color:on?"#fff":"#0f2740", fontWeight:700, cursor:"pointer", fontSize:"13px" }}>{label}</button>; }
+
+  const Dint = isRealDate(dForza) ? ymdIt(dForza) : 0;
+  const listA = Dint ? dips.filter(function(dp){ return assunzInt(dp) && inForceAt(dp,Dint); }) : [];
+  const missA = Dint ? dips.filter(function(dp){ return !assunzInt(dp); }) : [];
+  const nDetA = listA.filter(function(dp){ return String(dp.tipoContratto)==="determinato"; }).length;
+  const nIndA = listA.length - nDetA;
+  function expA(){ const aoa=[["IN FORZA AL "+dForza],[],["COGNOME NOME","TIPO","LIVELLO","DATA ASSUNZIONE","FINE CALCOLATA"]]; listA.forEach(function(dp){ aoa.push([nomeOf(dp), tipoLabel(dp.tipoContratto), dp.livello||"", intToIt(assunzInt(dp)), effEndInt(dp)?intToIt(effEndInt(dp)):"—"]); }); aoa.push([]); aoa.push(["TOTALE", listA.length, "di cui Determinati", nDetA, "Indeterminati", nIndA]); if(missA.length){ aoa.push([]); aoa.push(["DATA ASSUNZIONE MANCANTE (non conteggiati)"]); missA.forEach(function(dp){ aoa.push([nomeOf(dp)]); }); } qExport("Query - In forza al "+dForza.replace(/\//g,"-")+".xlsx", aoa); }
+
+  const okB = isRealDate(bFrom) && isRealDate(bTo) && ymdIt(bFrom)<=ymdIt(bTo);
+  const fromI = okB?ymdIt(bFrom):0, toI = okB?ymdIt(bTo):0;
+  const unitB = bWhat==="ORE" ? "ore" : "giorni";
+  const rowsB = okB ? (bChi==="__ALL__" ? dips.map(function(dp){ return { nome:nomeOf(dp), val:sumOverRange(state,dp.id,fromI,toI,bWhat) }; }) : (function(){ const dp=dips.find(function(d){return d.id===bChi;}); return dp?[{ nome:nomeOf(dp), val:sumOverRange(state,dp.id,fromI,toI,bWhat) }]:[]; })()) : [];
+  const totB = rowsB.reduce(function(a,r){ return a+r.val; },0);
+  const fmtVal = function(v){ return bWhat==="ORE" ? fmt2(v) : String(v); };
+  function expB(){ const whatL=(codeOpts.find(function(o){return o.v===bWhat;})||{}).l||bWhat; const aoa=[["TOTALE "+whatL+" DAL "+bFrom+" AL "+bTo+" (in "+unitB+")"],[],["COGNOME NOME","TOTALE ("+unitB+")"]]; rowsB.forEach(function(r){ aoa.push([r.nome, r.val]); }); aoa.push([]); aoa.push(["TOTALE COMPLESSIVO", totB]); qExport("Query - Totale "+whatL+" "+bFrom.replace(/\//g,"-")+"_"+bTo.replace(/\//g,"-")+".xlsx", aoa); }
+
+  const Y=parseInt(cAnno,10); const y0=Y*10000+101, y1=Y*10000+1231;
+  const enteredC = dips.filter(function(dp){ const a=assunzInt(dp); return a>=y0 && a<=y1; });
+  const exitedC = dips.filter(function(dp){ const e=effEndInt(dp); return e && e>=y0 && e<=y1; });
+  const missC = dips.filter(function(dp){ return !assunzInt(dp); });
+  const byTipo = function(arr,t){ return arr.filter(function(dp){ return String(dp.tipoContratto)===t; }); };
+  const cell = function(arr,t){ return t==="all"?arr.length:byTipo(arr,t).length; };
+  const yearOpts = (function(){ const set={}; (state.anni||[]).forEach(function(y){set[y]=true;}); set[now.getFullYear()]=true; return Object.keys(set).map(function(y){return parseInt(y,10);}).sort(function(a,b){return a-b;}); })();
+  const namesFor = function(kind, t){ const arr = kind==="ent"?enteredC:exitedC; const f = t==="all"?arr:byTipo(arr,t); return f.map(nomeOf); };
+  function expC(){ const aoa=[["MOVIMENTI ANNO "+Y],[],["","DETERMINATI","INDETERMINATI","TOTALE"],["Entrati", cell(enteredC,"determinato"), cell(enteredC,"indeterminato"), enteredC.length],["Usciti", cell(exitedC,"determinato"), cell(exitedC,"indeterminato"), exitedC.length],["Saldo", cell(enteredC,"determinato")-cell(exitedC,"determinato"), cell(enteredC,"indeterminato")-cell(exitedC,"indeterminato"), enteredC.length-exitedC.length]]; aoa.push([]); aoa.push(["ENTRATI"]); enteredC.forEach(function(dp){ aoa.push([nomeOf(dp), tipoLabel(dp.tipoContratto), intToIt(assunzInt(dp))]); }); aoa.push([]); aoa.push(["USCITI"]); exitedC.forEach(function(dp){ aoa.push([nomeOf(dp), tipoLabel(dp.tipoContratto), intToIt(effEndInt(dp))]); }); if(missC.length){ aoa.push([]); aoa.push(["DATA ASSUNZIONE MANCANTE (non conteggiati)"]); missC.forEach(function(dp){ aoa.push([nomeOf(dp)]); }); } qExport("Query - Movimenti "+Y+".xlsx", aoa); }
+
+  return (
+    <div style={{ padding:"14px" }}>
+      <div style={{ display:"flex", alignItems:"center", gap:"10px", marginBottom:"12px" }}>
+        <strong style={{ fontSize:"15px", color:"#0f2740" }}>🔎 Query personale</strong>
+        <span style={{ fontSize:"12px", color:"#64748b" }}>interrogazioni sui dipendenti — tutto sul dispositivo</span>
+      </div>
+      <div style={{ display:"flex", gap:"8px", flexWrap:"wrap", marginBottom:"14px" }}>
+        {modeBtn("forza","📅 In forza alla data")}
+        {modeBtn("totale","➕ Totale su intervallo")}
+        {modeBtn("movimenti","🔄 Movimenti nell'anno")}
+      </div>
+
+      {mode==="forza" ? (
+        <div>
+          <div style={{ display:"flex", alignItems:"flex-end", gap:"12px", flexWrap:"wrap", marginBottom:"12px" }}>
+            <div><div style={{ fontSize:"12px", fontWeight:700, marginBottom:"3px" }}>Data (gg/mm/aaaa)</div><input value={dForza} maxLength={10} placeholder="gg/mm/aaaa" inputMode="numeric" onChange={function(e){ setDForza(maskDate(e.target.value)); }} style={dForza && !isRealDate(dForza) ? Object.assign({}, yInput, { borderColor:"#dc2626", background:"#fef2f2" }) : yInput} /></div>
+            {Dint ? <button className="btn btn-blue" onClick={expA}>⬇️ Esporta Excel</button> : null}
+          </div>
+          {!dForza ? <div style={{ color:"#64748b", fontSize:"13px" }}>Inserisci una data per vedere chi era in forza quel giorno.</div> :
+           !isRealDate(dForza) ? <div style={{ color:"#dc2626", fontSize:"13px" }}>Data non valida: usa gg/mm/aaaa.</div> :
+           <div>
+             <div style={{ display:"flex", gap:"10px", flexWrap:"wrap", marginBottom:"10px" }}>
+               <div style={{ background:"#0f2740", color:"#fff", padding:"8px 14px", borderRadius:"8px", fontWeight:700 }}>Totale in forza: {listA.length}</div>
+               <div style={{ background:"#0369a1", color:"#fff", padding:"8px 14px", borderRadius:"8px", fontWeight:700 }}>Determinati: {nDetA}</div>
+               <div style={{ background:"#15803d", color:"#fff", padding:"8px 14px", borderRadius:"8px", fontWeight:700 }}>Indeterminati: {nIndA}</div>
+             </div>
+             <div style={{ overflowX:"auto", border:"1px solid #e2e8f0", borderRadius:"8px" }}>
+               <table style={{ borderCollapse:"collapse", width:"100%", minWidth:"640px" }}>
+                 <thead><tr><th style={th}>Cognome Nome</th><th style={th}>Tipo</th><th style={th}>Livello</th><th style={th}>Data assunzione</th><th style={th}>Fine calcolata</th></tr></thead>
+                 <tbody>{listA.map(function(dp){ return <tr key={dp.id}><td style={td}>{nomeOf(dp)}</td><td style={td}>{tipoLabel(dp.tipoContratto)}</td><td style={td}>{dp.livello||""}</td><td style={td}>{intToIt(assunzInt(dp))}</td><td style={td}>{effEndInt(dp)?intToIt(effEndInt(dp)):"—"}</td></tr>; })}
+                 {listA.length===0 ? <tr><td style={td} colSpan={5}>Nessun dipendente in forza a quella data.</td></tr> : null}</tbody>
+               </table>
+             </div>
+             {missA.length ? <div style={{ marginTop:"8px", fontSize:"12px", color:"#92400e" }}>⚠️ Senza data assunzione (non conteggiati): {missA.map(nomeOf).join(", ")}</div> : null}
+           </div>}
+        </div>
+      ) : null}
+
+      {mode==="totale" ? (
+        <div>
+          <div style={{ display:"flex", alignItems:"flex-end", gap:"12px", flexWrap:"wrap", marginBottom:"12px" }}>
+            <div><div style={{ fontSize:"12px", fontWeight:700, marginBottom:"3px" }}>Da data</div><input value={bFrom} maxLength={10} placeholder="gg/mm/aaaa" inputMode="numeric" onChange={function(e){ setBFrom(maskDate(e.target.value)); }} style={bFrom && !isRealDate(bFrom) ? Object.assign({}, yInput, { borderColor:"#dc2626", background:"#fef2f2" }) : yInput} /></div>
+            <div><div style={{ fontSize:"12px", fontWeight:700, marginBottom:"3px" }}>A data</div><input value={bTo} maxLength={10} placeholder="gg/mm/aaaa" inputMode="numeric" onChange={function(e){ setBTo(maskDate(e.target.value)); }} style={bTo && !isRealDate(bTo) ? Object.assign({}, yInput, { borderColor:"#dc2626", background:"#fef2f2" }) : yInput} /></div>
+            <div><div style={{ fontSize:"12px", fontWeight:700, marginBottom:"3px" }}>Cosa sommare</div><select value={bWhat} onChange={function(e){ setBWhat(e.target.value); }} style={yInput}>{codeOpts.map(function(o){ return <option key={o.v} value={o.v}>{o.l}</option>; })}</select></div>
+            <div><div style={{ fontSize:"12px", fontWeight:700, marginBottom:"3px" }}>Chi</div><select value={bChi} onChange={function(e){ setBChi(e.target.value); }} style={yInput}><option value="__ALL__">Tutti</option>{dips.map(function(dp){ return <option key={dp.id} value={dp.id}>{nomeOf(dp)}</option>; })}</select></div>
+            {okB ? <button className="btn btn-blue" onClick={expB}>⬇️ Esporta Excel</button> : null}
+          </div>
+          {(!bFrom||!bTo) ? <div style={{ color:"#64748b", fontSize:"13px" }}>Inserisci le due date per calcolare il totale.</div> :
+           !okB ? <div style={{ color:"#dc2626", fontSize:"13px" }}>Date non valide o intervallo rovesciato (la data iniziale deve precedere la finale).</div> :
+           <div>
+             <div style={{ background:"#0f2740", color:"#fff", padding:"8px 14px", borderRadius:"8px", fontWeight:700, display:"inline-block", marginBottom:"10px" }}>Totale complessivo: {fmtVal(totB)} {unitB}</div>
+             <div style={{ overflowX:"auto", border:"1px solid #e2e8f0", borderRadius:"8px" }}>
+               <table style={{ borderCollapse:"collapse", width:"100%", minWidth:"420px" }}>
+                 <thead><tr><th style={th}>Cognome Nome</th><th style={Object.assign({},th,{textAlign:"right"})}>Totale ({unitB})</th></tr></thead>
+                 <tbody>{rowsB.map(function(r,i){ return <tr key={i}><td style={td}>{r.nome}</td><td style={Object.assign({},td,{textAlign:"right",fontWeight:700})}>{fmtVal(r.val)}</td></tr>; })}</tbody>
+               </table>
+             </div>
+           </div>}
+        </div>
+      ) : null}
+
+      {mode==="movimenti" ? (
+        <div>
+          <div style={{ display:"flex", alignItems:"flex-end", gap:"12px", flexWrap:"wrap", marginBottom:"12px" }}>
+            <div><div style={{ fontSize:"12px", fontWeight:700, marginBottom:"3px" }}>Anno</div><select value={cAnno} onChange={function(e){ setCAnno(e.target.value); setOpenCell(""); }} style={yInput}>{yearOpts.map(function(y){ return <option key={y} value={String(y)}>{y}</option>; })}</select></div>
+            <button className="btn btn-blue" onClick={expC}>⬇️ Esporta Excel</button>
+          </div>
+          <div style={{ overflowX:"auto", border:"1px solid #e2e8f0", borderRadius:"8px", marginBottom:"10px" }}>
+            <table style={{ borderCollapse:"collapse", width:"100%", minWidth:"520px" }}>
+              <thead><tr><th style={th}></th><th style={Object.assign({},th,{textAlign:"center"})}>Determinati</th><th style={Object.assign({},th,{textAlign:"center"})}>Indeterminati</th><th style={Object.assign({},th,{textAlign:"center"})}>Totale</th></tr></thead>
+              <tbody>
+                {[["ent","Entrati",enteredC],["usc","Usciti",exitedC]].map(function(row){ const kind=row[0], lab=row[1], arr=row[2]; return <tr key={kind}>
+                  <td style={Object.assign({},td,{fontWeight:700})}>{lab}</td>
+                  {["determinato","indeterminato","all"].map(function(t){ const n=cell(arr,t); const ck=kind+"|"+t; return <td key={t} style={Object.assign({},td,{textAlign:"center",cursor:n?"pointer":"default",color:n?"#0369a1":"#94a3b8",fontWeight:700,textDecoration:n?"underline":"none"})} onClick={function(){ if(n) setOpenCell(openCell===ck?"":ck); }}>{n}</td>; })}
+                </tr>; })}
+                <tr><td style={Object.assign({},td,{fontWeight:700})}>Saldo</td>
+                  <td style={Object.assign({},td,{textAlign:"center",fontWeight:700})}>{cell(enteredC,"determinato")-cell(exitedC,"determinato")}</td>
+                  <td style={Object.assign({},td,{textAlign:"center",fontWeight:700})}>{cell(enteredC,"indeterminato")-cell(exitedC,"indeterminato")}</td>
+                  <td style={Object.assign({},td,{textAlign:"center",fontWeight:700})}>{enteredC.length-exitedC.length}</td></tr>
+              </tbody>
+            </table>
+          </div>
+          {openCell ? (function(){ const parts=openCell.split("|"); const kind=parts[0], t=parts[1]; const names=namesFor(kind,t); return <div style={{ background:"#f8fafc", border:"1px solid #e2e8f0", borderRadius:"8px", padding:"10px", fontSize:"13px" }}><b>{kind==="ent"?"Entrati":"Usciti"} — {t==="all"?"Totale":(t==="determinato"?"Determinati":"Indeterminati")}:</b> {names.length?names.join(", "):"nessuno"}</div>; })() : null}
+          {missC.length ? <div style={{ marginTop:"8px", fontSize:"12px", color:"#92400e" }}>⚠️ Senza data assunzione (non conteggiati): {missC.map(nomeOf).join(", ")}</div> : null}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -2129,6 +2316,13 @@ function App(){
     else dp.ana[field]=value;
     touch(next);
   };
+  const onAnaSet = function(dipId, patch){
+    const next = JSON.parse(JSON.stringify(state));
+    const dp = next.dipendenti.find(function(d){ return d.id===dipId; }); if (!dp) return;
+    if (!dp.ana) dp.ana = {};
+    Object.keys(patch).forEach(function(k){ if (ANA_SHARED[k]) dp[k]=patch[k]; else dp.ana[k]=patch[k]; });
+    touch(next);
+  };
   const onImportAna = function(){
     const next = JSON.parse(JSON.stringify(state)); let count=0, matched=0;
     next.dipendenti.forEach(function(dp){
@@ -2338,6 +2532,7 @@ function App(){
         })}
         <div className={"tab rep" + (vista==="rep"?" active":"")} onClick={function(){ setVista("rep"); }}>📊 Riepiloghi</div>
         <div className={"tab rep" + (vista==="ana"?" active":"")} onClick={function(){ setVista("ana"); }}>📇 Anagrafica</div>
+        <div className={"tab rep" + (vista==="query"?" active":"")} onClick={function(){ setVista("query"); }}>🔎 Query personale</div>
       </div>
 
       <div className="zoombar">
@@ -2352,7 +2547,8 @@ function App(){
 
       <div className="content" style={{ zoom: zoom / 100 }}>
         {vista === "rep" ? <Riepiloghi state={state} anno={anno} /> :
-         vista === "ana" ? <Anagrafica state={state} onAnaField={onAnaField} onImportAna={onImportAna} onExportAna={onExportAna} onAddDip={function(){ setDipModal({}); }} onEditDip={function(d){ setDipModal({ dip:d }); }} onSave={doSave} dirty={dirty} /> :
+         vista === "ana" ? <Anagrafica state={state} onAnaField={onAnaField} onAnaSet={onAnaSet} onImportAna={onImportAna} onExportAna={onExportAna} onAddDip={function(){ setDipModal({}); }} onEditDip={function(d){ setDipModal({ dip:d }); }} onSave={doSave} dirty={dirty} /> :
+         vista === "query" ? <QueryPanel state={state} /> :
           <div>
             <div className="toolbar">
               <strong style={{ fontSize:"15px", color:"#0f2740" }}>{MONTH_LABEL[mese-1]} {anno}</strong>
