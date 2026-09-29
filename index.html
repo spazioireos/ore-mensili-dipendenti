@@ -206,7 +206,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver44";
+const APP_VER = "ver45";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
 const MESE_ABBR_FILE = ["gen","feb","mar","apr","mag","giu","lug","ago","set","ott","nov","dic"];
@@ -331,7 +331,7 @@ function parseDMY(s){
 function isBlockedDay(dp, y, m, d){
   const cur = new Date(y, m-1, d);
   const a = parseDMY(dp.dataAssunzione);
-  const c = parseDMY(dp.dataCessazione);
+  const c = parseDMY(cessEffStr(dp));
   if (a && cur < new Date(a.getFullYear(), a.getMonth(), a.getDate())) return true;
   if (c && cur > new Date(c.getFullYear(), c.getMonth(), c.getDate())) return true;
   return false;
@@ -364,6 +364,9 @@ function ymdIt(s){ const m=String(s==null?"":s).match(/^(\d{1,2})\/(\d{1,2})\/(\
 function modNrFor(dp, docDate){ const dd=ymdIt(docDate); if(!dd) return ""; const all=prorogheList(dp).concat(trasfList(dp)); let before=0; all.forEach(function(x){ const v=ymdIt(x); if(v && v<dd) before++; }); return String(before+1); }
 function assunzInt(dp){ return ymdIt(dp.dataAssunzione); }
 function effEndInt(dp){ const cess=ymdIt(dp.dataCessazione); if(cess) return cess; if(String(dp.tipoContratto)==="determinato"){ let end=ymdIt(dp.scadenza); prorogheList(dp).forEach(function(p){ const v=ymdIt(p); if(v>end) end=v; }); return end||null; } return null; }
+function naturalEndInt(dp){ if(String(dp.tipoContratto)==="determinato"){ let end=ymdIt(dp.scadenza); prorogheList(dp).forEach(function(p){ const v=ymdIt(p); if(v>end) end=v; }); return end||0; } return 0; }
+function cessEffStr(dp){ if(dp && dp.cessManuale) return dp.dataCessazione||""; const n=naturalEndInt(dp); return n?intToIt(n):""; }
+function lastProroga(dp){ const ps=prorogheList(dp); if(!ps.length) return ""; let best=ps[0], bv=ymdIt(ps[0]); ps.forEach(function(p){ const v=ymdIt(p); if(v>bv){bv=v;best=p;} }); return best; }
 function inForceAt(dp, D){ const a=assunzInt(dp); if(!a) return false; if(a>D) return false; const e=effEndInt(dp); if(e && e<D) return false; return true; }
 function intToIt(n){ if(!n) return ""; const y=Math.floor(n/10000), m=Math.floor((n%10000)/100), d=n%100; return pad2(d)+"/"+pad2(m)+"/"+y; }
 function cellCode(v){ const s=String(v==null?"":v).trim().toUpperCase(); if(s==="") return ""; if(isNumeric(v)) return ""; return s.split(/\s+/)[0]; }
@@ -501,6 +504,7 @@ function migrate(obj){
     dp.dataAssunzione = expandDate(dp.dataAssunzione);
     dp.scadenza = expandDate(dp.scadenza);
     if (dp.dataCessazione) dp.dataCessazione = expandDate(dp.dataCessazione);
+    if (dp.cessManuale === undefined) dp.cessManuale = (dp.dataCessazione && String(dp.dataCessazione).trim()!=="") ? true : false;
     if (dp.ana){ dp.ana.dataNascita=expandDate(dp.ana.dataNascita); dp.ana.dataContratto=expandDate(dp.ana.dataContratto); if(dp.ana.dataProrogaAtto) dp.ana.dataProrogaAtto=expandDate(dp.ana.dataProrogaAtto); }
     if (Array.isArray(dp.proroghe)) dp.proroghe = dp.proroghe.map(expandDate);
     if (Array.isArray(dp.trasformazioni)) dp.trasformazioni = dp.trasformazioni.map(expandDate);
@@ -992,7 +996,7 @@ function EmployeeCard(props){
         {dp.livello ? <span className="pill">Liv. {dp.livello}</span> : null}
         <span className="pill">ORE SETT: {dp.oreSett}</span>
         <span className="pill">{contrLabel(dp)}</span>
-        {dp.dataCessazione ? <span className="pill cess">CESSATO {dp.dataCessazione}</span> : null}
+        {(function(){ const ce=cessEffStr(dp); if(!ce) return null; const now=new Date(); const tInt=now.getFullYear()*10000+(now.getMonth()+1)*100+now.getDate(); const ceInt=ymdIt(ce); return (ceInt && ceInt < tInt) ? <span className="pill cess">CESSATO {ce}</span> : <span className="pill" style={{ background:"#e0e7ff", color:"#3730a3" }}>fino al {ce}</span>; })()}
         <div className="spacer"></div>
         {!mLocked ? <button className="edit-mini qf" title="Compila velocemente il mese (ore o codice sui giorni scelti)" onClick={function(){ props.onQuickFill(dp); }}>⚡ Compila</button> : null}
         {!mLocked ? <button className="edit-mini svuota" title="Svuota tutto il mese per questo dipendente (con conferma)" onClick={function(){ props.onSvuotaMese(dp.id); }}>🗑 Svuota mese</button> : null}
@@ -1179,7 +1183,7 @@ function DipModal(props){
     if (n === "") return;
     const pro = tipo === "determinato" ? proroghe.filter(function(x){ return x && x.trim() !== ""; }) : [];
     props.onSave({ id: editing ? editing.id : uid(), nome:n, livello:livello.trim(), oreSett:Number(ore)||0,
-      tipoContratto:tipo, scadenza: tipo==="determinato" ? scad.trim() : "", proroghe:pro, trasformazioni: trasf.filter(function(x){ return x && x.trim() !== ""; }), ana: editing ? (editing.ana || {}) : {}, dataAssunzione:assunz.trim(), dataCessazione:cess.trim(), colore:colore });
+      tipoContratto:tipo, scadenza: tipo==="determinato" ? scad.trim() : "", proroghe:pro, trasformazioni: trasf.filter(function(x){ return x && x.trim() !== ""; }), ana: editing ? (editing.ana || {}) : {}, dataAssunzione:assunz.trim(), dataCessazione:cess.trim(), cessManuale: cess.trim()!=="", colore:colore });
   };
   return (
     <div className="overlay" onClick={props.onClose}>
@@ -1268,7 +1272,7 @@ function DipModal(props){
 
 const QUALIFICHE = ["ADDETTO ALLA CUSTODIA","ADDETTO ALLE PULIZIE","ANIMATORE / ASSISTENTE EDUCATIVO","COORDINATORE EDUCATIVO / REFERENTE","EDUCATORE","FORMATORE","IMPIEGATO","IMPIEGATO DI CONCETTO / REFERENTE DI UNITÀ PRODUTTIVA","SUPERVISORE"];
 const LUOGHI_LAVORO = ["ISTITUTO/I SCOLASTICO/I","CENTRO/I DI AGGREGAZIONE","UFFICIO/I","ALTRO/I LUOGO/I DEL TERRITORIO"];
-const ANA_SHARED = { livello:1, oreSett:1, tipoContratto:1, scadenza:1, dataAssunzione:1, dataCessazione:1 };
+const ANA_SHARED = { livello:1, oreSett:1, tipoContratto:1, scadenza:1, dataAssunzione:1, dataCessazione:1, cessManuale:1 };
 const ANA_DATALISTS = {
   giorniLav:["DA LUNEDI' A SABATO","DA LUNEDI' A VENERDI'"],
   periodo:["TUTTO IL PERIODO CONTRATTUALE","TUTTO IL PERIODO CONTRATTUALE (TEMPO DETERMINATO)","NELL' ANNO SCOLASTICO SECONDO I CALENDARI PUBBLICATI (A TEMPO INDETERMINATO)","NELL' ANNO SCOLASTICO SECONDO I CALENDARI PUBBLICATI DAGLI ENTI COMPETENTI"],
@@ -1279,18 +1283,26 @@ const ANA_SECTIONS = [
   { t:"Dati anagrafici", f:[["cognome","Cognome"],["nome","Nome"],["luogoNascita","Luogo di nascita"],["dataNascita","Data di nascita (gg/mm/aaaa)","date"],["sesso","Sesso","sex"],["cf","Codice fiscale","cf"],["email","Email"]] },
   { t:"Residenza", f:[["indRes","Indirizzo residenza"],["capRes","CAP"],["luogoRes","Comune"]] },
   { t:"Domicilio", f:[["indDom","Indirizzo domicilio"],["capDom","CAP"],["luogoDom","Comune"]] },
-  { t:"Contratto", f:[["dataContratto","Data contratto","date"],["dataAssunzione","Data avvio / assunzione","date"],["scadenza","Data conclusione / scadenza","date"],["tipoContratto","Tipo contratto","tipo"],["partFull","Part / Full time","list:partFull"],["orizz","Orizzontale / Verticale / Misto","list:orizz"],["qualifica","Ruolo / qualifica","qual"],["livello","Livello di inquadramento"]] },
+  { t:"Contratto", f:[["dataContratto","Data contratto","date"],["dataAssunzione","Data avvio / assunzione","date"],["scadenza","Data conclusione / scadenza","date"],["cessazione","Data cessazione","cess"],["tipoContratto","Tipo contratto","tipo"],["partFull","Part / Full time","list:partFull"],["orizz","Orizzontale / Verticale / Misto","list:orizz"],["qualifica","Ruolo / qualifica","qual"],["livello","Livello di inquadramento"]] },
   { t:"Luogo di lavoro", f:[["luogo","Luogo di lavoro","luogo"],["specificaStruttura","Specifica struttura (nome istituto/centro…)"],["ubicazione","Ubicazione / indirizzo"]] },
   { t:"Orario", f:[["oreSett","Monte ore settimanali"],["giorniLav","Giorni di lavoro nella settimana","list:giorniLav"],["periodo","Periodo di lavoro nell'anno","list:periodo"],["giorniProva","Giorni di prova"]] },
   { t:"Orari settimanali (per la tabella del contratto)", f:[["orarioLun","Lunedì"],["orarioMar","Martedì"],["orarioMer","Mercoledì"],["orarioGio","Giovedì"],["orarioVen","Venerdì"],["orarioSab","Sabato"]] },
   { t:"Economico", f:[["impBase","Importo orario base €"],["impSuper","Superminimo €"],["tipoSuper","Superminimo: variante","super"],["scatti","Scatti di anzianità €"],["impAltro","Altro importo orario €"],["tipoAltro","Tipologia altro"],["impTot","Importo orario totale € (automatico)","auto"]] },
   { t:"Note", f:[["note","Note"],["note2","Note 2"]] },
-  { t:"Proroga / Trasformazione — dati per le lettere", f:[
-    ["modNr","Nr. modifica contrattuale (lascia vuoto = automatico)"],
-    ["committenteFondi","Committente / fondi — es. Comune di Milano (proroga)"],
-    ["numeroAppalto","Numero appalto / convenzione (proroga)"],
-    ["contenutoModifica","Contenuto della modifica — testo libero (trasformazione)","textarea"],
-    ["dataProrogaAtto","Data dell'atto — gg/mm/aa (proroga e trasformazione)"]
+  { t:"Proroga — dati per la lettera", f:[
+    ["proroAvvio","Data di avvio proroga (gg/mm/aaaa)","date"],
+    ["__proroTermine","Data termine — ultima proroga (automatica)","roauto:proroTermine"],
+    ["committenteFondi","Committente / fondi — es. Comune di Milano"],
+    ["numeroAppalto","Numero appalto / convenzione"]
+  ] },
+  { t:"Trasformazione — dati per la lettera", f:[
+    ["trasfAvvio","Data di avvio trasformazione (gg/mm/aaaa)","date"],
+    ["__trasfTermine","Data termine (non prevista)","roblock"],
+    ["contenutoModifica","Contenuto della modifica — testo libero","textarea"]
+  ] },
+  { t:"Atto (comune a proroga e trasformazione) — per numerare le lettere", f:[
+    ["dataProrogaAtto","Data dell'atto — gg/mm/aaaa","date"],
+    ["modNr","Nr. modifica contrattuale (lascia vuoto = automatico)"]
   ] }
 ];
 function anaNum(v){ const s=String(v==null?"":v).replace(",", "."); const n=parseFloat(s); return isNaN(n)?0:n; }
@@ -1622,6 +1634,20 @@ function Anagrafica(props){
                   if (kind==="luogo") return <div key={key} className="field" style={{margin:0}}><label>{lbl}</label>
                     <select value={anaVal(dp,"luogo")||""} onChange={function(e){ props.onAnaField(dp.id,"luogo",e.target.value); }}>
                       <option value="">— seleziona —</option>{LUOGHI_LAVORO.map(function(q){ return <option key={q} value={q}>{q}</option>; })}</select></div>;
+                  if (kind==="cess"){ const manuale=!!dp.cessManuale; const ce=cessEffStr(dp);
+                    return <div key={key} className="field" style={{margin:0}}><label>{lbl}</label>
+                      <div style={{ display:"flex", gap:"6px", alignItems:"center", flexWrap:"wrap" }}>
+                        {manuale
+                          ? <input value={dp.dataCessazione||""} maxLength={10} placeholder="gg/mm/aaaa" inputMode="numeric" onChange={function(e){ props.onAnaField(dp.id,"dataCessazione",maskDate(e.target.value)); }} style={{ flex:"1 1 120px", minWidth:0, border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px", padding:"6px 8px" }} />
+                          : <input value={ce} disabled placeholder="(nessuna)" style={{ flex:"1 1 120px", minWidth:0, background:"#f1f5f9", borderColor:"#cbd5e1", color:"#475569", borderRadius:"6px", padding:"6px 8px" }} />}
+                        {manuale
+                          ? <button type="button" className="btn" title="Torna al calcolo automatico" onClick={function(){ props.onAnaSet(dp.id,{cessManuale:false,dataCessazione:""}); }} style={{ whiteSpace:"nowrap" }}>↺ auto</button>
+                          : <button type="button" className="btn" title="Imposta a mano (uscita anticipata)" onClick={function(){ props.onAnaSet(dp.id,{cessManuale:true,dataCessazione:ce}); }} style={{ whiteSpace:"nowrap" }}>✎ a mano</button>}
+                        {ce ? <button type="button" className="btn btn-red" title="Cancella le ore inserite dopo la cessazione (con conferma)" onClick={function(){ props.onCessCleanup(dp.id); }} style={{ whiteSpace:"nowrap" }}>🧹 Pulisci ore dopo</button> : null}
+                      </div>
+                      <div style={{ fontSize:"11px", marginTop:"2px", color:"#64748b" }}>{manuale ? "Impostata a mano (uscita anticipata)." : "Automatica: fine contratto o ultima proroga. Le ore dopo questa data sono bloccate nel report."}</div></div>; }
+                  if (kind && kind.indexOf("roauto:")===0){ const which=kind.slice(7); const val = which==="proroTermine" ? lastProroga(dp) : ""; return <div key={key} className="field" style={{margin:0}}><label>{lbl}</label><input value={val} disabled placeholder="(nessuna proroga)" style={{ background:"#f1f5f9", borderColor:"#cbd5e1", color:"#475569" }} /></div>; }
+                  if (kind==="roblock"){ return <div key={key} className="field" style={{margin:0}}><label>{lbl}</label><input value="" disabled placeholder="—" style={{ background:"#f1f5f9", borderColor:"#cbd5e1", color:"#94a3b8" }} /></div>; }
                   if (kind==="sex") return <div key={key} className="field" style={{margin:0}}><label>{lbl}</label>
                     <select value={anaVal(dp,"sesso")||""} onChange={function(e){ props.onAnaField(dp.id,"sesso",e.target.value); }}>
                       <option value="">—</option><option value="M">M</option><option value="F">F</option></select></div>;
@@ -2332,6 +2358,17 @@ function App(){
     Object.keys(patch).forEach(function(k){ if (ANA_SHARED[k]) dp[k]=patch[k]; else dp.ana[k]=patch[k]; });
     touch(next);
   };
+  const onCessCleanup = function(dipId){
+    const dp0 = state.dipendenti.find(function(d){ return d.id===dipId; }); if(!dp0) return;
+    const ce = cessEffStr(dp0); const ceInt = ymdIt(ce); if(!ceInt){ window.alert("Nessuna data di cessazione impostata."); return; }
+    const hits=[];
+    Object.keys(state.dati||{}).forEach(function(mk){ const rec=state.dati[mk] && state.dati[mk][dipId]; if(!rec||!rec.giorni) return; const parts=String(mk).split("-"); const y=parseInt(parts[0],10), m=parseInt(parts[1],10); Object.keys(rec.giorni).forEach(function(d){ const di=y*10000+m*100+parseInt(d,10); const v=rec.giorni[d]; if(di>ceInt && v!=null && String(v).trim()!==""){ hits.push({mk:mk,d:d}); } }); });
+    if(hits.length===0){ window.alert("Nessuna cella compilata dopo la data di cessazione ("+ce+")."); return; }
+    if(!window.confirm("Ci sono "+hits.length+" celle compilate dopo la data di cessazione ("+ce+"). Le cancello?")) return;
+    const next = JSON.parse(JSON.stringify(state));
+    hits.forEach(function(h){ if(next.dati[h.mk] && next.dati[h.mk][dipId] && next.dati[h.mk][dipId].giorni){ delete next.dati[h.mk][dipId].giorni[h.d]; } });
+    touch(next);
+  };
   const onImportAna = function(){
     const next = JSON.parse(JSON.stringify(state)); let count=0, matched=0;
     next.dipendenti.forEach(function(dp){
@@ -2354,7 +2391,7 @@ function App(){
   const onExportAna = function(){
     const dips = dipSorted(state);
     const cols = [];
-    ANA_SECTIONS.forEach(function(sec){ sec.f.forEach(function(f){ if (f[2]!=="auto") cols.push([f[0], f[1]]); }); });
+    ANA_SECTIONS.forEach(function(sec){ sec.f.forEach(function(f){ const k=f[2]; if (k!=="auto" && k!=="cess" && k!=="roblock" && !(k&&String(k).indexOf("roauto:")===0)) cols.push([f[0], f[1]]); }); });
     cols.push(["impTot","Importo orario totale €"]);
     const hdrStyle = { font:{ name:"Arial", bold:true, color:{rgb:"FFFFFFFF"} }, fill:{ patternType:"solid", fgColor:{rgb:"FF0F2740"} }, alignment:{horizontal:"center"} };
     const aoa = [cols.map(function(c){ return c[1].toUpperCase(); })];
@@ -2556,7 +2593,7 @@ function App(){
 
       <div className="content" style={{ zoom: zoom / 100 }}>
         {vista === "rep" ? <Riepiloghi state={state} anno={anno} /> :
-         vista === "ana" ? <Anagrafica state={state} onAnaField={onAnaField} onAnaSet={onAnaSet} onImportAna={onImportAna} onExportAna={onExportAna} onAddDip={function(){ setDipModal({}); }} onEditDip={function(d){ setDipModal({ dip:d }); }} onSave={doSave} dirty={dirty} /> :
+         vista === "ana" ? <Anagrafica state={state} onAnaField={onAnaField} onAnaSet={onAnaSet} onCessCleanup={onCessCleanup} onImportAna={onImportAna} onExportAna={onExportAna} onAddDip={function(){ setDipModal({}); }} onEditDip={function(d){ setDipModal({ dip:d }); }} onSave={doSave} dirty={dirty} /> :
          vista === "query" ? <QueryPanel state={state} /> :
           <div>
             <div className="toolbar">
