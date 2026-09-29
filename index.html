@@ -206,7 +206,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver43";
+const APP_VER = "ver44";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
 const MESE_ABBR_FILE = ["gen","feb","mar","apr","mag","giu","lug","ago","set","ott","nov","dic"];
@@ -1697,11 +1697,14 @@ function QueryPanel(props){
   const enteredC = dips.filter(function(dp){ const a=assunzInt(dp); return a>=y0 && a<=y1; });
   const exitedC = dips.filter(function(dp){ const e=effEndInt(dp); return e && e>=y0 && e<=y1; });
   const missC = dips.filter(function(dp){ return !assunzInt(dp); });
+  const eventsInYear = function(listFn){ const out=[]; dips.forEach(function(dp){ listFn(dp).forEach(function(ds){ const v=ymdIt(ds); if(v>=y0 && v<=y1) out.push({ dp:dp, d:ds, v:v }); }); }); out.sort(function(a,b){ return a.v-b.v; }); return out; };
+  const proroEventsC = eventsInYear(prorogheList);
+  const trasfEventsC = eventsInYear(trasfList);
   const byTipo = function(arr,t){ return arr.filter(function(dp){ return String(dp.tipoContratto)===t; }); };
   const cell = function(arr,t){ return t==="all"?arr.length:byTipo(arr,t).length; };
   const yearOpts = (function(){ const set={}; (state.anni||[]).forEach(function(y){set[y]=true;}); set[now.getFullYear()]=true; return Object.keys(set).map(function(y){return parseInt(y,10);}).sort(function(a,b){return a-b;}); })();
-  const namesFor = function(kind, t){ const arr = kind==="ent"?enteredC:exitedC; const f = t==="all"?arr:byTipo(arr,t); return f.map(nomeOf); };
-  function expC(){ const aoa=[["MOVIMENTI ANNO "+Y],[],["","DETERMINATI","INDETERMINATI","TOTALE"],["Entrati", cell(enteredC,"determinato"), cell(enteredC,"indeterminato"), enteredC.length],["Usciti", cell(exitedC,"determinato"), cell(exitedC,"indeterminato"), exitedC.length],["Saldo", cell(enteredC,"determinato")-cell(exitedC,"determinato"), cell(enteredC,"indeterminato")-cell(exitedC,"indeterminato"), enteredC.length-exitedC.length]]; aoa.push([]); aoa.push(["ENTRATI"]); enteredC.forEach(function(dp){ aoa.push([nomeOf(dp), tipoLabel(dp.tipoContratto), intToIt(assunzInt(dp))]); }); aoa.push([]); aoa.push(["USCITI"]); exitedC.forEach(function(dp){ aoa.push([nomeOf(dp), tipoLabel(dp.tipoContratto), intToIt(effEndInt(dp))]); }); if(missC.length){ aoa.push([]); aoa.push(["DATA ASSUNZIONE MANCANTE (non conteggiati)"]); missC.forEach(function(dp){ aoa.push([nomeOf(dp)]); }); } qExport("Query - Movimenti "+Y+".xlsx", aoa); }
+  const namesFor = function(kind, t){ if(kind==="pro") return proroEventsC.map(function(e){ return nomeOf(e.dp)+" ("+e.d+")"; }); if(kind==="tra") return trasfEventsC.map(function(e){ return nomeOf(e.dp)+" ("+e.d+")"; }); const arr = kind==="ent"?enteredC:exitedC; const f = t==="all"?arr:byTipo(arr,t); return f.map(nomeOf); };
+  function expC(){ const aoa=[["MOVIMENTI ANNO "+Y],[],["","DETERMINATI","INDETERMINATI","TOTALE"],["Entrati", cell(enteredC,"determinato"), cell(enteredC,"indeterminato"), enteredC.length],["Usciti", cell(exitedC,"determinato"), cell(exitedC,"indeterminato"), exitedC.length],["Proroghe","","",proroEventsC.length],["Trasformazioni","","",trasfEventsC.length],["Saldo", cell(enteredC,"determinato")-cell(exitedC,"determinato"), cell(enteredC,"indeterminato")-cell(exitedC,"indeterminato"), enteredC.length-exitedC.length]]; aoa.push([]); aoa.push(["ENTRATI"]); enteredC.forEach(function(dp){ aoa.push([nomeOf(dp), tipoLabel(dp.tipoContratto), intToIt(assunzInt(dp))]); }); aoa.push([]); aoa.push(["USCITI"]); exitedC.forEach(function(dp){ aoa.push([nomeOf(dp), tipoLabel(dp.tipoContratto), intToIt(effEndInt(dp))]); }); aoa.push([]); aoa.push(["PROROGHE"]); proroEventsC.forEach(function(e){ aoa.push([nomeOf(e.dp), tipoLabel(e.dp.tipoContratto), e.d]); }); aoa.push([]); aoa.push(["TRASFORMAZIONI"]); trasfEventsC.forEach(function(e){ aoa.push([nomeOf(e.dp), tipoLabel(e.dp.tipoContratto), e.d]); }); if(missC.length){ aoa.push([]); aoa.push(["DATA ASSUNZIONE MANCANTE (non conteggiati)"]); missC.forEach(function(dp){ aoa.push([nomeOf(dp)]); }); } qExport("Query - Movimenti "+Y+".xlsx", aoa); }
 
   return (
     <div style={{ padding:"14px" }}>
@@ -1778,6 +1781,12 @@ function QueryPanel(props){
                   <td style={Object.assign({},td,{fontWeight:700})}>{lab}</td>
                   {["determinato","indeterminato","all"].map(function(t){ const n=cell(arr,t); const ck=kind+"|"+t; return <td key={t} style={Object.assign({},td,{textAlign:"center",cursor:n?"pointer":"default",color:n?"#0369a1":"#94a3b8",fontWeight:700,textDecoration:n?"underline":"none"})} onClick={function(){ if(n) setOpenCell(openCell===ck?"":ck); }}>{n}</td>; })}
                 </tr>; })}
+                {[["pro","Proroghe",proroEventsC.length],["tra","Trasformazioni",trasfEventsC.length]].map(function(row){ const kind=row[0], lab=row[1], n=row[2]; const ck=kind+"|all"; return <tr key={kind}>
+                  <td style={Object.assign({},td,{fontWeight:700})}>{lab}</td>
+                  <td style={Object.assign({},td,{textAlign:"center",color:"#94a3b8"})}>—</td>
+                  <td style={Object.assign({},td,{textAlign:"center",color:"#94a3b8"})}>—</td>
+                  <td style={Object.assign({},td,{textAlign:"center",cursor:n?"pointer":"default",color:n?"#0369a1":"#94a3b8",fontWeight:700,textDecoration:n?"underline":"none"})} onClick={function(){ if(n) setOpenCell(openCell===ck?"":ck); }}>{n}</td>
+                </tr>; })}
                 <tr><td style={Object.assign({},td,{fontWeight:700})}>Saldo</td>
                   <td style={Object.assign({},td,{textAlign:"center",fontWeight:700})}>{cell(enteredC,"determinato")-cell(exitedC,"determinato")}</td>
                   <td style={Object.assign({},td,{textAlign:"center",fontWeight:700})}>{cell(enteredC,"indeterminato")-cell(exitedC,"indeterminato")}</td>
@@ -1785,7 +1794,7 @@ function QueryPanel(props){
               </tbody>
             </table>
           </div>
-          {openCell ? (function(){ const parts=openCell.split("|"); const kind=parts[0], t=parts[1]; const names=namesFor(kind,t); return <div style={{ background:"#f8fafc", border:"1px solid #e2e8f0", borderRadius:"8px", padding:"10px", fontSize:"13px" }}><b>{kind==="ent"?"Entrati":"Usciti"} — {t==="all"?"Totale":(t==="determinato"?"Determinati":"Indeterminati")}:</b> {names.length?names.join(", "):"nessuno"}</div>; })() : null}
+          {openCell ? (function(){ const parts=openCell.split("|"); const kind=parts[0], t=parts[1]; const names=namesFor(kind,t); return <div style={{ background:"#f8fafc", border:"1px solid #e2e8f0", borderRadius:"8px", padding:"10px", fontSize:"13px" }}><b>{(kind==="ent"?"Entrati":kind==="usc"?"Usciti":kind==="pro"?"Proroghe":"Trasformazioni") + ((kind==="pro"||kind==="tra")?"":(t==="all"?" — Totale":(t==="determinato"?" — Determinati":" — Indeterminati")))}:</b> {names.length?names.join(", "):"nessuno"}</div>; })() : null}
           {missC.length ? <div style={{ marginTop:"8px", fontSize:"12px", color:"#92400e" }}>⚠️ Senza data assunzione (non conteggiati): {missC.map(nomeOf).join(", ")}</div> : null}
         </div>
       ) : null}
