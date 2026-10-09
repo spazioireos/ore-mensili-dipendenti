@@ -206,7 +206,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver46";
+const APP_VER = "ver47";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
 const MESE_ABBR_FILE = ["gen","feb","mar","apr","mag","giu","lug","ago","set","ott","nov","dic"];
@@ -359,12 +359,46 @@ const PERM_TIPI = PERM_CODES.map(function(c){ return CODE_SET[c]; }).filter(func
 function hashPin(p){ let h=5381; for (let i=0;i<p.length;i++){ h=((h<<5)+h)+p.charCodeAt(i); h=h&0xffffffff; } return String(h>>>0); }
 
 function prorogheList(dp){ return Array.isArray(dp.proroghe) ? dp.proroghe.filter(function(x){ return x && String(x).trim() !== ""; }) : []; }
-function trasfList(dp){ return Array.isArray(dp.trasformazioni) ? dp.trasformazioni.filter(function(x){ return x && String(x).trim() !== ""; }) : []; }
+function trasfNorm(t){ if(typeof t==="string") return { data:t }; return t||{}; }
+function trasfList(dp){ return Array.isArray(dp.trasformazioni) ? dp.trasformazioni.map(trasfNorm).filter(function(x){ return x.data && String(x.data).trim()!==""; }) : []; }
+function trasfDates(dp){ return trasfList(dp).map(function(t){ return t.data; }); }
+function trasfOrder(dp){ return trasfList(dp).slice().sort(function(a,b){ return ymdIt(a.data)-ymdIt(b.data); }); }
+function valoriAt(dp, y, m){
+  let liv=(dp.livello==null?"":String(dp.livello)), ore=Number(dp.oreSett)||0, tipo=dp.tipoContratto||"indeterminato";
+  const ref=y*10000+m*100+1;
+  trasfOrder(dp).forEach(function(t){ if(ymdIt(t.data)<=ref){
+    if(t.livello!=null && String(t.livello).trim()!=="") liv=String(t.livello).trim();
+    if(t.oreSett!=null && String(t.oreSett)!=="" && !isNaN(Number(t.oreSett))) ore=Number(t.oreSett);
+    if(t.toIndet) tipo="indeterminato";
+  }});
+  return { livello:liv, oreSett:ore, tipo:tipo };
+}
+function valoriNow(dp){ return valoriAt(dp, 9999, 12); }
+function tipoNow(dp){ return valoriNow(dp).tipo; }
+function livelloAt(dp,y,m){ return valoriAt(dp,y,m).livello; }
+function oreSettAt(dp,y,m){ return valoriAt(dp,y,m).oreSett; }
+function tipoAt(dp,y,m){ return valoriAt(dp,y,m).tipo; }
+function hoursDisp(v){ const n=Number(v)||0; return Number.isInteger(n) ? String(n) : fmt2(n); }
+function contrLabelAt(dp,y,m){ if(tipoAt(dp,y,m)==="determinato"){ const chain=[dp.scadenza||"?"].concat(prorogheList(dp)); return "Determinato → "+chain.join(" → "); } return "Indeterminato"; }
+function autoContenuto(dp){
+  const list=trasfOrder(dp); if(!list.length) return "";
+  const t=list[list.length-1]; const di=ymdIt(t.data); if(!di) return "";
+  const y=Math.floor(di/10000), m=Math.floor((di%10000)/100);
+  let py=y, pm=m-1; if(pm<1){ pm=12; py=y-1; }
+  const prev=valoriAt(dp,py,pm);
+  const parts=[];
+  if(t.toIndet) parts.push("trasformazione del rapporto di lavoro da tempo determinato a tempo indeterminato");
+  if(t.livello!=null && String(t.livello).trim()!=="" && String(t.livello).trim()!==prev.livello) parts.push("passaggio dal livello "+(prev.livello||"—")+" al livello "+String(t.livello).trim());
+  if(t.oreSett!=null && String(t.oreSett)!=="" && Number(t.oreSett)!==prev.oreSett) parts.push("variazione del monte ore settimanale da "+hoursDisp(prev.oreSett)+" a "+hoursDisp(Number(t.oreSett))+" ore");
+  if(!parts.length) return "";
+  let frase=parts.join(" e ")+" con decorrenza "+dlong(t.data)+".";
+  return frase.charAt(0).toUpperCase()+frase.slice(1);
+}
 function ymdIt(s){ const m=String(s==null?"":s).match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/); if(!m) return 0; let d=parseInt(m[1],10),mo=parseInt(m[2],10),y=parseInt(m[3],10); if(y<100)y=(y>=40?1900+y:2000+y); return y*10000+mo*100+d; }
-function modNrFor(dp, docDate){ const dd=ymdIt(docDate); if(!dd) return ""; const all=prorogheList(dp).concat(trasfList(dp)); let before=0; all.forEach(function(x){ const v=ymdIt(x); if(v && v<dd) before++; }); return String(before+1); }
+function modNrFor(dp, docDate){ const dd=ymdIt(docDate); if(!dd) return ""; const all=prorogheList(dp).concat(trasfDates(dp)); let before=0; all.forEach(function(x){ const v=ymdIt(x); if(v && v<dd) before++; }); return String(before+1); }
 function assunzInt(dp){ return ymdIt(dp.dataAssunzione); }
-function effEndInt(dp){ const cess=ymdIt(dp.dataCessazione); if(cess) return cess; if(String(dp.tipoContratto)==="determinato"){ let end=ymdIt(dp.scadenza); prorogheList(dp).forEach(function(p){ const v=ymdIt(p); if(v>end) end=v; }); return end||null; } return null; }
-function naturalEndInt(dp){ if(String(dp.tipoContratto)==="determinato"){ let end=ymdIt(dp.scadenza); prorogheList(dp).forEach(function(p){ const v=ymdIt(p); if(v>end) end=v; }); return end||0; } return 0; }
+function effEndInt(dp){ const cess=ymdIt(dp.dataCessazione); if(cess) return cess; if(tipoNow(dp)==="determinato"){ let end=ymdIt(dp.scadenza); prorogheList(dp).forEach(function(p){ const v=ymdIt(p); if(v>end) end=v; }); return end||null; } return null; }
+function naturalEndInt(dp){ if(tipoNow(dp)==="determinato"){ let end=ymdIt(dp.scadenza); prorogheList(dp).forEach(function(p){ const v=ymdIt(p); if(v>end) end=v; }); return end||0; } return 0; }
 function cessEffStr(dp){ if(dp && dp.cessManuale) return dp.dataCessazione||""; const n=naturalEndInt(dp); return n?intToIt(n):""; }
 function lastProroga(dp){ const ps=prorogheList(dp); if(!ps.length) return ""; let best=ps[0], bv=ymdIt(ps[0]); ps.forEach(function(p){ const v=ymdIt(p); if(v>bv){bv=v;best=p;} }); return best; }
 function inForceAt(dp, D){ const a=assunzInt(dp); if(!a) return false; if(a>D) return false; const e=effEndInt(dp); if(e && e<D) return false; return true; }
@@ -507,7 +541,7 @@ function migrate(obj){
     if (dp.cessManuale === undefined) dp.cessManuale = (dp.dataCessazione && String(dp.dataCessazione).trim()!=="") ? true : false;
     if (dp.ana){ dp.ana.dataNascita=expandDate(dp.ana.dataNascita); dp.ana.dataContratto=expandDate(dp.ana.dataContratto); if(dp.ana.dataProrogaAtto) dp.ana.dataProrogaAtto=expandDate(dp.ana.dataProrogaAtto); }
     if (Array.isArray(dp.proroghe)) dp.proroghe = dp.proroghe.map(expandDate);
-    if (Array.isArray(dp.trasformazioni)) dp.trasformazioni = dp.trasformazioni.map(expandDate);
+    if (Array.isArray(dp.trasformazioni)) dp.trasformazioni = dp.trasformazioni.map(function(t){ if(typeof t==="string") return { data:expandDate(t) }; const o=Object.assign({}, t); o.data=expandDate(o.data); return o; });
   });
   if (!obj.noteRecuperate2026){
     const byName = {}; (obj.dipendenti || []).forEach(function(d){ byName[String(d.nome).trim().toUpperCase()] = d.id; });
@@ -644,7 +678,7 @@ function esportaExcel(state, pairs){
     // intestazioni
     put(1, 0, "Giorno", styGiornoHead);
     dips.forEach(function(dp, i){
-      const info = dp.oreSett + " h/sett · " + contrLabel(dp) + (dp.livello ? " · Liv. " + dp.livello : "");
+      const info = hoursDisp(oreSettAt(dp,anno,m)) + " h/sett · " + contrLabelAt(dp,anno,m) + (livelloAt(dp,anno,m) ? " · Liv. " + livelloAt(dp,anno,m) : "");
       put(1, i+1, dp.nome + "\n" + info, styEmpHead);
     });
     // giorni
@@ -993,9 +1027,9 @@ function EmployeeCard(props){
     <div className="emp-card" style={{ borderColor: dp.colore || "#00B0F0", borderWidth:"3px" }}>
       <div className="emp-head" style={{ background: dp.colore || "#00B0F0" }}>
         <span className="nome" style={{ color:"#08344a" }}>{dp.nome}</span>
-        {dp.livello ? <span className="pill">Liv. {dp.livello}</span> : null}
-        <span className="pill">ORE SETT: {dp.oreSett}</span>
-        <span className="pill">{contrLabel(dp)}</span>
+        {livelloAt(dp,y,m) ? <span className="pill">Liv. {livelloAt(dp,y,m)}</span> : null}
+        <span className="pill">ORE SETT: {hoursDisp(oreSettAt(dp,y,m))}</span>
+        <span className="pill">{contrLabelAt(dp,y,m)}</span>
         {(function(){ const ce=cessEffStr(dp); if(!ce) return null; const now=new Date(); const tInt=now.getFullYear()*10000+(now.getMonth()+1)*100+now.getDate(); const ceInt=ymdIt(ce); return (ceInt && ceInt < tInt) ? <span className="pill cess">CESSATO {ce}</span> : <span className="pill" style={{ background:"#e0e7ff", color:"#3730a3" }}>fino al {ce}</span>; })()}
         <div className="spacer"></div>
         {!mLocked ? <button className="edit-mini qf" title="Compila velocemente il mese (ore o codice sui giorni scelti)" onClick={function(){ props.onQuickFill(dp); }}>⚡ Compila</button> : null}
@@ -1171,10 +1205,27 @@ function DipModal(props){
   const [nuovaPro, setNuovaPro] = useState("");
   const addPro = function(){ const v = nuovaPro.trim(); if (v === "") return; setProroghe(proroghe.concat([v])); setNuovaPro(""); };
   const delPro = function(i){ setProroghe(proroghe.filter(function(_, k){ return k !== i; })); };
-  const [trasf, setTrasf] = useState(editing && Array.isArray(editing.trasformazioni) ? editing.trasformazioni.slice() : []);
-  const [nuovaTrasf, setNuovaTrasf] = useState("");
-  const addTrasf = function(){ const v = nuovaTrasf.trim(); if (v === "") return; setTrasf(trasf.concat([v])); setNuovaTrasf(""); };
+  const [trasf, setTrasf] = useState(editing && Array.isArray(editing.trasformazioni) ? editing.trasformazioni.map(function(t){ return typeof t==="string" ? { data:t } : Object.assign({}, t); }) : []);
+  const _now47 = new Date();
+  const [ntMese, setNtMese] = useState(String(_now47.getMonth()+1));
+  const [ntAnno, setNtAnno] = useState(String(_now47.getFullYear()));
+  const [ntLiv, setNtLiv] = useState("");
+  const [ntOre, setNtOre] = useState("");
+  const [ntIndet, setNtIndet] = useState(false);
+  const addTrasf = function(){
+    const mm=parseInt(ntMese,10), yy=parseInt(ntAnno,10);
+    if(!mm||mm<1||mm>12||!yy||yy<2000||yy>2100){ return; }
+    const rec={ data:"01/"+(mm<10?"0":"")+mm+"/"+yy };
+    if(ntLiv.trim()!=="") rec.livello=ntLiv.trim().toUpperCase();
+    const oreV=String(ntOre).replace(",",".").trim();
+    if(oreV!=="" && !isNaN(Number(oreV))) rec.oreSett=Number(oreV);
+    if(ntIndet) rec.toIndet=true;
+    if(!rec.livello && rec.oreSett==null && !rec.toIndet){ return; }
+    setTrasf(trasf.concat([rec]).sort(function(a,b){ return ymdIt(a.data)-ymdIt(b.data); }));
+    setNtLiv(""); setNtOre(""); setNtIndet(false);
+  };
   const delTrasf = function(i){ setTrasf(trasf.filter(function(_, k){ return k !== i; })); };
+  const trasfSummary = function(t){ const parts=[]; if(t.toIndet) parts.push("→ a tempo indeterminato"); if(t.livello) parts.push("livello "+t.livello); if(t.oreSett!=null && String(t.oreSett)!=="") parts.push((Number.isInteger(Number(t.oreSett))?String(Number(t.oreSett)):fmt2(Number(t.oreSett)))+" h/sett"); return (parts.join(", ")||"nessuna modifica")+" — dal "+t.data; };
   const [assunz, setAssunz] = useState(editing ? (editing.dataAssunzione||"") : "");
   const [cess, setCess] = useState(editing ? (editing.dataCessazione||"") : "");
   const [colore, setColore] = useState(editing ? (editing.colore||PALETTE[0]) : PALETTE[0]);
@@ -1183,7 +1234,7 @@ function DipModal(props){
     if (n === "") return;
     const pro = tipo === "determinato" ? proroghe.filter(function(x){ return x && x.trim() !== ""; }) : [];
     props.onSave({ id: editing ? editing.id : uid(), nome:n, livello:livello.trim(), oreSett:Number(ore)||0,
-      tipoContratto:tipo, scadenza: tipo==="determinato" ? scad.trim() : "", proroghe:pro, trasformazioni: trasf.filter(function(x){ return x && x.trim() !== ""; }), ana: editing ? (editing.ana || {}) : {}, dataAssunzione:assunz.trim(), dataCessazione:cess.trim(), cessManuale: cess.trim()!=="", colore:colore });
+      tipoContratto:tipo, scadenza: tipo==="determinato" ? scad.trim() : "", proroghe:pro, trasformazioni: trasf.filter(function(x){ return x && x.data; }), ana: editing ? (editing.ana || {}) : {}, dataAssunzione:assunz.trim(), dataCessazione:cess.trim(), cessManuale: cess.trim()!=="", colore:colore });
   };
   return (
     <div className="overlay" onClick={props.onClose}>
@@ -1228,23 +1279,30 @@ function DipModal(props){
             </div>
           </div> : null}
         <div className="field" style={{ background:"#faf5ff", border:"1px solid #e9d5ff", borderRadius:"8px", padding:"10px" }}>
-          <label style={{ fontWeight:800 }}>Trasformazioni (storico) — solo le date, per numerare le modifiche in ordine</label>
-          <div style={{ fontSize:"11px", color:"#64748b", margin:"2px 0 6px" }}>Registra qui la data di ogni trasformazione già fatta: il numero “Modifica contrattuale nr. N” conta insieme proroghe e trasformazioni in ordine di data.</div>
+          <label style={{ fontWeight:800 }}>Trasformazioni (storico) — decorrenza sempre dal 1° del mese</label>
+          <div style={{ fontSize:"11px", color:"#64748b", margin:"2px 0 6px" }}>Registra ogni trasformazione: innalzamento livello, variazione monte ore, passaggio a tempo indeterminato. Dal mese di decorrenza il report (ore teoriche) e i badge si adeguano da soli; i mesi precedenti restano col valore vecchio.</div>
           {trasf.length === 0 ? <div style={{ fontSize:"12px", color:"#64748b", margin:"4px 0" }}>Nessuna trasformazione registrata.</div> :
             <div style={{ margin:"6px 0" }}>
               {trasf.map(function(tt, i){ return (
                 <div key={i} style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"4px", fontSize:"13px" }}>
-                  <span style={{ fontWeight:700 }}>trasformazione → {tt}</span>
+                  <span style={{ fontWeight:700 }}>{trasfSummary(tt)}</span>
                   <button className="voce-del" title="Rimuovi trasformazione" onClick={function(){ delTrasf(i); }}>✕</button>
                 </div>
               ); })}
             </div>}
-          <div style={{ display:"flex", gap:"8px", alignItems:"center", marginTop:"4px" }}>
-            <input value={nuovaTrasf} onChange={function(e){ setNuovaTrasf(e.target.value); }} placeholder="gg/mm/aa"
-              onKeyDown={function(e){ if (e.key === "Enter"){ e.preventDefault(); addTrasf(); } }}
-              style={{ padding:"6px 8px", border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px", width:"140px" }} />
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(150px, 1fr))", gap:"6px", alignItems:"end", marginTop:"6px" }}>
+            <div><div style={{ fontSize:"11px", fontWeight:700, marginBottom:"2px" }}>Decorrenza — mese</div>
+              <select value={ntMese} onChange={function(e){ setNtMese(e.target.value); }} style={{ width:"100%", padding:"6px" }}>{MONTH_LABEL.map(function(l,i){ return <option key={i} value={String(i+1)}>{l}</option>; })}</select></div>
+            <div><div style={{ fontSize:"11px", fontWeight:700, marginBottom:"2px" }}>Anno</div>
+              <input value={ntAnno} onChange={function(e){ setNtAnno(e.target.value.replace(/[^0-9]/g,"").slice(0,4)); }} inputMode="numeric" style={{ width:"100%", padding:"6px", border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px" }} /></div>
+            <div><div style={{ fontSize:"11px", fontWeight:700, marginBottom:"2px" }}>Nuovo livello</div>
+              <input value={ntLiv} onChange={function(e){ setNtLiv(e.target.value.toUpperCase()); }} placeholder="es. D2" style={{ width:"100%", padding:"6px", border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px" }} /></div>
+            <div><div style={{ fontSize:"11px", fontWeight:700, marginBottom:"2px" }}>Nuovo monte ore/sett</div>
+              <input value={ntOre} onChange={function(e){ setNtOre(e.target.value); }} placeholder="es. 24" inputMode="decimal" style={{ width:"100%", padding:"6px", border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px" }} /></div>
+            <label style={{ display:"flex", alignItems:"center", gap:"6px", fontSize:"13px" }}><input type="checkbox" checked={ntIndet} onChange={function(e){ setNtIndet(e.target.checked); }} /> → a tempo indeterminato</label>
             <button className="btn btn-blue" onClick={addTrasf}>+ Aggiungi trasformazione</button>
           </div>
+          <div style={{ fontSize:"11px", color:"#64748b", marginTop:"4px" }}>Compila almeno uno tra livello, monte ore o la spunta "a tempo indeterminato".</div>
         </div>
         <div className="frow">
           <div className="field"><label>Data assunzione (blocca giorni prima)</label>
@@ -1322,7 +1380,7 @@ function dlong(s){
 function expandDate(s){ const m=String(s==null?"":s).match(/^([0-9]{1,2})\/([0-9]{1,2})\/([0-9]{2,4})$/); if(!m) return (s==null?"":s); let d=parseInt(m[1],10),mo=parseInt(m[2],10),y=parseInt(m[3],10); if(y<100)y=(y>=40?1900+y:2000+y); return (d<10?"0":"")+d+"/"+(mo<10?"0":"")+mo+"/"+y; }
 function isRealDate(s){ const m=String(s==null?"":s).match(/^([0-9]{2})\/([0-9]{2})\/([0-9]{4})$/); if(!m) return false; const d=parseInt(m[1],10),mo=parseInt(m[2],10),y=parseInt(m[3],10); if(mo<1||mo>12||d<1) return false; const dim=new Date(y,mo,0).getDate(); return d<=dim; }
 function maskDate(v){ const x=String(v==null?"":v).replace(/[^0-9]/g,"").slice(0,8); let out=x.slice(0,2); if(x.length>2)out+="/"+x.slice(2,4); if(x.length>4)out+="/"+x.slice(4,8); return out; }
-function firstBadDate(dp){ const a=dp.ana||{}; const list=[a.dataNascita,a.dataContratto,a.dataProrogaAtto,dp.dataAssunzione,dp.scadenza].concat(prorogheList(dp)).concat(trasfList(dp)); for(let i=0;i<list.length;i++){ const s=String(list[i]==null?"":list[i]).trim(); if(s!=="" && !isRealDate(s)) return s; } return null; }
+function firstBadDate(dp){ const a=dp.ana||{}; const list=[a.dataNascita,a.dataContratto,a.dataProrogaAtto,dp.dataAssunzione,dp.scadenza].concat(prorogheList(dp)).concat(trasfDates(dp)); for(let i=0;i<list.length;i++){ const s=String(list[i]==null?"":list[i]).trim(); if(s!=="" && !isRealDate(s)) return s; } return null; }
 function xmlEsc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 function b64ToU8(b64){ const bin=atob(b64); const u=new Uint8Array(bin.length); for (let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i); return u; }
 function getTemplateB64(){ try{ const t=localStorage.getItem(LS_TEMPLATE); if (t) return t; }catch(e){ } return window.TEMPLATE_CONTRATTO_B64; }
@@ -1334,11 +1392,11 @@ function contractValues(dp){
     "NOME":a.nome||"", "COGNOME":a.cognome||"", "LUOGO_NASCITA":a.luogoNascita||"", "DATA_nascita":dlong(a.dataNascita),
     "CODICE_FISCALE":a.cf||"", "INDIRIZZO_RESIDENZA":a.indRes||"", "LUOGO_RESIDENZA":a.luogoRes||"",
     "INDIRIZZO_DOMICILIO":a.indDom||"", "CAP_DOMICILIO":a.capDom||"", "LUOGO_DOMICILIO":a.luogoDom||"", "INDIRIZZO_EMAIL":a.email||"",
-    "DETERMINATOINDETERMINATO": (dp.tipoContratto==="determinato"?"DETERMINATO":"INDETERMINATO"), "LIVELLO":dp.livello||"",
+    "DETERMINATOINDETERMINATO": (tipoNow(dp)==="determinato"?"DETERMINATO":"INDETERMINATO"), "LIVELLO":valoriNow(dp).livello||"",
     "DATA_CONTRATTO":dlong(a.dataContratto), "DATA_AVVIO":dlong(dp.dataAssunzione), "DATA_conclusione":dlong(dp.scadenza),
     "PART_O_FULL_TIME":a.partFull||"", "ORIZZONTALE_O_VERTICALE_O_MISTO":a.orizz||"", "QUALIFICA":a.qualifica||"",
     "STRUTTURA_EO_LOCALITA_EO_INDIRIZZO":strut, "LOCALITA_STRUTTURA":a.ubicazione||"",
-    "MONTE_ORE_SETTIMANALE":fmt2(dp.oreSett||0), "PERIODO_DI_LAVORO_NELLANNO":a.periodo||"",
+    "MONTE_ORE_SETTIMANALE":fmt2(valoriNow(dp).oreSett||0), "PERIODO_DI_LAVORO_NELLANNO":a.periodo||"",
     "GIORNI_DI_LAVORO_NELLA_SETTIMANA":a.giorniLav||"", "GIORNI_DI_PROVA":a.giorniProva||"",
     "IMPORTO_ORARIO_BASE":a.impBase||"", "IMPORTO_ORARIO_SUPERMINIMO":a.impSuper||"", "TIPOLOGIA_SUPERMINIMO":a.tipoSuper||"",
     "ALTRO_IMPORTO_ORARIO":a.impAltro||"", "TIPOLOGIA_ALTRO":a.tipoAltro||"", "IMPORTO_ORARIO_TOTALE":anaTot(dp),
@@ -1411,7 +1469,7 @@ function prorogaValues(dp){
     "DATA_CONTRATTO":dlong(a.dataContratto), "SCAD_PRECEDENTE":dlong(precedente), "SCAD_NUOVA":dlong(nuova),
     "NOME":a.nome||"", "COGNOME":a.cognome||"", "IND_DOM":a.indDom||"", "CAP_DOM":a.capDom||"", "LUOGO_DOM":a.luogoDom||"",
     "LUOGO_NASCITA":a.luogoNascita||"", "DATA_NASCITA":dlong(a.dataNascita), "LUOGO_RESIDENZA":a.luogoRes||"", "IND_RESIDENZA":a.indRes||"",
-    "CF":a.cf||"", "DETERMINATO":(dp.tipoContratto==="determinato"?"DETERMINATO":"INDETERMINATO"),
+    "CF":a.cf||"", "DETERMINATO":(tipoNow(dp)==="determinato"?"DETERMINATO":"INDETERMINATO"),
     "COMMITTENTE_FONDI":a.committenteFondi||"", "NUMERO_APPALTO":a.numeroAppalto||"",
     "DATA_ATTO":dlong(a.dataProrogaAtto)
   };
@@ -1425,8 +1483,8 @@ function trasformazioneValues(dp){
     "MOD_NR":modnr, "DATA_CONTRATTO":dlong(a.dataContratto), "SCAD_PRECEDENTE":dlong(precedente),
     "NOME":a.nome||"", "COGNOME":a.cognome||"", "IND_DOM":a.indDom||"", "CAP_DOM":a.capDom||"", "LUOGO_DOM":a.luogoDom||"",
     "LUOGO_NASCITA":a.luogoNascita||"", "DATA_NASCITA":dlong(a.dataNascita), "LUOGO_RESIDENZA":a.luogoRes||"", "IND_RESIDENZA":a.indRes||"",
-    "CF":a.cf||"", "DETERMINATO":(dp.tipoContratto==="determinato"?"DETERMINATO":"INDETERMINATO"),
-    "CONTENUTO_MODIFICA":a.contenutoModifica||"", "DATA_ATTO":dlong(a.dataProrogaAtto)
+    "CF":a.cf||"", "DETERMINATO":(tipoNow(dp)==="determinato"?"DETERMINATO":"INDETERMINATO"),
+    "CONTENUTO_MODIFICA":(a.contenutoModifica&&String(a.contenutoModifica).trim()!=="")?a.contenutoModifica:autoContenuto(dp), "DATA_ATTO":dlong(a.dataProrogaAtto)
   };
 }
 function generaProroga(dp, onErr){
@@ -1749,9 +1807,10 @@ function QueryPanel(props){
   const Dint = isRealDate(dForza) ? ymdIt(dForza) : 0;
   const listA = Dint ? dips.filter(function(dp){ return assunzInt(dp) && inForceAt(dp,Dint); }) : [];
   const missA = Dint ? dips.filter(function(dp){ return !assunzInt(dp); }) : [];
-  const nDetA = listA.filter(function(dp){ return String(dp.tipoContratto)==="determinato"; }).length;
+  const yA=Dint?Math.floor(Dint/10000):0, mA=Dint?Math.floor((Dint%10000)/100):0;
+  const nDetA = listA.filter(function(dp){ return tipoAt(dp,yA,mA)==="determinato"; }).length;
   const nIndA = listA.length - nDetA;
-  function expA(){ const aoa=[["IN FORZA AL "+dForza],[],["COGNOME NOME","TIPO","LIVELLO","DATA ASSUNZIONE","FINE CALCOLATA"]]; listA.forEach(function(dp){ aoa.push([nomeOf(dp), tipoLabel(dp.tipoContratto), dp.livello||"", intToIt(assunzInt(dp)), effEndInt(dp)?intToIt(effEndInt(dp)):"—"]); }); aoa.push([]); aoa.push(["TOTALE", listA.length, "di cui Determinati", nDetA, "Indeterminati", nIndA]); if(missA.length){ aoa.push([]); aoa.push(["DATA ASSUNZIONE MANCANTE (non conteggiati)"]); missA.forEach(function(dp){ aoa.push([nomeOf(dp)]); }); } qExport("Query - In forza al "+dForza.replace(/\//g,"-")+".xlsx", aoa); }
+  function expA(){ const aoa=[["IN FORZA AL "+dForza],[],["COGNOME NOME","TIPO","LIVELLO","DATA ASSUNZIONE","FINE CALCOLATA"]]; listA.forEach(function(dp){ aoa.push([nomeOf(dp), tipoLabel(tipoAt(dp,yA,mA)), livelloAt(dp,yA,mA)||"", intToIt(assunzInt(dp)), effEndInt(dp)?intToIt(effEndInt(dp)):"—"]); }); aoa.push([]); aoa.push(["TOTALE", listA.length, "di cui Determinati", nDetA, "Indeterminati", nIndA]); if(missA.length){ aoa.push([]); aoa.push(["DATA ASSUNZIONE MANCANTE (non conteggiati)"]); missA.forEach(function(dp){ aoa.push([nomeOf(dp)]); }); } qExport("Query - In forza al "+dForza.replace(/\//g,"-")+".xlsx", aoa); }
 
   const okB = isRealDate(bFrom) && isRealDate(bTo) && ymdIt(bFrom)<=ymdIt(bTo);
   const fromI = okB?ymdIt(bFrom):0, toI = okB?ymdIt(bTo):0;
@@ -1767,12 +1826,12 @@ function QueryPanel(props){
   const missC = dips.filter(function(dp){ return !assunzInt(dp); });
   const eventsInYear = function(listFn){ const out=[]; dips.forEach(function(dp){ listFn(dp).forEach(function(ds){ const v=ymdIt(ds); if(v>=y0 && v<=y1) out.push({ dp:dp, d:ds, v:v }); }); }); out.sort(function(a,b){ return a.v-b.v; }); return out; };
   const proroEventsC = eventsInYear(prorogheList);
-  const trasfEventsC = eventsInYear(trasfList);
-  const byTipo = function(arr,t){ return arr.filter(function(dp){ return String(dp.tipoContratto)===t; }); };
+  const trasfEventsC = eventsInYear(trasfDates);
+  const byTipo = function(arr,t){ return arr.filter(function(dp){ return tipoNow(dp)===t; }); };
   const cell = function(arr,t){ return t==="all"?arr.length:byTipo(arr,t).length; };
   const yearOpts = (function(){ const set={}; (state.anni||[]).forEach(function(y){set[y]=true;}); set[now.getFullYear()]=true; return Object.keys(set).map(function(y){return parseInt(y,10);}).sort(function(a,b){return a-b;}); })();
   const namesFor = function(kind, t){ if(kind==="pro") return proroEventsC.map(function(e){ return nomeOf(e.dp)+" ("+e.d+")"; }); if(kind==="tra") return trasfEventsC.map(function(e){ return nomeOf(e.dp)+" ("+e.d+")"; }); const arr = kind==="ent"?enteredC:exitedC; const f = t==="all"?arr:byTipo(arr,t); return f.map(nomeOf); };
-  function expC(){ const aoa=[["MOVIMENTI ANNO "+Y],[],["","DETERMINATI","INDETERMINATI","TOTALE"],["Entrati", cell(enteredC,"determinato"), cell(enteredC,"indeterminato"), enteredC.length],["Usciti", cell(exitedC,"determinato"), cell(exitedC,"indeterminato"), exitedC.length],["Proroghe","","",proroEventsC.length],["Trasformazioni","","",trasfEventsC.length],["Saldo", cell(enteredC,"determinato")-cell(exitedC,"determinato"), cell(enteredC,"indeterminato")-cell(exitedC,"indeterminato"), enteredC.length-exitedC.length]]; aoa.push([]); aoa.push(["ENTRATI"]); enteredC.forEach(function(dp){ aoa.push([nomeOf(dp), tipoLabel(dp.tipoContratto), intToIt(assunzInt(dp))]); }); aoa.push([]); aoa.push(["USCITI"]); exitedC.forEach(function(dp){ aoa.push([nomeOf(dp), tipoLabel(dp.tipoContratto), intToIt(effEndInt(dp))]); }); aoa.push([]); aoa.push(["PROROGHE"]); proroEventsC.forEach(function(e){ aoa.push([nomeOf(e.dp), tipoLabel(e.dp.tipoContratto), e.d]); }); aoa.push([]); aoa.push(["TRASFORMAZIONI"]); trasfEventsC.forEach(function(e){ aoa.push([nomeOf(e.dp), tipoLabel(e.dp.tipoContratto), e.d]); }); if(missC.length){ aoa.push([]); aoa.push(["DATA ASSUNZIONE MANCANTE (non conteggiati)"]); missC.forEach(function(dp){ aoa.push([nomeOf(dp)]); }); } qExport("Query - Movimenti "+Y+".xlsx", aoa); }
+  function expC(){ const aoa=[["MOVIMENTI ANNO "+Y],[],["","DETERMINATI","INDETERMINATI","TOTALE"],["Entrati", cell(enteredC,"determinato"), cell(enteredC,"indeterminato"), enteredC.length],["Usciti", cell(exitedC,"determinato"), cell(exitedC,"indeterminato"), exitedC.length],["Proroghe","","",proroEventsC.length],["Trasformazioni","","",trasfEventsC.length],["Saldo", cell(enteredC,"determinato")-cell(exitedC,"determinato"), cell(enteredC,"indeterminato")-cell(exitedC,"indeterminato"), enteredC.length-exitedC.length]]; aoa.push([]); aoa.push(["ENTRATI"]); enteredC.forEach(function(dp){ aoa.push([nomeOf(dp), tipoLabel(tipoNow(dp)), intToIt(assunzInt(dp))]); }); aoa.push([]); aoa.push(["USCITI"]); exitedC.forEach(function(dp){ aoa.push([nomeOf(dp), tipoLabel(tipoNow(dp)), intToIt(effEndInt(dp))]); }); aoa.push([]); aoa.push(["PROROGHE"]); proroEventsC.forEach(function(e){ aoa.push([nomeOf(e.dp), tipoLabel(tipoNow(e.dp)), e.d]); }); aoa.push([]); aoa.push(["TRASFORMAZIONI"]); trasfEventsC.forEach(function(e){ aoa.push([nomeOf(e.dp), tipoLabel(tipoNow(e.dp)), e.d]); }); if(missC.length){ aoa.push([]); aoa.push(["DATA ASSUNZIONE MANCANTE (non conteggiati)"]); missC.forEach(function(dp){ aoa.push([nomeOf(dp)]); }); } qExport("Query - Movimenti "+Y+".xlsx", aoa); }
 
   return (
     <div style={{ padding:"14px" }}>
@@ -1803,7 +1862,7 @@ function QueryPanel(props){
              <div style={{ overflowX:"auto", border:"1px solid #e2e8f0", borderRadius:"8px" }}>
                <table style={{ borderCollapse:"collapse", width:"100%", minWidth:"640px" }}>
                  <thead><tr><th style={th}>Cognome Nome</th><th style={th}>Tipo</th><th style={th}>Livello</th><th style={th}>Data assunzione</th><th style={th}>Fine calcolata</th></tr></thead>
-                 <tbody>{listA.map(function(dp){ return <tr key={dp.id}><td style={td}>{nomeOf(dp)}</td><td style={td}>{tipoLabel(dp.tipoContratto)}</td><td style={td}>{dp.livello||""}</td><td style={td}>{intToIt(assunzInt(dp))}</td><td style={td}>{effEndInt(dp)?intToIt(effEndInt(dp)):"—"}</td></tr>; })}
+                 <tbody>{listA.map(function(dp){ return <tr key={dp.id}><td style={td}>{nomeOf(dp)}</td><td style={td}>{tipoLabel(tipoAt(dp,yA,mA))}</td><td style={td}>{livelloAt(dp,yA,mA)||""}</td><td style={td}>{intToIt(assunzInt(dp))}</td><td style={td}>{effEndInt(dp)?intToIt(effEndInt(dp)):"—"}</td></tr>; })}
                  {listA.length===0 ? <tr><td style={td} colSpan={5}>Nessun dipendente in forza a quella data.</td></tr> : null}</tbody>
                </table>
              </div>
@@ -2077,7 +2136,7 @@ function Riepiloghi(props){
   });
   const tabTeor = dips.map(function(dp){
     let lav=0, teor=0;
-    scopePairs.forEach(function(pr){ lav += totOfRec(getRecFrom(state, pr.y, pr.m, dp.id), pr.y, pr.m); teor += dp.oreSett * daysInMonth(pr.y, pr.m) / 7; });
+    scopePairs.forEach(function(pr){ lav += totOfRec(getRecFrom(state, pr.y, pr.m, dp.id), pr.y, pr.m); teor += oreSettAt(dp, pr.y, pr.m) * daysInMonth(pr.y, pr.m) / 7; });
     lav=Math.round(lav*100)/100; teor=Math.round(teor*100)/100;
     return { dp:dp, lav:lav, teor:teor, scost:Math.round((lav-teor)*100)/100 };
   });
