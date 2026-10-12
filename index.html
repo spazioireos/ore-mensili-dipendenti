@@ -20,18 +20,18 @@
 <style>
   * { box-sizing:border-box; }
   body { margin:0; font-family:'IBM Plex Sans',sans-serif; background:#eef2f5; color:#1f2937; }
-  .app-header { background:#0f2740; color:#fff; padding:10px 18px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; position:sticky; top:0; z-index:50; box-shadow:0 2px 6px rgba(0,0,0,.15); }
+  .app-header { background:#DE4C8A; color:#fff; padding:10px 18px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; position:sticky; top:0; z-index:50; box-shadow:0 2px 6px rgba(0,0,0,.15); }
   .app-header h1 { font-size:17px; margin:0; font-weight:800; letter-spacing:.3px; }
   .app-header .sub { font-size:11px; opacity:.7; }
   .spacer { flex:1; }
   .btn { border:none; border-radius:8px; padding:8px 13px; font-family:inherit; font-weight:700; font-size:13px; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
   .btn:disabled { opacity:.5; cursor:not-allowed; }
-  .btn-save { background:#16a34a; color:#fff; }
+  .btn-save { background:#A18594; color:#fff; }
   .btn-save.dirty { background:#dc2626; color:#fff; animation:pulse 1.6s infinite; }
   @keyframes pulse { 0%,100%{ box-shadow:0 0 0 0 rgba(220,38,38,.5);} 50%{ box-shadow:0 0 0 6px rgba(220,38,38,0);} }
-  .btn-ghost { background:rgba(255,255,255,.14); color:#fff; }
-  .btn-ghost:hover { background:rgba(255,255,255,.24); }
-  .btn-blue { background:#2563eb; color:#fff; }
+  .btn-ghost { background:#A18594; color:#fff; }
+  .btn-ghost:hover { background:#8A7080; }
+  .btn-blue { background:#A18594; color:#fff; }
   .btn-red { background:#dc2626; color:#fff; }
   .btn-gray { background:#e5e7eb; color:#374151; }
   .yearbar { display:flex; align-items:center; gap:8px; background:rgba(255,255,255,.12); border-radius:8px; padding:3px 6px; }
@@ -40,19 +40,19 @@
   .yearbar .yr { font-weight:800; font-size:15px; min-width:52px; text-align:center; }
   .zoombar { display:flex; align-items:center; gap:10px; padding:6px 16px; background:#dbe4ec; border-bottom:1px solid #c3d0da; flex-wrap:wrap; }
   .zoombar .zlbl { font-size:12px; font-weight:700; color:#334155; }
-  .zoombar input[type=range] { width:160px; accent-color:#2563eb; cursor:pointer; }
-  .zoombar .zval { font-size:12px; font-weight:800; color:#0f2740; min-width:44px; text-align:center; background:#fff; border-radius:6px; padding:2px 6px; }
-  .zoombar .zstep { border:none; background:#cbd5e1; color:#0f2740; width:26px; height:26px; border-radius:6px; font-size:15px; font-weight:800; cursor:pointer; }
+  .zoombar input[type=range] { width:160px; accent-color:#A18594; cursor:pointer; }
+  .zoombar .zval { font-size:12px; font-weight:800; color:#DE4C8A; min-width:44px; text-align:center; background:#fff; border-radius:6px; padding:2px 6px; }
+  .zoombar .zstep { border:none; background:#cbd5e1; color:#DE4C8A; width:26px; height:26px; border-radius:6px; font-size:15px; font-weight:800; cursor:pointer; }
   .zoombar .zstep:hover { background:#b6c2cf; }
-  .zoombar .btn-fit { border:none; background:#2563eb; color:#fff; border-radius:7px; padding:6px 12px; font-family:inherit; font-weight:700; font-size:12px; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
-  .zoombar .btn-fit:hover { background:#1d4ed8; }
+  .zoombar .btn-fit { border:none; background:#A18594; color:#fff; border-radius:7px; padding:6px 12px; font-family:inherit; font-weight:700; font-size:12px; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
+  .zoombar .btn-fit:hover { background:#8A7080; }
   .zoombar .btn-100 { border:none; background:#e5e7eb; color:#374151; border-radius:7px; padding:6px 10px; font-family:inherit; font-weight:700; font-size:12px; cursor:pointer; }
   .tabs { display:flex; gap:4px; flex-wrap:wrap; padding:10px 16px 0; align-items:center; }
   .tab { padding:7px 13px; border-radius:9px 9px 0 0; background:#d5dee6; color:#374151; font-weight:700; font-size:13px; cursor:pointer; }
-  .tab.active { background:#fff; color:#0f2740; box-shadow:0 -2px 4px rgba(0,0,0,.05); }
+  .tab.active { background:#fff; color:#DE4C8A; box-shadow:0 -2px 4px rgba(0,0,0,.05); }
   .tab.filled::after { content:'•'; color:#16a34a; margin-left:5px; }
-  .tab.rep { background:#0f2740; color:#fff; }
-  .tab.rep.active { background:#fff; color:#0f2740; }
+  .tab.rep { background:#DE4C8A; color:#fff; }
+  .tab.rep.active { background:#fff; color:#DE4C8A; }
   .content { padding:16px; }
   .toolbar { display:flex; gap:8px; align-items:center; margin-bottom:14px; flex-wrap:wrap; }
   .lock-badge { background:#7f1d1d; color:#fff; font-size:12px; font-weight:700; padding:3px 10px; border-radius:6px; }
@@ -64,7 +64,7 @@
   .emp-head .pill { background:rgba(255,255,255,.6); border-radius:20px; padding:3px 11px; font-size:12px; font-weight:700; }
   .emp-head .pill.cess { background:#7f1d1d; color:#fff; }
   .emp-head .edit-mini { background:rgba(0,0,0,.16); color:#fff; border:none; border-radius:6px; width:26px; height:26px; cursor:pointer; font-size:13px; }
-  .emp-head .edit-mini.qf { width:auto; padding:0 10px; height:26px; background:#0f2740; font-weight:700; font-size:12px; }
+  .emp-head .edit-mini.qf { width:auto; padding:0 10px; height:26px; background:#DE4C8A; font-weight:700; font-size:12px; }
   .emp-head .edit-mini.svuota { width:auto; padding:0 10px; height:26px; background:#b45309; font-weight:700; font-size:12px; }
   .congua-btn.gray { background:#94a3b8; }
   .grid-wrap { overflow-x:auto; padding:10px 12px 4px; }
@@ -73,10 +73,10 @@
   td.wd { font-size:11px; color:#64748b; padding:2px 0; width:66px; }
   td.wd.we { color:#c026d3; font-weight:700; }
   td.wd.hol { color:#fff; font-weight:800; background:#B22222; }
-  td.dn { font-size:13px; color:#0f2740; font-weight:700; padding:2px 0; background:#f8fafc; }
+  td.dn { font-size:13px; color:#DE4C8A; font-weight:700; padding:2px 0; background:#f8fafc; }
   td.dn.we { background:#fdf4ff; color:#c026d3; }
   td.dn.hol { background:#B22222; color:#fff; }
-  td.tot-h { font-size:11px; font-weight:700; color:#0f2740; background:#e2e8f0; padding:2px 6px; }
+  td.tot-h { font-size:11px; font-weight:700; color:#DE4C8A; background:#e2e8f0; padding:2px 6px; }
   .cell-in { width:66px; height:34px; border:2px solid #f59e0b; background:#fffde7; text-align:center; font-family:inherit; padding:0; border-radius:4px; -webkit-appearance:none; appearance:none; }
   .cell-in::-webkit-calendar-picker-indicator { display:none; opacity:0; }
   .cell-in.is-num { font-weight:700; font-size:20px; }
@@ -89,10 +89,10 @@
   .perm-flag.on { opacity:1; }
   .cell-wrap:hover .perm-flag { opacity:0.6; }
   .cell-wrap:hover .perm-flag.on { opacity:1; }
-  .cell-in:focus { outline:2px solid #2563eb; outline-offset:-1px; }
-  td.tot-v { font-weight:700; font-size:19px; color:#0f2740; background:#eef2ff; padding:0 8px; min-width:64px; }
+  .cell-in:focus { outline:2px solid #A18594; outline-offset:-1px; }
+  td.tot-v { font-weight:700; font-size:19px; color:#DE4C8A; background:#fdf0f6; padding:0 8px; min-width:64px; }
   .foot-line { display:flex; align-items:center; gap:10px; padding:8px 14px 2px; flex-wrap:wrap; }
-  .foot-line .foot-tot { font-size:12px; color:#0f2740; font-weight:700; }
+  .foot-line .foot-tot { font-size:12px; color:#DE4C8A; font-weight:700; }
   .foot-line label { font-size:12px; color:#64748b; font-weight:700; }
   .dich-in { width:80px; border:2px solid #f59e0b; background:#fffde7; border-radius:6px; padding:4px 6px; font-family:inherit; font-size:14px; font-weight:800; text-align:center; }
   .provv-lbl { display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:700; color:#92400e; background:#fffbeb; border:1px solid #fcd34d; border-radius:6px; padding:3px 8px; cursor:pointer; }
@@ -102,7 +102,7 @@
   .cong { flex-basis:100%; margin-top:4px; border-radius:10px; padding:8px 12px; border:2px solid; }
   .cong.warn { background:#fff7ed; border-color:#fb923c; color:#7c2d12; }
   .cong.ok   { background:#ecfdf5; border-color:#34d399; color:#065f46; }
-  .cong.over { background:#eff6ff; border-color:#60a5fa; color:#1e3a8a; }
+  .cong.over { background:#fdf0f6; border-color:#DE4C8A; color:#1e3a8a; }
   .cong-head { font-weight:800; font-size:13px; margin-bottom:6px; }
   .cong-row { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-bottom:6px; }
   .cong-chip { background:#fff; border:1px solid rgba(0,0,0,.15); border-radius:999px; padding:2px 10px; font-size:12px; font-weight:600; }
@@ -117,7 +117,7 @@
   .cong-status { display:inline-flex; align-items:center; gap:6px; font-size:14px; font-weight:800; text-transform:uppercase; letter-spacing:.3px; padding:5px 14px; border-radius:8px; color:#fff; box-shadow:0 1px 4px rgba(0,0,0,.2); }
   .cong-status b { font-size:17px; font-weight:900; }
   .cong.warn .cong-status { background:#c2410c; }
-  .cong.over .cong-status { background:#1d4ed8; }
+  .cong.over .cong-status { background:#8A7080; }
   .cong.ok   .cong-status { background:#059669; }
   .azzera-btn { border:none; background:#334155; color:#fff; border-radius:7px; padding:4px 10px; font-weight:700; font-size:12px; cursor:pointer; }
   .azzera-btn.annulla { background:#94a3b8; }
@@ -144,35 +144,35 @@
   .voce-txt:disabled { background:#f1f5f9; border-color:#cbd5e1; color:#94a3b8; }
   .voce-del { border:none; background:#fee2e2; color:#b91c1c; border-radius:6px; width:22px; height:22px; cursor:pointer; font-weight:700; }
   .legend, .rep-box { background:#fff; border-radius:12px; padding:12px 16px; box-shadow:0 1px 4px rgba(0,0,0,.08); margin-bottom:16px; }
-  .legend h3, .rep-box h3 { margin:0 0 8px; font-size:14px; color:#0f2740; }
+  .legend h3, .rep-box h3 { margin:0 0 8px; font-size:14px; color:#DE4C8A; }
   .legend-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:5px; }
   .legend-item { display:flex; align-items:center; gap:7px; font-size:11px; }
   .legend-code { min-width:56px; text-align:center; border-radius:4px; padding:2px 4px; font-weight:800; font-size:11px; }
   table.rep { border-collapse:collapse; width:100%; font-size:14px; }
   table.rep th, table.rep td { border:1px solid #e2e8f0; padding:7px 10px; text-align:center; }
-  table.rep th { background:#0f2740; color:#fff; font-size:13px; }
+  table.rep th { background:#DE4C8A; color:#fff; font-size:13px; }
   table.rep td.name { text-align:left; font-weight:700; white-space:nowrap; }
   table.rep tr:nth-child(even) td { background:#f8fafc; }
-  table.rep td.tot { font-weight:800; background:#eef2ff; }
+  table.rep td.tot { font-weight:800; background:#fdf0f6; }
   .rep-scroll { overflow-x:auto; }
   .flag-red { color:#dc2626; font-weight:800; }
   .flag-amber { color:#b45309; font-weight:800; }
   .overlay { position:fixed; inset:0; background:rgba(15,39,64,.55); display:flex; align-items:center; justify-content:center; z-index:100; padding:16px; }
   .modal { background:#fff; border-radius:14px; padding:22px; width:100%; max-width:460px; box-shadow:0 10px 40px rgba(0,0,0,.3); max-height:92vh; overflow:auto; }
-  .modal h2 { margin:0 0 14px; font-size:17px; color:#0f2740; }
+  .modal h2 { margin:0 0 14px; font-size:17px; color:#DE4C8A; }
   .field { margin-bottom:12px; }
   .field label { display:block; font-size:12px; font-weight:700; color:#374151; margin-bottom:4px; }
   .field input, .field select { width:100%; border:2px solid #f59e0b; background:#fffde7; border-radius:8px; padding:8px 10px; font-family:inherit; font-size:14px; }
   .frow { display:flex; gap:10px; } .frow .field { flex:1; }
   .color-row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
   .swatch { width:28px; height:28px; border-radius:50%; cursor:pointer; border:3px solid transparent; }
-  .swatch.sel { border-color:#0f2740; }
+  .swatch.sel { border-color:#DE4C8A; }
   .modal-actions { display:flex; gap:8px; justify-content:space-between; margin-top:18px; align-items:center; }
   .login-box { max-width:400px; margin:8vh auto; background:#fff; border-radius:16px; padding:30px; box-shadow:0 8px 30px rgba(0,0,0,.15); text-align:center; }
-  .login-box .logo { font-size:22px; font-weight:800; color:#0f2740; }
+  .login-box .logo { font-size:22px; font-weight:800; color:#DE4C8A; }
   .login-box .tag { font-size:12px; color:#64748b; margin-bottom:20px; }
   .banner { background:#fef3c7; color:#92400e; font-size:12px; padding:6px 16px; text-align:center; font-weight:700; }
-  .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:#0f2740; color:#fff; padding:11px 20px; border-radius:10px; font-size:13px; font-weight:700; z-index:200; box-shadow:0 6px 20px rgba(0,0,0,.3); max-width:90%; text-align:center; }
+  .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:#DE4C8A; color:#fff; padding:11px 20px; border-radius:10px; font-size:13px; font-weight:700; z-index:200; box-shadow:0 6px 20px rgba(0,0,0,.3); max-width:90%; text-align:center; }
   .toast.warn { background:#b45309; }
   .hidden-file { display:none; }
 </style>
@@ -206,7 +206,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver47";
+const APP_VER = "ver50";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
 const MESE_ABBR_FILE = ["gen","feb","mar","apr","mag","giu","lug","ago","set","ott","nov","dic"];
@@ -400,6 +400,7 @@ function assunzInt(dp){ return ymdIt(dp.dataAssunzione); }
 function effEndInt(dp){ const cess=ymdIt(dp.dataCessazione); if(cess) return cess; if(tipoNow(dp)==="determinato"){ let end=ymdIt(dp.scadenza); prorogheList(dp).forEach(function(p){ const v=ymdIt(p); if(v>end) end=v; }); return end||null; } return null; }
 function naturalEndInt(dp){ if(tipoNow(dp)==="determinato"){ let end=ymdIt(dp.scadenza); prorogheList(dp).forEach(function(p){ const v=ymdIt(p); if(v>end) end=v; }); return end||0; } return 0; }
 function cessEffStr(dp){ if(dp && dp.cessManuale) return dp.dataCessazione||""; const n=naturalEndInt(dp); return n?intToIt(n):""; }
+function recHasData(rec){ if(!rec||!rec.giorni) return false; const ks=Object.keys(rec.giorni); for(let i=0;i<ks.length;i++){ const v=rec.giorni[ks[i]]; const sv=String(v==null?"":v).trim(); if(sv!=="" && sv!=="--") return true; } return false; }
 function lastProroga(dp){ const ps=prorogheList(dp); if(!ps.length) return ""; let best=ps[0], bv=ymdIt(ps[0]); ps.forEach(function(p){ const v=ymdIt(p); if(v>bv){bv=v;best=p;} }); return best; }
 function inForceAt(dp, D){ const a=assunzInt(dp); if(!a) return false; if(a>D) return false; const e=effEndInt(dp); if(e && e<D) return false; return true; }
 function intToIt(n){ if(!n) return ""; const y=Math.floor(n/10000), m=Math.floor((n%10000)/100), d=n%100; return pad2(d)+"/"+pad2(m)+"/"+y; }
@@ -1030,13 +1031,14 @@ function EmployeeCard(props){
         {livelloAt(dp,y,m) ? <span className="pill">Liv. {livelloAt(dp,y,m)}</span> : null}
         <span className="pill">ORE SETT: {hoursDisp(oreSettAt(dp,y,m))}</span>
         <span className="pill">{contrLabelAt(dp,y,m)}</span>
-        {(function(){ const ce=cessEffStr(dp); if(!ce) return null; const now=new Date(); const tInt=now.getFullYear()*10000+(now.getMonth()+1)*100+now.getDate(); const ceInt=ymdIt(ce); return (ceInt && ceInt < tInt) ? <span className="pill cess">CESSATO {ce}</span> : <span className="pill" style={{ background:"#e0e7ff", color:"#3730a3" }}>fino al {ce}</span>; })()}
+        {(function(){ const ce=cessEffStr(dp); if(!ce) return null; const now=new Date(); const tInt=now.getFullYear()*10000+(now.getMonth()+1)*100+now.getDate(); const ceInt=ymdIt(ce); return (ceInt && ceInt < tInt) ? <span className="pill cess">CESSATO {ce}</span> : <span className="pill" style={{ background:"#fbe0ec", color:"#8A2358" }}>fino al {ce}</span>; })()}
         <div className="spacer"></div>
         {!mLocked ? <button className="edit-mini qf" title="Compila velocemente il mese (ore o codice sui giorni scelti)" onClick={function(){ props.onQuickFill(dp); }}>⚡ Compila</button> : null}
         {!mLocked ? <button className="edit-mini svuota" title="Svuota tutto il mese per questo dipendente (con conferma)" onClick={function(){ props.onSvuotaMese(dp.id); }}>🗑 Svuota mese</button> : null}
         <button className="edit-mini" title="Modifica anagrafica" onClick={function(){ props.onEditDip(dp); }}>✎</button>
         <button className="edit-mini" title="Elimina definitivamente" onClick={function(){ props.onDelDip(dp); }}>🗑</button>
       </div>
+      {props.fuoriPeriodo ? <div style={{ background:"#fef3c7", borderBottom:"2px solid #f59e0b", color:"#92400e", fontSize:"12px", fontWeight:700, padding:"5px 10px" }}>⚠️ Mese fuori dal periodo di rapporto (prima dell'assunzione o dopo la cessazione), ma contiene ore già inserite: controlla e, se vanno tolte, usa 🧹 Pulisci ore dopo nella scheda (✎).</div> : null}
       <div className="grid-wrap">
         <table className="cal"><tbody>
           <tr>
@@ -1269,7 +1271,7 @@ function DipModal(props){
                     <button className="voce-del" title="Rimuovi proroga" onClick={function(){ delPro(i); }}>✕</button>
                   </div>
                 ); })}
-                <div style={{ fontSize:"12px", color:"#0f2740", marginTop:"4px" }}>Scadenza effettiva: <b>{proroghe[proroghe.length-1]}</b></div>
+                <div style={{ fontSize:"12px", color:"#DE4C8A", marginTop:"4px" }}>Scadenza effettiva: <b>{proroghe[proroghe.length-1]}</b></div>
               </div>}
             <div style={{ display:"flex", gap:"8px", alignItems:"center", marginTop:"4px" }}>
               <input value={nuovaPro} onChange={function(e){ setNuovaPro(e.target.value); }} placeholder="gg/mm/aa"
@@ -1669,7 +1671,7 @@ function Anagrafica(props){
   return (
     <div>
       <div className="toolbar">
-        <strong style={{ fontSize:"15px", color:"#0f2740" }}>📇 Anagrafica dipendenti</strong>
+        <strong style={{ fontSize:"15px", color:"#DE4C8A" }}>📇 Anagrafica dipendenti</strong>
         <button className={"btn btn-save" + (props.dirty ? " dirty" : "")} disabled={!props.dirty} onClick={props.onSave} style={{ marginLeft:"12px" }} title="Salva le modifiche (cloud + copia locale)">💾 Salva</button>
         <div className="spacer"></div>
         <button className="btn btn-blue" onClick={props.onAddDip} title="Crea un nuovo dipendente: comparirà anche nei mesi con il box ore">+ Aggiungi dipendente</button>
@@ -1697,17 +1699,17 @@ function Anagrafica(props){
         <div style={{ minWidth:"210px", display:"flex", flexDirection:"column", gap:"4px" }}>
           {dips.map(function(x){ return (
             <button key={x.id} onClick={function(){ setSelId(x.id); setMsg(""); }}
-              style={{ textAlign:"left", padding:"8px 10px", borderRadius:"8px", border:"1px solid " + (x.id===dp.id?"#0f2740":"#e2e8f0"), background:(x.id===dp.id?"#0f2740":"#fff"), color:(x.id===dp.id?"#fff":"#0f2740"), fontWeight:700, fontSize:"13px", cursor:"pointer" }}>
+              style={{ textAlign:"left", padding:"8px 10px", borderRadius:"8px", border:"1px solid " + (x.id===dp.id?"#DE4C8A":"#e2e8f0"), background:(x.id===dp.id?"#DE4C8A":"#fff"), color:(x.id===dp.id?"#fff":"#DE4C8A"), fontWeight:700, fontSize:"13px", cursor:"pointer" }}>
               {x.nome}
             </button>
           ); })}
         </div>
         <div style={{ flex:1, background:"#fff", border:"2px solid #94a3b8", borderRadius:"12px", padding:"14px" }}>
           <div style={{ display:"flex", alignItems:"center", gap:"10px", marginBottom:"12px", flexWrap:"wrap" }}>
-            <div style={{ fontSize:"18px", fontWeight:800, color:"#0f2740" }}>{dp.nome}</div>
+            <div style={{ fontSize:"18px", fontWeight:800, color:"#DE4C8A" }}>{dp.nome}</div>
             <button className="btn btn-gray" onClick={function(){ props.onEditDip(dp); }} title="Modifica dati contrattuali e aggiungi/gestisci le proroghe">✎ Modifica dipendente</button>
             <div className="spacer"></div>
-            <div style={{ display:"flex", alignItems:"center", gap:"8px", background:"#eff6ff", border:"1px solid #bfdbfe", borderRadius:"10px", padding:"6px 10px" }}>
+            <div style={{ display:"flex", alignItems:"center", gap:"8px", background:"#fdf0f6", border:"1px solid #f7c6dd", borderRadius:"10px", padding:"6px 10px" }}>
               <span style={{ fontSize:"12px", fontWeight:800, color:"#1e3a8a", whiteSpace:"nowrap" }}>Genera documento:</span>
               <button className="btn btn-blue" onClick={genera} title="Genera il contratto .docx identico al modello, con i dati di questa scheda">📄 Contratto</button>
               <button className="btn btn-blue" onClick={generaPro} title="Genera la lettera di proroga .docx (richiede almeno una proroga nella scheda)">📄 Proroga</button>
@@ -1721,7 +1723,7 @@ function Anagrafica(props){
               <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(230px, 1fr))", gap:"8px" }}>
                 {sec.f.map(function(fld){
                   const key=fld[0], lbl=fld[1], kind=fld[2];
-                  if (kind==="auto") return <div key={key} className="field" style={{margin:0}}><label>{lbl}</label><input value={anaTot(dp)} disabled style={{background:"#eef2ff",borderColor:"#c7d2fe",fontWeight:700}} /></div>;
+                  if (kind==="auto") return <div key={key} className="field" style={{margin:0}}><label>{lbl}</label><input value={anaTot(dp)} disabled style={{background:"#fdf0f6",borderColor:"#f3bcd6",fontWeight:700}} /></div>;
                   if (kind==="tipo") return <div key={key} className="field" style={{margin:0}}><label>{lbl}</label>
                     <select value={anaVal(dp,"tipoContratto")||"indeterminato"} onChange={function(e){ props.onAnaField(dp.id,"tipoContratto",e.target.value); }}>
                       <option value="indeterminato">Indeterminato</option><option value="determinato">Determinato</option></select></div>;
@@ -1799,10 +1801,10 @@ function QueryPanel(props){
   const tipoLabel = function(t){ return String(t)==="determinato" ? "Determinato" : "Indeterminato"; };
   const nomeOf = function(dp){ return dp.nome || (dp.ana ? ((dp.ana.cognome||"")+" "+(dp.ana.nome||"")).trim() : ""); };
   const yInput = { border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px", padding:"6px 8px", fontSize:"13px", fontFamily:"inherit" };
-  const th = { background:"#0f2740", color:"#fff", padding:"6px 10px", fontSize:"12px", textAlign:"left" };
+  const th = { background:"#DE4C8A", color:"#fff", padding:"6px 10px", fontSize:"12px", textAlign:"left" };
   const td = { borderBottom:"1px solid #e2e8f0", padding:"5px 10px", fontSize:"13px" };
   const codeOpts = [{v:"ORE",l:"Ore lavorate"}].concat(CODICI.map(function(c){ return { v:c.c, l:(c.l||c.c) }; }));
-  function modeBtn(id, label){ const on = mode===id; return <button onClick={function(){ setMode(id); setOpenCell(""); }} style={{ padding:"8px 14px", borderRadius:"8px", border:"2px solid "+(on?"#0f2740":"#cbd5e1"), background:on?"#0f2740":"#fff", color:on?"#fff":"#0f2740", fontWeight:700, cursor:"pointer", fontSize:"13px" }}>{label}</button>; }
+  function modeBtn(id, label){ const on = mode===id; return <button onClick={function(){ setMode(id); setOpenCell(""); }} style={{ padding:"8px 14px", borderRadius:"8px", border:"2px solid "+(on?"#DE4C8A":"#cbd5e1"), background:on?"#DE4C8A":"#fff", color:on?"#fff":"#DE4C8A", fontWeight:700, cursor:"pointer", fontSize:"13px" }}>{label}</button>; }
 
   const Dint = isRealDate(dForza) ? ymdIt(dForza) : 0;
   const listA = Dint ? dips.filter(function(dp){ return assunzInt(dp) && inForceAt(dp,Dint); }) : [];
@@ -1836,7 +1838,7 @@ function QueryPanel(props){
   return (
     <div style={{ padding:"14px" }}>
       <div style={{ display:"flex", alignItems:"center", gap:"10px", marginBottom:"12px" }}>
-        <strong style={{ fontSize:"15px", color:"#0f2740" }}>🔎 Query personale</strong>
+        <strong style={{ fontSize:"15px", color:"#DE4C8A" }}>🔎 Query personale</strong>
         <span style={{ fontSize:"12px", color:"#64748b" }}>interrogazioni sui dipendenti — tutto sul dispositivo</span>
       </div>
       <div style={{ display:"flex", gap:"8px", flexWrap:"wrap", marginBottom:"14px" }}>
@@ -1855,8 +1857,8 @@ function QueryPanel(props){
            !isRealDate(dForza) ? <div style={{ color:"#dc2626", fontSize:"13px" }}>Data non valida: usa gg/mm/aaaa.</div> :
            <div>
              <div style={{ display:"flex", gap:"10px", flexWrap:"wrap", marginBottom:"10px" }}>
-               <div style={{ background:"#0f2740", color:"#fff", padding:"8px 14px", borderRadius:"8px", fontWeight:700 }}>Totale in forza: {listA.length}</div>
-               <div style={{ background:"#0369a1", color:"#fff", padding:"8px 14px", borderRadius:"8px", fontWeight:700 }}>Determinati: {nDetA}</div>
+               <div style={{ background:"#DE4C8A", color:"#fff", padding:"8px 14px", borderRadius:"8px", fontWeight:700 }}>Totale in forza: {listA.length}</div>
+               <div style={{ background:"#DE4C8A", color:"#fff", padding:"8px 14px", borderRadius:"8px", fontWeight:700 }}>Determinati: {nDetA}</div>
                <div style={{ background:"#15803d", color:"#fff", padding:"8px 14px", borderRadius:"8px", fontWeight:700 }}>Indeterminati: {nIndA}</div>
              </div>
              <div style={{ overflowX:"auto", border:"1px solid #e2e8f0", borderRadius:"8px" }}>
@@ -1883,7 +1885,7 @@ function QueryPanel(props){
           {(!bFrom||!bTo) ? <div style={{ color:"#64748b", fontSize:"13px" }}>Inserisci le due date per calcolare il totale.</div> :
            !okB ? <div style={{ color:"#dc2626", fontSize:"13px" }}>Date non valide o intervallo rovesciato (la data iniziale deve precedere la finale).</div> :
            <div>
-             <div style={{ background:"#0f2740", color:"#fff", padding:"8px 14px", borderRadius:"8px", fontWeight:700, display:"inline-block", marginBottom:"10px" }}>Totale complessivo: {fmtVal(totB)} {unitB}</div>
+             <div style={{ background:"#DE4C8A", color:"#fff", padding:"8px 14px", borderRadius:"8px", fontWeight:700, display:"inline-block", marginBottom:"10px" }}>Totale complessivo: {fmtVal(totB)} {unitB}</div>
              <div style={{ overflowX:"auto", border:"1px solid #e2e8f0", borderRadius:"8px" }}>
                <table style={{ borderCollapse:"collapse", width:"100%", minWidth:"420px" }}>
                  <thead><tr><th style={th}>Cognome Nome</th><th style={Object.assign({},th,{textAlign:"right"})}>Totale ({unitB})</th></tr></thead>
@@ -1906,13 +1908,13 @@ function QueryPanel(props){
               <tbody>
                 {[["ent","Entrati",enteredC],["usc","Usciti",exitedC]].map(function(row){ const kind=row[0], lab=row[1], arr=row[2]; return <tr key={kind}>
                   <td style={Object.assign({},td,{fontWeight:700})}>{lab}</td>
-                  {["determinato","indeterminato","all"].map(function(t){ const n=cell(arr,t); const ck=kind+"|"+t; return <td key={t} style={Object.assign({},td,{textAlign:"center",cursor:n?"pointer":"default",color:n?"#0369a1":"#94a3b8",fontWeight:700,textDecoration:n?"underline":"none"})} onClick={function(){ if(n) setOpenCell(openCell===ck?"":ck); }}>{n}</td>; })}
+                  {["determinato","indeterminato","all"].map(function(t){ const n=cell(arr,t); const ck=kind+"|"+t; return <td key={t} style={Object.assign({},td,{textAlign:"center",cursor:n?"pointer":"default",color:n?"#DE4C8A":"#94a3b8",fontWeight:700,textDecoration:n?"underline":"none"})} onClick={function(){ if(n) setOpenCell(openCell===ck?"":ck); }}>{n}</td>; })}
                 </tr>; })}
                 {[["pro","Proroghe",proroEventsC.length],["tra","Trasformazioni",trasfEventsC.length]].map(function(row){ const kind=row[0], lab=row[1], n=row[2]; const ck=kind+"|all"; return <tr key={kind}>
                   <td style={Object.assign({},td,{fontWeight:700})}>{lab}</td>
                   <td style={Object.assign({},td,{textAlign:"center",color:"#94a3b8"})}>—</td>
                   <td style={Object.assign({},td,{textAlign:"center",color:"#94a3b8"})}>—</td>
-                  <td style={Object.assign({},td,{textAlign:"center",cursor:n?"pointer":"default",color:n?"#0369a1":"#94a3b8",fontWeight:700,textDecoration:n?"underline":"none"})} onClick={function(){ if(n) setOpenCell(openCell===ck?"":ck); }}>{n}</td>
+                  <td style={Object.assign({},td,{textAlign:"center",cursor:n?"pointer":"default",color:n?"#DE4C8A":"#94a3b8",fontWeight:700,textDecoration:n?"underline":"none"})} onClick={function(){ if(n) setOpenCell(openCell===ck?"":ck); }}>{n}</td>
                 </tr>; })}
                 <tr><td style={Object.assign({},td,{fontWeight:700})}>Saldo</td>
                   <td style={Object.assign({},td,{textAlign:"center",fontWeight:700})}>{cell(enteredC,"determinato")-cell(exitedC,"determinato")}</td>
@@ -2019,7 +2021,7 @@ function QuickFillModal(props){
           <div style={{ fontSize:"13px", fontWeight:"700", marginBottom:"6px" }}>Giorni della settimana:</div>
           <div style={{ display:"flex", gap:"6px", flexWrap:"wrap", marginBottom:"6px" }}>
             {WDAYS.map(function(w){ return (
-              <label key={w.gd} style={{ display:"flex", alignItems:"center", gap:"4px", border:"1px solid #cbd5e1", borderRadius:"6px", padding:"4px 8px", fontSize:"13px", background: sel[w.gd] ? "#dbeafe" : "#fff", cursor:"pointer" }}>
+              <label key={w.gd} style={{ display:"flex", alignItems:"center", gap:"4px", border:"1px solid #cbd5e1", borderRadius:"6px", padding:"4px 8px", fontSize:"13px", background: sel[w.gd] ? "#fbdcea" : "#fff", cursor:"pointer" }}>
                 <input type="checkbox" checked={!!sel[w.gd]} onChange={function(){ toggle(w.gd); }} /> {w.lbl}
               </label>
             ); })}
@@ -2218,7 +2220,7 @@ function Riepiloghi(props){
   return (
     <div>
       <div className="toolbar">
-        <strong style={{ fontSize:"15px", color:"#0f2740" }}>Riepiloghi</strong>
+        <strong style={{ fontSize:"15px", color:"#DE4C8A" }}>Riepiloghi</strong>
         <label style={{ fontSize:"12px", fontWeight:"700", marginLeft:"10px" }}>Periodo: da</label>
         <select value={faM} onChange={function(e){ setFaM(e.target.value); }} style={{ padding:"6px", borderRadius:"6px", border:"2px solid #f59e0b", background:"#fffde7" }}>{mOpts}</select>
         <select value={faY} onChange={function(e){ setFaY(e.target.value); }} style={{ padding:"6px", borderRadius:"6px", border:"2px solid #f59e0b", background:"#fffde7" }}>{yOpts}</select>
@@ -2300,7 +2302,7 @@ function Riepiloghi(props){
         </tr></thead><tbody>
           {tabVoci.map(function(r,i){ return <tr key={i}><td className="name">{r.dp}</td><td>{r.mese}</td>
             {CAT_NOTE.map(function(c){ return <td key={c.c}>{r.counts[c.c]===0?"":r.counts[c.c]}</td>; })}<td className="tot">{r.tot}</td></tr>; })}
-          <tr style={{fontWeight:800,background:"#eef2ff"}}><td className="name">TOTALE</td><td></td>
+          <tr style={{fontWeight:800,background:"#fdf0f6"}}><td className="name">TOTALE</td><td></td>
             {CAT_NOTE.map(function(c){ return <td key={c.c}>{totVoci[c.c]}</td>; })}<td className="tot">{CAT_NOTE.reduce(function(a,c){ return a+totVoci[c.c]; },0)}</td></tr>
         </tbody></table></div>}
       </div>
@@ -2368,6 +2370,7 @@ function App(){
   const [anno, setAnno] = useState(2026);
   const [vista, setVista] = useState("m1");
   const [dirty, setDirty] = useState(false);
+  const [canRestoreImport, setCanRestoreImport] = useState(false);
   const [zoom, setZoom] = useState(function(){ const z = parseInt(localStorage.getItem(LS_ZOOM) || "100", 10); return (isNaN(z) || z < 40 || z > 110) ? 100 : z; });
   const setZoomP = function(z){ let v = Math.round(z); if (v < 40) v = 40; if (v > 110) v = 110; setZoom(v); try { localStorage.setItem(LS_ZOOM, String(v)); } catch (e) { console.error(e); } };
   const fitWidth = function(){
@@ -2385,7 +2388,7 @@ function App(){
   const [permModal, setPermModal] = useState(null);
   const [exportModal, setExportModal] = useState(null);
   const [quickFill, setQuickFill] = useState(null);
-  const fileRef = useRef(null); const dbRef = useRef(null); const uidRef = useRef(null);
+  const fileRef = useRef(null); const dbRef = useRef(null); const uidRef = useRef(null); const preImportRef = useRef(null);
 
   useEffect(function(){
     if (!FB_READY){ const loc = loadLocal(); const st = migrate(loc || emptyState()); setState(st); if (st.anni && st.anni.length) setAnno(st.anni[st.anni.length-1]); return; }
@@ -2609,20 +2612,44 @@ function App(){
     a.href = url; a.download = fileName("json").replace("Report Ore mensile", "Report Ore backup");
     a.click(); URL.revokeObjectURL(url); showToast("Backup JSON scaricato");
   };
+  const downloadStateJson = function(st, label){
+    try{
+      const blob = new Blob([JSON.stringify(Object.assign({}, st, { modelli: collectTemplates() }), null, 2)], { type:"application/json" });
+      const url = URL.createObjectURL(blob); const a = document.createElement("a");
+      a.href = url; a.download = fileName("json").replace("Report Ore mensile", "Report Ore backup " + label);
+      a.click(); URL.revokeObjectURL(url);
+      return true;
+    }catch(e){ console.error("downloadStateJson", e); return false; }
+  };
+  const onRestoreImport = function(){
+    if (!preImportRef.current){ return; }
+    if (!window.confirm("Ripristinare lo stato di PRIMA dell ultimo import? Le modifiche portate dall import verranno annullate (ricorda poi di premere salva).")) return;
+    const snap = JSON.parse(JSON.stringify(preImportRef.current));
+    touch(snap);
+    if (snap.anni && snap.anni.length) setAnno(snap.anni[snap.anni.length-1]);
+    setCanRestoreImport(false);
+    showToast("Ripristinato lo stato di prima dell import - ricorda di salvare");
+  };
   const onImportFile = function(e){
     const file = e.target.files[0]; if (!file) return;
+    if (state && Array.isArray(state.dipendenti) && state.dipendenti.length){
+      preImportRef.current = JSON.parse(JSON.stringify(state));
+      const okBk = downloadStateJson(state, "prima import");
+      setCanRestoreImport(true);
+      showToast(okBk ? "Backup automatico scaricato prima dell import" : "Backup automatico non riuscito: valuta un Backup manuale prima di procedere");
+    }
     const name = (file.name || "").toLowerCase();
     if (name.slice(-5) === ".json"){
       const reader = new FileReader();
       reader.onload = function(ev){
         try { let obj = JSON.parse(ev.target.result); if (!obj || !obj.dipendenti) throw new Error("struttura non valida");
           if (obj.modelli){ applyTemplates(obj.modelli); delete obj.modelli; }
-          obj = migrate(obj); touch(obj); if (obj.anni && obj.anni.length) setAnno(obj.anni[obj.anni.length-1]); showToast("Backup JSON importato — ricorda di salvare 💾"); }
+          obj = migrate(obj); touch(obj); if (obj.anni && obj.anni.length) setAnno(obj.anni[obj.anni.length-1]); showToast("Backup JSON importato — se sbagliato usa Annulla import, poi salva"); }
         catch (err) { console.error(err); showToast("Backup JSON non valido"); }
       };
       reader.readAsText(file);
     } else {
-      importaExcel(file, state, function(next, errMsg){ if (errMsg){ showToast(errMsg); return; } touch(next); if (next.anni && next.anni.length) setAnno(next.anni[next.anni.length-1]); showToast("Excel importato — ricorda di salvare 💾"); });
+      importaExcel(file, state, function(next, errMsg){ if (errMsg){ showToast(errMsg); return; } touch(next); if (next.anni && next.anni.length) setAnno(next.anni[next.anni.length-1]); showToast("Excel importato — se sbagliato usa Annulla import, poi salva"); });
     }
     e.target.value = "";
   };
@@ -2663,6 +2690,7 @@ function App(){
         <button className={"btn btn-save" + (dirty ? " dirty" : "")} onClick={doSave} disabled={!dirty}>💾 Salva</button>
         <button className="btn btn-ghost" onClick={doBackup}>⬇ Backup</button>
         <button className="btn btn-ghost" onClick={function(){ fileRef.current.click(); }}>⬆ Importa</button>
+        {canRestoreImport ? <button className="btn btn-ghost" onClick={onRestoreImport} title="Annulla l ultimo import e torna allo stato precedente">↩︎ Annulla import</button> : null}
         <button className="btn btn-ghost" onClick={function(){ setExportModal("Excel"); }}>📊 Excel</button>
         <button className="btn btn-ghost" onClick={function(){ setExportModal("PDF"); }}>🖨️ PDF A4</button>
         {!FB_READY ? <button className="btn btn-ghost" onClick={changePin}>🔑 PIN</button> : null}
@@ -2700,7 +2728,7 @@ function App(){
          vista === "query" ? <QueryPanel state={state} /> :
           <div>
             <div className="toolbar">
-              <strong style={{ fontSize:"15px", color:"#0f2740" }}>{MONTH_LABEL[mese-1]} {anno}</strong>
+              <strong style={{ fontSize:"15px", color:"#DE4C8A" }}>{MONTH_LABEL[mese-1]} {anno}</strong>
               {mLocked ? <span className="lock-badge">🔒 Mese bloccato</span> : null}
               <div className="spacer"></div>
               <button className={"btn " + (mLocked ? "btn-red" : "btn-gray")} title={mLocked ? "Sblocca il mese per poterlo modificare" : "Blocca il mese: nessuna cella potrà più essere modificata"}
@@ -2712,9 +2740,17 @@ function App(){
               <div style={{ padding:"30px", textAlign:"center", color:"#64748b" }}>Nessun dipendente. Aggiungine uno o importa il file Excel.</div>
               :
               dipSorted(state).map(function(dp){
+                const recDp = getRecFrom(state, anno, mese, dp.id);
+                const ym = anno*100 + mese;
+                const aInt = assunzInt(dp); const aMon = aInt ? Math.floor(aInt/100) : 0;
+                const ceStr = cessEffStr(dp); const ceInt = ymdIt(ceStr); const ceMon = ceInt ? Math.floor(ceInt/100) : 0;
+                const inPeriodo = (!aMon || ym >= aMon) && (!ceMon || ym <= ceMon);
+                const haDati = recHasData(recDp);
+                if (!inPeriodo && !haDati) return null;
+                const fuoriPeriodo = !inPeriodo && haDati;
                 const dipList = state.dipendenti.filter(function(x){ return x.id !== dp.id; }).map(function(x){ return x.nome; }).sort(function(a,b){ return a.localeCompare(b); });
                 const saldoP = saldoPrec(state, anno, mese, dp.id);
-                return <EmployeeCard key={dp.id} dp={dp} rec={getRecFrom(state, anno, mese, dp.id)} anno={anno} mese={mese} fset={fset} mLocked={mLocked}
+                return <EmployeeCard key={dp.id} dp={dp} rec={recDp} fuoriPeriodo={fuoriPeriodo} anno={anno} mese={mese} fset={fset} mLocked={mLocked}
                   dipList={dipList} onCell={onCell} onNota={onNota} onFestConfirm={onFestConfirm} onQuickFill={onQuickFill}
                   onVoceSet={onVoceSet} onVoceAdd={onVoceAdd} onVoceDel={onVoceDel}
                   onDich={onDich} onSvuotaMese={onSvuotaMese} saldoPrec={saldoP} onAzzeraSaldo={onAzzeraSaldo} onAnnullaAzzera={onAnnullaAzzera}
