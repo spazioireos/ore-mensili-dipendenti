@@ -206,7 +206,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver50";
+const APP_VER = "ver51";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
 const MESE_ABBR_FILE = ["gen","feb","mar","apr","mag","giu","lug","ago","set","ott","nov","dic"];
@@ -765,21 +765,26 @@ function esportaPDF(state, pairs){
     const dati = state.dati[mk] || {};
     const haData = Object.keys(dati).some(function(k){ const rr=dati[k]; return rr.giorni && Object.keys(rr.giorni).length>0; });
     if (!haData) return;
+    const ymP = anno*100 + m;
+    const inForzaMese = function(dp){ const aInt=assunzInt(dp); const aMon=aInt?Math.floor(aInt/100):0; const ceStr=cessEffStr(dp); const ceInt=ymdIt(ceStr); const ceMon=ceInt?Math.floor(ceInt/100):0; return (!aMon || ymP>=aMon) && (!ceMon || ymP<=ceMon); };
+    const dipsMese = dips.filter(inForzaMese);
+    const orfani = dips.filter(function(dp){ return !inForzaMese(dp) && recHasData(getRecFrom(state, anno, m, dp.id)); });
+    if (dipsMese.length === 0 && orfani.length === 0) return;
     const nd = daysInMonth(anno, m);
     // spezzo i dipendenti in blocchi da MAXCOL
-    const chunks = []; for (let i=0; i<dips.length; i+=MAXCOL) chunks.push(dips.slice(i, i+MAXCOL));
+    const chunks = []; for (let i=0; i<dipsMese.length; i+=MAXCOL) chunks.push(dipsMese.slice(i, i+MAXCOL));
     if (chunks.length === 0) chunks.push([]);
     const permMese = []; const noteMese = [];
-    dips.forEach(function(dp){ const rec = getRecFrom(state, anno, m, dp.id); const vl = vociLines(rec); if (vl.length > 0) noteMese.push({ nome: dp.nome, righe: vl }); });
+    dipsMese.forEach(function(dp){ const rec = getRecFrom(state, anno, m, dp.id); const vl = vociLines(rec); if (vl.length > 0) noteMese.push({ nome: dp.nome, righe: vl }); });
     // larghezza colonna UNICA per tutte le pagine (basata sul blocco più grande = min(dip, MAXCOL)+1 colonne)
-    const colW = Math.round((269 / (2 + Math.min(dips.length, MAXCOL))) * 100) / 100;
+    const colW = Math.round((269 / (2 + Math.min(Math.max(dipsMese.length,1), MAXCOL))) * 100) / 100;
 
     chunks.forEach(function(chunk, ci){
       if (!first) doc.addPage();
       first = false;
       doc.setFontSize(12); doc.setTextColor(15,39,64); doc.setFont(undefined,"bold");
       let titolo = "Spazio Ireos — Report Ore   ·   " + MONTH_LABEL[m-1] + " " + anno;
-      if (chunks.length > 1) titolo += "   (dipendenti " + (ci*MAXCOL+1) + "–" + (ci*MAXCOL+chunk.length) + " di " + dips.length + " · pag. " + (ci+1) + "/" + chunks.length + ")";
+      if (chunks.length > 1) titolo += "   (dipendenti " + (ci*MAXCOL+1) + "–" + (ci*MAXCOL+chunk.length) + " di " + dipsMese.length + " · pag. " + (ci+1) + "/" + chunks.length + ")";
       doc.text(titolo, 14, 12);
       doc.setFont(undefined,"normal");
       const head = [["Giorno"].concat(chunk.map(function(dp){ return dp.nome; })).concat(["Giorno"])];
@@ -891,6 +896,19 @@ function esportaPDF(state, pairs){
           doc.text("Permessi orari (segnalati con *, non inclusi nel TOT):", 14, yy); yy += 3.6; doc.setFont(undefined,"normal");
           doc.setFontSize(6.5); doc.setTextColor(70,70,70);
           permMese.forEach(function(pp){ const ls = doc.splitTextToSize("•  " + pp, 269); ensureY(ls.length * 3.2); doc.text(ls, 14, yy); yy += ls.length * 3.2; });
+        }
+        if (orfani.length > 0){
+          yy += 3;
+          const lines = [];
+          orfani.forEach(function(dp){ const ls = doc.splitTextToSize("•  " + dp.nome + " — ha ore registrate fuori rapporto (prima dell'assunzione o dopo la cessazione), NON incluse: verificare.", 178); ls.forEach(function(l){ lines.push(l); }); });
+          const boxH = 7 + lines.length*4.2 + 2;
+          if (yy + boxH > 287){ doc.addPage(); yy = 18; }
+          doc.setFillColor(254,226,226); doc.setDrawColor(220,38,38); doc.setLineWidth(0.4);
+          doc.rect(13, yy - 4, 184, boxH, "FD");
+          doc.setFontSize(9.5); doc.setTextColor(153,27,27); doc.setFont(undefined,"bold");
+          doc.text("ATTENZIONE — ore fuori rapporto non incluse nella stampa", 15, yy); yy += 5.4;
+          doc.setFontSize(8); doc.setFont(undefined,"normal"); doc.setTextColor(120,20,20);
+          lines.forEach(function(line){ ensureY(4.2); doc.text(line, 18, yy); yy += 4.2; });
         }
       }
     });
