@@ -95,6 +95,7 @@
   .foot-line .foot-tot { font-size:12px; color:#DE4C8A; font-weight:700; }
   .foot-line label { font-size:12px; color:#64748b; font-weight:700; }
   .dich-in { width:80px; border:2px solid #f59e0b; background:#fffde7; border-radius:6px; padding:4px 6px; font-family:inherit; font-size:14px; font-weight:800; text-align:center; }
+  .teor-abs { font-size:9px; font-weight:800; color:#7c2d12; text-align:center; line-height:1.1; margin-top:1px; }
   .provv-lbl { display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:700; color:#92400e; background:#fffbeb; border:1px solid #fcd34d; border-radius:6px; padding:3px 8px; cursor:pointer; }
   .provv-base { font-size:12px; font-weight:700; border:1px solid #fcd34d; border-radius:6px; padding:3px 6px; background:#fff; }
   .conguaglio-warn { display:inline-flex; align-items:center; gap:8px; font-size:13px; font-weight:800; color:#7c2d12; background:#ffedd5; border:2px solid #fb923c; border-radius:8px; padding:4px 10px; }
@@ -206,7 +207,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver51";
+const APP_VER = "ver53";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
 const MESE_ABBR_FILE = ["gen","feb","mar","apr","mag","giu","lug","ago","set","ott","nov","dic"];
@@ -250,10 +251,10 @@ const DIP_INIZIALI = [
   { nome:"CHIODI MANUELA",            livello:"", oreSett:12, tipoContratto:"indeterminato", scadenza:"",         dataAssunzione:"", dataCessazione:"", colore:"#00B0F0" },
   { nome:"DEL MASTRO MARIA",          livello:"", oreSett:17, tipoContratto:"indeterminato", scadenza:"",         dataAssunzione:"", dataCessazione:"", colore:"#CCFF66" },
   { nome:"DE MAIO BARBARA",           livello:"", oreSett:29, tipoContratto:"determinato",   scadenza:"31/12/26", dataAssunzione:"", dataCessazione:"", colore:"#CCFF66" },
-  { nome:"DI LECCE IVANA",            livello:"", oreSett:38, tipoContratto:"indeterminato", scadenza:"",         dataAssunzione:"", dataCessazione:"", colore:"#00B0F0" },
+  { nome:"DI LECCE IVANA",            livello:"", oreSett:38, tipoContratto:"indeterminato", scadenza:"",         dataAssunzione:"", dataCessazione:"", colore:"#00B0F0", mensilizzato:true },
   { nome:"FERRARI FEDERICA",          livello:"", oreSett:19, tipoContratto:"indeterminato", scadenza:"",         dataAssunzione:"", dataCessazione:"", colore:"#FFC000" },
   { nome:"FISICHELLA GIUSEPPE",       livello:"", oreSett:15, tipoContratto:"determinato",   scadenza:"31/12/26", dataAssunzione:"", dataCessazione:"", colore:"#FFDDFF" },
-  { nome:"FRUTAZ RACHELE",            livello:"", oreSett:19, tipoContratto:"indeterminato", scadenza:"",         dataAssunzione:"", dataCessazione:"", colore:"#FFC000" },
+  { nome:"FRUTAZ RACHELE",            livello:"", oreSett:19, tipoContratto:"indeterminato", scadenza:"",         dataAssunzione:"", dataCessazione:"", colore:"#FFC000", mensilizzato:true },
   { nome:"GIUNCHIGLIA BENEDETTA",     livello:"", oreSett:18, tipoContratto:"determinato",   scadenza:"07/08/26", dataAssunzione:"", dataCessazione:"", colore:"#00B0F0" },
   { nome:"PANSERA ANTONIA ALFONSINA", livello:"", oreSett:15, tipoContratto:"determinato",   scadenza:"31/12/26", dataAssunzione:"", dataCessazione:"", colore:"#CCFF66" }
 ];
@@ -282,6 +283,20 @@ function fmt2(num){
   if (isNaN(n)) n = 0;
   const neg = n < 0; n = Math.abs(n);
   const s = n.toFixed(2);
+  const parts = s.split(".");
+  let out = "";
+  for (let i = 0; i < parts[0].length; i++){
+    if (i > 0 && (parts[0].length - i) % 3 === 0) out += ".";
+    out += parts[0][i];
+  }
+  return (neg ? "-" : "") + out + "," + parts[1];
+}
+// formatta un numero con ESATTAMENTE 3 decimali, separatori italiani (per i conteggi Banca ore)
+function fmt3(num){
+  let n = parseFloat(String(num).replace(",", "."));
+  if (isNaN(n)) n = 0;
+  const neg = n < 0; n = Math.abs(n);
+  const s = n.toFixed(3);
   const parts = s.split(".");
   let out = "";
   for (let i = 0; i < parts[0].length; i++){
@@ -371,7 +386,60 @@ function valoriAt(dp, y, m){
     if(t.oreSett!=null && String(t.oreSett)!=="" && !isNaN(Number(t.oreSett))) ore=Number(t.oreSett);
     if(t.toIndet) tipo="indeterminato";
   }});
+  // trasformazioni orarie TEMPORANEE (finestra inizio→fine, allineata al mese): override di oreSett nei mesi coperti
+  const refYM=y*100+m;
+  (Array.isArray(dp.orariTemp)?dp.orariTemp:[]).forEach(function(w){
+    if(!w) return;
+    const wi=ymdIt(w.inizio), wf=ymdIt(w.fine);
+    if(!wi||!wf) return;
+    const iYM=Math.floor(wi/10000)*100+Math.floor((wi%10000)/100);
+    const fYM=Math.floor(wf/10000)*100+Math.floor((wf%10000)/100);
+    if(refYM>=iYM && refYM<=fYM && w.oreSett!=null && String(w.oreSett)!=="" && !isNaN(Number(w.oreSett))) ore=Number(w.oreSett);
+  });
   return { livello:liv, oreSett:ore, tipo:tipo };
+}
+function orarioTempAt(dp,y,m){ const refYM=y*100+m; let r=null; (Array.isArray(dp.orariTemp)?dp.orariTemp:[]).forEach(function(w){ if(!w)return; const wi=ymdIt(w.inizio),wf=ymdIt(w.fine); if(!wi||!wf)return; const iYM=Math.floor(wi/10000)*100+Math.floor((wi%10000)/100); const fYM=Math.floor(wf/10000)*100+Math.floor((wf%10000)/100); if(refYM>=iYM&&refYM<=fYM&&w.oreSett!=null&&String(w.oreSett)!==""&&!isNaN(Number(w.oreSett))) r=Number(w.oreSett); }); return r; }
+/* ===== Banca ore — METODO A (mensilizzazione fissa: 26 giornate convenzionali/mese) ===== */
+function quotaGiorno(dp,y,m){ return oreSettAt(dp,y,m)/6; }                 // sesto settimanale (orario vigente nel mese)
+function monteFissoMese(dp,y,m){ return quotaGiorno(dp,y,m)*26; }          // fisso mensile = quota × 26
+function coverAbsHours(rec,dp,y,m){                                        // ore assenze retribuite del mese, a quota esatta (coperte)
+  if(!rec||!rec.giorni) return 0;
+  const q=quotaGiorno(dp,y,m); const nd=daysInMonth(y,m); let days=0;
+  for(let d=1; d<=nd; d++){ const cv=String(rec.giorni[d]==null?"":rec.giorni[d]).trim(); if(CODE_SET[cv] && cv!=="--" && cv!=="AN") days++; }
+  return days*q;
+}
+function bancaMeseA(state,dp,y,m){                                          // banca del singolo mese (Metodo A). null se senza "ore dichiarate"
+  const rec=getRecFrom(state,y,m,dp.id);
+  const draw=String(rec.dich==null?"":rec.dich).trim(); if(draw==="") return null;
+  const D=parseFloat(draw.replace(",",".")); if(isNaN(D)) return null;
+  const eff=D + coverAbsHours(rec,dp,y,m);                                  // prodotto = lavorate + assenze coperte
+  return Math.round((eff - monteFissoMese(dp,y,m))*1000)/1000;
+}
+function bancaPrecA(state,dp,anno,mese){                                    // banca cumulata dei mesi PRECEDENTI (dopo l'ultimo azzeramento)
+  const months=[];
+  Object.keys(state.dati||{}).forEach(function(k){ const mm=k.match(/^(\d{4})-(\d{1,2})$/); if(!mm) return; const y=parseInt(mm[1],10), m=parseInt(mm[2],10); if(y>anno||(y===anno&&m>=mese)) return; const rec=state.dati[k][dp.id]; if(!rec) return; months.push({y:y,m:m,rec:rec,key:y*100+m}); });
+  months.sort(function(a,b){ return a.key-b.key; });
+  let startIdx=0; for(let i=0;i<months.length;i++){ if(months[i].rec.saldoAzzerato) startIdx=i+1; }
+  let s=0; for(let i=startIdx;i<months.length;i++){ const bm=bancaMeseA(state,dp,months[i].y,months[i].m); if(bm!=null) s+=bm; }
+  return Math.round(s*1000)/1000;
+}
+/* ===== Tetto annuo (attribuzione) — progetto unico, periodo scolastico o civile ===== */
+function prodottoMese(rec,dp,y,m){                                         // ore che consumano il tetto nel mese: lavorate dichiarate + assenze coperte
+  if(!rec) return null;
+  const draw=String(rec.dich==null?"":rec.dich).trim(); if(draw==="") return null;
+  const D=parseFloat(draw.replace(",",".")); if(isNaN(D)) return null;
+  return D + coverAbsHours(rec,dp,y,m);
+}
+function tettoWindow(periodo,y,m){                                         // finestra YM (incluso) del periodo che contiene (y,m)
+  if(periodo==="civile") return { fromYM:y*100+1, toYM:y*100+12 };
+  if(m>=9) return { fromYM:y*100+9, toYM:(y+1)*100+8 };                     // scolastico: set..ago
+  return { fromYM:(y-1)*100+9, toYM:y*100+8 };
+}
+function consumoTetto(state,dp,anno,mese){                                 // somma del prodotto sui mesi del periodo
+  const per=(dp.tettoPeriodo==="civile")?"civile":"scolastico";
+  const w=tettoWindow(per,anno,mese); let s=0;
+  Object.keys(state.dati||{}).forEach(function(k){ const mm=k.match(/^(\d{4})-(\d{1,2})$/); if(!mm) return; const y=parseInt(mm[1],10), mo=parseInt(mm[2],10); const ym=y*100+mo; if(ym<w.fromYM||ym>w.toYM) return; const rec=state.dati[k][dp.id]; if(!rec) return; const p=prodottoMese(rec,dp,y,mo); if(p!=null) s+=p; });
+  return Math.round(s*1000)/1000;
 }
 function valoriNow(dp){ return valoriAt(dp, 9999, 12); }
 function tipoNow(dp){ return valoriNow(dp).tipo; }
@@ -434,7 +502,7 @@ function contrLabel(dp){
 function emptyState(){
   const dip = DIP_INIZIALI.map(function(x){
     return { id:uid(), nome:x.nome, livello:x.livello, oreSett:x.oreSett, tipoContratto:x.tipoContratto,
-      scadenza:x.scadenza, proroghe:[], ana:{}, dataAssunzione:x.dataAssunzione, dataCessazione:x.dataCessazione, colore:x.colore };
+      scadenza:x.scadenza, proroghe:[], trasformazioni:[], orariTemp:[], mensilizzato:!!x.mensilizzato, tettoAnnuo:"", tettoPeriodo:"scolastico", ana:{}, dataAssunzione:x.dataAssunzione, dataCessazione:x.dataCessazione, colore:x.colore };
   });
   const byName = {}; dip.forEach(function(d){ byName[d.nome.trim().toUpperCase()] = d.id; });
   const dati = {};
@@ -581,7 +649,15 @@ function migrate(obj){
   (obj.dipendenti || []).forEach(function(d){ if (!Array.isArray(d.proroghe)) d.proroghe = []; if (!d.ana || typeof d.ana !== "object") d.ana = {};
     if (d.ana.struttura && !d.ana.specificaStruttura){ d.ana.specificaStruttura = d.ana.struttura; delete d.ana.struttura; }
     if (d.ana.locStruttura && !d.ana.ubicazione){ d.ana.ubicazione = d.ana.locStruttura; delete d.ana.locStruttura; }
+    if (!Array.isArray(d.orariTemp)) d.orariTemp = [];
+    if (typeof d.mensilizzato !== "boolean") d.mensilizzato = false;
+    if (d.tettoAnnuo == null) d.tettoAnnuo = "";
+    if (d.tettoPeriodo !== "civile" && d.tettoPeriodo !== "scolastico") d.tettoPeriodo = "scolastico";
   });
+  if (!obj.mensilizzatoInit2026){
+    (obj.dipendenti || []).forEach(function(d){ const nm=String(d.nome==null?"":d.nome).trim().toUpperCase(); if(nm==="DI LECCE IVANA" || nm==="FRUTAZ RACHELE") d.mensilizzato = true; });
+    obj.mensilizzatoInit2026 = true;
+  }
   obj.version = 4;
   return obj;
 }
@@ -1049,6 +1125,8 @@ function EmployeeCard(props){
         {livelloAt(dp,y,m) ? <span className="pill">Liv. {livelloAt(dp,y,m)}</span> : null}
         <span className="pill">ORE SETT: {hoursDisp(oreSettAt(dp,y,m))}</span>
         <span className="pill">{contrLabelAt(dp,y,m)}</span>
+        {dp.mensilizzato ? <span className="pill" style={{ background:"#fbcfe8", color:"#831843" }}>🏦 Mensilizzato</span> : null}
+        {orarioTempAt(dp,y,m)!=null ? <span className="pill" style={{ background:"#fde68a", color:"#78350f" }}>⏱ orario temp. {hoursDisp(orarioTempAt(dp,y,m))}h</span> : null}
         {(function(){ const ce=cessEffStr(dp); if(!ce) return null; const now=new Date(); const tInt=now.getFullYear()*10000+(now.getMonth()+1)*100+now.getDate(); const ceInt=ymdIt(ce); return (ceInt && ceInt < tInt) ? <span className="pill cess">CESSATO {ce}</span> : <span className="pill" style={{ background:"#fbe0ec", color:"#8A2358" }}>fino al {ce}</span>; })()}
         <div className="spacer"></div>
         {!mLocked ? <button className="edit-mini qf" title="Compila velocemente il mese (ore o codice sui giorni scelti)" onClick={function(){ props.onQuickFill(dp); }}>⚡ Compila</button> : null}
@@ -1079,8 +1157,11 @@ function EmployeeCard(props){
               const rosso = isRosso(fset, y, m, d);
               const blocked = isBlockedDay(dp, y, m, d) || mLocked;
               const perm = (rec.permessi && rec.permessi[d]) ? rec.permessi[d] : null;
+              const svalC = String(val).trim();
+              const isCovAbs = (CODE_SET[svalC] && svalC!=="--" && svalC!=="AN");
+              const quotaDay = oreSettAt(dp,y,m)/6;
               return (
-                <td key={"c"+d} style={{ padding:"1px" }}>
+                <td key={"c"+d} style={{ padding:"1px", verticalAlign:"top" }}>
                   <div className="cell-wrap">
                     <CellInput value={val} disabled={blocked} rosso={rosso} style={cellStyle(val, rosso, blocked)}
                       title={cellTitle(val, blocked, rosso, perm)}
@@ -1090,6 +1171,7 @@ function EmployeeCard(props){
                       title={perm ? ("Permesso orario " + fmt2(perm.ore) + " h (" + perm.tipo + ") — clic per modificare") : "Aggiungi permesso orario"}
                       onClick={function(){ props.onOpenPerm(dp.id, d); }}></button> : null}
                   </div>
+                  {isCovAbs ? <div className="teor-abs" title="Ore teoriche del giorno (orario sett ÷ 6) coperte da questa assenza retribuita">{fmt3(quotaDay)}</div> : null}
                 </td>
               );
             })}
@@ -1103,6 +1185,7 @@ function EmployeeCard(props){
         <input className="dich-in" value={rec.dich || ""} placeholder="—" disabled={mLocked}
           onChange={function(e){ props.onDich(dp.id, e.target.value); }} />
         {(function(){
+          if (dp.mensilizzato) return null;
           const s = String(rec.dich === undefined ? "" : rec.dich).trim();
           if (s === "") return null;
           const dn = parseFloat(s.replace(",", "."));
@@ -1121,6 +1204,56 @@ function EmployeeCard(props){
           const daPag = hasD ? Math.round((S + D) * 100) / 100 : S;
           const manca = Math.round((daPag - P) * 100) / 100;
           const azzeraBtn = (!mLocked) ? <button className="azzera-btn" title="Considera saldato il credito/debito fino a questo mese: dal mese dopo il saldo riparte da zero" onClick={function(){ props.onAzzeraSaldo(dp.id); }}>⊘ Azzera saldo</button> : null;
+          if (dp.mensilizzato){
+            const quotaExact = oreSettAt(dp,y,m)/6;
+            let assDays=0; for(let dd=1; dd<=nd; dd++){ const cv=String(rec.giorni[dd]==null?"":rec.giorni[dd]).trim(); if(CODE_SET[cv] && cv!=="--" && cv!=="AN") assDays++; }
+            const assOreExact = assDays*quotaExact;
+            const monteFisso = quotaExact*26;
+            const eff = hasD ? (D + assOreExact) : null;                               // prodotto = lavorate + assenze coperte
+            const bancaMese = hasD ? Math.round((eff - monteFisso)*1000)/1000 : null;  // Metodo A (precisione piena, 3 dec.)
+            const bancaPrev = Math.round((props.bancaPrec||0)*1000)/1000;
+            const bancaCum = hasD ? Math.round((bancaPrev + bancaMese)*1000)/1000 : bancaPrev;
+            const isAug = (m===8);
+            const statusTxt = bancaCum > 0.0005 ? "a credito operatore" : (bancaCum < -0.0005 ? "a debito operatore" : "in pari");
+            const bcls = bancaCum > 0.0005 ? "warn" : (bancaCum < -0.0005 ? "over" : "ok");
+            const azzeraBancaBtn = (!mLocked) ? <button className="azzera-btn" title="Conguaglio banca ore: considera chiusa la banca fino a questo mese (31/08). Dalla mensilità successiva riparte da zero." onClick={function(){ props.onAzzeraSaldo(dp.id); }}>⊘ Azzera banca (31/08)</button> : null;
+            if (azzerato){
+              return <div className="cong ok">
+                <div className="cong-head">🏦 Banca ore — SALDO AZZERATO{isAug?" (conguaglio 31/08)":""}</div>
+                <div className="cong-row">
+                  <span className="cong-status">Banca azzerata ✓</span>
+                  <span className="cong-chip">Chiusa a questo mese: <b>{fmt3(Math.abs(bancaCum))} h</b> {bancaCum>0.0005?"(erano a credito operatore)":(bancaCum<-0.0005?"(erano a debito operatore)":"")}</span>
+                  {!mLocked ? <button className="azzera-btn annulla" title="Annulla l'azzeramento" onClick={function(){ props.onAnnullaAzzera(dp.id); }}>↩︎ Annulla azzeramento</button> : null}
+                </div>
+                <div className="cong-res">Dalla mensilità successiva la banca riparte da <b>zero</b>. I mesi precedenti restano invariati.</div>
+              </div>;
+            }
+            if (!hasD && Math.abs(bancaPrev) <= 0.0005 && assDays === 0) return null;
+            return <div className={"cong " + bcls}>
+              <div className="cong-head">🏦 Banca ore — mensilizzazione fissa (26 gg){isAug ? " · ⚠️ conguaglio 31/08" : ""}</div>
+              <div className="cong-row">
+                <span className="cong-chip">Quota giorno (ore sett ÷ 6): <b>{fmt3(quotaExact)} h</b></span>
+                <span className="cong-chip">Monte fisso mese (quota × 26): <b>{fmt3(monteFisso)} h</b></span>
+                <span className="cong-chip">Lavorate (dichiarate): <b>{hasD?fmt3(D):"—"}</b></span>
+                <span className="cong-chip">Assenze coperte: <b>{assDays} gg = {fmt3(assOreExact)} h</b></span>
+              </div>
+              <div className="cong-row">
+                {hasD ? <span className="cong-chip">Prodotto (lavorate+coperte): <b>{fmt3(eff)}</b></span> : null}
+                <span className="cong-chip">Banca prec. <b>{fmt3(bancaPrev)}</b></span>
+                <span className="cong-op">+</span>
+                <span className="cong-chip">Mese <b>{hasD?((bancaMese>0?"+":"")+fmt3(bancaMese)):"0,000"}</b></span>
+                <span className="cong-op">=</span>
+                <span className="cong-chip strong">Banca cumulata <b>{(bancaCum>0?"+":"")+fmt3(bancaCum)} h</b></span>
+                <span className="cong-status">{statusTxt}</span>
+                {azzeraBancaBtn}
+              </div>
+              <div className="cong-res">
+                Fisso mensile = quota × 26 gg: i mesi "lunghi" vanno a credito, i "corti" a debito; sull'anno si compensano. Le assenze retribuite sono <b>coperte</b> a {fmt3(quotaExact)} h/giorno e rientrano nel prodotto.
+                {!hasD ? <span> · Inserisci le <b>ore dichiarate</b> (ore realmente lavorate) qui sopra per calcolare la banca del mese.</span> : null}
+                <div style={{ fontSize:"11px", color:"#9a3412", marginTop:"2px" }}>Valori mostrati a 3 decimali; i conteggi usano la precisione piena.</div>
+              </div>
+            </div>;
+          }
           if (azzerato){
             return <div className="cong ok">
               <div className="cong-head">✓ Conguaglio ore — SALDO AZZERATO MANUALMENTE</div>
@@ -1168,6 +1301,28 @@ function EmployeeCard(props){
                   ? <span>Pagate <b>{fmt2(P)}</b> su <b>{fmt2(daPag)}</b> → <b>togli {fmt2(Math.abs(manca))} ore (a debito operatore)</b>: si riportano al mese dopo.</span>
                   : <span><b>✓ Saldo azzerato</b> — pagate <b>{fmt2(P)}</b> su <b>{fmt2(daPag)}</b>. Nessun riporto.</span>)}
             </div>
+          </div>;
+        })()}
+        {(function(){
+          const tetto = parseFloat(String(dp.tettoAnnuo==null?"":dp.tettoAnnuo).replace(",","."));
+          if (isNaN(tetto) || tetto <= 0) return null;
+          const consumo = Math.round((props.tettoConsumo||0)*1000)/1000;
+          const rimaste = Math.round((tetto - consumo)*1000)/1000;
+          const pct = tetto>0 ? Math.max(0, Math.min(100, Math.round(consumo/tetto*100))) : 0;
+          const per = dp.tettoPeriodo==="civile" ? "anno civile (1/1 → 31/12)" : "anno scolastico (1/9 → 31/8)";
+          const over = rimaste < -0.0005;
+          const quasi = !over && rimaste <= tetto*0.1;
+          const tcls = over ? "over" : (quasi ? "warn" : "ok");
+          return <div className={"cong " + tcls} style={{ marginTop:"6px" }}>
+            <div className="cong-head">🎯 Tetto annuo — {per}</div>
+            <div className="cong-row">
+              <span className="cong-chip">Tetto: <b>{fmt3(tetto)} h</b></span>
+              <span className="cong-chip">Consumate: <b>{fmt3(consumo)} h</b></span>
+              <span className="cong-chip strong">Rimaste: <b>{fmt3(rimaste)} h</b></span>
+              <span className="cong-status">{over ? "⚠️ tetto superato" : (quasi ? "quasi esaurito" : "disponibili")}</span>
+            </div>
+            <div className="cong-bar"><div className="cong-bar-fill" style={{ width: pct + "%" }}></div></div>
+            <div className="cong-res">Consumo = ore lavorate dichiarate + assenze retribuite (a ore sett ÷ 6), sommate sui mesi del periodo. <span style={{ fontSize:"11px", color:"#9a3412" }}>Valori a 3 decimali.</span></div>
           </div>;
         })()}
       </div>
@@ -1249,12 +1404,34 @@ function DipModal(props){
   const [assunz, setAssunz] = useState(editing ? (editing.dataAssunzione||"") : "");
   const [cess, setCess] = useState(editing ? (editing.dataCessazione||"") : "");
   const [colore, setColore] = useState(editing ? (editing.colore||PALETTE[0]) : PALETTE[0]);
+  const [mensilizzato, setMensilizzato] = useState(editing ? !!editing.mensilizzato : false);
+  const [tettoAnnuo, setTettoAnnuo] = useState(editing && editing.tettoAnnuo != null ? String(editing.tettoAnnuo) : "");
+  const [tettoPeriodo, setTettoPeriodo] = useState(editing && editing.tettoPeriodo === "civile" ? "civile" : "scolastico");
+  const [orariTemp, setOrariTemp] = useState(editing && Array.isArray(editing.orariTemp) ? editing.orariTemp.map(function(w){ return Object.assign({}, w); }) : []);
+  const [otMeseI, setOtMeseI] = useState(String(_now47.getMonth()+1));
+  const [otAnnoI, setOtAnnoI] = useState(String(_now47.getFullYear()));
+  const [otMeseF, setOtMeseF] = useState(String(_now47.getMonth()+1));
+  const [otAnnoF, setOtAnnoF] = useState(String(_now47.getFullYear()));
+  const [otOre, setOtOre] = useState("");
+  const addOt = function(){
+    const mi=parseInt(otMeseI,10), yi=parseInt(otAnnoI,10), mf=parseInt(otMeseF,10), yf=parseInt(otAnnoF,10);
+    if(!mi||mi<1||mi>12||!yi||yi<2000||yi>2100) return;
+    if(!mf||mf<1||mf>12||!yf||yf<2000||yf>2100) return;
+    const oreV=String(otOre).replace(",",".").trim();
+    if(oreV==="" || isNaN(Number(oreV))) return;
+    if((yi*100+mi) > (yf*100+mf)) return; // inizio dopo fine: ignora
+    const rec={ inizio:"01/"+(mi<10?"0":"")+mi+"/"+yi, fine:"01/"+(mf<10?"0":"")+mf+"/"+yf, oreSett:Number(oreV) };
+    setOrariTemp(orariTemp.concat([rec]).sort(function(a,b){ return ymdIt(a.inizio)-ymdIt(b.inizio); }));
+    setOtOre("");
+  };
+  const delOt = function(i){ setOrariTemp(orariTemp.filter(function(_, k){ return k !== i; })); };
+  const otSummary = function(w){ const mi=ymdIt(w.inizio), mf=ymdIt(w.fine); const li=mi?(MONTH_LABEL[Math.floor((mi%10000)/100)-1]+" "+Math.floor(mi/10000)):w.inizio; const lf=mf?(MONTH_LABEL[Math.floor((mf%10000)/100)-1]+" "+Math.floor(mf/10000)):w.fine; return (Number.isInteger(Number(w.oreSett))?String(Number(w.oreSett)):fmt2(Number(w.oreSett)))+" h/sett — da "+li+" a "+lf; };
   const save = function(){
     const n = nome.trim().toUpperCase();
     if (n === "") return;
     const pro = tipo === "determinato" ? proroghe.filter(function(x){ return x && x.trim() !== ""; }) : [];
     props.onSave({ id: editing ? editing.id : uid(), nome:n, livello:livello.trim(), oreSett:Number(ore)||0,
-      tipoContratto:tipo, scadenza: tipo==="determinato" ? scad.trim() : "", proroghe:pro, trasformazioni: trasf.filter(function(x){ return x && x.data; }), ana: editing ? (editing.ana || {}) : {}, dataAssunzione:assunz.trim(), dataCessazione:cess.trim(), cessManuale: cess.trim()!=="", colore:colore });
+      tipoContratto:tipo, scadenza: tipo==="determinato" ? scad.trim() : "", proroghe:pro, trasformazioni: trasf.filter(function(x){ return x && x.data; }), orariTemp: orariTemp.filter(function(w){ return w && w.inizio && w.fine && w.oreSett!=null && String(w.oreSett)!==""; }), mensilizzato: mensilizzato, tettoAnnuo: String(tettoAnnuo).trim(), tettoPeriodo: tettoPeriodo, ana: editing ? (editing.ana || {}) : {}, dataAssunzione:assunz.trim(), dataCessazione:cess.trim(), cessManuale: cess.trim()!=="", colore:colore });
   };
   return (
     <div className="overlay" onClick={props.onClose}>
@@ -1323,6 +1500,51 @@ function DipModal(props){
             <button className="btn btn-blue" onClick={addTrasf}>+ Aggiungi trasformazione</button>
           </div>
           <div style={{ fontSize:"11px", color:"#64748b", marginTop:"4px" }}>Compila almeno uno tra livello, monte ore o la spunta "a tempo indeterminato".</div>
+        </div>
+        <div className="field" style={{ background:"#fdf2f8", border:"1px solid #f9a8d4", borderRadius:"8px", padding:"10px" }}>
+          <label style={{ display:"flex", alignItems:"center", gap:"8px", fontWeight:800, cursor:"pointer" }}>
+            <input type="checkbox" checked={mensilizzato} onChange={function(e){ setMensilizzato(e.target.checked); }} /> 🏦 Mensilizzato — attiva il conteggio Banca ore
+          </label>
+          <div style={{ fontSize:"11px", color:"#64748b", marginTop:"4px" }}>Se attivo, nella scheda mensile compare il riquadro <b>Banca ore</b> (dichiarate − teoriche lavorate; le assenze retribuite sono neutre). Conguaglio/azzeramento al <b>31/08</b> (servizio scolastico).</div>
+        </div>
+        <div className="field" style={{ background:"#eef6ff", border:"1px solid #bfdbfe", borderRadius:"8px", padding:"10px" }}>
+          <label style={{ fontWeight:800 }}>🎯 Tetto annuo (attribuzione) — opzionale</label>
+          <div style={{ fontSize:"11px", color:"#64748b", margin:"2px 0 6px" }}>Se compili le ore, nella scheda mensile compare il riquadro <b>Tetto annuo</b>: quanto resta del monte ore totale del periodo. Si consuma con le ore lavorate dichiarate + le assenze retribuite (a ore sett ÷ 6). Lascia vuoto per disattivarlo.</div>
+          <div style={{ display:"flex", gap:"10px", alignItems:"end", flexWrap:"wrap" }}>
+            <div><div style={{ fontSize:"11px", fontWeight:700, marginBottom:"2px" }}>Tetto annuo (ore)</div>
+              <input value={tettoAnnuo} onChange={function(e){ setTettoAnnuo(e.target.value); }} placeholder="es. 500" inputMode="decimal" style={{ width:"140px", padding:"6px", border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px" }} /></div>
+            <div><div style={{ fontSize:"11px", fontWeight:700, marginBottom:"2px" }}>Periodo</div>
+              <select value={tettoPeriodo} onChange={function(e){ setTettoPeriodo(e.target.value); }} style={{ padding:"6px" }}>
+                <option value="scolastico">Anno scolastico (1/9 → 31/8)</option>
+                <option value="civile">Anno civile (1/1 → 31/12)</option>
+              </select></div>
+          </div>
+        </div>
+        <div className="field" style={{ background:"#fff7ed", border:"1px solid #fed7aa", borderRadius:"8px", padding:"10px" }}>
+          <label style={{ fontWeight:800 }}>Trasformazioni orarie temporanee — sempre dal 1° del mese</label>
+          <div style={{ fontSize:"11px", color:"#64748b", margin:"2px 0 6px" }}>Variazione di monte ore <b>a termine</b> (es. 30h → 20h da gennaio ad aprile, poi di nuovo 30h). Nei mesi coperti la scheda usa automaticamente l'orario temporaneo (e la quota giornaliera orario/6); fuori dalla finestra torna da sola all'orario normale.</div>
+          {orariTemp.length === 0 ? <div style={{ fontSize:"12px", color:"#64748b", margin:"4px 0" }}>Nessuna trasformazione temporanea.</div> :
+            <div style={{ margin:"6px 0" }}>
+              {orariTemp.map(function(ww, i){ return (
+                <div key={i} style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"4px", fontSize:"13px" }}>
+                  <span style={{ fontWeight:700 }}>{otSummary(ww)}</span>
+                  <button className="voce-del" title="Rimuovi trasformazione temporanea" onClick={function(){ delOt(i); }}>✕</button>
+                </div>
+              ); })}
+            </div>}
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(130px, 1fr))", gap:"6px", alignItems:"end", marginTop:"6px" }}>
+            <div><div style={{ fontSize:"11px", fontWeight:700, marginBottom:"2px" }}>Da — mese</div>
+              <select value={otMeseI} onChange={function(e){ setOtMeseI(e.target.value); }} style={{ width:"100%", padding:"6px" }}>{MONTH_LABEL.map(function(l,i){ return <option key={i} value={String(i+1)}>{l}</option>; })}</select></div>
+            <div><div style={{ fontSize:"11px", fontWeight:700, marginBottom:"2px" }}>Da — anno</div>
+              <input value={otAnnoI} onChange={function(e){ setOtAnnoI(e.target.value.replace(/[^0-9]/g,"").slice(0,4)); }} inputMode="numeric" style={{ width:"100%", padding:"6px", border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px" }} /></div>
+            <div><div style={{ fontSize:"11px", fontWeight:700, marginBottom:"2px" }}>A — mese (incluso)</div>
+              <select value={otMeseF} onChange={function(e){ setOtMeseF(e.target.value); }} style={{ width:"100%", padding:"6px" }}>{MONTH_LABEL.map(function(l,i){ return <option key={i} value={String(i+1)}>{l}</option>; })}</select></div>
+            <div><div style={{ fontSize:"11px", fontWeight:700, marginBottom:"2px" }}>A — anno</div>
+              <input value={otAnnoF} onChange={function(e){ setOtAnnoF(e.target.value.replace(/[^0-9]/g,"").slice(0,4)); }} inputMode="numeric" style={{ width:"100%", padding:"6px", border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px" }} /></div>
+            <div><div style={{ fontSize:"11px", fontWeight:700, marginBottom:"2px" }}>Monte ore/sett temporaneo</div>
+              <input value={otOre} onChange={function(e){ setOtOre(e.target.value); }} placeholder="es. 20" inputMode="decimal" style={{ width:"100%", padding:"6px", border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px" }} /></div>
+            <button className="btn btn-blue" onClick={addOt}>+ Aggiungi periodo</button>
+          </div>
         </div>
         <div className="frow">
           <div className="field"><label>Data assunzione (blocca giorni prima)</label>
@@ -2768,10 +2990,13 @@ function App(){
                 const fuoriPeriodo = !inPeriodo && haDati;
                 const dipList = state.dipendenti.filter(function(x){ return x.id !== dp.id; }).map(function(x){ return x.nome; }).sort(function(a,b){ return a.localeCompare(b); });
                 const saldoP = saldoPrec(state, anno, mese, dp.id);
+                const bancaP = dp.mensilizzato ? bancaPrecA(state, dp, anno, mese) : 0;
+                const tettoNum = parseFloat(String(dp.tettoAnnuo==null?"":dp.tettoAnnuo).replace(",","."));
+                const tettoC = (!isNaN(tettoNum) && tettoNum>0) ? consumoTetto(state, dp, anno, mese) : 0;
                 return <EmployeeCard key={dp.id} dp={dp} rec={recDp} fuoriPeriodo={fuoriPeriodo} anno={anno} mese={mese} fset={fset} mLocked={mLocked}
                   dipList={dipList} onCell={onCell} onNota={onNota} onFestConfirm={onFestConfirm} onQuickFill={onQuickFill}
                   onVoceSet={onVoceSet} onVoceAdd={onVoceAdd} onVoceDel={onVoceDel}
-                  onDich={onDich} onSvuotaMese={onSvuotaMese} saldoPrec={saldoP} onAzzeraSaldo={onAzzeraSaldo} onAnnullaAzzera={onAnnullaAzzera}
+                  onDich={onDich} onSvuotaMese={onSvuotaMese} saldoPrec={saldoP} bancaPrec={bancaP} tettoConsumo={tettoC} onAzzeraSaldo={onAzzeraSaldo} onAnnullaAzzera={onAnnullaAzzera}
                   onSostAdd={onSostAdd} onSostChange={onSostChange} onSostDel={onSostDel} onOpenPerm={onOpenPerm}
                   onEditDip={function(d){ setDipModal({ dip:d }); }} onDelDip={askDelDip} />;
               })
