@@ -2618,6 +2618,40 @@ function Login(props){
 }
 
 /* ===================== APP ===================== */
+/* ===== Confronto non vincolante con l'app "Fogli ore" (SOLA LETTURA) =====
+   La app Dipendenti e la app Fogli ore condividono lo stesso progetto Firebase
+   (spazio-ireos-foglio-ore): da qui possiamo LEGGERE le collection users/timesheets.
+   Non si scrive MAI nei dati di Fogli ore. L'inserimento resta manuale e primario;
+   questo serve solo a mostrare un avviso in caso di scostamento, ignorabile. */
+function foNorm(s){ return String(s==null?"":s).trim().toUpperCase().replace(/\s+/g," "); }
+function foFmt(n){ return (Math.round((n||0)*100)/100).toFixed(2).replace(".",","); }
+function foParseT(s){ var m=String(s==null?"":s).trim().match(/^(\d{1,2}):(\d{2})$/); if(!m) return null; return parseInt(m[1],10)+parseInt(m[2],10)/60; }
+function foPairSum(e,pairs){ var t=0; for(var i=0;i<pairs.length;i++){ var a=foParseT(e[pairs[i][0]]), b=foParseT(e[pairs[i][1]]); if(a!=null&&b!=null&&b>a) t+=(b-a); } return t; }
+function foDayAbsence(e){ if(!e) return ""; return String(e.absence||e.assenza||"").trim().toUpperCase(); }
+function foDayHours(e){ if(!e||foDayAbsence(e)) return 0; return foPairSum(e,[["t1f","t1t"],["t2f","t2t"],["t3f","t3t"],["t4f","t4t"]]) + foPairSum(e,[["iF","iT"],["iF2","iT2"]]); }
+var FO_ABS_MAP = { "FERIE":"FERIE", "MALATTIA":"MAL", "MALATTIA FIGLIO":"MALFG", "PERM. ELETTORALE":"ELEZ", "PERM. LUTTO":"LUTTO", "ALTRO AUTORIZ.":"" };
+function foAbsToDip(a){ a=foNorm(a); return FO_ABS_MAP.hasOwnProperty(a)?FO_ABS_MAP[a]:""; }
+function foCompare(foRec, recDp, y, m){
+  var totDip = totOfRec(recDp, y, m);
+  var totFo = Math.round((foRec.total||0)*100)/100;
+  var out = { totDip: totDip, totFo: totFo, totDiff: Math.round((totDip-totFo)*100)/100, giorni: [] };
+  var nd = daysInMonth(y, m);
+  var gi = (recDp && recDp.giorni) ? recDp.giorni : {};
+  for (var d=1; d<=nd; d++){
+    var sVal = String(gi[d]==null?"":gi[d]).trim();
+    var dipNum = sVal!=="" && /^[0-9]/.test(sVal) && !isNaN(parseFloat(sVal.replace(",",".")));
+    var dipAbs = (sVal!=="" && !dipNum) ? sVal.toUpperCase() : "";
+    var foDay = foRec.days[d] || null;
+    var foAbs = foDay ? (foDay.abs||"") : "";
+    if (!dipAbs && !foAbs) continue;            // nessuna assenza da nessuna parte: non confrontiamo il giorno
+    var agree = false;
+    if (dipAbs && foAbs){ var exp = foAbsToDip(foAbs); agree = !exp || dipAbs.indexOf(exp)===0; }
+    if (agree) continue;
+    out.giorni.push({ d:d, dip: dipAbs || (sVal!==""?(sVal+" h"):"—"), fo: foAbs || (foDay && foDay.h>0 ? (foFmt(foDay.h)+" h") : "—") });
+  }
+  return out;
+}
+
 function App(){
   const [authState, setAuthState] = useState(FB_READY ? "checking" : "gate");
   const [denied, setDenied] = useState("");
@@ -2644,6 +2678,7 @@ function App(){
   const [exportModal, setExportModal] = useState(null);
   const [quickFill, setQuickFill] = useState(null);
   const fileRef = useRef(null); const dbRef = useRef(null); const uidRef = useRef(null); const preImportRef = useRef(null);
+  const [foData, setFoData] = useState(null); const [foStatus, setFoStatus] = useState("");
 
   useEffect(function(){
     if (!FB_READY){ const loc = loadLocal(); const st = migrate(loc || emptyState()); setState(st); if (st.anni && st.anni.length) setAnno(st.anni[st.anni.length-1]); return; }
@@ -2670,6 +2705,32 @@ function App(){
   const fset = useMemo(function(){ return festivitaSet(anno); }, [anno]);
   const mese = vista.charAt(0) === "m" ? parseInt(vista.slice(1),10) : null;
   const showToast = function(msg, warn){ setToast({ msg:msg, warn:!!warn }); };
+
+  // Carica (SOLA LETTURA) le ore compilate in "Fogli ore" per il mese corrente, per il confronto non vincolante.
+  useEffect(function(){
+    if (!FB_READY || authState !== "in" || !dbRef.current || !mese){ setFoData(null); setFoStatus(""); return; }
+    const y = anno, m = mese; let cancelled = false; const db = dbRef.current;
+    setFoStatus("loading");
+    Promise.all([ db.collection("users").get(), db.collection("timesheets").where("year","==",y).get() ]).then(function(res){
+      if (cancelled) return;
+      const uidName = {};
+      res[0].forEach(function(doc){ const u = doc.data() || {}; const nm = u.name || (((u.cognome||"")+" "+(u.nome||"")).trim()); uidName[doc.id] = foNorm(nm); });
+      const byName = {};
+      res[1].forEach(function(doc){ const t = doc.data() || {}; if (t.month !== m) return; const nn = uidName[t.workerUid]; if (!nn) return;
+        if (!byName[nn]) byName[nn] = { total:0, days:{} };
+        const days = t.days || {};
+        for (const k in days){ if (!days.hasOwnProperty(k)) continue; const dn = parseInt(k,10); if (!dn) continue; const e = days[k];
+          if (!byName[nn].days[dn]) byName[nn].days[dn] = { h:0, abs:"" };
+          const abs = foDayAbsence(e);
+          if (abs){ byName[nn].days[dn].abs = abs; }
+          else { const h = foDayHours(e); if (h>0){ byName[nn].days[dn].h += h; byName[nn].total += h; } }
+        }
+      });
+      for (const nn in byName){ byName[nn].total = Math.round(byName[nn].total*100)/100; }
+      setFoData(byName); setFoStatus("ok");
+    }).catch(function(e){ if (cancelled) return; console.error("Confronto Fogli ore non riuscito:", e); setFoData(null); setFoStatus("blocked"); });
+    return function(){ cancelled = true; };
+  }, [anno, mese, authState]);
 
   const onCell = function(dipId, day, value){
     const next = JSON.parse(JSON.stringify(state)); const mk = monthKey(anno, mese);
@@ -2984,6 +3045,7 @@ function App(){
           <div>
             <div className="toolbar">
               <strong style={{ fontSize:"15px", color:"#DE4C8A" }}>{MONTH_LABEL[mese-1]} {anno}</strong>
+              {foStatus === "blocked" ? <span style={{ fontSize:"12px", color:"#b45309", marginLeft:"8px" }}>⚠️ confronto Fogli ore non disponibile (permessi Firestore)</span> : null}
               {mLocked ? <span className="lock-badge">🔒 Mese bloccato</span> : null}
               <div className="spacer"></div>
               <button className={"btn " + (mLocked ? "btn-red" : "btn-gray")} title={mLocked ? "Sblocca il mese per poterlo modificare" : "Blocca il mese: nessuna cella potrà più essere modificata"}
@@ -3008,12 +3070,29 @@ function App(){
                 const bancaP = dp.mensilizzato ? bancaPrecA(state, dp, anno, mese) : 0;
                 const tettoNum = parseFloat(String(dp.tettoAnnuo==null?"":dp.tettoAnnuo).replace(",","."));
                 const tettoC = (!isNaN(tettoNum) && tettoNum>0) ? consumoTetto(state, dp, anno, mese) : 0;
-                return <EmployeeCard key={dp.id} dp={dp} rec={recDp} fuoriPeriodo={fuoriPeriodo} anno={anno} mese={mese} fset={fset} mLocked={mLocked}
+                const foRec = (foData && dp.nome) ? foData[foNorm(dp.nome)] : null;
+                const foCmp = foRec ? foCompare(foRec, recDp, anno, mese) : null;
+                const foShow = foCmp && (Math.abs(foCmp.totDiff) > 0.01 || foCmp.giorni.length > 0);
+                const card = <EmployeeCard key={dp.id} dp={dp} rec={recDp} fuoriPeriodo={fuoriPeriodo} anno={anno} mese={mese} fset={fset} mLocked={mLocked}
                   dipList={dipList} onCell={onCell} onNota={onNota} onFestConfirm={onFestConfirm} onQuickFill={onQuickFill}
                   onVoceSet={onVoceSet} onVoceAdd={onVoceAdd} onVoceDel={onVoceDel}
                   onDich={onDich} onSvuotaMese={onSvuotaMese} saldoPrec={saldoP} bancaPrec={bancaP} tettoConsumo={tettoC} onAzzeraSaldo={onAzzeraSaldo} onAnnullaAzzera={onAnnullaAzzera}
                   onSostAdd={onSostAdd} onSostChange={onSostChange} onSostDel={onSostDel} onOpenPerm={onOpenPerm}
                   onEditDip={function(d){ setDipModal({ dip:d }); }} onDelDip={askDelDip} />;
+                if (!foShow) return card;
+                return <React.Fragment key={dp.id}>
+                  <div style={{ margin:"8px 0 0", padding:"8px 12px", background:"#fff7ed", border:"1px solid #fed7aa", borderLeft:"4px solid #f59e0b", borderRadius:"8px", color:"#7c2d12", fontSize:"13px", lineHeight:"1.45" }}>
+                    <strong>⚠️ Confronto Fogli ore — {dp.nome}:</strong>{" "}
+                    {Math.abs(foCmp.totDiff) > 0.01
+                      ? ("totale del mese diverso — tu " + foFmt(foCmp.totDip) + " h · Fogli ore " + foFmt(foCmp.totFo) + " h")
+                      : "totale del mese coincide"}
+                    {foCmp.giorni.length
+                      ? (" · giorni con assenza da controllare: " + foCmp.giorni.map(function(g){ return g.d + " (tu: " + (g.dip||"—") + " / Fogli ore: " + (g.fo||"—") + ")"; }).join(", "))
+                      : ""}
+                    {" "}— è solo un avviso, puoi ignorarlo.
+                  </div>
+                  {card}
+                </React.Fragment>;
               })
             }
             <div className="legend">
