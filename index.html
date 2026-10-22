@@ -207,7 +207,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver54";
+const APP_VER = "ver55";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
 const MESE_ABBR_FILE = ["gen","feb","mar","apr","mag","giu","lug","ago","set","ott","nov","dic"];
@@ -880,9 +880,13 @@ function esportaPDF(state, pairs){
           const v = rec.giorni[d];
           const perm = (rec.permessi && rec.permessi[d]) ? rec.permessi[d] : null;
           tot[i] += parseHour(v === undefined ? "" : v);
+          const isDom = weekdayOf(anno, m, d) === 0;
+          const sv = String(v === undefined ? "" : v).trim();
           let txt;
-          if (v === undefined || v === "") txt = rosso ? "–" : "";
-          else if (CODE_SET[String(v).trim()]) txt = String(v).trim();
+          if (sv === "--") txt = "R";                                       // riposo settimanale -> R (in rosso)
+          else if (sv === "") txt = isDom ? "R" : (rosso ? "–" : "");       // domenica senza dato -> riposo (per tutti)
+          else if (dp.mensilizzato && isNumeric(sv)) txt = "P";            // mensilizzato: giorno lavorato = presenza (LUL)
+          else if (CODE_SET[sv]) txt = sv;
           else txt = pdfHM(v);
           if (perm){ txt = (txt === "*" || txt === "" ? "*" : txt + "*"); permMese.push(dp.nome + " g." + d + " " + fmt2(perm.ore) + " h (" + perm.tipo + ")"); }
           row.push(txt);
@@ -890,7 +894,10 @@ function esportaPDF(state, pairs){
         row.push(dayLabel);
         body.push(row);
       }
-      const totRow = ["TOT"].concat(tot.map(function(t){ return pdfHM(Math.round(t*100)/100); })).concat(["TOT"]);
+      const totRow = ["TOT ORE RESE"].concat(chunk.map(function(dp, i){
+        if (dp.mensilizzato){ const rc = getRecFrom(state, anno, m, dp.id); const dv = String(rc.dich==null?"":rc.dich).trim(); const dn = parseFloat(dv.replace(",",".")); return (dv!=="" && !isNaN(dn)) ? pdfHM(Math.round(dn*100)/100) : "—"; }
+        return pdfHM(Math.round(tot[i]*100)/100);
+      })).concat(["TOT ORE RESE"]);
       body.push(totRow);
       const ncols = 2 + chunk.length;
       const lastIdx = chunk.length + 1;
@@ -916,7 +923,8 @@ function esportaPDF(state, pairs){
           } else {
             if (isNum) data.cell.styles.fontSize = 7; // ore in formato esteso: un filo più grandi ma su una riga
             const txt = raw.replace(/\*$/, "");
-            if (CODE_SET[txt]){
+            if (txt === "R"){ data.cell.styles.textColor = [178,34,34]; data.cell.styles.fontStyle = "bold"; } // riposo: R in rosso
+            else if (CODE_SET[txt]){
               const hx = CODE_SET[txt].bg.replace("#","");
               data.cell.styles.fillColor = [parseInt(hx.slice(0,2),16), parseInt(hx.slice(2,4),16), parseInt(hx.slice(4,6),16)];
               data.cell.styles.textColor = lumaText(CODE_SET[txt].bg) === "#ffffff" ? [255,255,255] : [17,24,39];
@@ -950,6 +958,9 @@ function esportaPDF(state, pairs){
       if (ci === chunks.length - 1){
         let yy = doc.lastAutoTable.finalY + 6;
         const ensureY = function(h){ if (yy + h > 287){ doc.addPage(); yy = 18; } };
+        // Legenda simboli (LUL)
+        doc.setFontSize(6.5); doc.setTextColor(90,90,90); doc.setFont(undefined,"normal");
+        ensureY(4); doc.text("Legenda: R (rosso) = riposo/domenica · P = presenza (mensilizzati) · TOT ORE RESE = totale ore effettivamente rese (mensilizzati: ore dichiarate; altri: somma delle ore giornaliere).", 14, yy); yy += 5;
         // NOTE DEL MESE — ben visibili, subito sotto la tabella
         if (noteMese.length > 0){
           ensureY(10);
