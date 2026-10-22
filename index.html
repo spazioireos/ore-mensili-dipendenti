@@ -115,6 +115,7 @@
   .cong-bar { height:9px; background:rgba(0,0,0,.08); border-radius:999px; overflow:hidden; margin:2px 0 6px; }
   .cong-bar-fill { height:100%; background:currentColor; border-radius:999px; transition:width .2s; }
   .cong-res { font-size:12.5px; line-height:1.45; }
+  .cong-plain { font-size:13.5px; line-height:1.5; font-weight:600; background:rgba(255,255,255,.65); border:1px dashed rgba(0,0,0,.2); border-radius:8px; padding:6px 10px; margin-bottom:6px; }
   .cong-status { display:inline-flex; align-items:center; gap:6px; font-size:14px; font-weight:800; text-transform:uppercase; letter-spacing:.3px; padding:5px 14px; border-radius:8px; color:#fff; box-shadow:0 1px 4px rgba(0,0,0,.2); }
   .cong-status b { font-size:17px; font-weight:900; }
   .cong.warn .cong-status { background:#c2410c; }
@@ -207,7 +208,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver55";
+const APP_VER = "ver57";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
 const MESE_ABBR_FILE = ["gen","feb","mar","apr","mag","giu","lug","ago","set","ott","nov","dic"];
@@ -411,11 +412,11 @@ function coverAbsHours(rec,dp,y,m){                                        // or
   for(let d=1; d<=nd; d++){ const cv=String(rec.giorni[d]==null?"":rec.giorni[d]).trim(); if(CODE_SET[cv] && cv!=="--" && cv!=="AN") days++; }
   return days*q;
 }
-function bancaMeseA(state,dp,y,m){                                          // banca del singolo mese (Metodo A). null se senza "ore dichiarate"
+function bancaMeseA(state,dp,y,m){                                          // banca del singolo mese (Metodo A). null se il mese non è compilato
   const rec=getRecFrom(state,y,m,dp.id);
-  const draw=String(rec.dich==null?"":rec.dich).trim(); if(draw==="") return null;
-  const D=parseFloat(draw.replace(",",".")); if(isNaN(D)) return null;
-  const eff=D + coverAbsHours(rec,dp,y,m);                                  // prodotto = lavorate + assenze coperte
+  if(!recHasData(rec)) return null;                                         // mese non compilato -> non conteggiato
+  const rese=totOfRec(rec,y,m);                                            // ore effettivamente rese = somma delle celle
+  const eff=rese + coverAbsHours(rec,dp,y,m);                               // prodotto = rese + assenze coperte
   return Math.round((eff - monteFissoMese(dp,y,m))*1000)/1000;
 }
 function bancaPrecA(state,dp,anno,mese){                                    // banca cumulata dei mesi PRECEDENTI (dopo l'ultimo azzeramento, dalla decorrenza mensilizzazione)
@@ -428,11 +429,9 @@ function bancaPrecA(state,dp,anno,mese){                                    // b
   return Math.round(s*1000)/1000;
 }
 /* ===== Tetto annuo (attribuzione) — progetto unico, periodo scolastico o civile ===== */
-function prodottoMese(rec,dp,y,m){                                         // ore che consumano il tetto nel mese: lavorate dichiarate + assenze coperte
-  if(!rec) return null;
-  const draw=String(rec.dich==null?"":rec.dich).trim(); if(draw==="") return null;
-  const D=parseFloat(draw.replace(",",".")); if(isNaN(D)) return null;
-  return D + coverAbsHours(rec,dp,y,m);
+function prodottoMese(rec,dp,y,m){                                         // ore che consumano il tetto nel mese: ore rese (celle) + assenze coperte
+  if(!rec || !recHasData(rec)) return null;
+  return totOfRec(rec,y,m) + coverAbsHours(rec,dp,y,m);
 }
 function tettoWindow(periodo,y,m){                                         // finestra YM (incluso) del periodo che contiene (y,m)
   if(periodo==="civile") return { fromYM:y*100+1, toYM:y*100+12 };
@@ -894,10 +893,7 @@ function esportaPDF(state, pairs){
         row.push(dayLabel);
         body.push(row);
       }
-      const totRow = ["TOT ORE RESE"].concat(chunk.map(function(dp, i){
-        if (dp.mensilizzato){ const rc = getRecFrom(state, anno, m, dp.id); const dv = String(rc.dich==null?"":rc.dich).trim(); const dn = parseFloat(dv.replace(",",".")); return (dv!=="" && !isNaN(dn)) ? pdfHM(Math.round(dn*100)/100) : "—"; }
-        return pdfHM(Math.round(tot[i]*100)/100);
-      })).concat(["TOT ORE RESE"]);
+      const totRow = ["TOT ORE RESE"].concat(tot.map(function(t){ return pdfHM(Math.round(t*100)/100); })).concat(["TOT ORE RESE"]);
       body.push(totRow);
       const ncols = 2 + chunk.length;
       const lastIdx = chunk.length + 1;
@@ -960,7 +956,33 @@ function esportaPDF(state, pairs){
         const ensureY = function(h){ if (yy + h > 287){ doc.addPage(); yy = 18; } };
         // Legenda simboli (LUL)
         doc.setFontSize(6.5); doc.setTextColor(90,90,90); doc.setFont(undefined,"normal");
-        ensureY(4); doc.text("Legenda: R (rosso) = riposo/domenica · P = presenza (mensilizzati) · TOT ORE RESE = totale ore effettivamente rese (mensilizzati: ore dichiarate; altri: somma delle ore giornaliere).", 14, yy); yy += 5;
+        ensureY(4); doc.text("Legenda: R (rosso) = riposo/domenica · P = presenza (mensilizzati) · TOT ORE RESE = somma delle ore effettivamente rese (dal totale delle celle).", 14, yy); yy += 5;
+        // RECUPERO / ORE NUOVE (mensilizzati con debito pregresso)
+        const recupLines = [];
+        dipsMese.forEach(function(dp){
+          if (!dp.mensilizzato) return;
+          if (!(mensDalYM(dp)===0 || (anno*100+m) >= mensDalYM(dp))) return;
+          const bp = bancaPrecA(state, dp, anno, m);
+          const bm = bancaMeseA(state, dp, anno, m);
+          if (bm == null) return;
+          const deb = Math.max(0, -bp);
+          if (deb <= 0.0005) return;
+          const rec = (bm > 0) ? Math.min(bm, deb) : 0;
+          const nuo = Math.round((bm - rec)*1000)/1000;
+          recupLines.push(dp.nome + " — debito pregresso " + fmt3(deb) + " h: recupero " + fmt3(Math.round(rec*1000)/1000) + " h, ore nuove " + fmt3(nuo) + " h");
+        });
+        if (recupLines.length > 0){
+          ensureY(8);
+          const boxH = 7 + recupLines.length*4.2 + 2;
+          if (yy + boxH > 287){ doc.addPage(); yy = 18; }
+          doc.setFillColor(255,247,237); doc.setDrawColor(251,146,60); doc.setLineWidth(0.4);
+          doc.rect(13, yy - 4, 184, boxH, "FD");
+          doc.setFontSize(9); doc.setTextColor(124,45,18); doc.setFont(undefined,"bold");
+          doc.text("RECUPERO / ORE NUOVE DEL MESE (mensilizzati con debito pregresso)", 15, yy); yy += 5.2;
+          doc.setFontSize(8); doc.setFont(undefined,"normal"); doc.setTextColor(60,40,20);
+          recupLines.forEach(function(l){ const ls = doc.splitTextToSize("•  " + l, 178); ls.forEach(function(x){ ensureY(4.2); doc.text(x, 16, yy); yy += 4.2; }); });
+          yy += 2;
+        }
         // NOTE DEL MESE — ben visibili, subito sotto la tabella
         if (noteMese.length > 0){
           ensureY(10);
@@ -1197,9 +1219,9 @@ function EmployeeCard(props){
       </div>
       <div className="foot-line">
         <span className="foot-tot">TOT calcolato: <b>{fmt2(tot)}</b></span>
-        <label>Ore dichiarate (uso interno):</label>
-        <input className="dich-in" value={rec.dich || ""} placeholder="—" disabled={mLocked}
-          onChange={function(e){ props.onDich(dp.id, e.target.value); }} />
+        {!dp.mensilizzato ? <label>Ore dichiarate (uso interno):</label> : null}
+        {!dp.mensilizzato ? <input className="dich-in" value={rec.dich || ""} placeholder="—" disabled={mLocked}
+          onChange={function(e){ props.onDich(dp.id, e.target.value); }} /> : null}
         {(function(){
           if (dp.mensilizzato) return null;
           const s = String(rec.dich === undefined ? "" : rec.dich).trim();
@@ -1225,10 +1247,17 @@ function EmployeeCard(props){
             const quotaExact = monteFisso/26;                                           // quota giornaliera allineata al mese
             let assDays=0; for(let dd=1; dd<=nd; dd++){ const cv=String(rec.giorni[dd]==null?"":rec.giorni[dd]).trim(); if(CODE_SET[cv] && cv!=="--" && cv!=="AN") assDays++; }
             const assOreExact = assDays*quotaExact;
-            const eff = hasD ? (D + assOreExact) : null;                               // prodotto = lavorate + assenze coperte
-            const bancaMese = hasD ? Math.round((eff - monteFisso)*1000)/1000 : null;  // Metodo A (precisione piena, 3 dec.)
+            const hasData = recHasData(rec);                                            // mese compilato
+            const rese = P;                                                             // ore effettivamente rese = somma delle celle
+            const eff = hasData ? (rese + assOreExact) : null;                          // prodotto = rese + assenze coperte
+            const bancaMese = hasData ? Math.round((eff - monteFisso)*1000)/1000 : null; // Metodo A (precisione piena, 3 dec.)
             const bancaPrev = Math.round((props.bancaPrec||0)*1000)/1000;
-            const bancaCum = hasD ? Math.round((bancaPrev + bancaMese)*1000)/1000 : bancaPrev;
+            const bancaCum = hasData ? Math.round((bancaPrev + bancaMese)*1000)/1000 : bancaPrev;
+            // Recupero / ore nuove (Modo A): le ore in più del mese prima tappano il debito pregresso, poi diventano nuove
+            const debitoIniz = Math.max(0, -bancaPrev);
+            const recuperoMese = (hasData && bancaMese > 0) ? Math.round(Math.min(bancaMese, debitoIniz)*1000)/1000 : 0;
+            const nuoveMese = hasData ? Math.round((bancaMese - recuperoMese)*1000)/1000 : 0;
+            const mostraRecupero = hasData && debitoIniz > 0.0005;
             const isAug = (m===8);
             const statusTxt = bancaCum > 0.0005 ? "a credito operatore" : (bancaCum < -0.0005 ? "a debito operatore" : "in pari");
             const bcls = bancaCum > 0.0005 ? "warn" : (bancaCum < -0.0005 ? "over" : "ok");
@@ -1244,29 +1273,34 @@ function EmployeeCard(props){
                 <div className="cong-res">Dalla mensilità successiva la banca riparte da <b>zero</b>. I mesi precedenti restano invariati.</div>
               </div>;
             }
-            if (!hasD && Math.abs(bancaPrev) <= 0.0005 && assDays === 0) return null;
+            if (!hasData && Math.abs(bancaPrev) <= 0.0005) return null;
             return <div className={"cong " + bcls}>
-              <div className="cong-head">🏦 Banca ore — mensilizzazione fissa{isAug ? " · ⚠️ conguaglio 31/08" : ""}</div>
-              <div className="cong-row">
-                <span className="cong-chip">Quota giorno (monte ÷ 26): <b>{fmt3(quotaExact)} h</b></span>
-                <span className="cong-chip">Monte fisso mese (165 h a 38/sett, riproporz.): <b>{fmt3(monteFisso)} h</b></span>
-                <span className="cong-chip">Lavorate (dichiarate): <b>{hasD?fmt3(D):"—"}</b></span>
-                <span className="cong-chip">Assenze coperte: <b>{assDays} gg = {fmt3(assOreExact)} h</b></span>
+              <div className="cong-head">🏦 Banca ore — ore in più o in meno rispetto al dovuto{isAug ? " · ⚠️ mese del conguaglio (31/08)" : ""}</div>
+              <div className="cong-plain">
+                {hasData
+                  ? <span>In parole semplici: questo mese ha fatto <b>{fmt3(rese)} ore</b>; ne doveva fare <b>{fmt3(monteFisso)}</b> (il suo fisso). Ferie e malattia contano come fatte. <b>Differenza del mese: {(bancaMese>0?"+":"")+fmt3(bancaMese)} ore.</b></span>
+                  : <span>Compila le <b>ore nelle celle</b> del mese e qui vedrai la banca.</span>}
               </div>
               <div className="cong-row">
-                {hasD ? <span className="cong-chip">Prodotto (lavorate+coperte): <b>{fmt3(eff)}</b></span> : null}
-                <span className="cong-chip">Banca prec. <b>{fmt3(bancaPrev)}</b></span>
+                <span className="cong-chip">Ore che deve ogni mese (fisse): <b>{fmt3(monteFisso)} h</b></span>
+                <span className="cong-chip">Ore che ha fatto (dal foglio): <b>{hasData?fmt3(rese):"—"}</b></span>
+                <span className="cong-chip">Ferie/malattia (contano come fatte): <b>{assDays} gg = {fmt3(assOreExact)} h</b></span>
+              </div>
+              <div className="cong-row">
+                <span className="cong-chip">Banca dei mesi prima: <b>{fmt3(bancaPrev)}</b></span>
                 <span className="cong-op">+</span>
-                <span className="cong-chip">Mese <b>{hasD?((bancaMese>0?"+":"")+fmt3(bancaMese)):"0,000"}</b></span>
+                <span className="cong-chip">Questo mese: <b>{hasData?((bancaMese>0?"+":"")+fmt3(bancaMese)):"0,000"}</b></span>
                 <span className="cong-op">=</span>
-                <span className="cong-chip strong">Banca cumulata <b>{(bancaCum>0?"+":"")+fmt3(bancaCum)} h</b></span>
+                <span className="cong-chip strong">Banca ore totale: <b>{(bancaCum>0?"+":"")+fmt3(bancaCum)} h</b></span>
                 <span className="cong-status">{statusTxt}</span>
                 {azzeraBancaBtn}
               </div>
+              {mostraRecupero ? <div className="cong-plain" style={{ background:"rgba(255,237,213,.8)", borderStyle:"solid", borderColor:"#fb923c" }}>
+                Questo lavoratore doveva recuperare <b>{fmt3(debitoIniz)} h</b>. Delle ore in più fatte questo mese: <b>{fmt3(recuperoMese)} h di recupero</b> (già pagate in passato → non si ripagano) · <b>{fmt3(nuoveMese)} h nuove</b> (nuovo credito/straordinario).
+              </div> : null}
               <div className="cong-res">
-                Fisso mensile = 165 h (full-time 38 h/sett) riproporzionato sull'orario; uguale ogni mese. Banca = (lavorate + assenze coperte) − fisso. Le assenze retribuite sono <b>coperte</b> a {fmt3(quotaExact)} h/giorno (monte ÷ 26) e rientrano nel prodotto.
-                {!hasD ? <span> · Inserisci le <b>ore dichiarate</b> (ore realmente lavorate) qui sopra per calcolare la banca del mese.</span> : null}
-                <div style={{ fontSize:"11px", color:"#9a3412", marginTop:"2px" }}>Valori mostrati a 3 decimali; i conteggi usano la precisione piena.</div>
+                <b>Come si legge:</b> <b>positivo</b> = ha lavorato <b>più</b> del dovuto (ore a suo favore); <b>negativo</b> = ne <b>deve</b> ancora. Il "fisso" è 165 h per chi fa 38 h/settimana, in proporzione per gli altri; un giorno vale {fmt3(quotaExact)} h. A fine agosto chiudi i conti col pulsante <b>⊘ Azzera banca</b>.
+                <div style={{ fontSize:"11px", color:"#9a3412", marginTop:"2px" }}>Numeri a 3 decimali; i conteggi usano la precisione piena.</div>
               </div>
             </div>;
           }
@@ -1330,15 +1364,16 @@ function EmployeeCard(props){
           const quasi = !over && rimaste <= tetto*0.1;
           const tcls = over ? "over" : (quasi ? "warn" : "ok");
           return <div className={"cong " + tcls} style={{ marginTop:"6px" }}>
-            <div className="cong-head">🎯 Tetto annuo — {per}</div>
+            <div className="cong-head">🎯 Tetto annuo — ore massime che può fare nell'anno</div>
+            <div className="cong-plain">In parole semplici: nell'<b>{per}</b> può fare al massimo <b>{fmt3(tetto)} ore</b>. Finora ne ha usate <b>{fmt3(consumo)}</b>. <b>Gliene restano {fmt3(rimaste)}.</b></div>
             <div className="cong-row">
-              <span className="cong-chip">Tetto: <b>{fmt3(tetto)} h</b></span>
-              <span className="cong-chip">Consumate: <b>{fmt3(consumo)} h</b></span>
-              <span className="cong-chip strong">Rimaste: <b>{fmt3(rimaste)} h</b></span>
-              <span className="cong-status">{over ? "⚠️ tetto superato" : (quasi ? "quasi esaurito" : "disponibili")}</span>
+              <span className="cong-chip">Massimo dell'anno: <b>{fmt3(tetto)} h</b></span>
+              <span className="cong-chip">Già usate: <b>{fmt3(consumo)} h</b></span>
+              <span className="cong-chip strong">Restano: <b>{fmt3(rimaste)} h</b></span>
+              <span className="cong-status">{over ? "⚠️ superato" : (quasi ? "quasi finito" : "ancora disponibili")}</span>
             </div>
             <div className="cong-bar"><div className="cong-bar-fill" style={{ width: pct + "%" }}></div></div>
-            <div className="cong-res">Consumo = ore lavorate dichiarate + assenze retribuite (a monte ÷ 26), sommate sui mesi del periodo. <span style={{ fontSize:"11px", color:"#9a3412" }}>Valori a 3 decimali.</span></div>
+            <div className="cong-res">Si consuma con le <b>ore fatte</b> (dal foglio) più <b>ferie e malattia</b>. Periodo: {per}. <span style={{ fontSize:"11px", color:"#9a3412" }}>Numeri a 3 decimali.</span></div>
           </div>;
         })()}
       </div>
