@@ -208,7 +208,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver59";
+const APP_VER = "ver60";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
 const MESE_ABBR_FILE = ["gen","feb","mar","apr","mag","giu","lug","ago","set","ott","nov","dic"];
@@ -460,6 +460,28 @@ function straoRange(state, dp, fromYM, toYM){   // somma per persona dei delta m
   });
   return { piu:Math.round(piu*1000)/1000, meno:Math.round(meno*1000)/1000 };
 }
+/* ===== Ferie da smaltire (controllo al 30 aprile sull'anno precedente) ===== */
+const FERIE_GG_ANNO = 26;                 // giorni ferie annui (pieni)
+const FERIE_GG_MESE = 26/12;              // 2,1666... GG al mese, riproporzionati sui mesi lavorati
+function ferieGodute(state, dp, year){    // giorni "FERIE" segnati nelle celle dell'anno
+  let n=0;
+  for(let mo=1; mo<=12; mo++){
+    const rec=(state.dati[monthKey(year,mo)]||{})[dp.id];
+    if(!rec||!rec.giorni) continue;
+    const nd=daysInMonth(year,mo);
+    for(let d=1; d<=nd; d++){ if(String(rec.giorni[d]==null?"":rec.giorni[d]).trim()==="FERIE") n++; }
+  }
+  return n;
+}
+function mesiInForzaAnno(dp, year){        // mesi dell'anno in cui l'operatore è in forza (test a metà mese)
+  if(!assunzInt(dp)) return 12;            // senza data assunzione: anno intero
+  let n=0;
+  for(let mo=1; mo<=12; mo++){ if(inForceAt(dp, year*10000+mo*100+15)) n++; }
+  return n;
+}
+function ferieMaturato(dp, year){ return Math.round(FERIE_GG_MESE*mesiInForzaAnno(dp,year)*1000)/1000; }
+function ferieResiduo(state, dp, year){ return Math.round((ferieMaturato(dp,year)-ferieGodute(state,dp,year))*1000)/1000; }
+function annoHasData(state, year){ const ks=Object.keys(state.dati||{}); for(let i=0;i<ks.length;i++){ if(ks[i].indexOf(String(year)+"-")===0) return true; } return false; }
 function tettiList(dp){ return (Array.isArray(dp.tettiAnnui)?dp.tettiAnnui:[]).map(function(t){ return { anno:parseInt(t&&t.anno,10)||0, ore:parseFloat(String(t&&t.ore).replace(",",".")) }; }).filter(function(t){ return !isNaN(t.ore) && t.ore>0; }).sort(function(a,b){ return a.anno-b.anno; }); }
 function tettoStartYear(dp,y,m){ return (dp.tettoPeriodo==="civile") ? y : (m>=9 ? y : y-1); } // anno iniziale del periodo che contiene (y,m)
 function tettoForPeriod(dp,y,m){ const sy=tettoStartYear(dp,y,m); const list=tettiList(dp); let val=0; list.forEach(function(t){ if(t.anno<=sy) val=t.ore; }); return val; } // tetto vigente (l'ultimo <= anno), 0 se nessuno
@@ -1195,6 +1217,12 @@ function EmployeeCard(props){
         <button className="edit-mini" title="Modifica anagrafica" onClick={function(){ props.onEditDip(dp); }}>✎</button>
         <button className="edit-mini" title="Elimina definitivamente" onClick={function(){ props.onDelDip(dp); }}>🗑</button>
       </div>
+      {props.ferieApr ? (function(){
+        const f = props.ferieApr;
+        if (f.noData) return <div style={{ background:"#f1f5f9", borderBottom:"2px solid #cbd5e1", color:"#475569", fontSize:"12px", fontWeight:700, padding:"5px 10px" }}>🏖️ Ferie anno {f.year}: dati non presenti nel programma — residuo non calcolabile.</div>;
+        if (f.res > 0.0005) return <div style={{ background:"#fee2e2", borderBottom:"3px solid #dc2626", color:"#991b1b", fontSize:"13px", fontWeight:800, padding:"6px 10px" }}>⚠️ FERIE DA SMALTIRE (anno {f.year}): <b>{fmt2(f.res)} GG</b> ancora da fare — maturate {fmt2(f.mat)} − godute {fmt2(f.god)}. Da far godere entro il 30 aprile.</div>;
+        return <div style={{ background:"#dcfce7", borderBottom:"2px solid #16a34a", color:"#166534", fontSize:"12px", fontWeight:700, padding:"5px 10px" }}>✓ Ferie anno {f.year} in regola — nessun residuo (maturate {fmt2(f.mat)}, godute {fmt2(f.god)}).</div>;
+      })() : null}
       {props.fuoriPeriodo ? <div style={{ background:"#fef3c7", borderBottom:"2px solid #f59e0b", color:"#92400e", fontSize:"12px", fontWeight:700, padding:"5px 10px" }}>⚠️ Mese fuori dal periodo di rapporto (prima dell'assunzione o dopo la cessazione), ma contiene ore già inserite: controlla e, se vanno tolte, usa 🧹 Pulisci ore dopo nella scheda (✎).</div> : null}
       <div className="grid-wrap">
         <table className="cal"><tbody>
@@ -2144,6 +2172,7 @@ function QueryPanel(props){
   const [sFromY, setSFromY] = useState("2026");
   const [sToM, setSToM] = useState(String(now.getMonth()+1));
   const [sToY, setSToY] = useState(String(now.getFullYear()));
+  const [fAnno, setFAnno] = useState(String(now.getFullYear()-1));
   const dips = dipSorted(state);
   const tipoLabel = function(t){ return String(t)==="determinato" ? "Determinato" : "Indeterminato"; };
   const nomeOf = function(dp){ return dp.nome || (dp.ana ? ((dp.ana.cognome||"")+" "+(dp.ana.nome||"")).trim() : ""); };
@@ -2192,6 +2221,13 @@ function QueryPanel(props){
   const sLabel = function(ym){ return MONTH_LABEL[(ym%100)-1]+" "+Math.floor(ym/100); };
   function expS(){ const aoa=[["STRAORDINARIO (base mensile) — da "+sLabel(sFromYM)+" a "+sLabel(sToYM)],["Conteggiati solo i mesi da ottobre 2026 in poi. Ore in più = straordinario pagato; ore in meno = ore tolte. Nessuna compensazione tra i due."],[],["COGNOME NOME","ORE IN PIU' (STRAORDINARIO)","ORE IN MENO"]]; rowsS.forEach(function(r){ aoa.push([r.nome, Math.round(r.piu*1000)/1000, Math.round(r.meno*1000)/1000]); }); aoa.push([]); aoa.push(["TOTALE COMPLESSIVO", Math.round(totSPiu*1000)/1000, Math.round(totSMeno*1000)/1000]); qExport("Query - Straordinario "+sLabel(sFromYM).replace(/ /g,"-")+"_"+sLabel(sToYM).replace(/ /g,"-")+".xlsx", aoa); }
 
+  // --- Ferie da smaltire: residuo (26 GG/anno, 2,1666 GG/mese sui mesi lavorati) per l'anno scelto ---
+  const fY = parseInt(fAnno,10)||0;
+  const fHasData = fY>0 && annoHasData(state, fY);
+  const rowsF = fY>0 ? dips.map(function(dp){ const mat=ferieMaturato(dp,fY), god=ferieGodute(state,dp,fY), res=Math.round((mat-god)*1000)/1000; return { nome:nomeOf(dp), mat:mat, god:god, res:res }; }) : [];
+  const daSmaltire = rowsF.filter(function(r){ return r.res>0.0005; });
+  function expF(){ const aoa=[["FERIE DA SMALTIRE — anno "+fY+" (verifica al 30 aprile "+(fY+1)+")"],["26 GG annui = 2,1666 GG/mese riproporzionati sui mesi in forza. Residuo = maturate − godute. In rosso chi ha residuo > 0."],[],["COGNOME NOME","FERIE MATURATE (GG)","FERIE GODUTE (GG)","RESIDUO DA SMALTIRE (GG)"]]; rowsF.forEach(function(r){ aoa.push([r.nome, Math.round(r.mat*1000)/1000, r.god, Math.round(r.res*1000)/1000]); }); qExport("Query - Ferie da smaltire "+fY+".xlsx", aoa); }
+
   return (
     <div style={{ padding:"14px" }}>
       <div style={{ display:"flex", alignItems:"center", gap:"10px", marginBottom:"12px" }}>
@@ -2203,6 +2239,7 @@ function QueryPanel(props){
         {modeBtn("totale","➕ Totale su intervallo")}
         {modeBtn("movimenti","🔄 Movimenti nell'anno")}
         {modeBtn("strao","⚡ Straordinario")}
+        {modeBtn("ferie","🏖️ Ferie da smaltire")}
       </div>
 
       {mode==="forza" ? (
@@ -2308,6 +2345,31 @@ function QueryPanel(props){
                <table style={{ borderCollapse:"collapse", width:"100%", minWidth:"520px" }}>
                  <thead><tr><th style={th}>Cognome Nome</th><th style={Object.assign({},th,{textAlign:"right"})}>Ore in più (straordinario)</th><th style={Object.assign({},th,{textAlign:"right"})}>Ore in meno</th></tr></thead>
                  <tbody>{rowsS.map(function(r,i){ return <tr key={i}><td style={td}>{r.nome}</td><td style={Object.assign({},td,{textAlign:"right",fontWeight:700,color:r.piu>0.0005?"#b45309":"#94a3b8"})}>{fmt3(r.piu)}</td><td style={Object.assign({},td,{textAlign:"right",fontWeight:700,color:r.meno>0.0005?"#475569":"#94a3b8"})}>{fmt3(r.meno)}</td></tr>; })}</tbody>
+               </table>
+             </div>
+           </div>}
+        </div>
+      ) : null}
+
+      {mode==="ferie" ? (
+        <div>
+          <div style={{ fontSize:"12px", color:"#334155", background:"#fff7ed", border:"1px dashed #fb923c", borderRadius:"8px", padding:"8px 12px", marginBottom:"12px", lineHeight:1.5 }}>
+            Residuo ferie per l'anno scelto: <b>26 GG annui</b> = 2,1666 GG/mese riproporzionati sui mesi in forza. <b>Residuo = maturate − godute</b> (un giorno "FERIE" nel foglio = 1 GG). Al <b>30 aprile</b> si controlla l'anno <b>precedente</b>, per far godere il residuo in tempo.
+          </div>
+          <div style={{ display:"flex", alignItems:"flex-end", gap:"10px", flexWrap:"wrap", marginBottom:"12px" }}>
+            <div><div style={{ fontSize:"12px", fontWeight:700, marginBottom:"3px" }}>Anno da controllare</div><input value={fAnno} onChange={function(e){ setFAnno(e.target.value.replace(/[^0-9]/g,"").slice(0,4)); }} inputMode="numeric" style={Object.assign({},yInput,{width:"100px"})} /></div>
+            {fY>0 ? <button className="btn btn-blue" onClick={expF}>⬇️ Esporta Excel</button> : null}
+          </div>
+          {!(fY>0) ? <div style={{ color:"#dc2626", fontSize:"13px" }}>Inserisci l'anno da controllare.</div> :
+           <div>
+             {!fHasData ? <div style={{ fontSize:"12px", color:"#92400e", marginBottom:"8px" }}>⚠️ L'anno {fY} non ha dati nel programma: i "godute" risultano 0, quindi il residuo potrebbe non essere attendibile.</div> : null}
+             <div style={{ display:"flex", gap:"10px", flexWrap:"wrap", marginBottom:"10px" }}>
+               <div style={{ background:"#dc2626", color:"#fff", padding:"8px 14px", borderRadius:"8px", fontWeight:700 }}>Con ferie da smaltire: {daSmaltire.length}</div>
+             </div>
+             <div style={{ overflowX:"auto", border:"1px solid #e2e8f0", borderRadius:"8px" }}>
+               <table style={{ borderCollapse:"collapse", width:"100%", minWidth:"560px" }}>
+                 <thead><tr><th style={th}>Cognome Nome</th><th style={Object.assign({},th,{textAlign:"right"})}>Maturate (GG)</th><th style={Object.assign({},th,{textAlign:"right"})}>Godute (GG)</th><th style={Object.assign({},th,{textAlign:"right"})}>Residuo da smaltire (GG)</th></tr></thead>
+                 <tbody>{rowsF.map(function(r,i){ const flag=r.res>0.0005; return <tr key={i} style={flag?{background:"#fee2e2"}:undefined}><td style={Object.assign({},td,flag?{fontWeight:800,color:"#991b1b"}:undefined)}>{r.nome}</td><td style={Object.assign({},td,{textAlign:"right"})}>{fmt2(r.mat)}</td><td style={Object.assign({},td,{textAlign:"right"})}>{r.god}</td><td style={Object.assign({},td,{textAlign:"right",fontWeight:800,color:flag?"#dc2626":"#94a3b8"})}>{flag?fmt2(r.res):"0,00"}</td></tr>; })}</tbody>
                </table>
              </div>
            </div>}
@@ -3139,9 +3201,10 @@ function App(){
                 const bancaP = dp.mensilizzato ? bancaPrecA(state, dp, anno, mese) : 0;
                 const tettoNum = tettoForPeriod(dp, anno, mese);
                 const tettoC = (!isNaN(tettoNum) && tettoNum>0) ? consumoTetto(state, dp, anno, mese) : 0;
+                const ferieApr = (mese===4) ? { year:anno-1, mat:ferieMaturato(dp,anno-1), god:ferieGodute(state,dp,anno-1), res:ferieResiduo(state,dp,anno-1), noData:!annoHasData(state,anno-1) } : null;
                 return <EmployeeCard key={dp.id} dp={dp} rec={recDp} fuoriPeriodo={fuoriPeriodo} anno={anno} mese={mese} fset={fset} mLocked={mLocked}
                   dipList={dipList} onCell={onCell} onNota={onNota} onFestConfirm={onFestConfirm} onQuickFill={onQuickFill}
-                  onVoceSet={onVoceSet} onVoceAdd={onVoceAdd} onVoceDel={onVoceDel}
+                  onVoceSet={onVoceSet} onVoceAdd={onVoceAdd} onVoceDel={onVoceDel} ferieApr={ferieApr}
                   onDich={onDich} onSvuotaMese={onSvuotaMese} saldoPrec={saldoP} bancaPrec={bancaP} tettoConsumo={tettoC} onAzzeraSaldo={onAzzeraSaldo} onAnnullaAzzera={onAnnullaAzzera}
                   onSostAdd={onSostAdd} onSostChange={onSostChange} onSostDel={onSostDel} onOpenPerm={onOpenPerm}
                   onEditDip={function(d){ setDipModal({ dip:d }); }} onDelDip={askDelDip} />;
