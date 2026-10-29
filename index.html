@@ -1208,6 +1208,7 @@ function EmployeeCard(props){
         <span className="nome" style={{ color:"#08344a" }}>{dp.nome}</span>
         {livelloAt(dp,y,m) ? <span className="pill">Liv. {livelloAt(dp,y,m)}</span> : null}
         <span className="pill">ORE SETT: {hoursDisp(oreSettAt(dp,y,m))}</span>
+        <span className="pill" title="Monte ore mensile: 165 h per chi fa 38 h/settimana, in proporzione per gli altri (stessa base usata dalla Banca ore)">ORE MESE: {hoursDisp(monteFissoMese(dp,y,m))}</span>
         <span className="pill">{contrLabelAt(dp,y,m)}</span>
         {orarioTempAt(dp,y,m)!=null ? <span className="pill" style={{ background:"#fde68a", color:"#78350f" }}>⏱ orario temp. {hoursDisp(orarioTempAt(dp,y,m))}h</span> : null}
         {(function(){ const ce=cessEffStr(dp); if(!ce) return null; const now=new Date(); const tInt=now.getFullYear()*10000+(now.getMonth()+1)*100+now.getDate(); const ceInt=ymdIt(ce); return (ceInt && ceInt < tInt) ? <span className="pill cess">CESSATO {ce}</span> : <span className="pill" style={{ background:"#fbe0ec", color:"#8A2358" }}>fino al {ce}</span>; })()}
