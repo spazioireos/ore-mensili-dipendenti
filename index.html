@@ -115,6 +115,7 @@
   .cong-bar { height:9px; background:rgba(0,0,0,.08); border-radius:999px; overflow:hidden; margin:2px 0 6px; }
   .cong-bar-fill { height:100%; background:currentColor; border-radius:999px; transition:width .2s; }
   .cong-res { font-size:12.5px; line-height:1.45; }
+  .cong-plain { font-size:13.5px; line-height:1.5; font-weight:600; background:rgba(255,255,255,.65); border:1px dashed rgba(0,0,0,.2); border-radius:8px; padding:6px 10px; margin-bottom:6px; }
   .cong-status { display:inline-flex; align-items:center; gap:6px; font-size:14px; font-weight:800; text-transform:uppercase; letter-spacing:.3px; padding:5px 14px; border-radius:8px; color:#fff; box-shadow:0 1px 4px rgba(0,0,0,.2); }
   .cong-status b { font-size:17px; font-weight:900; }
   .cong.warn .cong-status { background:#c2410c; }
@@ -207,7 +208,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver54";
+const APP_VER = "ver60";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
 const MESE_ABBR_FILE = ["gen","feb","mar","apr","mag","giu","lug","ago","set","ott","nov","dic"];
@@ -411,11 +412,11 @@ function coverAbsHours(rec,dp,y,m){                                        // or
   for(let d=1; d<=nd; d++){ const cv=String(rec.giorni[d]==null?"":rec.giorni[d]).trim(); if(CODE_SET[cv] && cv!=="--" && cv!=="AN") days++; }
   return days*q;
 }
-function bancaMeseA(state,dp,y,m){                                          // banca del singolo mese (Metodo A). null se senza "ore dichiarate"
+function bancaMeseA(state,dp,y,m){                                          // banca del singolo mese (Metodo A). null se il mese non è compilato
   const rec=getRecFrom(state,y,m,dp.id);
-  const draw=String(rec.dich==null?"":rec.dich).trim(); if(draw==="") return null;
-  const D=parseFloat(draw.replace(",",".")); if(isNaN(D)) return null;
-  const eff=D + coverAbsHours(rec,dp,y,m);                                  // prodotto = lavorate + assenze coperte
+  if(!recHasData(rec)) return null;                                         // mese non compilato -> non conteggiato
+  const rese=totOfRec(rec,y,m);                                            // ore effettivamente rese = somma delle celle
+  const eff=rese + coverAbsHours(rec,dp,y,m);                               // prodotto = rese + assenze coperte
   return Math.round((eff - monteFissoMese(dp,y,m))*1000)/1000;
 }
 function bancaPrecA(state,dp,anno,mese){                                    // banca cumulata dei mesi PRECEDENTI (dopo l'ultimo azzeramento, dalla decorrenza mensilizzazione)
@@ -428,11 +429,9 @@ function bancaPrecA(state,dp,anno,mese){                                    // b
   return Math.round(s*1000)/1000;
 }
 /* ===== Tetto annuo (attribuzione) — progetto unico, periodo scolastico o civile ===== */
-function prodottoMese(rec,dp,y,m){                                         // ore che consumano il tetto nel mese: lavorate dichiarate + assenze coperte
-  if(!rec) return null;
-  const draw=String(rec.dich==null?"":rec.dich).trim(); if(draw==="") return null;
-  const D=parseFloat(draw.replace(",",".")); if(isNaN(D)) return null;
-  return D + coverAbsHours(rec,dp,y,m);
+function prodottoMese(rec,dp,y,m){                                         // ore che consumano il tetto nel mese: ore rese (celle) + assenze coperte
+  if(!rec || !recHasData(rec)) return null;
+  return totOfRec(rec,y,m) + coverAbsHours(rec,dp,y,m);
 }
 function tettoWindow(periodo,y,m){                                         // finestra YM (incluso) del periodo che contiene (y,m)
   if(periodo==="civile") return { fromYM:y*100+1, toYM:y*100+12 };
@@ -445,6 +444,47 @@ function consumoTetto(state,dp,anno,mese){                                 // so
   Object.keys(state.dati||{}).forEach(function(k){ const mm=k.match(/^(\d{4})-(\d{1,2})$/); if(!mm) return; const y=parseInt(mm[1],10), mo=parseInt(mm[2],10); const ym=y*100+mo; if(ym<w.fromYM||ym>w.toYM) return; const rec=state.dati[k][dp.id]; if(!rec) return; const p=prodottoMese(rec,dp,y,mo); if(p!=null) s+=p; });
   return Math.round(s*1000)/1000;
 }
+/* ===== Base mensile (ore in più / in meno del mese, no accumulo) — per tutti dal 01/10/2026 ===== */
+const BM_DAL_YM = 202610;   // decorrenza globale base mensile = ottobre 2026
+function straoRange(state, dp, fromYM, toYM){   // somma per persona dei delta mensili nel periodo (solo mesi >= BM_DAL_YM)
+  let piu=0, meno=0;
+  const start = Math.max(fromYM, BM_DAL_YM);
+  Object.keys(state.dati||{}).forEach(function(k){
+    const mm=k.match(/^(\d{4})-(\d{1,2})$/); if(!mm) return;
+    const y=parseInt(mm[1],10), mo=parseInt(mm[2],10); const ym=y*100+mo;
+    if(ym<start || ym>toYM) return;
+    if(!state.dati[k][dp.id]) return;
+    const bm = bancaMeseA(state, dp, y, mo);   // delta del mese = (rese + assenze coperte) - monte fisso
+    if(bm==null) return;
+    if(bm>0) piu+=bm; else if(bm<0) meno+=(-bm);
+  });
+  return { piu:Math.round(piu*1000)/1000, meno:Math.round(meno*1000)/1000 };
+}
+/* ===== Ferie da smaltire (controllo al 30 aprile sull'anno precedente) ===== */
+const FERIE_GG_ANNO = 26;                 // giorni ferie annui (pieni)
+const FERIE_GG_MESE = 26/12;              // 2,1666... GG al mese, riproporzionati sui mesi lavorati
+function ferieGodute(state, dp, year){    // giorni "FERIE" segnati nelle celle dell'anno
+  let n=0;
+  for(let mo=1; mo<=12; mo++){
+    const rec=(state.dati[monthKey(year,mo)]||{})[dp.id];
+    if(!rec||!rec.giorni) continue;
+    const nd=daysInMonth(year,mo);
+    for(let d=1; d<=nd; d++){ if(String(rec.giorni[d]==null?"":rec.giorni[d]).trim()==="FERIE") n++; }
+  }
+  return n;
+}
+function mesiInForzaAnno(dp, year){        // mesi dell'anno in cui l'operatore è in forza (test a metà mese)
+  if(!assunzInt(dp)) return 12;            // senza data assunzione: anno intero
+  let n=0;
+  for(let mo=1; mo<=12; mo++){ if(inForceAt(dp, year*10000+mo*100+15)) n++; }
+  return n;
+}
+function ferieMaturato(dp, year){ return Math.round(FERIE_GG_MESE*mesiInForzaAnno(dp,year)*1000)/1000; }
+function ferieResiduo(state, dp, year){ return Math.round((ferieMaturato(dp,year)-ferieGodute(state,dp,year))*1000)/1000; }
+function annoHasData(state, year){ const ks=Object.keys(state.dati||{}); for(let i=0;i<ks.length;i++){ if(ks[i].indexOf(String(year)+"-")===0) return true; } return false; }
+function tettiList(dp){ return (Array.isArray(dp.tettiAnnui)?dp.tettiAnnui:[]).map(function(t){ return { anno:parseInt(t&&t.anno,10)||0, ore:parseFloat(String(t&&t.ore).replace(",",".")) }; }).filter(function(t){ return !isNaN(t.ore) && t.ore>0; }).sort(function(a,b){ return a.anno-b.anno; }); }
+function tettoStartYear(dp,y,m){ return (dp.tettoPeriodo==="civile") ? y : (m>=9 ? y : y-1); } // anno iniziale del periodo che contiene (y,m)
+function tettoForPeriod(dp,y,m){ const sy=tettoStartYear(dp,y,m); const list=tettiList(dp); let val=0; list.forEach(function(t){ if(t.anno<=sy) val=t.ore; }); return val; } // tetto vigente (l'ultimo <= anno), 0 se nessuno
 function valoriNow(dp){ return valoriAt(dp, 9999, 12); }
 function tipoNow(dp){ return valoriNow(dp).tipo; }
 function livelloAt(dp,y,m){ return valoriAt(dp,y,m).livello; }
@@ -658,6 +698,11 @@ function migrate(obj){
     if (d.mensilizzatoDal == null) d.mensilizzatoDal = "";
     if (d.tettoAnnuo == null) d.tettoAnnuo = "";
     if (d.tettoPeriodo !== "civile" && d.tettoPeriodo !== "scolastico") d.tettoPeriodo = "scolastico";
+    if (!Array.isArray(d.tettiAnnui)){
+      d.tettiAnnui = [];
+      const ta = parseFloat(String(d.tettoAnnuo).replace(",", "."));
+      if (!isNaN(ta) && ta > 0) d.tettiAnnui.push({ anno:0, ore:ta });   // tetto esistente -> baseline (anno 0 = da sempre)
+    }
   });
   if (!obj.mensilizzatoInit2026){
     (obj.dipendenti || []).forEach(function(d){ const nm=String(d.nome==null?"":d.nome).trim().toUpperCase(); if(nm==="DI LECCE IVANA" || nm==="FRUTAZ RACHELE") d.mensilizzato = true; });
@@ -880,9 +925,13 @@ function esportaPDF(state, pairs){
           const v = rec.giorni[d];
           const perm = (rec.permessi && rec.permessi[d]) ? rec.permessi[d] : null;
           tot[i] += parseHour(v === undefined ? "" : v);
+          const isDom = weekdayOf(anno, m, d) === 0;
+          const sv = String(v === undefined ? "" : v).trim();
           let txt;
-          if (v === undefined || v === "") txt = rosso ? "–" : "";
-          else if (CODE_SET[String(v).trim()]) txt = String(v).trim();
+          if (sv === "--") txt = "R";                                       // riposo settimanale -> R (in rosso)
+          else if (sv === "") txt = isDom ? "R" : (rosso ? "–" : "");       // domenica senza dato -> riposo (per tutti)
+          else if (dp.mensilizzato && isNumeric(sv)) txt = "P";            // mensilizzato: giorno lavorato = presenza (LUL)
+          else if (CODE_SET[sv]) txt = sv;
           else txt = pdfHM(v);
           if (perm){ txt = (txt === "*" || txt === "" ? "*" : txt + "*"); permMese.push(dp.nome + " g." + d + " " + fmt2(perm.ore) + " h (" + perm.tipo + ")"); }
           row.push(txt);
@@ -890,7 +939,7 @@ function esportaPDF(state, pairs){
         row.push(dayLabel);
         body.push(row);
       }
-      const totRow = ["TOT"].concat(tot.map(function(t){ return pdfHM(Math.round(t*100)/100); })).concat(["TOT"]);
+      const totRow = ["TOT ORE RESE"].concat(tot.map(function(t){ return pdfHM(Math.round(t*100)/100); })).concat(["TOT ORE RESE"]);
       body.push(totRow);
       const ncols = 2 + chunk.length;
       const lastIdx = chunk.length + 1;
@@ -916,7 +965,8 @@ function esportaPDF(state, pairs){
           } else {
             if (isNum) data.cell.styles.fontSize = 7; // ore in formato esteso: un filo più grandi ma su una riga
             const txt = raw.replace(/\*$/, "");
-            if (CODE_SET[txt]){
+            if (txt === "R"){ data.cell.styles.textColor = [178,34,34]; data.cell.styles.fontStyle = "bold"; } // riposo: R in rosso
+            else if (CODE_SET[txt]){
               const hx = CODE_SET[txt].bg.replace("#","");
               data.cell.styles.fillColor = [parseInt(hx.slice(0,2),16), parseInt(hx.slice(2,4),16), parseInt(hx.slice(4,6),16)];
               data.cell.styles.textColor = lumaText(CODE_SET[txt].bg) === "#ffffff" ? [255,255,255] : [17,24,39];
@@ -950,6 +1000,35 @@ function esportaPDF(state, pairs){
       if (ci === chunks.length - 1){
         let yy = doc.lastAutoTable.finalY + 6;
         const ensureY = function(h){ if (yy + h > 287){ doc.addPage(); yy = 18; } };
+        // Legenda simboli (LUL)
+        doc.setFontSize(6.5); doc.setTextColor(90,90,90); doc.setFont(undefined,"normal");
+        ensureY(4); doc.text("Legenda: R (rosso) = riposo/domenica · P = presenza (mensilizzati) · TOT ORE RESE = somma delle ore effettivamente rese (dal totale delle celle).", 14, yy); yy += 5;
+        // RECUPERO / ORE NUOVE (mensilizzati con debito pregresso)
+        const recupLines = [];
+        dipsMese.forEach(function(dp){
+          if (!dp.mensilizzato) return;
+          if (!(mensDalYM(dp)===0 || (anno*100+m) >= mensDalYM(dp))) return;
+          const bp = bancaPrecA(state, dp, anno, m);
+          const bm = bancaMeseA(state, dp, anno, m);
+          if (bm == null) return;
+          const deb = Math.max(0, -bp);
+          if (deb <= 0.0005) return;
+          const rec = (bm > 0) ? Math.min(bm, deb) : 0;
+          const nuo = Math.round((bm - rec)*1000)/1000;
+          recupLines.push(dp.nome + " — debito pregresso " + fmt3(deb) + " h: recupero " + fmt3(Math.round(rec*1000)/1000) + " h, ore nuove " + fmt3(nuo) + " h");
+        });
+        if (recupLines.length > 0){
+          ensureY(8);
+          const boxH = 7 + recupLines.length*4.2 + 2;
+          if (yy + boxH > 287){ doc.addPage(); yy = 18; }
+          doc.setFillColor(255,247,237); doc.setDrawColor(251,146,60); doc.setLineWidth(0.4);
+          doc.rect(13, yy - 4, 184, boxH, "FD");
+          doc.setFontSize(9); doc.setTextColor(124,45,18); doc.setFont(undefined,"bold");
+          doc.text("RECUPERO / ORE NUOVE DEL MESE (mensilizzati con debito pregresso)", 15, yy); yy += 5.2;
+          doc.setFontSize(8); doc.setFont(undefined,"normal"); doc.setTextColor(60,40,20);
+          recupLines.forEach(function(l){ const ls = doc.splitTextToSize("•  " + l, 178); ls.forEach(function(x){ ensureY(4.2); doc.text(x, 16, yy); yy += 4.2; }); });
+          yy += 2;
+        }
         // NOTE DEL MESE — ben visibili, subito sotto la tabella
         if (noteMese.length > 0){
           ensureY(10);
@@ -1130,7 +1209,6 @@ function EmployeeCard(props){
         {livelloAt(dp,y,m) ? <span className="pill">Liv. {livelloAt(dp,y,m)}</span> : null}
         <span className="pill">ORE SETT: {hoursDisp(oreSettAt(dp,y,m))}</span>
         <span className="pill">{contrLabelAt(dp,y,m)}</span>
-        {(dp.mensilizzato && (mensDalYM(dp)===0 || (y*100+m)>=mensDalYM(dp))) ? <span className="pill" style={{ background:"#fbcfe8", color:"#831843" }}>🏦 Mensilizzato</span> : null}
         {orarioTempAt(dp,y,m)!=null ? <span className="pill" style={{ background:"#fde68a", color:"#78350f" }}>⏱ orario temp. {hoursDisp(orarioTempAt(dp,y,m))}h</span> : null}
         {(function(){ const ce=cessEffStr(dp); if(!ce) return null; const now=new Date(); const tInt=now.getFullYear()*10000+(now.getMonth()+1)*100+now.getDate(); const ceInt=ymdIt(ce); return (ceInt && ceInt < tInt) ? <span className="pill cess">CESSATO {ce}</span> : <span className="pill" style={{ background:"#fbe0ec", color:"#8A2358" }}>fino al {ce}</span>; })()}
         <div className="spacer"></div>
@@ -1139,6 +1217,12 @@ function EmployeeCard(props){
         <button className="edit-mini" title="Modifica anagrafica" onClick={function(){ props.onEditDip(dp); }}>✎</button>
         <button className="edit-mini" title="Elimina definitivamente" onClick={function(){ props.onDelDip(dp); }}>🗑</button>
       </div>
+      {props.ferieApr ? (function(){
+        const f = props.ferieApr;
+        if (f.noData) return <div style={{ background:"#f1f5f9", borderBottom:"2px solid #cbd5e1", color:"#475569", fontSize:"12px", fontWeight:700, padding:"5px 10px" }}>🏖️ Ferie anno {f.year}: dati non presenti nel programma — residuo non calcolabile.</div>;
+        if (f.res > 0.0005) return <div style={{ background:"#fee2e2", borderBottom:"3px solid #dc2626", color:"#991b1b", fontSize:"13px", fontWeight:800, padding:"6px 10px" }}>⚠️ FERIE DA SMALTIRE (anno {f.year}): <b>{fmt2(f.res)} GG</b> ancora da fare — maturate {fmt2(f.mat)} − godute {fmt2(f.god)}. Da far godere entro il 30 aprile.</div>;
+        return <div style={{ background:"#dcfce7", borderBottom:"2px solid #16a34a", color:"#166534", fontSize:"12px", fontWeight:700, padding:"5px 10px" }}>✓ Ferie anno {f.year} in regola — nessun residuo (maturate {fmt2(f.mat)}, godute {fmt2(f.god)}).</div>;
+      })() : null}
       {props.fuoriPeriodo ? <div style={{ background:"#fef3c7", borderBottom:"2px solid #f59e0b", color:"#92400e", fontSize:"12px", fontWeight:700, padding:"5px 10px" }}>⚠️ Mese fuori dal periodo di rapporto (prima dell'assunzione o dopo la cessazione), ma contiene ore già inserite: controlla e, se vanno tolte, usa 🧹 Pulisci ore dopo nella scheda (✎).</div> : null}
       <div className="grid-wrap">
         <table className="cal"><tbody>
@@ -1186,9 +1270,9 @@ function EmployeeCard(props){
       </div>
       <div className="foot-line">
         <span className="foot-tot">TOT calcolato: <b>{fmt2(tot)}</b></span>
-        <label>Ore dichiarate (uso interno):</label>
-        <input className="dich-in" value={rec.dich || ""} placeholder="—" disabled={mLocked}
-          onChange={function(e){ props.onDich(dp.id, e.target.value); }} />
+        {!dp.mensilizzato ? <label>Ore dichiarate (uso interno):</label> : null}
+        {!dp.mensilizzato ? <input className="dich-in" value={rec.dich || ""} placeholder="—" disabled={mLocked}
+          onChange={function(e){ props.onDich(dp.id, e.target.value); }} /> : null}
         {(function(){
           if (dp.mensilizzato) return null;
           const s = String(rec.dich === undefined ? "" : rec.dich).trim();
@@ -1200,6 +1284,37 @@ function EmployeeCard(props){
           return <span className="badge ko">Δ {(diff>0?"+":"")}{fmt2(diff)} {diff<0?"(mancano ore)":"(ore in più)"}</span>;
         })()}
         {(function(){
+          if ((y*100+m) < BM_DAL_YM) return null;                                    // base mensile attiva solo dai mesi >= ottobre 2026
+          const base = monteFissoMese(dp,y,m);
+          if (!base || base<=0) return null;
+          if (!recHasData(rec)) return null;                                          // niente riquadro finché il mese non è compilato
+          const quota = base/26;
+          let assDays=0; for(let dd=1; dd<=nd; dd++){ const cv=String(rec.giorni[dd]==null?"":rec.giorni[dd]).trim(); if(CODE_SET[cv] && cv!=="--" && cv!=="AN") assDays++; }
+          const assOre = assDays*quota;
+          const rese = tot;
+          const delta = Math.round((rese + assOre - base)*1000)/1000;                 // delta del mese (no accumulo)
+          const bcls = delta > 0.0005 ? "warn" : (delta < -0.0005 ? "over" : "ok");
+          const segno = delta>0.0005 ? "+" : "";
+          const esito = delta>0.0005 ? "ore in più (straordinario)" : (delta<-0.0005 ? "ore in meno" : "in pari");
+          return <div className={"cong " + bcls}>
+            <div className="cong-head">➕➖ Ore in più / in meno — base mensile</div>
+            <div className="cong-plain">
+              Questo mese ha fatto <b>{fmt3(rese)} ore</b>; ne doveva fare <b>{fmt3(base)}</b> (base mensile). Ferie, malattia e permessi contano come fatte. <b>Risultato del mese: {segno}{fmt3(delta)} ore</b> ({esito}).
+            </div>
+            <div className="cong-row">
+              <span className="cong-chip">Base del mese: <b>{fmt3(base)} h</b></span>
+              <span className="cong-chip">Ore fatte (dal foglio): <b>{fmt3(rese)}</b></span>
+              <span className="cong-chip">Ferie/malattia/permessi: <b>{assDays} gg = {fmt3(assOre)} h</b></span>
+              <span className="cong-chip strong">Risultato del mese: <b>{segno}{fmt3(delta)} h</b></span>
+              <span className="cong-status">{esito}</span>
+            </div>
+            <div className="cong-res">
+              Ogni mese fa storia a sé: le <b>ore in più</b> si pagano maggiorate (straordinario), le <b>ore in meno</b> si tolgono. <b>Niente si riporta</b> al mese dopo. Il totale annuo per persona è nella <b>Query personale → ⚡ Straordinario</b>.
+              <div style={{ fontSize:"11px", color:"#9a3412", marginTop:"2px" }}>Base = 165 h per chi fa 38 h/settimana, in proporzione per gli altri. Numeri a 3 decimali.</div>
+            </div>
+          </div>;
+        })()}
+        {(function(){
           const S = Math.round((props.saldoPrec || 0) * 100) / 100;
           const draw = String(rec.dich == null ? "" : rec.dich).trim();
           const P = tot;
@@ -1209,56 +1324,6 @@ function EmployeeCard(props){
           const daPag = hasD ? Math.round((S + D) * 100) / 100 : S;
           const manca = Math.round((daPag - P) * 100) / 100;
           const azzeraBtn = (!mLocked) ? <button className="azzera-btn" title="Considera saldato il credito/debito fino a questo mese: dal mese dopo il saldo riparte da zero" onClick={function(){ props.onAzzeraSaldo(dp.id); }}>⊘ Azzera saldo</button> : null;
-          if (dp.mensilizzato && (mensDalYM(dp)===0 || (y*100+m) >= mensDalYM(dp))){
-            const monteFisso = monteFissoMese(dp,y,m);
-            const quotaExact = monteFisso/26;                                           // quota giornaliera allineata al mese
-            let assDays=0; for(let dd=1; dd<=nd; dd++){ const cv=String(rec.giorni[dd]==null?"":rec.giorni[dd]).trim(); if(CODE_SET[cv] && cv!=="--" && cv!=="AN") assDays++; }
-            const assOreExact = assDays*quotaExact;
-            const eff = hasD ? (D + assOreExact) : null;                               // prodotto = lavorate + assenze coperte
-            const bancaMese = hasD ? Math.round((eff - monteFisso)*1000)/1000 : null;  // Metodo A (precisione piena, 3 dec.)
-            const bancaPrev = Math.round((props.bancaPrec||0)*1000)/1000;
-            const bancaCum = hasD ? Math.round((bancaPrev + bancaMese)*1000)/1000 : bancaPrev;
-            const isAug = (m===8);
-            const statusTxt = bancaCum > 0.0005 ? "a credito operatore" : (bancaCum < -0.0005 ? "a debito operatore" : "in pari");
-            const bcls = bancaCum > 0.0005 ? "warn" : (bancaCum < -0.0005 ? "over" : "ok");
-            const azzeraBancaBtn = (!mLocked) ? <button className="azzera-btn" title="Conguaglio banca ore: considera chiusa la banca fino a questo mese (31/08). Dalla mensilità successiva riparte da zero." onClick={function(){ props.onAzzeraSaldo(dp.id); }}>⊘ Azzera banca (31/08)</button> : null;
-            if (azzerato){
-              return <div className="cong ok">
-                <div className="cong-head">🏦 Banca ore — SALDO AZZERATO{isAug?" (conguaglio 31/08)":""}</div>
-                <div className="cong-row">
-                  <span className="cong-status">Banca azzerata ✓</span>
-                  <span className="cong-chip">Chiusa a questo mese: <b>{fmt3(Math.abs(bancaCum))} h</b> {bancaCum>0.0005?"(erano a credito operatore)":(bancaCum<-0.0005?"(erano a debito operatore)":"")}</span>
-                  {!mLocked ? <button className="azzera-btn annulla" title="Annulla l'azzeramento" onClick={function(){ props.onAnnullaAzzera(dp.id); }}>↩︎ Annulla azzeramento</button> : null}
-                </div>
-                <div className="cong-res">Dalla mensilità successiva la banca riparte da <b>zero</b>. I mesi precedenti restano invariati.</div>
-              </div>;
-            }
-            if (!hasD && Math.abs(bancaPrev) <= 0.0005 && assDays === 0) return null;
-            return <div className={"cong " + bcls}>
-              <div className="cong-head">🏦 Banca ore — mensilizzazione fissa{isAug ? " · ⚠️ conguaglio 31/08" : ""}</div>
-              <div className="cong-row">
-                <span className="cong-chip">Quota giorno (monte ÷ 26): <b>{fmt3(quotaExact)} h</b></span>
-                <span className="cong-chip">Monte fisso mese (165 h a 38/sett, riproporz.): <b>{fmt3(monteFisso)} h</b></span>
-                <span className="cong-chip">Lavorate (dichiarate): <b>{hasD?fmt3(D):"—"}</b></span>
-                <span className="cong-chip">Assenze coperte: <b>{assDays} gg = {fmt3(assOreExact)} h</b></span>
-              </div>
-              <div className="cong-row">
-                {hasD ? <span className="cong-chip">Prodotto (lavorate+coperte): <b>{fmt3(eff)}</b></span> : null}
-                <span className="cong-chip">Banca prec. <b>{fmt3(bancaPrev)}</b></span>
-                <span className="cong-op">+</span>
-                <span className="cong-chip">Mese <b>{hasD?((bancaMese>0?"+":"")+fmt3(bancaMese)):"0,000"}</b></span>
-                <span className="cong-op">=</span>
-                <span className="cong-chip strong">Banca cumulata <b>{(bancaCum>0?"+":"")+fmt3(bancaCum)} h</b></span>
-                <span className="cong-status">{statusTxt}</span>
-                {azzeraBancaBtn}
-              </div>
-              <div className="cong-res">
-                Fisso mensile = 165 h (full-time 38 h/sett) riproporzionato sull'orario; uguale ogni mese. Banca = (lavorate + assenze coperte) − fisso. Le assenze retribuite sono <b>coperte</b> a {fmt3(quotaExact)} h/giorno (monte ÷ 26) e rientrano nel prodotto.
-                {!hasD ? <span> · Inserisci le <b>ore dichiarate</b> (ore realmente lavorate) qui sopra per calcolare la banca del mese.</span> : null}
-                <div style={{ fontSize:"11px", color:"#9a3412", marginTop:"2px" }}>Valori mostrati a 3 decimali; i conteggi usano la precisione piena.</div>
-              </div>
-            </div>;
-          }
           if (azzerato){
             return <div className="cong ok">
               <div className="cong-head">✓ Conguaglio ore — SALDO AZZERATO MANUALMENTE</div>
@@ -1309,7 +1374,7 @@ function EmployeeCard(props){
           </div>;
         })()}
         {(function(){
-          const tetto = parseFloat(String(dp.tettoAnnuo==null?"":dp.tettoAnnuo).replace(",","."));
+          const tetto = tettoForPeriod(dp, y, m);
           if (isNaN(tetto) || tetto <= 0) return null;
           const consumo = Math.round((props.tettoConsumo||0)*1000)/1000;
           const rimaste = Math.round((tetto - consumo)*1000)/1000;
@@ -1319,15 +1384,16 @@ function EmployeeCard(props){
           const quasi = !over && rimaste <= tetto*0.1;
           const tcls = over ? "over" : (quasi ? "warn" : "ok");
           return <div className={"cong " + tcls} style={{ marginTop:"6px" }}>
-            <div className="cong-head">🎯 Tetto annuo — {per}</div>
+            <div className="cong-head">🎯 Tetto annuo — ore massime che può fare nell'anno</div>
+            <div className="cong-plain">In parole semplici: nell'<b>{per}</b> può fare al massimo <b>{fmt3(tetto)} ore</b>. Finora ne ha usate <b>{fmt3(consumo)}</b>. <b>Gliene restano {fmt3(rimaste)}.</b></div>
             <div className="cong-row">
-              <span className="cong-chip">Tetto: <b>{fmt3(tetto)} h</b></span>
-              <span className="cong-chip">Consumate: <b>{fmt3(consumo)} h</b></span>
-              <span className="cong-chip strong">Rimaste: <b>{fmt3(rimaste)} h</b></span>
-              <span className="cong-status">{over ? "⚠️ tetto superato" : (quasi ? "quasi esaurito" : "disponibili")}</span>
+              <span className="cong-chip">Massimo dell'anno: <b>{fmt3(tetto)} h</b></span>
+              <span className="cong-chip">Già usate: <b>{fmt3(consumo)} h</b></span>
+              <span className="cong-chip strong">Restano: <b>{fmt3(rimaste)} h</b></span>
+              <span className="cong-status">{over ? "⚠️ superato" : (quasi ? "quasi finito" : "ancora disponibili")}</span>
             </div>
             <div className="cong-bar"><div className="cong-bar-fill" style={{ width: pct + "%" }}></div></div>
-            <div className="cong-res">Consumo = ore lavorate dichiarate + assenze retribuite (a monte ÷ 26), sommate sui mesi del periodo. <span style={{ fontSize:"11px", color:"#9a3412" }}>Valori a 3 decimali.</span></div>
+            <div className="cong-res">Si consuma con le <b>ore fatte</b> (dal foglio) più <b>ferie e malattia</b>. Periodo: {per}. <span style={{ fontSize:"11px", color:"#9a3412" }}>Numeri a 3 decimali.</span></div>
           </div>;
         })()}
       </div>
@@ -1415,6 +1481,32 @@ function DipModal(props){
   const [mensAnno, setMensAnno] = useState(_mdal ? String(Math.floor(_mdal/10000)) : String(_now47.getFullYear()));
   const [tettoAnnuo, setTettoAnnuo] = useState(editing && editing.tettoAnnuo != null ? String(editing.tettoAnnuo) : "");
   const [tettoPeriodo, setTettoPeriodo] = useState(editing && editing.tettoPeriodo === "civile" ? "civile" : "scolastico");
+  const [tetti, setTetti] = useState(function(){
+    const src = (editing && Array.isArray(editing.tettiAnnui)) ? editing.tettiAnnui : [];
+    const out = src.map(function(t){ return { anno: (t && t.anno!=null) ? String(t.anno) : "", ore: (t && t.ore!=null) ? String(t.ore) : "" }; });
+    // Se non c'è ancora lo storico ma c'è il vecchio tetto singolo, mostralo come riga baseline
+    if (out.length===0 && editing){
+      const ta = parseFloat(String(editing.tettoAnnuo==null?"":editing.tettoAnnuo).replace(",","."));
+      if (!isNaN(ta) && ta>0) out.push({ anno:"", ore:String(editing.tettoAnnuo) });
+    }
+    return out;
+  });
+  const [ntTettoAnno, setNtTettoAnno] = useState("");
+  const [ntTettoOre, setNtTettoOre] = useState("");
+  const addTetto = function(){
+    const oreV = String(ntTettoOre).replace(",",".").trim();
+    if (oreV==="" || isNaN(Number(oreV)) || Number(oreV)<=0) return;
+    const annoV = String(ntTettoAnno).replace(/[^0-9]/g,"").slice(0,4);
+    const rec = { anno: annoV, ore: String(ntTettoOre).trim() };
+    const next = tetti.concat([rec]).sort(function(a,b){ return (parseInt(a.anno,10)||0)-(parseInt(b.anno,10)||0); });
+    setTetti(next); setNtTettoAnno(""); setNtTettoOre("");
+  };
+  const delTetto = function(i){ setTetti(tetti.filter(function(_, k){ return k !== i; })); };
+  const tettoRowLabel = function(t){
+    const an = parseInt(t.anno,10)||0;
+    const lab = an>0 ? ("dal "+an+(tettoPeriodo==="civile"?"":"/"+(an+1))) : "da sempre (valore di partenza)";
+    return (Number.isInteger(Number(String(t.ore).replace(",",".")))?String(parseInt(String(t.ore).replace(",","."),10)):fmt2(Number(String(t.ore).replace(",",".")))) + " ore — " + lab;
+  };
   const [orariTemp, setOrariTemp] = useState(editing && Array.isArray(editing.orariTemp) ? editing.orariTemp.map(function(w){ return Object.assign({}, w); }) : []);
   const [otMeseI, setOtMeseI] = useState(String(_now47.getMonth()+1));
   const [otAnnoI, setOtAnnoI] = useState(String(_now47.getFullYear()));
@@ -1438,14 +1530,22 @@ function DipModal(props){
     const n = nome.trim().toUpperCase();
     if (n === "") return;
     const pro = tipo === "determinato" ? proroghe.filter(function(x){ return x && x.trim() !== ""; }) : [];
+    const tettiOut = tetti.map(function(t){ return { anno: parseInt(t.anno,10)||0, ore: String(t.ore).trim() }; }).filter(function(t){ const nn=parseFloat(String(t.ore).replace(",",".")); return !isNaN(nn) && nn>0; }).sort(function(a,b){ return a.anno-b.anno; });
+    // legacy tettoAnnuo = valore di partenza (riga "da sempre", anno 0) o la prima riga disponibile
+    let legacyTetto = "";
+    if (tettiOut.length){ const base = tettiOut.filter(function(t){ return t.anno===0; }); legacyTetto = base.length ? base[0].ore : tettiOut[0].ore; }
     props.onSave({ id: editing ? editing.id : uid(), nome:n, livello:livello.trim(), oreSett:Number(ore)||0,
-      tipoContratto:tipo, scadenza: tipo==="determinato" ? scad.trim() : "", proroghe:pro, trasformazioni: trasf.filter(function(x){ return x && x.data; }), orariTemp: orariTemp.filter(function(w){ return w && w.inizio && w.fine && w.oreSett!=null && String(w.oreSett)!==""; }), mensilizzato: mensilizzato, mensilizzatoDal: (mensilizzato && parseInt(mensMese,10)>=1 && parseInt(mensMese,10)<=12 && parseInt(mensAnno,10)>=2000) ? ("01/"+(parseInt(mensMese,10)<10?"0":"")+parseInt(mensMese,10)+"/"+parseInt(mensAnno,10)) : "", tettoAnnuo: String(tettoAnnuo).trim(), tettoPeriodo: tettoPeriodo, ana: editing ? (editing.ana || {}) : {}, dataAssunzione:assunz.trim(), dataCessazione:cess.trim(), cessManuale: cess.trim()!=="", colore:colore });
+      tipoContratto:tipo, scadenza: tipo==="determinato" ? scad.trim() : "", proroghe:pro, trasformazioni: trasf.filter(function(x){ return x && x.data; }), orariTemp: orariTemp.filter(function(w){ return w && w.inizio && w.fine && w.oreSett!=null && String(w.oreSett)!==""; }), mensilizzato: mensilizzato, mensilizzatoDal: (mensilizzato && parseInt(mensMese,10)>=1 && parseInt(mensMese,10)<=12 && parseInt(mensAnno,10)>=2000) ? ("01/"+(parseInt(mensMese,10)<10?"0":"")+parseInt(mensMese,10)+"/"+parseInt(mensAnno,10)) : "", tettoAnnuo: legacyTetto, tettoPeriodo: tettoPeriodo, tettiAnnui: tettiOut, ana: editing ? (editing.ana || {}) : {}, dataAssunzione:assunz.trim(), dataCessazione:cess.trim(), cessManuale: cess.trim()!=="", colore:colore });
   };
   return (
     <div className="overlay" onClick={props.onClose}>
       <div className="modal" onClick={function(e){ e.stopPropagation(); }}>
         <h2>{editing ? "Modifica dipendente" : "Nuovo dipendente"}</h2>
-        <div className="field"><label>Nominativo (STAMPATELLO: COGNOME NOME)</label>
+        <div style={{ background:"#f0f9ff", border:"1px dashed #7dd3fc", borderRadius:"10px", padding:"8px 12px", margin:"0 0 12px", fontSize:"12.5px", color:"#0c4a6e", lineHeight:1.55 }}>
+          <b>Che cos'è questa scheda?</b> È la carta d'identità della persona dentro il programma: qui scrivi chi è, che contratto ha e come lavora.<br/>
+          👉 I campi con il <span style={{ background:"#fffde7", border:"1px solid #f59e0b", borderRadius:"4px", padding:"0 5px", fontWeight:700 }}>bordo giallo</span> sono quelli che puoi scrivere. Alla fine premi <b>Salva</b>. Se non ti serve una parte, lasciala vuota.
+        </div>
+        <div className="field"><label>Nome e cognome (tutto in STAMPATELLO: COGNOME NOME)</label>
           <input value={nome} onChange={function(e){ setNome(e.target.value.toUpperCase()); }} placeholder="COGNOME NOME" /></div>
         <div className="frow">
           <div className="field"><label>Livello</label>
@@ -1510,29 +1610,45 @@ function DipModal(props){
           <div style={{ fontSize:"11px", color:"#64748b", marginTop:"4px" }}>Compila almeno uno tra livello, monte ore o la spunta "a tempo indeterminato".</div>
         </div>
         <div className="field" style={{ background:"#fdf2f8", border:"1px solid #f9a8d4", borderRadius:"8px", padding:"10px" }}>
-          <label style={{ display:"flex", alignItems:"center", gap:"8px", fontWeight:800, cursor:"pointer" }}>
-            <input type="checkbox" checked={mensilizzato} onChange={function(e){ setMensilizzato(e.target.checked); }} /> 🏦 Mensilizzato — attiva il conteggio Banca ore
-          </label>
-          <div style={{ fontSize:"11px", color:"#64748b", marginTop:"4px" }}>Se attivo, nella scheda mensile compare il riquadro <b>Banca ore</b> (dichiarate − teoriche lavorate; le assenze retribuite sono neutre). Conguaglio/azzeramento al <b>31/08</b> (servizio scolastico).</div>
-          {mensilizzato ? <div style={{ display:"flex", gap:"8px", alignItems:"end", marginTop:"8px", flexWrap:"wrap" }}>
-            <div><div style={{ fontSize:"11px", fontWeight:700, marginBottom:"2px" }}>Mensilizzato dal — mese</div>
-              <select value={mensMese} onChange={function(e){ setMensMese(e.target.value); }} style={{ padding:"6px" }}>{MONTH_LABEL.map(function(l,i){ return <option key={i} value={String(i+1)}>{l}</option>; })}</select></div>
-            <div><div style={{ fontSize:"11px", fontWeight:700, marginBottom:"2px" }}>Anno</div>
-              <input value={mensAnno} onChange={function(e){ setMensAnno(e.target.value.replace(/[^0-9]/g,"").slice(0,4)); }} inputMode="numeric" style={{ width:"90px", padding:"6px", border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px" }} /></div>
-            <div style={{ fontSize:"11px", color:"#64748b", maxWidth:"320px" }}>La banca ore parte da questo mese: i mesi precedenti non entrano nel conteggio.</div>
-          </div> : null}
+          <div style={{ fontSize:"12px", color:"#334155", lineHeight:1.5 }}>➕➖ <b>Base mensile</b> — attiva <b>per tutti</b> in automatico dai mesi <b>da ottobre 2026</b> in poi. Nella scheda del mese compare il riquadro <b>"Ore in più / in meno"</b>: ogni mese fa storia a sé (nessun accumulo), le ore in più si pagano come straordinario e le ore in meno si tolgono. Il totale annuo per persona è nella <b>Query personale → ⚡ Straordinario</b>. Non c'è nulla da impostare qui.</div>
         </div>
         <div className="field" style={{ background:"#eef6ff", border:"1px solid #bfdbfe", borderRadius:"8px", padding:"10px" }}>
-          <label style={{ fontWeight:800 }}>🎯 Tetto annuo (attribuzione) — opzionale</label>
-          <div style={{ fontSize:"11px", color:"#64748b", margin:"2px 0 6px" }}>Se compili le ore, nella scheda mensile compare il riquadro <b>Tetto annuo</b>: quanto resta del monte ore totale del periodo. Si consuma con le ore lavorate dichiarate + le assenze retribuite (a monte ÷ 26). Lascia vuoto per disattivarlo.</div>
-          <div style={{ display:"flex", gap:"10px", alignItems:"end", flexWrap:"wrap" }}>
-            <div><div style={{ fontSize:"11px", fontWeight:700, marginBottom:"2px" }}>Tetto annuo (ore)</div>
-              <input value={tettoAnnuo} onChange={function(e){ setTettoAnnuo(e.target.value); }} placeholder="es. 500" inputMode="decimal" style={{ width:"140px", padding:"6px", border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px" }} /></div>
-            <div><div style={{ fontSize:"11px", fontWeight:700, marginBottom:"2px" }}>Periodo</div>
-              <select value={tettoPeriodo} onChange={function(e){ setTettoPeriodo(e.target.value); }} style={{ padding:"6px" }}>
-                <option value="scolastico">Anno scolastico (1/9 → 31/8)</option>
-                <option value="civile">Anno civile (1/1 → 31/12)</option>
-              </select></div>
+          <label style={{ fontWeight:800 }}>🎯 Tetto annuo (monte ore massimo) — facoltativo</label>
+          <div style={{ fontSize:"12px", color:"#334155", margin:"4px 0 6px", lineHeight:1.5 }}>
+            È il <b>numero massimo di ore</b> che questa persona può fare in un anno. Nella scheda del mese comparirà una barra che dice <b>quante ne restano</b>.<br/>
+            Se non ti serve, <b>lascia la lista vuota</b>.
+          </div>
+          <div style={{ fontSize:"12px", color:"#1e3a8a", background:"#dbeafe", border:"1px dashed #93c5fd", borderRadius:"8px", padding:"6px 10px", margin:"0 0 8px", lineHeight:1.5 }}>
+            💡 Il tetto <b>può cambiare di anno in anno</b>. Scrivi un valore per ogni anno in cui cambia: vale da quell'anno in poi finché non ne metti un altro.<br/>
+            Esempio: <b>500 dal 2024</b>, poi <b>550 dal 2026</b> → nel 2024 e 2025 vale 500, dal 2026 vale 550.<br/>
+            Se lasci l'anno <b>vuoto</b>, quel valore vale <b>da sempre</b> (punto di partenza).
+          </div>
+          <div style={{ marginBottom:"6px" }}>
+            <div style={{ fontSize:"11px", fontWeight:700, marginBottom:"2px" }}>Periodo dell'anno</div>
+            <select value={tettoPeriodo} onChange={function(e){ setTettoPeriodo(e.target.value); }} style={{ padding:"6px" }}>
+              <option value="scolastico">Anno scolastico (1/9 → 31/8)</option>
+              <option value="civile">Anno civile (1/1 → 31/12)</option>
+            </select>
+          </div>
+          {tetti.length === 0 ? <div style={{ fontSize:"12px", color:"#64748b", margin:"4px 0" }}>Nessun tetto impostato.</div> :
+            <div style={{ margin:"6px 0" }}>
+              {tetti.map(function(tt, i){ return (
+                <div key={i} style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"4px", fontSize:"13px" }}>
+                  <span style={{ fontWeight:700 }}>🎯 {tettoRowLabel(tt)}</span>
+                  <button className="voce-del" title="Rimuovi questo tetto" onClick={function(){ delTetto(i); }}>✕</button>
+                </div>
+              ); })}
+            </div>}
+          <div style={{ display:"flex", gap:"8px", alignItems:"end", flexWrap:"wrap", marginTop:"4px" }}>
+            <div><div style={{ fontSize:"11px", fontWeight:700, marginBottom:"2px" }}>Ore (tetto)</div>
+              <input value={ntTettoOre} onChange={function(e){ setNtTettoOre(e.target.value); }} placeholder="es. 500" inputMode="decimal"
+                onKeyDown={function(e){ if (e.key === "Enter"){ e.preventDefault(); addTetto(); } }}
+                style={{ width:"120px", padding:"6px", border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px" }} /></div>
+            <div><div style={{ fontSize:"11px", fontWeight:700, marginBottom:"2px" }}>Dall'anno (vuoto = da sempre)</div>
+              <input value={ntTettoAnno} onChange={function(e){ setNtTettoAnno(e.target.value.replace(/[^0-9]/g,"").slice(0,4)); }} placeholder="es. 2026" inputMode="numeric"
+                onKeyDown={function(e){ if (e.key === "Enter"){ e.preventDefault(); addTetto(); } }}
+                style={{ width:"120px", padding:"6px", border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px" }} /></div>
+            <button className="btn btn-blue" onClick={addTetto}>+ Aggiungi tetto</button>
           </div>
         </div>
         <div className="field" style={{ background:"#fff7ed", border:"1px solid #fed7aa", borderRadius:"8px", padding:"10px" }}>
@@ -2052,6 +2168,11 @@ function QueryPanel(props){
   const annoDefault = (state.anni && state.anni.length) ? state.anni[state.anni.length-1] : now.getFullYear();
   const [cAnno, setCAnno] = useState(String(annoDefault));
   const [openCell, setOpenCell] = useState("");
+  const [sFromM, setSFromM] = useState("10");
+  const [sFromY, setSFromY] = useState("2026");
+  const [sToM, setSToM] = useState(String(now.getMonth()+1));
+  const [sToY, setSToY] = useState(String(now.getFullYear()));
+  const [fAnno, setFAnno] = useState(String(now.getFullYear()-1));
   const dips = dipSorted(state);
   const tipoLabel = function(t){ return String(t)==="determinato" ? "Determinato" : "Indeterminato"; };
   const nomeOf = function(dp){ return dp.nome || (dp.ana ? ((dp.ana.cognome||"")+" "+(dp.ana.nome||"")).trim() : ""); };
@@ -2090,6 +2211,23 @@ function QueryPanel(props){
   const namesFor = function(kind, t){ if(kind==="pro") return proroEventsC.map(function(e){ return nomeOf(e.dp)+" ("+e.d+")"; }); if(kind==="tra") return trasfEventsC.map(function(e){ return nomeOf(e.dp)+" ("+e.d+")"; }); const arr = kind==="ent"?enteredC:exitedC; const f = t==="all"?arr:byTipo(arr,t); return f.map(nomeOf); };
   function expC(){ const aoa=[["MOVIMENTI ANNO "+Y],[],["","DETERMINATI","INDETERMINATI","TOTALE"],["Entrati", cell(enteredC,"determinato"), cell(enteredC,"indeterminato"), enteredC.length],["Usciti", cell(exitedC,"determinato"), cell(exitedC,"indeterminato"), exitedC.length],["Proroghe","","",proroEventsC.length],["Trasformazioni","","",trasfEventsC.length],["Saldo", cell(enteredC,"determinato")-cell(exitedC,"determinato"), cell(enteredC,"indeterminato")-cell(exitedC,"indeterminato"), enteredC.length-exitedC.length]]; aoa.push([]); aoa.push(["ENTRATI"]); enteredC.forEach(function(dp){ aoa.push([nomeOf(dp), tipoLabel(tipoNow(dp)), intToIt(assunzInt(dp))]); }); aoa.push([]); aoa.push(["USCITI"]); exitedC.forEach(function(dp){ aoa.push([nomeOf(dp), tipoLabel(tipoNow(dp)), intToIt(effEndInt(dp))]); }); aoa.push([]); aoa.push(["PROROGHE"]); proroEventsC.forEach(function(e){ aoa.push([nomeOf(e.dp), tipoLabel(tipoNow(e.dp)), e.d]); }); aoa.push([]); aoa.push(["TRASFORMAZIONI"]); trasfEventsC.forEach(function(e){ aoa.push([nomeOf(e.dp), tipoLabel(tipoNow(e.dp)), e.d]); }); if(missC.length){ aoa.push([]); aoa.push(["DATA ASSUNZIONE MANCANTE (non conteggiati)"]); missC.forEach(function(dp){ aoa.push([nomeOf(dp)]); }); } qExport("Query - Movimenti "+Y+".xlsx", aoa); }
 
+  // --- Straordinario (base mensile): totale ore in più / in meno per persona su periodo (mesi >= ottobre 2026) ---
+  const sFromYM = (parseInt(sFromY,10)||0)*100 + (parseInt(sFromM,10)||0);
+  const sToYM = (parseInt(sToY,10)||0)*100 + (parseInt(sToM,10)||0);
+  const okS = sFromYM>=200001 && sToYM>=200001 && sFromYM<=sToYM;
+  const rowsS = okS ? dips.map(function(dp){ const r=straoRange(state,dp,sFromYM,sToYM); return { nome:nomeOf(dp), piu:r.piu, meno:r.meno }; }) : [];
+  const totSPiu = rowsS.reduce(function(a,r){ return a+r.piu; },0);
+  const totSMeno = rowsS.reduce(function(a,r){ return a+r.meno; },0);
+  const sLabel = function(ym){ return MONTH_LABEL[(ym%100)-1]+" "+Math.floor(ym/100); };
+  function expS(){ const aoa=[["STRAORDINARIO (base mensile) — da "+sLabel(sFromYM)+" a "+sLabel(sToYM)],["Conteggiati solo i mesi da ottobre 2026 in poi. Ore in più = straordinario pagato; ore in meno = ore tolte. Nessuna compensazione tra i due."],[],["COGNOME NOME","ORE IN PIU' (STRAORDINARIO)","ORE IN MENO"]]; rowsS.forEach(function(r){ aoa.push([r.nome, Math.round(r.piu*1000)/1000, Math.round(r.meno*1000)/1000]); }); aoa.push([]); aoa.push(["TOTALE COMPLESSIVO", Math.round(totSPiu*1000)/1000, Math.round(totSMeno*1000)/1000]); qExport("Query - Straordinario "+sLabel(sFromYM).replace(/ /g,"-")+"_"+sLabel(sToYM).replace(/ /g,"-")+".xlsx", aoa); }
+
+  // --- Ferie da smaltire: residuo (26 GG/anno, 2,1666 GG/mese sui mesi lavorati) per l'anno scelto ---
+  const fY = parseInt(fAnno,10)||0;
+  const fHasData = fY>0 && annoHasData(state, fY);
+  const rowsF = fY>0 ? dips.map(function(dp){ const mat=ferieMaturato(dp,fY), god=ferieGodute(state,dp,fY), res=Math.round((mat-god)*1000)/1000; return { nome:nomeOf(dp), mat:mat, god:god, res:res }; }) : [];
+  const daSmaltire = rowsF.filter(function(r){ return r.res>0.0005; });
+  function expF(){ const aoa=[["FERIE DA SMALTIRE — anno "+fY+" (verifica al 30 aprile "+(fY+1)+")"],["26 GG annui = 2,1666 GG/mese riproporzionati sui mesi in forza. Residuo = maturate − godute. In rosso chi ha residuo > 0."],[],["COGNOME NOME","FERIE MATURATE (GG)","FERIE GODUTE (GG)","RESIDUO DA SMALTIRE (GG)"]]; rowsF.forEach(function(r){ aoa.push([r.nome, Math.round(r.mat*1000)/1000, r.god, Math.round(r.res*1000)/1000]); }); qExport("Query - Ferie da smaltire "+fY+".xlsx", aoa); }
+
   return (
     <div style={{ padding:"14px" }}>
       <div style={{ display:"flex", alignItems:"center", gap:"10px", marginBottom:"12px" }}>
@@ -2100,6 +2238,8 @@ function QueryPanel(props){
         {modeBtn("forza","📅 In forza alla data")}
         {modeBtn("totale","➕ Totale su intervallo")}
         {modeBtn("movimenti","🔄 Movimenti nell'anno")}
+        {modeBtn("strao","⚡ Straordinario")}
+        {modeBtn("ferie","🏖️ Ferie da smaltire")}
       </div>
 
       {mode==="forza" ? (
@@ -2180,6 +2320,59 @@ function QueryPanel(props){
           </div>
           {openCell ? (function(){ const parts=openCell.split("|"); const kind=parts[0], t=parts[1]; const names=namesFor(kind,t); return <div style={{ background:"#f8fafc", border:"1px solid #e2e8f0", borderRadius:"8px", padding:"10px", fontSize:"13px" }}><b>{(kind==="ent"?"Entrati":kind==="usc"?"Usciti":kind==="pro"?"Proroghe":"Trasformazioni") + ((kind==="pro"||kind==="tra")?"":(t==="all"?" — Totale":(t==="determinato"?" — Determinati":" — Indeterminati")))}:</b> {names.length?names.join(", "):"nessuno"}</div>; })() : null}
           {missC.length ? <div style={{ marginTop:"8px", fontSize:"12px", color:"#92400e" }}>⚠️ Senza data assunzione (non conteggiati): {missC.map(nomeOf).join(", ")}</div> : null}
+        </div>
+      ) : null}
+
+      {mode==="strao" ? (
+        <div>
+          <div style={{ fontSize:"12px", color:"#334155", background:"#fff7ed", border:"1px dashed #fb923c", borderRadius:"8px", padding:"8px 12px", marginBottom:"12px", lineHeight:1.5 }}>
+            Totale delle <b>ore in più</b> (straordinario pagato) e delle <b>ore in meno</b> per persona, nel periodo scelto. Si contano <b>solo i mesi da ottobre 2026</b> in poi; ogni mese fa storia a sé e <b>non c'è compensazione</b> tra ore in più e ore in meno.
+          </div>
+          <div style={{ display:"flex", alignItems:"flex-end", gap:"10px", flexWrap:"wrap", marginBottom:"12px" }}>
+            <div><div style={{ fontSize:"12px", fontWeight:700, marginBottom:"3px" }}>Da — mese</div><select value={sFromM} onChange={function(e){ setSFromM(e.target.value); }} style={yInput}>{MONTH_LABEL.map(function(l,i){ return <option key={i} value={String(i+1)}>{l}</option>; })}</select></div>
+            <div><div style={{ fontSize:"12px", fontWeight:700, marginBottom:"3px" }}>Da — anno</div><input value={sFromY} onChange={function(e){ setSFromY(e.target.value.replace(/[^0-9]/g,"").slice(0,4)); }} inputMode="numeric" style={Object.assign({},yInput,{width:"90px"})} /></div>
+            <div><div style={{ fontSize:"12px", fontWeight:700, marginBottom:"3px" }}>A — mese</div><select value={sToM} onChange={function(e){ setSToM(e.target.value); }} style={yInput}>{MONTH_LABEL.map(function(l,i){ return <option key={i} value={String(i+1)}>{l}</option>; })}</select></div>
+            <div><div style={{ fontSize:"12px", fontWeight:700, marginBottom:"3px" }}>A — anno</div><input value={sToY} onChange={function(e){ setSToY(e.target.value.replace(/[^0-9]/g,"").slice(0,4)); }} inputMode="numeric" style={Object.assign({},yInput,{width:"90px"})} /></div>
+            {okS ? <button className="btn btn-blue" onClick={expS}>⬇️ Esporta Excel</button> : null}
+          </div>
+          {!okS ? <div style={{ color:"#dc2626", fontSize:"13px" }}>Periodo non valido: il mese iniziale deve precedere (o essere uguale a) quello finale.</div> :
+           <div>
+             <div style={{ display:"flex", gap:"10px", flexWrap:"wrap", marginBottom:"10px" }}>
+               <div style={{ background:"#b45309", color:"#fff", padding:"8px 14px", borderRadius:"8px", fontWeight:700 }}>Totale ore in più (straordinario): {fmt3(totSPiu)} h</div>
+               <div style={{ background:"#475569", color:"#fff", padding:"8px 14px", borderRadius:"8px", fontWeight:700 }}>Totale ore in meno: {fmt3(totSMeno)} h</div>
+             </div>
+             <div style={{ overflowX:"auto", border:"1px solid #e2e8f0", borderRadius:"8px" }}>
+               <table style={{ borderCollapse:"collapse", width:"100%", minWidth:"520px" }}>
+                 <thead><tr><th style={th}>Cognome Nome</th><th style={Object.assign({},th,{textAlign:"right"})}>Ore in più (straordinario)</th><th style={Object.assign({},th,{textAlign:"right"})}>Ore in meno</th></tr></thead>
+                 <tbody>{rowsS.map(function(r,i){ return <tr key={i}><td style={td}>{r.nome}</td><td style={Object.assign({},td,{textAlign:"right",fontWeight:700,color:r.piu>0.0005?"#b45309":"#94a3b8"})}>{fmt3(r.piu)}</td><td style={Object.assign({},td,{textAlign:"right",fontWeight:700,color:r.meno>0.0005?"#475569":"#94a3b8"})}>{fmt3(r.meno)}</td></tr>; })}</tbody>
+               </table>
+             </div>
+           </div>}
+        </div>
+      ) : null}
+
+      {mode==="ferie" ? (
+        <div>
+          <div style={{ fontSize:"12px", color:"#334155", background:"#fff7ed", border:"1px dashed #fb923c", borderRadius:"8px", padding:"8px 12px", marginBottom:"12px", lineHeight:1.5 }}>
+            Residuo ferie per l'anno scelto: <b>26 GG annui</b> = 2,1666 GG/mese riproporzionati sui mesi in forza. <b>Residuo = maturate − godute</b> (un giorno "FERIE" nel foglio = 1 GG). Al <b>30 aprile</b> si controlla l'anno <b>precedente</b>, per far godere il residuo in tempo.
+          </div>
+          <div style={{ display:"flex", alignItems:"flex-end", gap:"10px", flexWrap:"wrap", marginBottom:"12px" }}>
+            <div><div style={{ fontSize:"12px", fontWeight:700, marginBottom:"3px" }}>Anno da controllare</div><input value={fAnno} onChange={function(e){ setFAnno(e.target.value.replace(/[^0-9]/g,"").slice(0,4)); }} inputMode="numeric" style={Object.assign({},yInput,{width:"100px"})} /></div>
+            {fY>0 ? <button className="btn btn-blue" onClick={expF}>⬇️ Esporta Excel</button> : null}
+          </div>
+          {!(fY>0) ? <div style={{ color:"#dc2626", fontSize:"13px" }}>Inserisci l'anno da controllare.</div> :
+           <div>
+             {!fHasData ? <div style={{ fontSize:"12px", color:"#92400e", marginBottom:"8px" }}>⚠️ L'anno {fY} non ha dati nel programma: i "godute" risultano 0, quindi il residuo potrebbe non essere attendibile.</div> : null}
+             <div style={{ display:"flex", gap:"10px", flexWrap:"wrap", marginBottom:"10px" }}>
+               <div style={{ background:"#dc2626", color:"#fff", padding:"8px 14px", borderRadius:"8px", fontWeight:700 }}>Con ferie da smaltire: {daSmaltire.length}</div>
+             </div>
+             <div style={{ overflowX:"auto", border:"1px solid #e2e8f0", borderRadius:"8px" }}>
+               <table style={{ borderCollapse:"collapse", width:"100%", minWidth:"560px" }}>
+                 <thead><tr><th style={th}>Cognome Nome</th><th style={Object.assign({},th,{textAlign:"right"})}>Maturate (GG)</th><th style={Object.assign({},th,{textAlign:"right"})}>Godute (GG)</th><th style={Object.assign({},th,{textAlign:"right"})}>Residuo da smaltire (GG)</th></tr></thead>
+                 <tbody>{rowsF.map(function(r,i){ const flag=r.res>0.0005; return <tr key={i} style={flag?{background:"#fee2e2"}:undefined}><td style={Object.assign({},td,flag?{fontWeight:800,color:"#991b1b"}:undefined)}>{r.nome}</td><td style={Object.assign({},td,{textAlign:"right"})}>{fmt2(r.mat)}</td><td style={Object.assign({},td,{textAlign:"right"})}>{r.god}</td><td style={Object.assign({},td,{textAlign:"right",fontWeight:800,color:flag?"#dc2626":"#94a3b8"})}>{flag?fmt2(r.res):"0,00"}</td></tr>; })}</tbody>
+               </table>
+             </div>
+           </div>}
         </div>
       ) : null}
     </div>
@@ -2618,40 +2811,6 @@ function Login(props){
 }
 
 /* ===================== APP ===================== */
-/* ===== Confronto non vincolante con l'app "Fogli ore" (SOLA LETTURA) =====
-   La app Dipendenti e la app Fogli ore condividono lo stesso progetto Firebase
-   (spazio-ireos-foglio-ore): da qui possiamo LEGGERE le collection users/timesheets.
-   Non si scrive MAI nei dati di Fogli ore. L'inserimento resta manuale e primario;
-   questo serve solo a mostrare un avviso in caso di scostamento, ignorabile. */
-function foNorm(s){ return String(s==null?"":s).trim().toUpperCase().replace(/\s+/g," "); }
-function foFmt(n){ return (Math.round((n||0)*100)/100).toFixed(2).replace(".",","); }
-function foParseT(s){ var m=String(s==null?"":s).trim().match(/^(\d{1,2}):(\d{2})$/); if(!m) return null; return parseInt(m[1],10)+parseInt(m[2],10)/60; }
-function foPairSum(e,pairs){ var t=0; for(var i=0;i<pairs.length;i++){ var a=foParseT(e[pairs[i][0]]), b=foParseT(e[pairs[i][1]]); if(a!=null&&b!=null&&b>a) t+=(b-a); } return t; }
-function foDayAbsence(e){ if(!e) return ""; return String(e.absence||e.assenza||"").trim().toUpperCase(); }
-function foDayHours(e){ if(!e||foDayAbsence(e)) return 0; return foPairSum(e,[["t1f","t1t"],["t2f","t2t"],["t3f","t3t"],["t4f","t4t"]]) + foPairSum(e,[["iF","iT"],["iF2","iT2"]]); }
-var FO_ABS_MAP = { "FERIE":"FERIE", "MALATTIA":"MAL", "MALATTIA FIGLIO":"MALFG", "PERM. ELETTORALE":"ELEZ", "PERM. LUTTO":"LUTTO", "ALTRO AUTORIZ.":"" };
-function foAbsToDip(a){ a=foNorm(a); return FO_ABS_MAP.hasOwnProperty(a)?FO_ABS_MAP[a]:""; }
-function foCompare(foRec, recDp, y, m){
-  var totDip = totOfRec(recDp, y, m);
-  var totFo = Math.round((foRec.total||0)*100)/100;
-  var out = { totDip: totDip, totFo: totFo, totDiff: Math.round((totDip-totFo)*100)/100, giorni: [] };
-  var nd = daysInMonth(y, m);
-  var gi = (recDp && recDp.giorni) ? recDp.giorni : {};
-  for (var d=1; d<=nd; d++){
-    var sVal = String(gi[d]==null?"":gi[d]).trim();
-    var dipNum = sVal!=="" && /^[0-9]/.test(sVal) && !isNaN(parseFloat(sVal.replace(",",".")));
-    var dipAbs = (sVal!=="" && !dipNum) ? sVal.toUpperCase() : "";
-    var foDay = foRec.days[d] || null;
-    var foAbs = foDay ? (foDay.abs||"") : "";
-    if (!dipAbs && !foAbs) continue;            // nessuna assenza da nessuna parte: non confrontiamo il giorno
-    var agree = false;
-    if (dipAbs && foAbs){ var exp = foAbsToDip(foAbs); agree = !exp || dipAbs.indexOf(exp)===0; }
-    if (agree) continue;
-    out.giorni.push({ d:d, dip: dipAbs || (sVal!==""?(sVal+" h"):"—"), fo: foAbs || (foDay && foDay.h>0 ? (foFmt(foDay.h)+" h") : "—") });
-  }
-  return out;
-}
-
 function App(){
   const [authState, setAuthState] = useState(FB_READY ? "checking" : "gate");
   const [denied, setDenied] = useState("");
@@ -2678,7 +2837,6 @@ function App(){
   const [exportModal, setExportModal] = useState(null);
   const [quickFill, setQuickFill] = useState(null);
   const fileRef = useRef(null); const dbRef = useRef(null); const uidRef = useRef(null); const preImportRef = useRef(null);
-  const [foData, setFoData] = useState(null); const [foStatus, setFoStatus] = useState("");
 
   useEffect(function(){
     if (!FB_READY){ const loc = loadLocal(); const st = migrate(loc || emptyState()); setState(st); if (st.anni && st.anni.length) setAnno(st.anni[st.anni.length-1]); return; }
@@ -2705,32 +2863,6 @@ function App(){
   const fset = useMemo(function(){ return festivitaSet(anno); }, [anno]);
   const mese = vista.charAt(0) === "m" ? parseInt(vista.slice(1),10) : null;
   const showToast = function(msg, warn){ setToast({ msg:msg, warn:!!warn }); };
-
-  // Carica (SOLA LETTURA) le ore compilate in "Fogli ore" per il mese corrente, per il confronto non vincolante.
-  useEffect(function(){
-    if (!FB_READY || authState !== "in" || !dbRef.current || !mese){ setFoData(null); setFoStatus(""); return; }
-    const y = anno, m = mese; let cancelled = false; const db = dbRef.current;
-    setFoStatus("loading");
-    Promise.all([ db.collection("users").get(), db.collection("timesheets").where("year","==",y).get() ]).then(function(res){
-      if (cancelled) return;
-      const uidName = {};
-      res[0].forEach(function(doc){ const u = doc.data() || {}; const nm = u.name || (((u.cognome||"")+" "+(u.nome||"")).trim()); uidName[doc.id] = foNorm(nm); });
-      const byName = {};
-      res[1].forEach(function(doc){ const t = doc.data() || {}; if (t.month !== m) return; const nn = uidName[t.workerUid]; if (!nn) return;
-        if (!byName[nn]) byName[nn] = { total:0, days:{} };
-        const days = t.days || {};
-        for (const k in days){ if (!days.hasOwnProperty(k)) continue; const dn = parseInt(k,10); if (!dn) continue; const e = days[k];
-          if (!byName[nn].days[dn]) byName[nn].days[dn] = { h:0, abs:"" };
-          const abs = foDayAbsence(e);
-          if (abs){ byName[nn].days[dn].abs = abs; }
-          else { const h = foDayHours(e); if (h>0){ byName[nn].days[dn].h += h; byName[nn].total += h; } }
-        }
-      });
-      for (const nn in byName){ byName[nn].total = Math.round(byName[nn].total*100)/100; }
-      setFoData(byName); setFoStatus("ok");
-    }).catch(function(e){ if (cancelled) return; console.error("Confronto Fogli ore non riuscito:", e); setFoData(null); setFoStatus("blocked"); });
-    return function(){ cancelled = true; };
-  }, [anno, mese, authState]);
 
   const onCell = function(dipId, day, value){
     const next = JSON.parse(JSON.stringify(state)); const mk = monthKey(anno, mese);
@@ -3045,7 +3177,6 @@ function App(){
           <div>
             <div className="toolbar">
               <strong style={{ fontSize:"15px", color:"#DE4C8A" }}>{MONTH_LABEL[mese-1]} {anno}</strong>
-              {foStatus === "blocked" ? <span style={{ fontSize:"12px", color:"#b45309", marginLeft:"8px" }}>⚠️ confronto Fogli ore non disponibile (permessi Firestore)</span> : null}
               {mLocked ? <span className="lock-badge">🔒 Mese bloccato</span> : null}
               <div className="spacer"></div>
               <button className={"btn " + (mLocked ? "btn-red" : "btn-gray")} title={mLocked ? "Sblocca il mese per poterlo modificare" : "Blocca il mese: nessuna cella potrà più essere modificata"}
@@ -3068,31 +3199,15 @@ function App(){
                 const dipList = state.dipendenti.filter(function(x){ return x.id !== dp.id; }).map(function(x){ return x.nome; }).sort(function(a,b){ return a.localeCompare(b); });
                 const saldoP = saldoPrec(state, anno, mese, dp.id);
                 const bancaP = dp.mensilizzato ? bancaPrecA(state, dp, anno, mese) : 0;
-                const tettoNum = parseFloat(String(dp.tettoAnnuo==null?"":dp.tettoAnnuo).replace(",","."));
+                const tettoNum = tettoForPeriod(dp, anno, mese);
                 const tettoC = (!isNaN(tettoNum) && tettoNum>0) ? consumoTetto(state, dp, anno, mese) : 0;
-                const foRec = (foData && dp.nome) ? foData[foNorm(dp.nome)] : null;
-                const foCmp = foRec ? foCompare(foRec, recDp, anno, mese) : null;
-                const foShow = foCmp && (Math.abs(foCmp.totDiff) > 0.01 || foCmp.giorni.length > 0);
-                const card = <EmployeeCard key={dp.id} dp={dp} rec={recDp} fuoriPeriodo={fuoriPeriodo} anno={anno} mese={mese} fset={fset} mLocked={mLocked}
+                const ferieApr = (mese===4) ? { year:anno-1, mat:ferieMaturato(dp,anno-1), god:ferieGodute(state,dp,anno-1), res:ferieResiduo(state,dp,anno-1), noData:!annoHasData(state,anno-1) } : null;
+                return <EmployeeCard key={dp.id} dp={dp} rec={recDp} fuoriPeriodo={fuoriPeriodo} anno={anno} mese={mese} fset={fset} mLocked={mLocked}
                   dipList={dipList} onCell={onCell} onNota={onNota} onFestConfirm={onFestConfirm} onQuickFill={onQuickFill}
-                  onVoceSet={onVoceSet} onVoceAdd={onVoceAdd} onVoceDel={onVoceDel}
+                  onVoceSet={onVoceSet} onVoceAdd={onVoceAdd} onVoceDel={onVoceDel} ferieApr={ferieApr}
                   onDich={onDich} onSvuotaMese={onSvuotaMese} saldoPrec={saldoP} bancaPrec={bancaP} tettoConsumo={tettoC} onAzzeraSaldo={onAzzeraSaldo} onAnnullaAzzera={onAnnullaAzzera}
                   onSostAdd={onSostAdd} onSostChange={onSostChange} onSostDel={onSostDel} onOpenPerm={onOpenPerm}
                   onEditDip={function(d){ setDipModal({ dip:d }); }} onDelDip={askDelDip} />;
-                if (!foShow) return card;
-                return <React.Fragment key={dp.id}>
-                  <div style={{ margin:"8px 0 0", padding:"8px 12px", background:"#fff7ed", border:"1px solid #fed7aa", borderLeft:"4px solid #f59e0b", borderRadius:"8px", color:"#7c2d12", fontSize:"13px", lineHeight:"1.45" }}>
-                    <strong>⚠️ Confronto Fogli ore — {dp.nome}:</strong>{" "}
-                    {Math.abs(foCmp.totDiff) > 0.01
-                      ? ("totale del mese diverso — tu " + foFmt(foCmp.totDip) + " h · Fogli ore " + foFmt(foCmp.totFo) + " h")
-                      : "totale del mese coincide"}
-                    {foCmp.giorni.length
-                      ? (" · giorni con assenza da controllare: " + foCmp.giorni.map(function(g){ return g.d + " (tu: " + (g.dip||"—") + " / Fogli ore: " + (g.fo||"—") + ")"; }).join(", "))
-                      : ""}
-                    {" "}— è solo un avviso, puoi ignorarlo.
-                  </div>
-                  {card}
-                </React.Fragment>;
               })
             }
             <div className="legend">
