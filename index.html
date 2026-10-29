@@ -23,6 +23,7 @@
   .app-header { background:#DE4C8A; color:#fff; padding:10px 18px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; position:sticky; top:0; z-index:50; box-shadow:0 2px 6px rgba(0,0,0,.15); }
   .app-header h1 { font-size:17px; margin:0; font-weight:800; letter-spacing:.3px; }
   .app-header .sub { font-size:11px; opacity:.7; }
+  .app-rev { font-size:11px; font-weight:700; letter-spacing:.3px; line-height:1.2; color:rgba(255,255,255,.95); background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.24); border-radius:8px; padding:3px 8px; white-space:nowrap; align-self:center; }
   .spacer { flex:1; }
   .btn { border:none; border-radius:8px; padding:8px 13px; font-family:inherit; font-weight:700; font-size:13px; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
   .btn:disabled { opacity:.5; cursor:not-allowed; }
@@ -209,6 +210,7 @@ const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
 const APP_VER = "ver60";
+const APP_REV = "rev 1 · 29ott26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
 const MESE_ABBR_FILE = ["gen","feb","mar","apr","mag","giu","lug","ago","set","ott","nov","dic"];
@@ -3320,6 +3322,7 @@ function App(){
 
       <div className="app-header">
         <div><h1>Spazio Ireos — Report Ore mensile</h1><div className="sub">{APP_VER}{FB_READY ? " · cloud" : " · locale"}</div></div>
+        <div className="app-rev" title="Revisione dell'app">{APP_REV}</div>
         <div className="yearbar">
           <button title="Anno precedente" onClick={function(){ if (state.anni.indexOf(anno-1)===-1) addAnno(-1); else setAnno(anno-1); }}>◀</button>
           <span className="yr">{anno}</span>
