@@ -1224,6 +1224,15 @@ function EmployeeCard(props){
         return <div style={{ background:"#dcfce7", borderBottom:"2px solid #16a34a", color:"#166534", fontSize:"12px", fontWeight:700, padding:"5px 10px" }}>✓ Ferie anno {f.year} in regola — nessun residuo (maturate {fmt2(f.mat)}, godute {fmt2(f.god)}).</div>;
       })() : null}
       {props.fuoriPeriodo ? <div style={{ background:"#fef3c7", borderBottom:"2px solid #f59e0b", color:"#92400e", fontSize:"12px", fontWeight:700, padding:"5px 10px" }}>⚠️ Mese fuori dal periodo di rapporto (prima dell'assunzione o dopo la cessazione), ma contiene ore già inserite: controlla e, se vanno tolte, usa 🧹 Pulisci ore dopo nella scheda (✎).</div> : null}
+      {props.fogliOre ? (function(){
+        const fo = props.fogliOre;
+        return <div style={{ background:"#fffbeb", borderLeft:"4px solid #f97316", borderBottom:"1px solid #fde68a", color:"#78350f", fontSize:"12px", fontWeight:600, padding:"6px 10px", lineHeight:"1.5" }}>
+          <b>ℹ️ Confronto con "Fogli ore"</b> — {dp.nome}
+          {fo.diffTot ? <span> · totale mese: tu: <b>{fmt2(fo.totMio)} h</b> · Fogli ore: <b>{fmt2(fo.totFo)} h</b></span> : null}
+          {fo.giorni.length > 0 ? <span> · giorni discordanti: {fo.giorni.map(function(g){ return g.g + " (tu: " + g.mio + " / Fogli ore: " + g.fo + ")"; }).join(" · ")}</span> : null}
+          <span style={{ fontWeight:500, fontStyle:"italic" }}> — è solo un avviso informativo e ignorabile: l'inserimento manuale resta quello valido.</span>
+        </div>;
+      })() : null}
       <div className="grid-wrap">
         <table className="cal"><tbody>
           <tr>
@@ -2810,6 +2819,165 @@ function Login(props){
   );
 }
 
+/* ===================== CONFRONTO CON L'APP "FOGLI ORE" (SOLA LETTURA) =====================
+   Questa app usa GIA' il progetto Firebase "spazio-ireos-foglio-ore", lo stesso dell'app
+   "Fogli ore": si riusa la connessione Firestore già aperta (dbRef) e si leggono SOLTANTO
+   le collection "users" e "timesheets". Non si scrive MAI nulla lì.
+   Il risultato è un AVVISO NON VINCOLANTE: l'inserimento manuale resta primario. */
+const FO_RUOLI = ["worker", "editor"];
+/* fasce orarie di Fogli ore: 4 dirette + 2 indirette */
+const FO_FASCE = [["t1f","t1t"], ["t2f","t2t"], ["t3f","t3t"], ["t4f","t4t"], ["iF","iT"], ["iF2","iT2"]];
+/* assenze di Fogli ore -> codici equivalenti di QUESTA app (null = qualunque assenza va bene) */
+const FO_ASSENZE = {
+  "FERIE":            ["FERIE"],
+  "MALATTIA":         ["MAL", "MAL 0H"],
+  "MALATTIA FIGLIO":  ["MALFG"],
+  "PERM. ELETTORALE": ["ELEZ"],
+  "PERM. LUTTO":      ["LUTTO"],
+  "ALTRO AUTORIZ.":   null
+};
+function foNorm(s){ return String(s === null || s === undefined ? "" : s).replace(/\s+/g, " ").trim().toUpperCase(); }
+/* "COGNOME NOME" dell'utente di Fogli ore: se cognome/nome mancano si ricava da name
+   (PRIMA parola = cognome, resto = nome) */
+function foNomeUtente(u){
+  const cog = foNorm(u.cognome), nom = foNorm(u.nome);
+  if (cog && nom) return cog + " " + nom;
+  const nm = foNorm(u.name);
+  if (nm){ const p = nm.split(" "); return p.length > 1 ? (p[0] + " " + p.slice(1).join(" ")) : nm; }
+  return cog || nom || "";
+}
+/* parser orario TOLLERANTE (equivalente a quello di Fogli ore) -> minuti dalla mezzanotte, null se non valido.
+   Accetta "9:00", "09:00", "14.30", "14h30", "900" (=09:00), "130" (=01:30), "9" (=09:00). */
+function foParseMin(v){
+  if (v === null || v === undefined) return null;
+  const s = String(v).trim().toLowerCase().replace(/\s+/g, "");
+  if (s === "") return null;
+  let h = null, mi = null, mm = null;
+  if ((mm = s.match(/^(\d{1,2})[:.,h;'](\d{1,2})$/))){ h = parseInt(mm[1], 10); mi = parseInt(mm[2], 10); }
+  else if ((mm = s.match(/^(\d{3,4})$/))){ h = parseInt(mm[1].slice(0, mm[1].length - 2), 10); mi = parseInt(mm[1].slice(-2), 10); }
+  else if ((mm = s.match(/^(\d{1,2})[:.,h;']?$/))){ h = parseInt(mm[1], 10); mi = 0; }
+  else return null;
+  if (isNaN(h) || isNaN(mi) || h < 0 || h > 24 || mi < 0 || mi > 59) return null;
+  const t = h * 60 + mi;
+  return (t < 0 || t > 1440) ? null : t;
+}
+/* ore lavorate in un giorno = somma, su tutte le fasce dirette e indirette, di (fine - inizio) */
+function foOreEntry(e){
+  if (!e || typeof e !== "object") return 0;
+  let tot = 0;
+  for (let i = 0; i < FO_FASCE.length; i++){
+    const a = foParseMin(e[FO_FASCE[i][0]]), b = foParseMin(e[FO_FASCE[i][1]]);
+    if (a === null || b === null) continue;
+    if (b > a) tot += (b - a) / 60;
+  }
+  return tot;   /* perm / spole / pausa / nonImp NON sono ore lavorate: ignorati */
+}
+/* aggrega i documenti timesheets di UNA persona per UN mese (uno per servizio: vanno sommati).
+   L'assenza è scritta su TUTTI i servizi del giorno: va contata UNA SOLA VOLTA e vale 0 ore. */
+function foAggregaMese(daysList){
+  const ore = {}, ass = {};
+  (daysList || []).forEach(function(days){
+    if (!days || typeof days !== "object") return;
+    Object.keys(days).forEach(function(k){
+      const d = parseInt(k, 10);
+      if (isNaN(d) || d < 1 || d > 31) return;
+      const e = days[k];
+      if (!e || typeof e !== "object") return;
+      const ab = foNorm(e.absence);
+      if (ab !== ""){ if (!ass[d]) ass[d] = ab; return; }
+      ore[d] = (ore[d] || 0) + foOreEntry(e);
+    });
+  });
+  let tot = 0;
+  Object.keys(ore).forEach(function(d){ if (!ass[d]) tot += ore[d]; });
+  return { tot: Math.round(tot * 100) / 100, ore: ore, ass: ass };
+}
+/* codice-assenza di QUESTA app per una cella: null se vuota, numerica, "--" o "AN" */
+function foCodiceMio(v){
+  const s = String(v === null || v === undefined ? "" : v).trim();
+  if (s === "" || s === "--" || s === "AN" || !CODE_SET[s]) return null;
+  return s;
+}
+function foAssenzeCompatibili(absFogliOre, codiceMio){
+  const a = foNorm(absFogliOre);
+  if (!Object.prototype.hasOwnProperty.call(FO_ASSENZE, a)) return true;   /* codice non previsto: non facciamo le pulci */
+  const lista = FO_ASSENZE[a];
+  if (lista === null) return true;                                          /* "ALTRO AUTORIZ.": basta che ci sia un'assenza */
+  return lista.indexOf(foNorm(codiceMio)) !== -1;
+}
+/* confronto di un dipendente per il mese: null se tutto combacia (nessun avviso da mostrare) */
+function foConfronta(rec, y, m, agg){
+  const totMio = totOfRec(rec, y, m);
+  const totFo = agg.tot;
+  const diffTot = Math.abs(totMio - totFo) > 0.01;
+  const giorni = [];
+  const nd = daysInMonth(y, m);
+  const gg = (rec && rec.giorni) ? rec.giorni : {};
+  for (let d = 1; d <= nd; d++){
+    const val = gg[d];
+    const mioCod = foCodiceMio(val);
+    const foAbs = agg.ass[d] ? agg.ass[d] : null;
+    if (!mioCod && !foAbs) continue;                 /* solo i giorni con assenza in almeno una delle due app */
+    const mieOre = parseHour(val);
+    const foOre = foAbs ? 0 : (agg.ore[d] || 0);
+    if (mioCod && foAbs){
+      if (!foAssenzeCompatibili(foAbs, mioCod)) giorni.push({ g:d, mio:mioCod, fo:foAbs });
+    } else if (mioCod){
+      if (foOre > 0.005) giorni.push({ g:d, mio:mioCod, fo:fmt2(foOre) + " h" });
+    } else {
+      if (mieOre > 0.005) giorni.push({ g:d, mio:fmt2(mieOre) + " h", fo:foAbs });
+    }
+  }
+  if (!diffTot && giorni.length === 0) return null;
+  return { totMio:totMio, totFo:totFo, diffTot:diffTot, giorni:giorni };
+}
+/* lettura utenti di Fogli ore (uid -> "COGNOME NOME"), solo ruoli che compilano i fogli ore */
+function foLeggiUtenti(db, cache){
+  if (cache.__users) return Promise.resolve(cache.__users);
+  return db.collection("users").get().then(function(us){
+    const map = {};
+    us.forEach(function(doc){
+      try {
+        const u = doc.data() || {};
+        if (FO_RUOLI.indexOf(String(u.role === null || u.role === undefined ? "" : u.role).trim().toLowerCase()) === -1) return;
+        const nome = foNomeUtente(u);
+        if (nome) map[doc.id] = nome;
+      } catch (e){ console.error("foLeggiUtenti", e); }
+    });
+    cache.__users = map;
+    return map;
+  });
+}
+/* lettura timesheets del mese: una query per anno (nessun indice composito) + filtro client su mese.
+   Ritorna { "COGNOME NOME": aggregato }. */
+function foLeggiMese(db, cache, y, m){
+  const key = "m" + y + "-" + m;
+  if (cache[key]) return Promise.resolve(cache[key]);
+  return foLeggiUtenti(db, cache).then(function(utenti){
+    return db.collection("timesheets").where("year", "==", y).get().then(function(ts){
+      if (ts.empty) return db.collection("timesheets").where("month", "==", m).get();   /* dati storici con "year" non numerico */
+      return ts;
+    }).then(function(ts){
+      const perUid = {};
+      ts.forEach(function(doc){
+        try {
+          const t = doc.data() || {};
+          if (String(t.year) !== String(y)) return;
+          if (parseInt(t.month, 10) !== m) return;
+          const u = String(t.workerUid === null || t.workerUid === undefined ? "" : t.workerUid).trim();
+          if (!u || !utenti[u]) return;
+          if (!perUid[u]) perUid[u] = [];
+          perUid[u].push(t.days);
+        } catch (e){ console.error("foLeggiMese", e); }
+      });
+      const perNome = {};
+      Object.keys(perUid).forEach(function(u){ perNome[utenti[u]] = foAggregaMese(perUid[u]); });
+      cache[key] = perNome;
+      return perNome;
+    });
+  });
+}
+
 /* ===================== APP ===================== */
 function App(){
   const [authState, setAuthState] = useState(FB_READY ? "checking" : "gate");
@@ -3109,6 +3277,28 @@ function App(){
     localStorage.setItem(LS_PIN, hashPin(String(nuovo).replace(/\D/g,""))); showToast("PIN aggiornato");
   };
 
+
+  /* ---- confronto NON VINCOLANTE con l'app "Fogli ore" (sola lettura, una lettura per mese/anno) ---- */
+  const [foData, setFoData] = useState(null);
+  const [foErr, setFoErr] = useState(false);
+  const foCacheRef = useRef({});
+  useEffect(function(){
+    let vivo = true;
+    setFoData(null);
+    if (!FB_READY || authState !== "in" || !dbRef.current || !mese) return function(){ vivo = false; };
+    try {
+      foLeggiMese(dbRef.current, foCacheRef.current, anno, mese).then(function(res){
+        if (!vivo) return;
+        setFoData(res); setFoErr(false);
+      }).catch(function(e){
+        console.error("confronto Fogli ore non disponibile", e);
+        if (vivo) setFoErr(true);
+      });
+    } catch (e){ console.error("confronto Fogli ore non disponibile", e); setFoErr(true); }
+    return function(){ vivo = false; };
+  }, [authState, anno, mese]);
+  const foPerNome = foData || null;
+
   if (FB_READY && authState === "checking") return <div style={{ padding:"40px", textAlign:"center" }}>Caricamento…</div>;
   if (FB_READY && denied) return (
     <div className="login-box">
@@ -3184,6 +3374,7 @@ function App(){
               <button className="btn btn-blue" disabled={mLocked} onClick={function(){ setDipModal({}); }}>+ Dipendente</button>
             </div>
             {mLocked ? <div className="lock-info">Questo mese è bloccato: le celle non sono modificabili. Premi "Sblocca mese" per riaprirlo.</div> : null}
+            {foErr ? <div style={{ background:"#f8fafc", border:"1px solid #e2e8f0", borderRadius:"8px", color:"#64748b", fontSize:"11px", padding:"4px 9px", margin:"6px 0", display:"inline-block" }}>confronto Fogli ore non disponibile (permessi)</div> : null}
             {state.dipendenti.length === 0 ?
               <div style={{ padding:"30px", textAlign:"center", color:"#64748b" }}>Nessun dipendente. Aggiungine uno o importa il file Excel.</div>
               :
@@ -3202,9 +3393,10 @@ function App(){
                 const tettoNum = tettoForPeriod(dp, anno, mese);
                 const tettoC = (!isNaN(tettoNum) && tettoNum>0) ? consumoTetto(state, dp, anno, mese) : 0;
                 const ferieApr = (mese===4) ? { year:anno-1, mat:ferieMaturato(dp,anno-1), god:ferieGodute(state,dp,anno-1), res:ferieResiduo(state,dp,anno-1), noData:!annoHasData(state,anno-1) } : null;
+                const foDiff = (function(){ try { if (!foPerNome) return null; const agg = foPerNome[foNorm(dp.nome)]; return agg ? foConfronta(recDp, anno, mese, agg) : null; } catch (e){ console.error("confronto Fogli ore", e); return null; } })();
                 return <EmployeeCard key={dp.id} dp={dp} rec={recDp} fuoriPeriodo={fuoriPeriodo} anno={anno} mese={mese} fset={fset} mLocked={mLocked}
                   dipList={dipList} onCell={onCell} onNota={onNota} onFestConfirm={onFestConfirm} onQuickFill={onQuickFill}
-                  onVoceSet={onVoceSet} onVoceAdd={onVoceAdd} onVoceDel={onVoceDel} ferieApr={ferieApr}
+                  onVoceSet={onVoceSet} onVoceAdd={onVoceAdd} onVoceDel={onVoceDel} ferieApr={ferieApr} fogliOre={foDiff}
                   onDich={onDich} onSvuotaMese={onSvuotaMese} saldoPrec={saldoP} bancaPrec={bancaP} tettoConsumo={tettoC} onAzzeraSaldo={onAzzeraSaldo} onAnnullaAzzera={onAnnullaAzzera}
                   onSostAdd={onSostAdd} onSostChange={onSostChange} onSostDel={onSostDel} onOpenPerm={onOpenPerm}
                   onEditDip={function(d){ setDipModal({ dip:d }); }} onDelDip={askDelDip} />;
