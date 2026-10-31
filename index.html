@@ -209,8 +209,8 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver61";
-const APP_DATA = "29ott26";
+const APP_VER = "ver62";
+const APP_DATA = "31ott26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
 const MESE_ABBR_FILE = ["gen","feb","mar","apr","mag","giu","lug","ago","set","ott","nov","dic"];
@@ -1452,266 +1452,7 @@ function EmployeeCard(props){
   );
 }
 
-function DipModal(props){
-  const editing = props.dip;
-  const [nome, setNome] = useState(editing ? editing.nome : "");
-  const [livello, setLivello] = useState(editing ? (editing.livello||"") : "");
-  const [ore, setOre] = useState(editing ? editing.oreSett : "");
-  const [tipo, setTipo] = useState(editing ? (editing.tipoContratto||"indeterminato") : "indeterminato");
-  const [scad, setScad] = useState(editing ? (editing.scadenza||"") : "");
-  const [proroghe, setProroghe] = useState(editing && Array.isArray(editing.proroghe) ? editing.proroghe.slice() : []);
-  const [nuovaPro, setNuovaPro] = useState("");
-  const addPro = function(){ const v = nuovaPro.trim(); if (v === "") return; setProroghe(proroghe.concat([v])); setNuovaPro(""); };
-  const delPro = function(i){ setProroghe(proroghe.filter(function(_, k){ return k !== i; })); };
-  const [trasf, setTrasf] = useState(editing && Array.isArray(editing.trasformazioni) ? editing.trasformazioni.map(function(t){ return typeof t==="string" ? { data:t } : Object.assign({}, t); }) : []);
-  const _now47 = new Date();
-  const [ntMese, setNtMese] = useState(String(_now47.getMonth()+1));
-  const [ntAnno, setNtAnno] = useState(String(_now47.getFullYear()));
-  const [ntLiv, setNtLiv] = useState("");
-  const [ntOre, setNtOre] = useState("");
-  const [ntIndet, setNtIndet] = useState(false);
-  const addTrasf = function(){
-    const mm=parseInt(ntMese,10), yy=parseInt(ntAnno,10);
-    if(!mm||mm<1||mm>12||!yy||yy<2000||yy>2100){ return; }
-    const rec={ data:"01/"+(mm<10?"0":"")+mm+"/"+yy };
-    if(ntLiv.trim()!=="") rec.livello=ntLiv.trim().toUpperCase();
-    const oreV=String(ntOre).replace(",",".").trim();
-    if(oreV!=="" && !isNaN(Number(oreV))) rec.oreSett=Number(oreV);
-    if(ntIndet) rec.toIndet=true;
-    if(!rec.livello && rec.oreSett==null && !rec.toIndet){ return; }
-    setTrasf(trasf.concat([rec]).sort(function(a,b){ return ymdIt(a.data)-ymdIt(b.data); }));
-    setNtLiv(""); setNtOre(""); setNtIndet(false);
-  };
-  const delTrasf = function(i){ setTrasf(trasf.filter(function(_, k){ return k !== i; })); };
-  const trasfSummary = function(t){ const parts=[]; if(t.toIndet) parts.push("→ a tempo indeterminato"); if(t.livello) parts.push("livello "+t.livello); if(t.oreSett!=null && String(t.oreSett)!=="") parts.push((Number.isInteger(Number(t.oreSett))?String(Number(t.oreSett)):fmt2(Number(t.oreSett)))+" h/sett"); return (parts.join(", ")||"nessuna modifica")+" — dal "+t.data; };
-  const [assunz, setAssunz] = useState(editing ? (editing.dataAssunzione||"") : "");
-  const [cess, setCess] = useState(editing ? (editing.dataCessazione||"") : "");
-  const [colore, setColore] = useState(editing ? (editing.colore||PALETTE[0]) : PALETTE[0]);
-  const [mensilizzato, setMensilizzato] = useState(editing ? !!editing.mensilizzato : false);
-  const _mdal = (editing && editing.mensilizzatoDal) ? ymdIt(editing.mensilizzatoDal) : 0;
-  const [mensMese, setMensMese] = useState(_mdal ? String(Math.floor((_mdal%10000)/100)) : String(_now47.getMonth()+1));
-  const [mensAnno, setMensAnno] = useState(_mdal ? String(Math.floor(_mdal/10000)) : String(_now47.getFullYear()));
-  const [tettoAnnuo, setTettoAnnuo] = useState(editing && editing.tettoAnnuo != null ? String(editing.tettoAnnuo) : "");
-  const [tettoPeriodo, setTettoPeriodo] = useState(editing && editing.tettoPeriodo === "civile" ? "civile" : "scolastico");
-  const [tetti, setTetti] = useState(function(){
-    const src = (editing && Array.isArray(editing.tettiAnnui)) ? editing.tettiAnnui : [];
-    const out = src.map(function(t){ return { anno: (t && t.anno!=null) ? String(t.anno) : "", ore: (t && t.ore!=null) ? String(t.ore) : "" }; });
-    // Se non c'è ancora lo storico ma c'è il vecchio tetto singolo, mostralo come riga baseline
-    if (out.length===0 && editing){
-      const ta = parseFloat(String(editing.tettoAnnuo==null?"":editing.tettoAnnuo).replace(",","."));
-      if (!isNaN(ta) && ta>0) out.push({ anno:"", ore:String(editing.tettoAnnuo) });
-    }
-    return out;
-  });
-  const [ntTettoAnno, setNtTettoAnno] = useState("");
-  const [ntTettoOre, setNtTettoOre] = useState("");
-  const addTetto = function(){
-    const oreV = String(ntTettoOre).replace(",",".").trim();
-    if (oreV==="" || isNaN(Number(oreV)) || Number(oreV)<=0) return;
-    const annoV = String(ntTettoAnno).replace(/[^0-9]/g,"").slice(0,4);
-    const rec = { anno: annoV, ore: String(ntTettoOre).trim() };
-    const next = tetti.concat([rec]).sort(function(a,b){ return (parseInt(a.anno,10)||0)-(parseInt(b.anno,10)||0); });
-    setTetti(next); setNtTettoAnno(""); setNtTettoOre("");
-  };
-  const delTetto = function(i){ setTetti(tetti.filter(function(_, k){ return k !== i; })); };
-  const tettoRowLabel = function(t){
-    const an = parseInt(t.anno,10)||0;
-    const lab = an>0 ? ("dal "+an+(tettoPeriodo==="civile"?"":"/"+(an+1))) : "da sempre (valore di partenza)";
-    return (Number.isInteger(Number(String(t.ore).replace(",",".")))?String(parseInt(String(t.ore).replace(",","."),10)):fmt2(Number(String(t.ore).replace(",",".")))) + " ore — " + lab;
-  };
-  const [orariTemp, setOrariTemp] = useState(editing && Array.isArray(editing.orariTemp) ? editing.orariTemp.map(function(w){ return Object.assign({}, w); }) : []);
-  const [otMeseI, setOtMeseI] = useState(String(_now47.getMonth()+1));
-  const [otAnnoI, setOtAnnoI] = useState(String(_now47.getFullYear()));
-  const [otMeseF, setOtMeseF] = useState(String(_now47.getMonth()+1));
-  const [otAnnoF, setOtAnnoF] = useState(String(_now47.getFullYear()));
-  const [otOre, setOtOre] = useState("");
-  const addOt = function(){
-    const mi=parseInt(otMeseI,10), yi=parseInt(otAnnoI,10), mf=parseInt(otMeseF,10), yf=parseInt(otAnnoF,10);
-    if(!mi||mi<1||mi>12||!yi||yi<2000||yi>2100) return;
-    if(!mf||mf<1||mf>12||!yf||yf<2000||yf>2100) return;
-    const oreV=String(otOre).replace(",",".").trim();
-    if(oreV==="" || isNaN(Number(oreV))) return;
-    if((yi*100+mi) > (yf*100+mf)) return; // inizio dopo fine: ignora
-    const rec={ inizio:"01/"+(mi<10?"0":"")+mi+"/"+yi, fine:"01/"+(mf<10?"0":"")+mf+"/"+yf, oreSett:Number(oreV) };
-    setOrariTemp(orariTemp.concat([rec]).sort(function(a,b){ return ymdIt(a.inizio)-ymdIt(b.inizio); }));
-    setOtOre("");
-  };
-  const delOt = function(i){ setOrariTemp(orariTemp.filter(function(_, k){ return k !== i; })); };
-  const otSummary = function(w){ const mi=ymdIt(w.inizio), mf=ymdIt(w.fine); const li=mi?(MONTH_LABEL[Math.floor((mi%10000)/100)-1]+" "+Math.floor(mi/10000)):w.inizio; const lf=mf?(MONTH_LABEL[Math.floor((mf%10000)/100)-1]+" "+Math.floor(mf/10000)):w.fine; return (Number.isInteger(Number(w.oreSett))?String(Number(w.oreSett)):fmt2(Number(w.oreSett)))+" h/sett — da "+li+" a "+lf; };
-  const save = function(){
-    const n = nome.trim().toUpperCase();
-    if (n === "") return;
-    const pro = tipo === "determinato" ? proroghe.filter(function(x){ return x && x.trim() !== ""; }) : [];
-    const tettiOut = tetti.map(function(t){ return { anno: parseInt(t.anno,10)||0, ore: String(t.ore).trim() }; }).filter(function(t){ const nn=parseFloat(String(t.ore).replace(",",".")); return !isNaN(nn) && nn>0; }).sort(function(a,b){ return a.anno-b.anno; });
-    // legacy tettoAnnuo = valore di partenza (riga "da sempre", anno 0) o la prima riga disponibile
-    let legacyTetto = "";
-    if (tettiOut.length){ const base = tettiOut.filter(function(t){ return t.anno===0; }); legacyTetto = base.length ? base[0].ore : tettiOut[0].ore; }
-    props.onSave({ id: editing ? editing.id : uid(), nome:n, livello:livello.trim(), oreSett:Number(ore)||0,
-      tipoContratto:tipo, scadenza: tipo==="determinato" ? scad.trim() : "", proroghe:pro, trasformazioni: trasf.filter(function(x){ return x && x.data; }), orariTemp: orariTemp.filter(function(w){ return w && w.inizio && w.fine && w.oreSett!=null && String(w.oreSett)!==""; }), mensilizzato: mensilizzato, mensilizzatoDal: (mensilizzato && parseInt(mensMese,10)>=1 && parseInt(mensMese,10)<=12 && parseInt(mensAnno,10)>=2000) ? ("01/"+(parseInt(mensMese,10)<10?"0":"")+parseInt(mensMese,10)+"/"+parseInt(mensAnno,10)) : "", tettoAnnuo: legacyTetto, tettoPeriodo: tettoPeriodo, tettiAnnui: tettiOut, ana: editing ? (editing.ana || {}) : {}, dataAssunzione:assunz.trim(), dataCessazione:cess.trim(), cessManuale: cess.trim()!=="", colore:colore });
-  };
-  return (
-    <div className="overlay" onClick={props.onClose}>
-      <div className="modal" onClick={function(e){ e.stopPropagation(); }}>
-        <h2>{editing ? "Modifica dipendente" : "Nuovo dipendente"}</h2>
-        <div style={{ background:"#f0f9ff", border:"1px dashed #7dd3fc", borderRadius:"10px", padding:"8px 12px", margin:"0 0 12px", fontSize:"12.5px", color:"#0c4a6e", lineHeight:1.55 }}>
-          <b>Che cos'è questa scheda?</b> È la carta d'identità della persona dentro il programma: qui scrivi chi è, che contratto ha e come lavora.<br/>
-          👉 I campi con il <span style={{ background:"#fffde7", border:"1px solid #f59e0b", borderRadius:"4px", padding:"0 5px", fontWeight:700 }}>bordo giallo</span> sono quelli che puoi scrivere. Alla fine premi <b>Salva</b>. Se non ti serve una parte, lasciala vuota.
-        </div>
-        <div className="field"><label>Nome e cognome (tutto in STAMPATELLO: COGNOME NOME)</label>
-          <input value={nome} onChange={function(e){ setNome(e.target.value.toUpperCase()); }} placeholder="COGNOME NOME" /></div>
-        <div className="frow">
-          <div className="field"><label>Livello</label>
-            <input value={livello} onChange={function(e){ setLivello(e.target.value); }} placeholder="es. 3" /></div>
-          <div className="field"><label>Ore settimanali</label>
-            <input type="number" step="0.5" value={ore} onChange={function(e){ setOre(e.target.value); }} /></div>
-        </div>
-        <div className="frow">
-          <div className="field"><label>Tipo contratto</label>
-            <select value={tipo} onChange={function(e){ setTipo(e.target.value); }}>
-              <option value="indeterminato">Indeterminato</option>
-              <option value="determinato">Determinato</option>
-            </select></div>
-          {tipo === "determinato" ?
-            <div className="field"><label>Scadenza originale (gg/mm/aa)</label>
-              <input value={scad} onChange={function(e){ setScad(e.target.value); }} placeholder="31/12/26" /></div> : null}
-        </div>
-        {tipo === "determinato" ?
-          <div className="field" style={{ background:"#f8fafc", border:"1px solid #e2e8f0", borderRadius:"8px", padding:"10px" }}>
-            <label style={{ fontWeight:800 }}>Proroghe (storico) — la scadenza originale resta invariata</label>
-            {proroghe.length === 0 ? <div style={{ fontSize:"12px", color:"#64748b", margin:"4px 0" }}>Nessuna proroga.</div> :
-              <div style={{ margin:"6px 0" }}>
-                {proroghe.map(function(pp, i){ return (
-                  <div key={i} style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"4px", fontSize:"13px" }}>
-                    <span style={{ fontWeight:700 }}>{i+1}ª proroga → {pp}</span>
-                    <button className="voce-del" title="Rimuovi proroga" onClick={function(){ delPro(i); }}>✕</button>
-                  </div>
-                ); })}
-                <div style={{ fontSize:"12px", color:"#DE4C8A", marginTop:"4px" }}>Scadenza effettiva: <b>{proroghe[proroghe.length-1]}</b></div>
-              </div>}
-            <div style={{ display:"flex", gap:"8px", alignItems:"center", marginTop:"4px" }}>
-              <input value={nuovaPro} onChange={function(e){ setNuovaPro(e.target.value); }} placeholder="gg/mm/aa"
-                onKeyDown={function(e){ if (e.key === "Enter"){ e.preventDefault(); addPro(); } }}
-                style={{ padding:"6px 8px", border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px", width:"140px" }} />
-              <button className="btn btn-blue" onClick={addPro}>+ Aggiungi proroga</button>
-            </div>
-          </div> : null}
-        <div className="field" style={{ background:"#faf5ff", border:"1px solid #e9d5ff", borderRadius:"8px", padding:"10px" }}>
-          <label style={{ fontWeight:800 }}>Trasformazioni (storico) — decorrenza sempre dal 1° del mese</label>
-          <div style={{ fontSize:"11px", color:"#64748b", margin:"2px 0 6px" }}>Registra ogni trasformazione: innalzamento livello, variazione monte ore, passaggio a tempo indeterminato. Dal mese di decorrenza il report (ore teoriche) e i badge si adeguano da soli; i mesi precedenti restano col valore vecchio.</div>
-          {trasf.length === 0 ? <div style={{ fontSize:"12px", color:"#64748b", margin:"4px 0" }}>Nessuna trasformazione registrata.</div> :
-            <div style={{ margin:"6px 0" }}>
-              {trasf.map(function(tt, i){ return (
-                <div key={i} style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"4px", fontSize:"13px" }}>
-                  <span style={{ fontWeight:700 }}>{trasfSummary(tt)}</span>
-                  <button className="voce-del" title="Rimuovi trasformazione" onClick={function(){ delTrasf(i); }}>✕</button>
-                </div>
-              ); })}
-            </div>}
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(150px, 1fr))", gap:"6px", alignItems:"end", marginTop:"6px" }}>
-            <div><div style={{ fontSize:"11px", fontWeight:700, marginBottom:"2px" }}>Decorrenza — mese</div>
-              <select value={ntMese} onChange={function(e){ setNtMese(e.target.value); }} style={{ width:"100%", padding:"6px" }}>{MONTH_LABEL.map(function(l,i){ return <option key={i} value={String(i+1)}>{l}</option>; })}</select></div>
-            <div><div style={{ fontSize:"11px", fontWeight:700, marginBottom:"2px" }}>Anno</div>
-              <input value={ntAnno} onChange={function(e){ setNtAnno(e.target.value.replace(/[^0-9]/g,"").slice(0,4)); }} inputMode="numeric" style={{ width:"100%", padding:"6px", border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px" }} /></div>
-            <div><div style={{ fontSize:"11px", fontWeight:700, marginBottom:"2px" }}>Nuovo livello</div>
-              <input value={ntLiv} onChange={function(e){ setNtLiv(e.target.value.toUpperCase()); }} placeholder="es. D2" style={{ width:"100%", padding:"6px", border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px" }} /></div>
-            <div><div style={{ fontSize:"11px", fontWeight:700, marginBottom:"2px" }}>Nuovo monte ore/sett</div>
-              <input value={ntOre} onChange={function(e){ setNtOre(e.target.value); }} placeholder="es. 24" inputMode="decimal" style={{ width:"100%", padding:"6px", border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px" }} /></div>
-            <label style={{ display:"flex", alignItems:"center", gap:"6px", fontSize:"13px" }}><input type="checkbox" checked={ntIndet} onChange={function(e){ setNtIndet(e.target.checked); }} /> → a tempo indeterminato</label>
-            <button className="btn btn-blue" onClick={addTrasf}>+ Aggiungi trasformazione</button>
-          </div>
-          <div style={{ fontSize:"11px", color:"#64748b", marginTop:"4px" }}>Compila almeno uno tra livello, monte ore o la spunta "a tempo indeterminato".</div>
-        </div>
-        <div className="field" style={{ background:"#fdf2f8", border:"1px solid #f9a8d4", borderRadius:"8px", padding:"10px" }}>
-          <div style={{ fontSize:"12px", color:"#334155", lineHeight:1.5 }}>➕➖ <b>Base mensile</b> — attiva <b>per tutti</b> in automatico dai mesi <b>da ottobre 2026</b> in poi. Nella scheda del mese compare il riquadro <b>"Ore in più / in meno"</b>: ogni mese fa storia a sé (nessun accumulo), le ore in più si pagano come straordinario e le ore in meno si tolgono. Il totale annuo per persona è nella <b>Query personale → ⚡ Straordinario</b>. Non c'è nulla da impostare qui.</div>
-        </div>
-        <div className="field" style={{ background:"#eef6ff", border:"1px solid #bfdbfe", borderRadius:"8px", padding:"10px" }}>
-          <label style={{ fontWeight:800 }}>🎯 Tetto annuo (monte ore massimo) — facoltativo</label>
-          <div style={{ fontSize:"12px", color:"#334155", margin:"4px 0 6px", lineHeight:1.5 }}>
-            È il <b>numero massimo di ore</b> che questa persona può fare in un anno. Nella scheda del mese comparirà una barra che dice <b>quante ne restano</b>.<br/>
-            Se non ti serve, <b>lascia la lista vuota</b>.
-          </div>
-          <div style={{ fontSize:"12px", color:"#1e3a8a", background:"#dbeafe", border:"1px dashed #93c5fd", borderRadius:"8px", padding:"6px 10px", margin:"0 0 8px", lineHeight:1.5 }}>
-            💡 Il tetto <b>può cambiare di anno in anno</b>. Scrivi un valore per ogni anno in cui cambia: vale da quell'anno in poi finché non ne metti un altro.<br/>
-            Esempio: <b>500 dal 2024</b>, poi <b>550 dal 2026</b> → nel 2024 e 2025 vale 500, dal 2026 vale 550.<br/>
-            Se lasci l'anno <b>vuoto</b>, quel valore vale <b>da sempre</b> (punto di partenza).
-          </div>
-          <div style={{ marginBottom:"6px" }}>
-            <div style={{ fontSize:"11px", fontWeight:700, marginBottom:"2px" }}>Periodo dell'anno</div>
-            <select value={tettoPeriodo} onChange={function(e){ setTettoPeriodo(e.target.value); }} style={{ padding:"6px" }}>
-              <option value="scolastico">Anno scolastico (1/9 → 31/8)</option>
-              <option value="civile">Anno civile (1/1 → 31/12)</option>
-            </select>
-          </div>
-          {tetti.length === 0 ? <div style={{ fontSize:"12px", color:"#64748b", margin:"4px 0" }}>Nessun tetto impostato.</div> :
-            <div style={{ margin:"6px 0" }}>
-              {tetti.map(function(tt, i){ return (
-                <div key={i} style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"4px", fontSize:"13px" }}>
-                  <span style={{ fontWeight:700 }}>🎯 {tettoRowLabel(tt)}</span>
-                  <button className="voce-del" title="Rimuovi questo tetto" onClick={function(){ delTetto(i); }}>✕</button>
-                </div>
-              ); })}
-            </div>}
-          <div style={{ display:"flex", gap:"8px", alignItems:"end", flexWrap:"wrap", marginTop:"4px" }}>
-            <div><div style={{ fontSize:"11px", fontWeight:700, marginBottom:"2px" }}>Ore (tetto)</div>
-              <input value={ntTettoOre} onChange={function(e){ setNtTettoOre(e.target.value); }} placeholder="es. 500" inputMode="decimal"
-                onKeyDown={function(e){ if (e.key === "Enter"){ e.preventDefault(); addTetto(); } }}
-                style={{ width:"120px", padding:"6px", border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px" }} /></div>
-            <div><div style={{ fontSize:"11px", fontWeight:700, marginBottom:"2px" }}>Dall'anno (vuoto = da sempre)</div>
-              <input value={ntTettoAnno} onChange={function(e){ setNtTettoAnno(e.target.value.replace(/[^0-9]/g,"").slice(0,4)); }} placeholder="es. 2026" inputMode="numeric"
-                onKeyDown={function(e){ if (e.key === "Enter"){ e.preventDefault(); addTetto(); } }}
-                style={{ width:"120px", padding:"6px", border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px" }} /></div>
-            <button className="btn btn-blue" onClick={addTetto}>+ Aggiungi tetto</button>
-          </div>
-        </div>
-        <div className="field" style={{ background:"#fff7ed", border:"1px solid #fed7aa", borderRadius:"8px", padding:"10px" }}>
-          <label style={{ fontWeight:800 }}>Trasformazioni orarie temporanee — sempre dal 1° del mese</label>
-          <div style={{ fontSize:"11px", color:"#64748b", margin:"2px 0 6px" }}>Variazione di monte ore <b>a termine</b> (es. 30h → 20h da gennaio ad aprile, poi di nuovo 30h). Nei mesi coperti la scheda usa automaticamente l'orario temporaneo (e la quota giornaliera orario/6); fuori dalla finestra torna da sola all'orario normale.</div>
-          {orariTemp.length === 0 ? <div style={{ fontSize:"12px", color:"#64748b", margin:"4px 0" }}>Nessuna trasformazione temporanea.</div> :
-            <div style={{ margin:"6px 0" }}>
-              {orariTemp.map(function(ww, i){ return (
-                <div key={i} style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"4px", fontSize:"13px" }}>
-                  <span style={{ fontWeight:700 }}>{otSummary(ww)}</span>
-                  <button className="voce-del" title="Rimuovi trasformazione temporanea" onClick={function(){ delOt(i); }}>✕</button>
-                </div>
-              ); })}
-            </div>}
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(130px, 1fr))", gap:"6px", alignItems:"end", marginTop:"6px" }}>
-            <div><div style={{ fontSize:"11px", fontWeight:700, marginBottom:"2px" }}>Da — mese</div>
-              <select value={otMeseI} onChange={function(e){ setOtMeseI(e.target.value); }} style={{ width:"100%", padding:"6px" }}>{MONTH_LABEL.map(function(l,i){ return <option key={i} value={String(i+1)}>{l}</option>; })}</select></div>
-            <div><div style={{ fontSize:"11px", fontWeight:700, marginBottom:"2px" }}>Da — anno</div>
-              <input value={otAnnoI} onChange={function(e){ setOtAnnoI(e.target.value.replace(/[^0-9]/g,"").slice(0,4)); }} inputMode="numeric" style={{ width:"100%", padding:"6px", border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px" }} /></div>
-            <div><div style={{ fontSize:"11px", fontWeight:700, marginBottom:"2px" }}>A — mese (incluso)</div>
-              <select value={otMeseF} onChange={function(e){ setOtMeseF(e.target.value); }} style={{ width:"100%", padding:"6px" }}>{MONTH_LABEL.map(function(l,i){ return <option key={i} value={String(i+1)}>{l}</option>; })}</select></div>
-            <div><div style={{ fontSize:"11px", fontWeight:700, marginBottom:"2px" }}>A — anno</div>
-              <input value={otAnnoF} onChange={function(e){ setOtAnnoF(e.target.value.replace(/[^0-9]/g,"").slice(0,4)); }} inputMode="numeric" style={{ width:"100%", padding:"6px", border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px" }} /></div>
-            <div><div style={{ fontSize:"11px", fontWeight:700, marginBottom:"2px" }}>Monte ore/sett temporaneo</div>
-              <input value={otOre} onChange={function(e){ setOtOre(e.target.value); }} placeholder="es. 20" inputMode="decimal" style={{ width:"100%", padding:"6px", border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px" }} /></div>
-            <button className="btn btn-blue" onClick={addOt}>+ Aggiungi periodo</button>
-          </div>
-        </div>
-        <div className="frow">
-          <div className="field"><label>Data assunzione (blocca giorni prima)</label>
-            <input value={assunz} onChange={function(e){ setAssunz(e.target.value); }} placeholder="gg/mm/aa" /></div>
-          <div className="field"><label>Data cessazione (blocca giorni dopo)</label>
-            <input value={cess} onChange={function(e){ setCess(e.target.value); }} placeholder="gg/mm/aa" /></div>
-        </div>
-        <div className="field"><label>Colore scheda</label>
-          <div className="color-row">
-            {PALETTE.map(function(cx){ return <div key={cx} className={"swatch" + (cx===colore ? " sel" : "")} style={{ background:cx }} onClick={function(){ setColore(cx); }}></div>; })}
-            <input type="color" value={colore} onChange={function(e){ setColore(e.target.value); }} style={{ width:"40px", height:"34px", padding:"0", border:"none", background:"none", cursor:"pointer" }} />
-          </div>
-        </div>
-        <div className="modal-actions">
-          <span style={{ fontSize:"11px", color:"#64748b" }}>{editing ? "Per cessare: imposta la data di cessazione." : ""}</span>
-          <span>
-            <button className="btn btn-gray" onClick={props.onClose}>Annulla</button>
-            <button className="btn btn-blue" style={{ marginLeft:"8px" }} onClick={save}>Salva</button>
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-}
+
 
 const QUALIFICHE = ["ADDETTO ALLA CUSTODIA","ADDETTO ALLE PULIZIE","ANIMATORE / ASSISTENTE EDUCATIVO","COORDINATORE EDUCATIVO / REFERENTE","EDUCATORE","FORMATORE","IMPIEGATO","IMPIEGATO DI CONCETTO / REFERENTE DI UNITÀ PRODUTTIVA","SUPERVISORE"];
 const LUOGHI_LAVORO = ["ISTITUTO/I SCOLASTICO/I","CENTRO/I DI AGGREGAZIONE","UFFICIO/I","ALTRO/I LUOGO/I DEL TERRITORIO"];
@@ -1992,10 +1733,267 @@ function collectTemplates(){ const m={}; const c=lsGet(LS_TEMPLATE), p=lsGet(LS_
 function applyTemplates(mods){ if(!mods||typeof mods!=="object") return; try{ if(typeof mods.c==="string"&&mods.c.length>100) localStorage.setItem(LS_TEMPLATE, mods.c); if(typeof mods.p==="string"&&mods.p.length>100) localStorage.setItem(LS_TEMPLATE_PRO, mods.p); if(typeof mods.t==="string"&&mods.t.length>100) localStorage.setItem(LS_TEMPLATE_TRASF, mods.t); }catch(e){ } }
 function withTemplatesForCloud(state){ const obj=Object.assign({}, state); const LIMIT=950000; let used=0; try{ used=JSON.stringify(obj).length; }catch(e){ return obj; } const mods={}; const cand=[["p",lsGet(LS_TEMPLATE_PRO)],["t",lsGet(LS_TEMPLATE_TRASF)],["c",lsGet(LS_TEMPLATE)]]; cand.forEach(function(pr){ const k=pr[0], v=pr[1]; if(typeof v==="string" && v.length>100 && (used + v.length + 30) < LIMIT){ mods[k]=v; used += v.length + 30; } }); if(Object.keys(mods).length) obj.modelli=mods; return obj; }
 
+// ===== SCHEDA CONTRATTO (dentro ANAGRAFICA) ==================================
+// Blocchi che prima stavano SOLO nella finestrella "Modifica dipendente":
+// trasformazioni/proroghe, monte ore temporaneo, mensilizzazione, massimali
+// annui, colore. Qui ogni modifica scrive subito nello stato (come fanno gia'
+// gli altri campi della scheda) e accende il 💾: nessun salvataggio a parte.
+// I dati restano negli stessi campi di prima: dp.proroghe, dp.trasformazioni,
+// dp.orariTemp, dp.mensilizzato/mensilizzatoDal, dp.tettiAnnui/tettoAnnuo/
+// tettoPeriodo, dp.colore. I calcoli non sono stati toccati.
+function SchedaContratto(props){
+  const dp = props.dp;
+  const patch = function(o){ props.onPatch(dp.id, o); };
+  const proroghe = Array.isArray(dp.proroghe) ? dp.proroghe : [];
+  const trasf = Array.isArray(dp.trasformazioni) ? dp.trasformazioni.map(function(t){ return typeof t==="string" ? { data:t } : Object.assign({}, t); }) : [];
+  const orariTemp = Array.isArray(dp.orariTemp) ? dp.orariTemp : [];
+  const tetti = Array.isArray(dp.tettiAnnui) ? dp.tettiAnnui : [];
+  const tettoPeriodo = dp.tettoPeriodo === "civile" ? "civile" : "scolastico";
+  const determinato = String(dp.tipoContratto||"indeterminato") === "determinato";
+  const _now = new Date();
+
+  const [nuovaPro, setNuovaPro] = useState("");
+  const [ntMese, setNtMese] = useState(String(_now.getMonth()+1));
+  const [ntAnno, setNtAnno] = useState(String(_now.getFullYear()));
+  const [ntLiv, setNtLiv] = useState("");
+  const [ntOre, setNtOre] = useState("");
+  const [ntIndet, setNtIndet] = useState(false);
+  const [otMeseI, setOtMeseI] = useState(String(_now.getMonth()+1));
+  const [otAnnoI, setOtAnnoI] = useState(String(_now.getFullYear()));
+  const [otMeseF, setOtMeseF] = useState(String(_now.getMonth()+1));
+  const [otAnnoF, setOtAnnoF] = useState(String(_now.getFullYear()));
+  const [otOre, setOtOre] = useState("");
+  const [ntTettoAnno, setNtTettoAnno] = useState("");
+  const [ntTettoOre, setNtTettoOre] = useState("");
+  const _mdal = dp.mensilizzatoDal ? ymdIt(dp.mensilizzatoDal) : 0;
+  const [mensMese, setMensMese] = useState(_mdal ? String(Math.floor((_mdal%10000)/100)) : String(_now.getMonth()+1));
+  const [mensAnno, setMensAnno] = useState(_mdal ? String(Math.floor(_mdal/10000)) : String(_now.getFullYear()));
+
+  const giallo = { border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px", padding:"6px 8px", fontFamily:"inherit", fontSize:"13px" };
+  const etich = { fontSize:"11px", fontWeight:700, marginBottom:"2px" };
+
+  // --- trasformazioni e proroghe ---
+  const trasfSummary = function(t){
+    const parts=[];
+    if(t.toIndet) parts.push("→ a tempo indeterminato");
+    if(t.livello) parts.push("livello "+t.livello);
+    if(t.oreSett!=null && String(t.oreSett)!=="") parts.push((Number.isInteger(Number(t.oreSett))?String(Number(t.oreSett)):fmt2(Number(t.oreSett)))+" h/sett");
+    return (parts.join(", ")||"nessuna modifica")+" — dal "+t.data;
+  };
+  const addPro = function(){ const v=nuovaPro.trim(); if(v==="") return; patch({ proroghe: proroghe.concat([v]) }); setNuovaPro(""); };
+  const delPro = function(i){ patch({ proroghe: proroghe.filter(function(_,k){ return k!==i; }) }); };
+  const addTrasf = function(){
+    const mm=parseInt(ntMese,10), yy=parseInt(ntAnno,10);
+    if(!mm||mm<1||mm>12||!yy||yy<2000||yy>2100) return;
+    const rec={ data:"01/"+(mm<10?"0":"")+mm+"/"+yy };
+    if(ntLiv.trim()!=="") rec.livello=ntLiv.trim().toUpperCase();
+    const oreV=String(ntOre).replace(",",".").trim();
+    if(oreV!=="" && !isNaN(Number(oreV))) rec.oreSett=Number(oreV);
+    if(ntIndet) rec.toIndet=true;
+    if(!rec.livello && rec.oreSett==null && !rec.toIndet) return;
+    patch({ trasformazioni: trasf.concat([rec]).sort(function(a,b){ return ymdIt(a.data)-ymdIt(b.data); }) });
+    setNtLiv(""); setNtOre(""); setNtIndet(false);
+  };
+  const delTrasf = function(i){ patch({ trasformazioni: trasf.filter(function(_,k){ return k!==i; }) }); };
+
+  // --- monte ore temporaneo ---
+  const otLabel = function(w){
+    const o=Number(w.oreSett);
+    return (Number.isInteger(o)?String(o):fmt2(o))+" h/sett — da "+String(w.inizio).slice(3)+" a "+String(w.fine).slice(3);
+  };
+  const addOt = function(){
+    const mi=parseInt(otMeseI,10), yi=parseInt(otAnnoI,10), mf=parseInt(otMeseF,10), yf=parseInt(otAnnoF,10);
+    if(!mi||mi<1||mi>12||!yi||yi<2000||yi>2100) return;
+    if(!mf||mf<1||mf>12||!yf||yf<2000||yf>2100) return;
+    const oreV=String(otOre).replace(",",".").trim();
+    if(oreV==="" || isNaN(Number(oreV))) return;
+    if((yi*100+mi) > (yf*100+mf)) return;
+    const rec={ inizio:"01/"+(mi<10?"0":"")+mi+"/"+yi, fine:"01/"+(mf<10?"0":"")+mf+"/"+yf, oreSett:Number(oreV) };
+    patch({ orariTemp: orariTemp.concat([rec]).sort(function(a,b){ return ymdIt(a.inizio)-ymdIt(b.inizio); }) });
+    setOtOre("");
+  };
+  const delOt = function(i){ patch({ orariTemp: orariTemp.filter(function(_,k){ return k!==i; }) }); };
+
+  // --- mensilizzazione ---
+  const dalStr = function(m,y){
+    const mm=parseInt(m,10), yy=parseInt(y,10);
+    return (mm>=1 && mm<=12 && yy>=2000) ? ("01/"+(mm<10?"0":"")+mm+"/"+yy) : "";
+  };
+  const setMens = function(on){ patch({ mensilizzato: !!on, mensilizzatoDal: on ? dalStr(mensMese,mensAnno) : "" }); };
+
+  // --- massimali annui ---
+  const tettoRowLabel = function(t){
+    const an = parseInt(t.anno,10)||0;
+    const lab = an>0 ? ("dal "+an+(tettoPeriodo==="civile"?"":"/"+(an+1))) : "da sempre (valore di partenza)";
+    const n = Number(String(t.ore).replace(",","."));
+    return (Number.isInteger(n)?String(n):fmt2(n)) + " ore — " + lab;
+  };
+  const patchTetti = function(lista){
+    const out = lista.map(function(t){ return { anno: parseInt(t.anno,10)||0, ore: String(t.ore).trim() }; })
+      .filter(function(t){ const nn=parseFloat(String(t.ore).replace(",",".")); return !isNaN(nn) && nn>0; })
+      .sort(function(a,b){ return a.anno-b.anno; });
+    let legacy = "";
+    if(out.length){ const base=out.filter(function(t){ return t.anno===0; }); legacy = base.length ? base[0].ore : out[0].ore; }
+    patch({ tettiAnnui: out, tettoAnnuo: legacy });
+  };
+  const addTetto = function(){
+    const oreV=String(ntTettoOre).replace(",",".").trim();
+    if(oreV==="" || isNaN(Number(oreV)) || Number(oreV)<=0) return;
+    patchTetti(tetti.concat([{ anno: String(ntTettoAnno).replace(/[^0-9]/g,"").slice(0,4), ore: String(ntTettoOre).trim() }]));
+    setNtTettoAnno(""); setNtTettoOre("");
+  };
+  const delTetto = function(i){ patchTetti(tetti.filter(function(_,k){ return k!==i; })); };
+
+  const box = function(colore, bordo){ return { background:colore, border:"1px solid "+bordo, borderRadius:"10px", padding:"12px", marginBottom:"12px" }; };
+  const titolo = { fontWeight:800, fontSize:"14px", marginBottom:"6px", display:"block" };
+  const aiuto = { fontSize:"11.5px", color:"#64748b", lineHeight:1.5, margin:"0 0 8px" };
+
+  return (
+    <div style={{ marginTop:"14px" }}>
+
+      <div style={box("#faf5ff","#e9d5ff")}>
+        <label style={titolo}>Trasformaz./proroghe</label>
+        <div style={aiuto}>Qui registri i <b>cambi di contratto</b> (nuovo livello, nuovo monte ore, passaggio a tempo indeterminato) e, per i contratti a termine, le <b>proroghe</b>. Ogni cambio parte <b>dal 1° del mese</b> che indichi: i mesi precedenti restano come prima, quelli successivi si adeguano da soli.</div>
+
+        {determinato ?
+          <div style={{ marginBottom:"10px" }}>
+            <div style={etich}>Proroghe — la scadenza originale resta quella scritta sopra</div>
+            {proroghe.length===0 ? <div style={{ fontSize:"12px", color:"#64748b", margin:"4px 0" }}>Nessuna proroga.</div> :
+              <div style={{ margin:"6px 0" }}>
+                {proroghe.map(function(pp,i){ return (
+                  <div key={"p"+i} style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"4px", fontSize:"13px" }}>
+                    <span style={{ fontWeight:700 }}>{i+1}ª proroga → {pp}</span>
+                    <button className="voce-del" title="Rimuovi proroga" onClick={function(){ delPro(i); }}>✕</button>
+                  </div>
+                ); })}
+                <div style={{ fontSize:"12px", color:"#DE4C8A", marginTop:"4px" }}>Scadenza effettiva: <b>{proroghe[proroghe.length-1]}</b></div>
+              </div>}
+            <div style={{ display:"flex", gap:"8px", alignItems:"center", flexWrap:"wrap" }}>
+              <input value={nuovaPro} placeholder="gg/mm/aa" style={Object.assign({width:"140px"}, giallo)}
+                onChange={function(e){ setNuovaPro(e.target.value); }}
+                onKeyDown={function(e){ if(e.key==="Enter"){ e.preventDefault(); addPro(); } }} />
+              <button className="btn btn-blue" onClick={addPro}>+ Aggiungi proroga</button>
+            </div>
+          </div> : null}
+
+        <div style={etich}>Trasformazioni registrate</div>
+        {trasf.length===0 ? <div style={{ fontSize:"12px", color:"#64748b", margin:"4px 0" }}>Nessuna trasformazione registrata.</div> :
+          <div style={{ margin:"6px 0" }}>
+            {trasf.map(function(tt,i){ return (
+              <div key={"t"+i} style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"4px", fontSize:"13px" }}>
+                <span style={{ fontWeight:700 }}>{trasfSummary(tt)}</span>
+                <button className="voce-del" title="Rimuovi trasformazione" onClick={function(){ delTrasf(i); }}>✕</button>
+              </div>
+            ); })}
+          </div>}
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(150px, 1fr))", gap:"6px", alignItems:"end", marginTop:"6px" }}>
+          <div><div style={etich}>Dal mese</div>
+            <select value={ntMese} onChange={function(e){ setNtMese(e.target.value); }} style={{ width:"100%", padding:"6px" }}>{MONTH_LABEL.map(function(l,i){ return <option key={i} value={String(i+1)}>{l}</option>; })}</select></div>
+          <div><div style={etich}>Anno</div>
+            <input value={ntAnno} inputMode="numeric" style={Object.assign({width:"100%"}, giallo)} onChange={function(e){ setNtAnno(e.target.value.replace(/[^0-9]/g,"").slice(0,4)); }} /></div>
+          <div><div style={etich}>Nuovo livello</div>
+            <input value={ntLiv} placeholder="es. D2" style={Object.assign({width:"100%"}, giallo)} onChange={function(e){ setNtLiv(e.target.value.toUpperCase()); }} /></div>
+          <div><div style={etich}>Nuovo monte ore/sett</div>
+            <input value={ntOre} placeholder="es. 24" inputMode="decimal" style={Object.assign({width:"100%"}, giallo)} onChange={function(e){ setNtOre(e.target.value); }} /></div>
+          <label style={{ display:"flex", alignItems:"center", gap:"6px", fontSize:"13px" }}><input type="checkbox" checked={ntIndet} onChange={function(e){ setNtIndet(e.target.checked); }} /> → a tempo indeterminato</label>
+          <button className="btn btn-blue" onClick={addTrasf}>+ Aggiungi trasformazione</button>
+        </div>
+        <div style={{ fontSize:"11px", color:"#64748b", marginTop:"4px" }}>Compila almeno uno tra livello, monte ore o la spunta "a tempo indeterminato".</div>
+      </div>
+
+      <div style={box("#fff7ed","#fed7aa")}>
+        <label style={titolo}>Monte ore (anche temporaneo)</label>
+        <div style={aiuto}>Il monte ore <b>normale</b> si scrive sopra, nel riquadro "Orario". Qui aggiungi i <b>periodi in cui lavora con un orario diverso</b> — per esempio 20 ore da marzo a giugno — e poi torna da solo al monte ore normale. Vale dal 1° del mese di inizio al 1° del mese di fine.</div>
+        {orariTemp.length===0 ? <div style={{ fontSize:"12px", color:"#64748b", margin:"4px 0" }}>Nessun periodo con orario diverso.</div> :
+          <div style={{ margin:"6px 0" }}>
+            {orariTemp.map(function(w,i){ return (
+              <div key={"o"+i} style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"4px", fontSize:"13px" }}>
+                <span style={{ fontWeight:700 }}>{otLabel(w)}</span>
+                <button className="voce-del" title="Rimuovi periodo" onClick={function(){ delOt(i); }}>✕</button>
+              </div>
+            ); })}
+          </div>}
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(140px, 1fr))", gap:"6px", alignItems:"end", marginTop:"6px" }}>
+          <div><div style={etich}>Da — mese</div>
+            <select value={otMeseI} onChange={function(e){ setOtMeseI(e.target.value); }} style={{ width:"100%", padding:"6px" }}>{MONTH_LABEL.map(function(l,i){ return <option key={i} value={String(i+1)}>{l}</option>; })}</select></div>
+          <div><div style={etich}>Anno</div>
+            <input value={otAnnoI} inputMode="numeric" style={Object.assign({width:"100%"}, giallo)} onChange={function(e){ setOtAnnoI(e.target.value.replace(/[^0-9]/g,"").slice(0,4)); }} /></div>
+          <div><div style={etich}>A — mese</div>
+            <select value={otMeseF} onChange={function(e){ setOtMeseF(e.target.value); }} style={{ width:"100%", padding:"6px" }}>{MONTH_LABEL.map(function(l,i){ return <option key={i} value={String(i+1)}>{l}</option>; })}</select></div>
+          <div><div style={etich}>Anno</div>
+            <input value={otAnnoF} inputMode="numeric" style={Object.assign({width:"100%"}, giallo)} onChange={function(e){ setOtAnnoF(e.target.value.replace(/[^0-9]/g,"").slice(0,4)); }} /></div>
+          <div><div style={etich}>Ore a settimana</div>
+            <input value={otOre} placeholder="es. 20" inputMode="decimal" style={Object.assign({width:"100%"}, giallo)} onChange={function(e){ setOtOre(e.target.value); }} /></div>
+          <button className="btn btn-blue" onClick={addOt}>+ Aggiungi periodo</button>
+        </div>
+      </div>
+
+      <div style={box("#f0fdf4","#bbf7d0")}>
+        <label style={titolo}>Mensilizzazione</label>
+        <div style={aiuto}>Spunta se questa persona ha lo <b>stipendio uguale ogni mese</b> invece che a ore. Cambia il modo di contare le ore del mese, a partire dal mese che indichi.</div>
+        <label style={{ display:"flex", alignItems:"center", gap:"8px", fontSize:"13px", marginBottom:"6px" }}>
+          <input type="checkbox" checked={!!dp.mensilizzato} onChange={function(e){ setMens(e.target.checked); }} /> Mensilizzato
+        </label>
+        {dp.mensilizzato ?
+          <div style={{ display:"flex", gap:"8px", alignItems:"end", flexWrap:"wrap" }}>
+            <div><div style={etich}>Dal mese</div>
+              <select value={mensMese} style={{ padding:"6px" }} onChange={function(e){ setMensMese(e.target.value); patch({ mensilizzatoDal: dalStr(e.target.value, mensAnno) }); }}>{MONTH_LABEL.map(function(l,i){ return <option key={i} value={String(i+1)}>{l}</option>; })}</select></div>
+            <div><div style={etich}>Anno</div>
+              <input value={mensAnno} inputMode="numeric" style={Object.assign({width:"100px"}, giallo)}
+                onChange={function(e){ const v=e.target.value.replace(/[^0-9]/g,"").slice(0,4); setMensAnno(v); patch({ mensilizzatoDal: dalStr(mensMese, v) }); }} /></div>
+            <div style={{ fontSize:"12px", color:"#166534" }}>In vigore dal: <b>{dp.mensilizzatoDal || "— (indica mese e anno)"}</b></div>
+          </div> : null}
+      </div>
+
+      <div style={box("#eef6ff","#bfdbfe")}>
+        <label style={titolo}>Massimali annui</label>
+        <div style={aiuto}>È il <b>numero massimo di ore</b> che questa persona può fare in un anno. Nella scheda del mese compare una barra con <b>quante ne restano</b>. Se non ti serve, lascia la lista vuota. Il massimale <b>può cambiare di anno in anno</b>: scrivi un valore per ogni anno in cui cambia, e vale da lì in poi. Se lasci l'anno vuoto, quel valore vale <b>da sempre</b>.</div>
+        <div style={{ marginBottom:"6px" }}>
+          <div style={etich}>Periodo dell'anno</div>
+          <select value={tettoPeriodo} style={{ padding:"6px" }} onChange={function(e){ patch({ tettoPeriodo: e.target.value }); }}>
+            <option value="scolastico">Anno scolastico (1/9 → 31/8)</option>
+            <option value="civile">Anno civile (1/1 → 31/12)</option>
+          </select>
+        </div>
+        {tetti.length===0 ? <div style={{ fontSize:"12px", color:"#64748b", margin:"4px 0" }}>Nessun massimale impostato.</div> :
+          <div style={{ margin:"6px 0" }}>
+            {tetti.map(function(tt,i){ return (
+              <div key={"m"+i} style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"4px", fontSize:"13px" }}>
+                <span style={{ fontWeight:700 }}>🎯 {tettoRowLabel(tt)}</span>
+                <button className="voce-del" title="Rimuovi questo massimale" onClick={function(){ delTetto(i); }}>✕</button>
+              </div>
+            ); })}
+          </div>}
+        <div style={{ display:"flex", gap:"8px", alignItems:"end", flexWrap:"wrap", marginTop:"6px" }}>
+          <div><div style={etich}>Dall'anno (vuoto = da sempre)</div>
+            <input value={ntTettoAnno} inputMode="numeric" placeholder="es. 2026" style={Object.assign({width:"130px"}, giallo)} onChange={function(e){ setNtTettoAnno(e.target.value.replace(/[^0-9]/g,"").slice(0,4)); }} /></div>
+          <div><div style={etich}>Ore massime nell'anno</div>
+            <input value={ntTettoOre} inputMode="decimal" placeholder="es. 500" style={Object.assign({width:"130px"}, giallo)} onChange={function(e){ setNtTettoOre(e.target.value); }} /></div>
+          <button className="btn btn-blue" onClick={addTetto}>+ Aggiungi massimale</button>
+        </div>
+      </div>
+
+      <div style={box("#f8fafc","#e2e8f0")}>
+        <label style={titolo}>Colore della scheda</label>
+        <div style={aiuto}>Serve a riconoscere la persona a colpo d'occhio nella griglia del mese.</div>
+        <div style={{ display:"flex", gap:"8px", flexWrap:"wrap" }}>
+          {PALETTE.map(function(c){
+            const scelto = (dp.colore||PALETTE[0]) === c;
+            return <button key={c} title={scelto?"Colore scelto":"Scegli questo colore"} onClick={function(){ patch({ colore:c }); }}
+              style={{ width:"32px", height:"32px", borderRadius:"8px", background:c, cursor:"pointer",
+                border: scelto ? "3px solid #0f172a" : "1px solid #cbd5e1" }} />;
+          })}
+        </div>
+      </div>
+
+    </div>
+  );
+}
+
 function Anagrafica(props){
   const state = props.state;
   const dips = dipSorted(state);
-  const [selId, setSelId] = useState(dips.length ? dips[0].id : null);
+  const [selId, setSelId] = useState((props.selInit && dips.some(function(x){ return x.id===props.selInit; })) ? props.selInit : (dips.length ? dips[0].id : null));
   const [msg, setMsg] = useState("");
   const tplRef = React.useRef(null);
   const tplProRef = React.useRef(null);
@@ -2090,7 +2088,6 @@ function Anagrafica(props){
         <div style={{ flex:1, background:"#fff", border:"2px solid #94a3b8", borderRadius:"12px", padding:"14px" }}>
           <div style={{ display:"flex", alignItems:"center", gap:"10px", marginBottom:"12px", flexWrap:"wrap" }}>
             <div style={{ fontSize:"18px", fontWeight:800, color:"#DE4C8A" }}>{dp.nome}</div>
-            <button className="btn btn-gray" onClick={function(){ props.onEditDip(dp); }} title="Modifica dati contrattuali e aggiungi/gestisci le proroghe">✎ Modifica dipendente</button>
             <div className="spacer"></div>
             <div style={{ display:"flex", alignItems:"center", gap:"8px", background:"#fdf0f6", border:"1px solid #f7c6dd", borderRadius:"10px", padding:"6px 10px" }}>
               <span style={{ fontSize:"12px", fontWeight:800, color:"#1e3a8a", whiteSpace:"nowrap" }}>Genera documento:</span>
@@ -2162,6 +2159,7 @@ function Anagrafica(props){
               </div>
             </div>
           ); })}
+          <SchedaContratto dp={dp} onPatch={props.onDipPatch} />
         </div>
       </div>
     </div>
@@ -2988,6 +2986,7 @@ function App(){
   const [state, setState] = useState(null);
   const [anno, setAnno] = useState(2026);
   const [vista, setVista] = useState("m1");
+  const [anaSel, setAnaSel] = useState(null);
   const [dirty, setDirty] = useState(false);
   const [canRestoreImport, setCanRestoreImport] = useState(false);
   const [zoom, setZoom] = useState(function(){ const z = parseInt(localStorage.getItem(LS_ZOOM) || "100", 10); return (isNaN(z) || z < 40 || z > 110) ? 100 : z; });
@@ -3002,7 +3001,6 @@ function App(){
     setZoomP(Math.floor(avail / natural * 100));
   };
   const [toast, setToast] = useState(null);
-  const [dipModal, setDipModal] = useState(null);
   const [confirm, setConfirm] = useState(null);
   const [permModal, setPermModal] = useState(null);
   const [exportModal, setExportModal] = useState(null);
@@ -3072,6 +3070,15 @@ function App(){
     if (ANA_SHARED[field]){ dp[field] = (field==="oreSett") ? (Number(String(value).replace(",","."))||0) : value; }
     else if (field==="cognome" || field==="nome"){ dp.ana[field]=value; const nn=((dp.ana.cognome||"")+" "+(dp.ana.nome||"")).trim().toUpperCase(); if (nn!=="") dp.nome=nn; }
     else dp.ana[field]=value;
+    touch(next);
+  };
+  // Scrive i campi di PRIMO LIVELLO del dipendente (trasformazioni, proroghe,
+  // orari temporanei, mensilizzazione, massimali, colore). Unisce al dipendente
+  // esistente, non lo sostituisce: cosi' nessun campo puo' sparire.
+  const onDipPatch = function(dipId, campi){
+    const next = JSON.parse(JSON.stringify(state));
+    const dp = next.dipendenti.find(function(d){ return d.id===dipId; }); if (!dp) return;
+    Object.keys(campi).forEach(function(k){ dp[k] = campi[k]; });
     touch(next);
   };
   const onAnaSet = function(dipId, patch){
@@ -3194,13 +3201,20 @@ function App(){
     rec.sost.splice(idx, 1); touch(next);
   };
 
-  const saveDip = function(dp){
+  // "+ Aggiungi dipendente": crea la scheda vuota e la apre in ANAGRAFICA.
+  const addDipDiretto = function(){
     const next = JSON.parse(JSON.stringify(state));
-    const idx = next.dipendenti.map(function(x){ return x.id; }).indexOf(dp.id);
-    if (idx >= 0) next.dipendenti[idx] = dp; else next.dipendenti.push(dp);
+    const nuovo = { id: uid(), nome:"NUOVO DIPENDENTE", livello:"", oreSett:0,
+      tipoContratto:"indeterminato", scadenza:"", proroghe:[], trasformazioni:[], orariTemp:[],
+      mensilizzato:false, mensilizzatoDal:"", tettoAnnuo:"", tettoPeriodo:"scolastico", tettiAnnui:[],
+      ana:{}, dataAssunzione:"", dataCessazione:"", cessManuale:false, colore:PALETTE[0] };
+    next.dipendenti.push(nuovo);
     next.dipendenti.sort(function(a,b){ return a.nome.localeCompare(b.nome); });
-    touch(next); setDipModal(null); showToast(idx>=0 ? "Anagrafica aggiornata" : "Dipendente aggiunto");
+    touch(next); setAnaSel(nuovo.id); setVista("ana");
+    showToast("Scheda creata: scrivi Cognome e Nome, poi premi 💾");
   };
+  // La matita apre la scheda ANAGRAFICA di quella persona (la finestrella non c'e' piu').
+  const apriScheda = function(d){ setAnaSel(d.id); setVista("ana"); };
   const askDelDip = function(dp){
     setConfirm({ title:"Eliminare DEFINITIVAMENTE il dipendente?",
       body:"Attenzione: verrà rimosso " + dp.nome + " e TUTTO il suo storico, in ogni mese e anno. Se il dipendente è semplicemente cessato, NON eliminarlo: chiudi e imposta la sua Data di cessazione (così mantieni lo storico). Procedere con l'eliminazione definitiva?",
@@ -3338,7 +3352,7 @@ function App(){
         {!FB_READY ? <button className="btn btn-ghost" onClick={changePin}>🔑 PIN</button> : null}
         {FB_READY ? <button className="btn btn-ghost" onClick={function(){ if (dirty && !window.confirm("Ci sono modifiche non salvate. Uscire comunque?")) return; firebase.auth().signOut(); }}>Esci</button> : null}
         <input ref={fileRef} type="file" accept=".xlsx,.xls,.json" className="hidden-file" onChange={onImportFile} />
-        <div className="monthstrip">{vista === "rep" ? "📊 Riepiloghi" : ("📅 " + MONTH_LABEL[mese-1] + " " + anno + (mLocked ? "  🔒 bloccato" : ""))}</div>
+        <div className="monthstrip">{vista === "rep" ? "📊 Riepiloghi" : (vista === "ana" ? "📇 Anagrafica" : ("📅 " + MONTH_LABEL[mese-1] + " " + anno + (mLocked ? "  🔒 bloccato" : "")))}</div>
       </div>
 
       {!FB_READY ? <div className="banner">Modalità LOCALE (localStorage, accesso con PIN).</div> : null}
@@ -3366,7 +3380,7 @@ function App(){
 
       <div className="content" style={{ zoom: zoom / 100 }}>
         {vista === "rep" ? <Riepiloghi state={state} anno={anno} /> :
-         vista === "ana" ? <Anagrafica state={state} onAnaField={onAnaField} onAnaSet={onAnaSet} onCessCleanup={onCessCleanup} onTemplateChanged={onTemplateChanged} onImportAna={onImportAna} onExportAna={onExportAna} onAddDip={function(){ setDipModal({}); }} onEditDip={function(d){ setDipModal({ dip:d }); }} onSave={doSave} dirty={dirty} /> :
+         vista === "ana" ? <Anagrafica key={"ana-"+(anaSel||"")} selInit={anaSel} onDipPatch={onDipPatch} state={state} onAnaField={onAnaField} onAnaSet={onAnaSet} onCessCleanup={onCessCleanup} onTemplateChanged={onTemplateChanged} onImportAna={onImportAna} onExportAna={onExportAna} onAddDip={addDipDiretto} onEditDip={apriScheda} onSave={doSave} dirty={dirty} /> :
          vista === "query" ? <QueryPanel state={state} /> :
           <div>
             <div className="toolbar">
@@ -3375,7 +3389,7 @@ function App(){
               <div className="spacer"></div>
               <button className={"btn " + (mLocked ? "btn-red" : "btn-gray")} title={mLocked ? "Sblocca il mese per poterlo modificare" : "Blocca il mese: nessuna cella potrà più essere modificata"}
                 onClick={toggleLock}>{mLocked ? "🔓 Sblocca mese" : "🔒 Blocca mese"}</button>
-              <button className="btn btn-blue" disabled={mLocked} onClick={function(){ setDipModal({}); }}>+ Dipendente</button>
+              <button className="btn btn-blue" disabled={mLocked} onClick={addDipDiretto}>+ Dipendente</button>
             </div>
             {mLocked ? <div className="lock-info">Questo mese è bloccato: le celle non sono modificabili. Premi "Sblocca mese" per riaprirlo.</div> : null}
             {foErr ? <div style={{ background:"#f8fafc", border:"1px solid #e2e8f0", borderRadius:"8px", color:"#64748b", fontSize:"11px", padding:"4px 9px", margin:"6px 0", display:"inline-block" }}>confronto Fogli ore non disponibile (permessi)</div> : null}
@@ -3403,7 +3417,7 @@ function App(){
                   onVoceSet={onVoceSet} onVoceAdd={onVoceAdd} onVoceDel={onVoceDel} ferieApr={ferieApr} fogliOre={foDiff}
                   onDich={onDich} onSvuotaMese={onSvuotaMese} saldoPrec={saldoP} bancaPrec={bancaP} tettoConsumo={tettoC} onAzzeraSaldo={onAzzeraSaldo} onAnnullaAzzera={onAnnullaAzzera}
                   onSostAdd={onSostAdd} onSostChange={onSostChange} onSostDel={onSostDel} onOpenPerm={onOpenPerm}
-                  onEditDip={function(d){ setDipModal({ dip:d }); }} onDelDip={askDelDip} />;
+                  onEditDip={apriScheda} onDelDip={askDelDip} />;
               })
             }
             <div className="legend">
@@ -3431,7 +3445,6 @@ function App(){
           onDelete={function(){ onPermDelete(permModal.dipId, permModal.day); }}
           onClose={function(){ setPermModal(null); }} />;
       })() : null}
-      {dipModal ? <DipModal dip={dipModal.dip} onSave={saveDip} onClose={function(){ setDipModal(null); }} /> : null}
       {confirm ? <ConfirmModal title={confirm.title} body={confirm.body} confirmLabel={confirm.confirmLabel} onConfirm={confirm.onConfirm} onClose={function(){ if (confirm.onCancel) confirm.onCancel(); else setConfirm(null); }} /> : null}
       {toast ? <Toast msg={toast.msg} warn={toast.warn} onDone={function(){ setToast(null); }} /> : null}
     </div>

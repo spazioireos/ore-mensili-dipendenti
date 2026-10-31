@@ -12,8 +12,24 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver61 · 29ott26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver62 · 31ott26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
+- **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
+  finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
+  livello, ore settimanali, tipo di contratto e date, e l'unico posto per cinque cose che ora
+  stanno in fondo alla scheda, nel componente **`SchedaContratto`**: *Trasformaz./proroghe*,
+  *Monte ore (anche temporaneo)*, *Mensilizzazione*, *Massimali annui*, *Colore della scheda*.
+  I dati restano **negli stessi campi di prima** (`dp.proroghe`, `dp.trasformazioni`,
+  `dp.orariTemp`, `dp.mensilizzato`/`mensilizzatoDal`, `dp.tettiAnnui`/`tettoAnnuo`/
+  `tettoPeriodo`, `dp.colore`): **nessun calcolo è stato toccato**.
+  Scrivono tramite **`onDipPatch(dipId, campi)`**, che **unisce** i campi al dipendente invece di
+  sostituirlo: il vecchio `saveDip` rimpiazzava l'intero oggetto, ed è il motivo per cui le
+  modifiche fatte nella finestrella potevano non comparire nella scheda.
+  La matita ✎ e "+ Dipendente" ora **aprono o creano la scheda in ANAGRAFICA** (`apriScheda`,
+  `addDipDiretto`); `Anagrafica` accetta `selInit` e viene rimontata con `key`.
+  Corretto anche un difetto **preesistente** che la nuova navigazione rendeva visibile: nella
+  testata, in vista Anagrafica, compariva "📅 undefined 2026" (perché `mese` è `null` fuori dalle
+  viste mensili); ora mostra "📇 Anagrafica".
 - **Funzione presente**: confronto non vincolante con l'app "Fogli ore" (SOLA LETTURA delle
   collection `users` e `timesheets` dello stesso progetto Firebase). Non scrivere MAI lì.
 - **Verifica prima del commit**: compilare l'intero blocco `<script type="text/babel">` con
