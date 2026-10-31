@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver64 · 31ott26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver65 · 31ott26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -30,14 +30,17 @@ Banca ore, tetto annuo, contratti e export.
   Corretto anche un difetto **preesistente** che la nuova navigazione rendeva visibile: nella
   testata, in vista Anagrafica, compariva "📅 undefined 2026" (perché `mese` è `null` fuori dalle
   viste mensili); ora mostra "📇 Anagrafica".
-- **Straordinario / "Ore in più / in meno"** (regola confermata da Christian il 31/10/2026):
-  ferie, malattia e permessi retribuiti **coprono le ore mancanti ma non generano mai
-  straordinario**. Funzione **`deltaStraoMese()`**: se le ore rese ≥ base del mese lo
-  straordinario è la sola eccedenza di ore davvero lavorate; se sono minori, le assenze coprono
-  il buco e resta in meno solo la parte scoperta. La usano il riquadro della scheda del mese e la
-  query ⚡ Straordinario (`straoRange`). ⚠️ **`bancaMeseA` NON è stata toccata**: la Banca ore
-  continua a contare `rese + assenze − monte` come prima. Se un giorno si volesse allineare anche
-  quella, è una decisione di Christian, non una conseguenza automatica.
+- **Straordinario / "Ore in più / in meno"** — **regola definitiva, confermata con un numero da
+  Christian il 31/10/2026**: `delta del mese = ore rese + ore di assenza retribuita − monte del
+  mese`. Le assenze retribuite **contano come ore lavorate** e concorrono a raggiungere il monte
+  ore contrattuale; lo straordinario si paga su quanto eccede il contrattualizzato e le ore non
+  dovute si trattengono, **tutto dentro lo stesso mese**: Spazio Ireos **non usa la Banca ore**.
+  Esempio deciso da Christian: contratto 165 h, lavora 165 h e ha 2 giorni di ferie (12,69 h) →
+  **+12,69 di straordinario**.
+  ⚠️ **Storia da non ripetere**: in ver64 questo conto era stato cambiato (le assenze coprivano
+  solo le ore mancanti senza fare straordinario) ed è stato **rimesso com'era in ver65**, perché
+  la regola era stata fraintesa. Non ricambiarlo senza che Christian lo chieda **con un numero
+  davanti**, come in questo esempio.
 - **"Ore dichiarate" e Conguaglio ore**: nel report mensile la casella *Ore dichiarate (uso
   interno)* si compila per **tutti** i dipendenti, **mensilizzati compresi** (da ver63,
   31/10/2026: prima era nascosta da `{!dp.mensilizzato ? … : null}`, e il meccanismo del

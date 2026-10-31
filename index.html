@@ -209,7 +209,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver64";
+const APP_VER = "ver65";
 const APP_DATA = "31ott26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
@@ -421,20 +421,6 @@ function bancaMeseA(state,dp,y,m){                                          // b
   const eff=rese + coverAbsHours(rec,dp,y,m);                               // prodotto = rese + assenze coperte
   return Math.round((eff - monteFissoMese(dp,y,m))*1000)/1000;
 }
-function deltaStraoMese(state,dp,y,m){
-  // Ore in piu' / in meno del mese — regola confermata da Christian il 31/10/2026:
-  // ferie, malattia e permessi retribuiti COPRONO le ore mancanti ma NON generano
-  // mai straordinario. Quindi: se ha reso almeno la base, lo straordinario e' la
-  // sola eccedenza di ore davvero lavorate; se ha reso meno, le assenze coprono il
-  // buco e restano in meno soltanto le ore scoperte.
-  const rec=getRecFrom(state,y,m,dp.id);
-  if(!recHasData(rec)) return null;
-  const base=monteFissoMese(dp,y,m); if(!base || base<=0) return null;
-  const rese=totOfRec(rec,y,m);
-  const ass=coverAbsHours(rec,dp,y,m);
-  const d = (rese>=base) ? (rese-base) : -Math.max(0, base-rese-ass);
-  return Math.round(d*1000)/1000;
-}
 function bancaPrecA(state,dp,anno,mese){                                    // banca cumulata dei mesi PRECEDENTI (dopo l'ultimo azzeramento, dalla decorrenza mensilizzazione)
   const dal=mensDalYM(dp);
   const months=[];
@@ -470,7 +456,7 @@ function straoRange(state, dp, fromYM, toYM){   // somma per persona dei delta m
     const y=parseInt(mm[1],10), mo=parseInt(mm[2],10); const ym=y*100+mo;
     if(ym<start || ym>toYM) return;
     if(!state.dati[k][dp.id]) return;
-    const bm = deltaStraoMese(state, dp, y, mo);   // ore in piu'/in meno del mese (le assenze non fanno straordinario)
+    const bm = bancaMeseA(state, dp, y, mo);   // delta del mese = (rese + assenze coperte) - monte fisso
     if(bm==null) return;
     if(bm>0) piu+=bm; else if(bm<0) meno+=(-bm);
   });
@@ -1317,14 +1303,14 @@ function EmployeeCard(props){
           let assDays=0; for(let dd=1; dd<=nd; dd++){ const cv=String(rec.giorni[dd]==null?"":rec.giorni[dd]).trim(); if(CODE_SET[cv] && cv!=="--" && cv!=="AN") assDays++; }
           const assOre = assDays*quota;
           const rese = tot;
-          const delta = Math.round(((rese>=base ? (rese-base) : -Math.max(0, base-rese-assOre)))*1000)/1000;  // le assenze coprono il buco, non fanno straordinario
+          const delta = Math.round((rese + assOre - base)*1000)/1000;                 // delta del mese (no accumulo)
           const bcls = delta > 0.0005 ? "warn" : (delta < -0.0005 ? "over" : "ok");
           const segno = delta>0.0005 ? "+" : "";
           const esito = delta>0.0005 ? "ore in più (straordinario)" : (delta<-0.0005 ? "ore in meno" : "in pari");
           return <div className={"cong " + bcls}>
             <div className="cong-head">➕➖ Ore in più / in meno — base mensile</div>
             <div className="cong-plain">
-              Questo mese ha fatto <b>{fmt3(rese)} ore</b>; ne doveva fare <b>{fmt3(base)}</b> (base mensile). Ferie, malattia e permessi <b>coprono le ore mancanti</b>, ma non fanno straordinario. <b>Risultato del mese: {segno}{fmt3(delta)} ore</b> ({esito}).
+              Questo mese ha fatto <b>{fmt3(rese)} ore</b>; ne doveva fare <b>{fmt3(base)}</b> (base mensile). Ferie, malattia e permessi contano come fatte. <b>Risultato del mese: {segno}{fmt3(delta)} ore</b> ({esito}).
             </div>
             <div className="cong-row">
               <span className="cong-chip">Base del mese: <b>{fmt3(base)} h</b></span>
