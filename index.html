@@ -209,7 +209,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver62";
+const APP_VER = "ver63";
 const APP_DATA = "31ott26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
@@ -1282,11 +1282,10 @@ function EmployeeCard(props){
       </div>
       <div className="foot-line">
         <span className="foot-tot">TOT calcolato: <b>{fmt2(tot)}</b></span>
-        {!dp.mensilizzato ? <label>Ore dichiarate (uso interno):</label> : null}
-        {!dp.mensilizzato ? <input className="dich-in" value={rec.dich || ""} placeholder="—" disabled={mLocked}
-          onChange={function(e){ props.onDich(dp.id, e.target.value); }} /> : null}
+        <label>Ore dichiarate (uso interno):</label>
+        <input className="dich-in" value={rec.dich || ""} placeholder="—" disabled={mLocked}
+          onChange={function(e){ props.onDich(dp.id, e.target.value); }} title="Ore dichiarate dal lavoratore. Se sono diverse dal totale calcolato, la differenza resta nel Conguaglio ore e te la ritrovi nei mesi dopo, finche' non la sistemi." />
         {(function(){
-          if (dp.mensilizzato) return null;
           const s = String(rec.dich === undefined ? "" : rec.dich).trim();
           if (s === "") return null;
           const dn = parseFloat(s.replace(",", "."));

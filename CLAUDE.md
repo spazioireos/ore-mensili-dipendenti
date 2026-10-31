@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver62 · 31ott26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver63 · 31ott26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -30,6 +30,14 @@ Banca ore, tetto annuo, contratti e export.
   Corretto anche un difetto **preesistente** che la nuova navigazione rendeva visibile: nella
   testata, in vista Anagrafica, compariva "📅 undefined 2026" (perché `mese` è `null` fuori dalle
   viste mensili); ora mostra "📇 Anagrafica".
+- **"Ore dichiarate" e Conguaglio ore**: nel report mensile la casella *Ore dichiarate (uso
+  interno)* si compila per **tutti** i dipendenti, **mensilizzati compresi** (da ver63,
+  31/10/2026: prima era nascosta da `{!dp.mensilizzato ? … : null}`, e il meccanismo del
+  conguaglio restava inutilizzabile proprio per loro, che sono quelli pagati "in via teorica"
+  quando il lavoratore non consegna le ore in tempo). La differenza fra dichiarato e calcolato
+  **si riporta da sola nei mesi successivi**: `saldoPrec()` somma `dichiarate − calcolate` dei
+  mesi precedenti e riparte da zero dopo l'ultimo mese con `saldoAzzerato`. Il riquadro
+  "Conguaglio ore" era già visibile a tutti: mancava solo il modo di scrivere il dato.
 - **Funzione presente**: confronto non vincolante con l'app "Fogli ore" (SOLA LETTURA delle
   collection `users` e `timesheets` dello stesso progetto Firebase). Non scrivere MAI lì.
 - **Verifica prima del commit**: compilare l'intero blocco `<script type="text/babel">` con
