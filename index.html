@@ -178,6 +178,23 @@
   .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:#DE4C8A; color:#fff; padding:11px 20px; border-radius:10px; font-size:13px; font-weight:700; z-index:200; box-shadow:0 6px 20px rgba(0,0,0,.3); max-width:90%; text-align:center; }
   .toast.warn { background:#b45309; }
   .hidden-file { display:none; }
+
+/* ============== LEGGIBILITA' (ver66 - 31ott26) ==============
+   Pensata per chi legge con la vista stanca.
+   1) nessuna scritta sotto i 12px fuori dalla griglia del mese;
+   2) i grigi chiari su bianco diventano piu' scuri: piu' contrasto;
+   3) bordo ben visibile sulla casella in cui stai scrivendo;
+   4) pulsanti piu' alti, piu' facili da centrare.
+   Le misure minuscole sono scritte dentro l'attributo style, percio' si
+   recuperano con [style*="..."] e !important. Solo aspetto: nessuna logica.  */
+[style*="font-size: 5px"],[style*="font-size: 6px"],[style*="font-size: 9px"],
+[style*="font-size: 11px"],[style*="font-size: 11.5px"]{font-size:12.5px !important}
+[style*="color: #94a3b8"],[style*="color: #cbd5e1"],
+[style*="color: #9ca3af"]{color:#475569 !important}
+.btn{min-height:40px;font-size:14px}
+input:focus,select:focus,textarea:focus{outline:3px solid #1d4ed8;outline-offset:1px}
+.btn:focus-visible{outline:3px solid #1d4ed8;outline-offset:2px}
+/* ================= fine aggiunta leggibilita' ================= */
 </style>
 </head>
 <body>
@@ -209,7 +226,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver65";
+const APP_VER = "ver66";
 const APP_DATA = "31ott26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];

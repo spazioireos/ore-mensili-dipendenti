@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver65 · 31ott26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver66 · 31ott26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -51,6 +51,10 @@ Banca ore, tetto annuo, contratti e export.
   "Conguaglio ore" era già visibile a tutti: mancava solo il modo di scrivere il dato.
 - **Funzione presente**: confronto non vincolante con l'app "Fogli ore" (SOLA LETTURA delle
   collection `users` e `timesheets` dello stesso progetto Firebase). Non scrivere MAI lì.
+- **Leggibilità (ver66, 31/10/2026)**: blocco in fondo al `<style>`. Le scritte sotto i 12px
+  scritte nell'attributo `style` salgono a 12,5px, i grigi chiari (#94a3b8, #cbd5e1, #9ca3af)
+  diventano `#475569`, i pulsanti `.btn` sono alti almeno 40px e la casella in cui scrivi ha un
+  bordo blu ben visibile. Solo aspetto.
 - **Verifica prima del commit**: compilare l'intero blocco `<script type="text/babel">` con
   Babel preset-react e fare `node --check` sull'output.
 - **Non toccare senza richiesta esplicita**: Banca ore, tetto annuo, `monteFissoMese`,
