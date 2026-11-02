@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver68 · 01nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver69 · 02nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -57,6 +57,29 @@ Banca ore, tetto annuo, contratti e export.
   altrimenti scrivere "7" con la domenica deselezionata non riempirebbe nulla senza spiegazione;
   i numeri fuori dal mese vengono contati e segnalati, non applicati. Il resto della finestra
   (valore, giorni della settimana, salta festivi, sovrascrivi, conferma) è invariato.
+- **Date di avvio automatiche** (da ver69, 02/11/2026). Nel modulo dell'anagrafica le caselle
+  *Data di avvio proroga* e *Data di avvio trasformazione* erano **scritte, salvate e mai usate**:
+  nessuna lettera le leggeva, nessun calcolo le guardava. Ora sono **di sola lettura e si
+  calcolano da sole** (tipo `roauto:proroAvvio` / `roauto:trasfAvvio`, chiavi `__proroAvvio` /
+  `__trasfAvvio`, funzioni `proroAvvioAuto` = giorno dopo la scadenza precedente, e
+  `trasfAvvioAuto` = decorrenza dell'ultima trasformazione registrata). ⚠️ I vecchi valori
+  `ana.proroAvvio` / `ana.trasfAvvio` **restano nel database e non vengono cancellati**:
+  semplicemente non si leggono più. Nell'**export Excel** le due colonne **restano al loro posto**
+  (43ª e 46ª su 50) con il valore automatico: cambia solo l'intestazione, da "(GG/MM/AAAA)" a
+  "(AUTOMATICA)". Il contrario — dedurre il riquadro *Trasformaz./proroghe* dai dati della
+  lettera — **non si fa**: quel riquadro muove i calcoli di tutti i mesi successivi e deve restare
+  una scrittura voluta.
+- **Mensilizza tutti dal mese…** (da ver69, 02/11/2026). In ANAGRAFICA, riga "Azioni su tutti":
+  apre un pannello con mese + anno e l'elenco delle persone spuntate (si tolgono quelle che non
+  devono esserlo), poi `onMensTutti(ids, mese, anno)` scrive `mensilizzato:true` e
+  `mensilizzatoDal:"01/MM/AAAA"`. **Chiede conferma** elencando i nomi, **salta** chi è già
+  mensilizzato da quella stessa data, avvisa se non è selezionato nessuno o se l'anno non è di 4
+  cifre. Come tutto il resto, scrive solo in memoria: **serve 💾 per salvare**.
+- **Spaziatura dell'anagrafica (ver69)**: la griglia dei campi ha classe **`.ana-grid`**; gap
+  8→6px, margine delle sezioni 12→8px, margine sotto le etichette 4→2px (regola CSS in fondo al
+  `<style>`). ⚠️ **L'altezza delle caselle non si tocca** (resta 38px): si stringono solo gli
+  spazi, non i bersagli da toccare col dito. Misurato: modulo da 3298px a 3171px, stessi 53
+  campi, zero caselle sotto i 32px.
 - **Funzione presente**: confronto non vincolante con l'app "Fogli ore" (SOLA LETTURA delle
   collection `users` e `timesheets` dello stesso progetto Firebase). Non scrivere MAI lì.
 - **Leggibilità (ver66, 31/10/2026)**: blocco in fondo al `<style>`. Le scritte sotto i 12px

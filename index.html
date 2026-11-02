@@ -192,6 +192,9 @@
 [style*="color: #94a3b8"],[style*="color: #cbd5e1"],
 [style*="color: #9ca3af"]{color:#475569 !important}
 .btn{min-height:40px;font-size:14px}
+/* ver69 (02nov26): campi dell'anagrafica piu' vicini tra loro. Solo spazi:
+   l'altezza delle caselle NON si tocca, resta comoda da toccare col dito. */
+.ana-grid .field label{margin-bottom:2px}
 input:focus,select:focus,textarea:focus{outline:3px solid #1d4ed8;outline-offset:1px}
 .btn:focus-visible{outline:3px solid #1d4ed8;outline-offset:2px}
 /* ================= fine aggiunta leggibilita' ================= */
@@ -226,8 +229,8 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver68";
-const APP_DATA = "01nov26";
+const APP_VER = "ver69";
+const APP_DATA = "02nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
 const MESE_ABBR_FILE = ["gen","feb","mar","apr","mag","giu","lug","ago","set","ott","nov","dic"];
@@ -530,6 +533,9 @@ function naturalEndInt(dp){ if(tipoNow(dp)==="determinato"){ let end=ymdIt(dp.sc
 function cessEffStr(dp){ if(dp && dp.cessManuale) return dp.dataCessazione||""; const n=naturalEndInt(dp); return n?intToIt(n):""; }
 function recHasData(rec){ if(!rec||!rec.giorni) return false; const ks=Object.keys(rec.giorni); for(let i=0;i<ks.length;i++){ const v=rec.giorni[ks[i]]; const sv=String(v==null?"":v).trim(); if(sv!=="" && sv!=="--") return true; } return false; }
 function lastProroga(dp){ const ps=prorogheList(dp); if(!ps.length) return ""; let best=ps[0], bv=ymdIt(ps[0]); ps.forEach(function(p){ const v=ymdIt(p); if(v>bv){bv=v;best=p;} }); return best; }
+function dayAfterIt(s){ const v=ymdIt(s); if(!v) return ""; const y=Math.floor(v/10000), m=Math.floor((v%10000)/100), d=v%100; const dt=new Date(y, m-1, d+1); return pad2(dt.getDate())+"/"+pad2(dt.getMonth()+1)+"/"+dt.getFullYear(); }
+function proroAvvioAuto(dp){ const ps=prorogheList(dp); if(!ps.length) return ""; const chain=[dp.scadenza||""].concat(ps); const prec=chain.length>1?chain[chain.length-2]:(dp.scadenza||""); return dayAfterIt(prec); }  // avvio dell'ultima proroga = giorno dopo la scadenza precedente
+function trasfAvvioAuto(dp){ const l=trasfOrder(dp); return l.length ? (l[l.length-1].data||"") : ""; }                                                                                     // avvio = decorrenza dell'ultima trasformazione registrata
 function inForceAt(dp, D){ const a=assunzInt(dp); if(!a) return false; if(a>D) return false; const e=effEndInt(dp); if(e && e<D) return false; return true; }
 function intToIt(n){ if(!n) return ""; const y=Math.floor(n/10000), m=Math.floor((n%10000)/100), d=n%100; return pad2(d)+"/"+pad2(m)+"/"+y; }
 function cellCode(v){ const s=String(v==null?"":v).trim().toUpperCase(); if(s==="") return ""; if(isNumeric(v)) return ""; return s.split(/\s+/)[0]; }
@@ -1487,13 +1493,13 @@ const ANA_SECTIONS = [
   { t:"Economico", f:[["impBase","Importo orario base €"],["impSuper","Superminimo €"],["tipoSuper","Superminimo: variante","super"],["scatti","Scatti di anzianità €"],["impAltro","Altro importo orario €"],["tipoAltro","Tipologia altro"],["impTot","Importo orario totale € (automatico)","auto"]] },
   { t:"Note", f:[["note","Note"],["note2","Note 2"]] },
   { t:"Proroga — dati per la lettera", f:[
-    ["proroAvvio","Data di avvio proroga (gg/mm/aaaa)","date"],
+    ["__proroAvvio","Data di avvio proroga (automatica)","roauto:proroAvvio"],
     ["__proroTermine","Data termine — ultima proroga (automatica)","roauto:proroTermine"],
     ["committenteFondi","Committente / fondi — es. Comune di Milano"],
     ["numeroAppalto","Numero appalto / convenzione"]
   ] },
   { t:"Trasformazione — dati per la lettera", f:[
-    ["trasfAvvio","Data di avvio trasformazione (gg/mm/aaaa)","date"],
+    ["__trasfAvvio","Data di avvio trasformazione (automatica)","roauto:trasfAvvio"],
     ["__trasfTermine","Data termine (non prevista)","roblock"],
     ["contenutoModifica","Contenuto della modifica — testo libero","textarea"]
   ] },
@@ -2008,6 +2014,10 @@ function Anagrafica(props){
   const dips = dipSorted(state);
   const [selId, setSelId] = useState((props.selInit && dips.some(function(x){ return x.id===props.selInit; })) ? props.selInit : (dips.length ? dips[0].id : null));
   const [msg, setMsg] = useState("");
+  const [mtOpen, setMtOpen] = useState(false);                                   // pannello "Mensilizza tutti"
+  const [mtMese, setMtMese] = useState("10");
+  const [mtAnno, setMtAnno] = useState(String(new Date().getFullYear()));
+  const [mtEsclusi, setMtEsclusi] = useState([]);
   const tplRef = React.useRef(null);
   const tplProRef = React.useRef(null);
   const tplTrasfRef = React.useRef(null);
@@ -2085,9 +2095,43 @@ function Anagrafica(props){
         <input ref={tplProRef} type="file" accept=".docx" style={{ display:"none" }} onChange={onTplPro} />
         <input ref={tplTrasfRef} type="file" accept=".docx" style={{ display:"none" }} onChange={onTplTrasf} />
       </div>
+      <div style={{ display:"flex", gap:"8px", alignItems:"center", flexWrap:"wrap", marginBottom:"10px" }}>
+        <span style={{ fontSize:"11px", fontWeight:800, color:"#64748b", textTransform:"uppercase", letterSpacing:".4px" }}>Azioni su tutti:</span>
+        <button className="btn btn-gray" onClick={function(){ setMtOpen(!mtOpen); setMsg(""); }} title="Imposta la mensilizzazione su piu' persone in una sola volta">📅 Mensilizza tutti dal mese…</button>
+      </div>
+      {mtOpen ?
+        <div style={{ background:"#ecfdf5", border:"2px solid #6ee7b7", borderRadius:"10px", padding:"12px 14px", marginBottom:"12px" }}>
+          <div style={{ fontSize:"14px", fontWeight:800, color:"#065f46", marginBottom:"6px" }}>Mensilizza piu' persone in una volta</div>
+          <div style={{ fontSize:"12.5px", color:"#065f46", lineHeight:1.5, marginBottom:"8px" }}>Mette la spunta <b>Mensilizzato</b> a tutte le persone selezionate, con decorrenza <b>dal 1° del mese</b> che scegli. Togli la spunta a chi <b>non</b> deve esserlo. Chi è già mensilizzato da quella stessa data non viene toccato. Prima di scrivere ti chiedo conferma; poi premi <b>💾 Salva</b>.</div>
+          <div style={{ display:"flex", gap:"10px", alignItems:"flex-end", flexWrap:"wrap", marginBottom:"8px" }}>
+            <div><div style={{ fontSize:"12px", fontWeight:700, color:"#374151", marginBottom:"2px" }}>Dal mese</div>
+              <select value={mtMese} style={{ padding:"8px" }} onChange={function(e){ setMtMese(e.target.value); }}>{MONTH_LABEL.map(function(l,i){ return <option key={i} value={String(i+1)}>{l}</option>; })}</select></div>
+            <div><div style={{ fontSize:"12px", fontWeight:700, color:"#374151", marginBottom:"2px" }}>Anno</div>
+              <input value={mtAnno} inputMode="numeric" style={{ width:"100px", border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"8px", padding:"8px 10px", fontFamily:"inherit", fontSize:"14px" }}
+                onChange={function(e){ setMtAnno(e.target.value.replace(/[^0-9]/g,"").slice(0,4)); }} /></div>
+            <div style={{ fontSize:"13px", color:"#065f46" }}>Decorrenza: <b>{(parseInt(mtMese,10)>=1 && parseInt(mtAnno,10)>=2000) ? ("01/"+(parseInt(mtMese,10)<10?"0":"")+parseInt(mtMese,10)+"/"+parseInt(mtAnno,10)) : "— (scegli mese e anno)"}</b></div>
+          </div>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(230px, 1fr))", gap:"4px", marginBottom:"10px" }}>
+            {dips.map(function(x){ const incluso = mtEsclusi.indexOf(x.id)<0; return (
+              <label key={x.id} style={{ display:"flex", alignItems:"center", gap:"6px", fontSize:"13px", cursor:"pointer" }}>
+                <input type="checkbox" checked={incluso} onChange={function(e){ setMtEsclusi(e.target.checked ? mtEsclusi.filter(function(i){ return i!==x.id; }) : mtEsclusi.concat([x.id])); }} />
+                <span style={{ fontWeight:700 }}>{x.nome}</span>
+                {x.mensilizzato && x.mensilizzatoDal ? <span style={{ fontSize:"12px", color:"#475569" }}>(già dal {x.mensilizzatoDal})</span> : null}
+              </label>
+            ); })}
+          </div>
+          <div style={{ display:"flex", gap:"8px", flexWrap:"wrap" }}>
+            <button className="btn btn-blue" onClick={function(){
+              const ids = dips.filter(function(x){ return mtEsclusi.indexOf(x.id)<0; }).map(function(x){ return x.id; });
+              const r = props.onMensTutti ? props.onMensTutti(ids, mtMese, mtAnno) : null;
+              if (r && r.ok){ setMtOpen(false); setMtEsclusi([]); setMsg("📅 Mensilizzazione impostata dal " + r.dal + " su " + r.n + (r.n===1?" persona":" persone") + ". Premi 💾 per salvare."); }
+            }}>✔ Applica a chi è spuntato</button>
+            <button className="btn btn-gray" onClick={function(){ setMtOpen(false); }}>Annulla</button>
+          </div>
+        </div> : null}
       {msg ? <div style={{ background:"#ecfdf5", border:"1px solid #6ee7b7", color:"#065f46", borderRadius:"8px", padding:"8px 12px", fontSize:"13px", marginBottom:"10px" }}>{msg}</div> : null}
       <div style={{ background:"#f8fafc", border:"1px dashed #94a3b8", borderRadius:"10px", padding:"10px 14px", marginBottom:"12px", fontSize:"13px", color:"#334155", lineHeight:"1.5" }}>
-        <b>Come si usa:</b> 1) scegli una persona nell'elenco a sinistra · 2) compila i campi <span style={{ background:"#fffde7", border:"1px solid #f59e0b", borderRadius:"4px", padding:"0 5px", fontWeight:700 }}>giallini</span> (sono quelli modificabili) · 3) premi <b>💾 Salva</b> · 4) crea i documenti con i pulsanti <b>📄 Contratto / Proroga / Trasformazione</b> in alto a destra. Le <b>proroghe</b> si aggiungono con <b>✎ Modifica dipendente</b>.
+        <b>Come si usa:</b> 1) scegli una persona nell'elenco a sinistra · 2) compila i campi <span style={{ background:"#fffde7", border:"1px solid #f59e0b", borderRadius:"4px", padding:"0 5px", fontWeight:700 }}>giallini</span> (sono quelli modificabili) · 3) premi <b>💾 Salva</b> · 4) crea i documenti con i pulsanti <b>📄 Contratto / Proroga / Trasformazione</b> in alto a destra. Le <b>proroghe</b> e le <b>trasformazioni</b> si aggiungono in fondo a questa scheda, nel riquadro viola <b>Trasformaz./proroghe</b>.
       </div>
       <div style={{ display:"flex", gap:"14px", alignItems:"flex-start" }}>
         <div style={{ minWidth:"210px", display:"flex", flexDirection:"column", gap:"4px" }}>
@@ -2110,10 +2154,10 @@ function Anagrafica(props){
             </div>
           </div>
           {ANA_SECTIONS.map(function(sec){ return (
-            <div key={sec.t} style={{ marginBottom:"12px" }}>
-              <div style={{ fontSize:"12px", fontWeight:800, color:"#92400e", textTransform:"uppercase", letterSpacing:".4px", marginBottom:"6px", borderBottom:"1px solid #fde68a", paddingBottom:"3px" }}>{sec.t}</div>
+            <div key={sec.t} style={{ marginBottom:"8px" }}>
+              <div style={{ fontSize:"12px", fontWeight:800, color:"#92400e", textTransform:"uppercase", letterSpacing:".4px", marginBottom:"4px", borderBottom:"1px solid #fde68a", paddingBottom:"2px" }}>{sec.t}</div>
               {sec.t==="Domicilio" ? <label style={{ display:"flex", alignItems:"center", gap:"6px", fontSize:"13px", marginBottom:"6px", cursor:"pointer" }}><input type="checkbox" checked={!!(dp.ana&&dp.ana.domUgualeRes)} onChange={function(e){ props.onAnaField(dp.id,"domUgualeRes",e.target.checked); }} /> Domicilio uguale alla residenza</label> : null}
-              <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(230px, 1fr))", gap:"8px" }}>
+              <div className="ana-grid" style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(230px, 1fr))", gap:"6px" }}>
                 {sec.f.map(function(fld){
                   const key=fld[0], lbl=fld[1], kind=fld[2];
                   if (kind==="auto") return <div key={key} className="field" style={{margin:0}}><label>{lbl}</label><input value={anaTot(dp)} disabled style={{background:"#fdf0f6",borderColor:"#f3bcd6",fontWeight:700}} /></div>;
@@ -2141,7 +2185,13 @@ function Anagrafica(props){
                         {ce ? <button type="button" className="btn btn-red" title="Cancella le ore inserite dopo la cessazione (con conferma)" onClick={function(){ props.onCessCleanup(dp.id); }} style={{ whiteSpace:"nowrap" }}>🧹 Pulisci ore dopo</button> : null}
                       </div>
                       <div style={{ fontSize:"11px", marginTop:"2px", color:"#64748b" }}>{manuale ? "Impostata a mano (uscita anticipata)." : "Automatica: fine contratto o ultima proroga. Le ore dopo questa data sono bloccate nel report."}</div></div>; }
-                  if (kind && kind.indexOf("roauto:")===0){ const which=kind.slice(7); const val = which==="proroTermine" ? lastProroga(dp) : ""; return <div key={key} className="field" style={{margin:0}}><label>{lbl}</label><input value={val} disabled placeholder="(nessuna proroga)" style={{ background:"#f1f5f9", borderColor:"#cbd5e1", color:"#475569" }} /></div>; }
+                  if (kind && kind.indexOf("roauto:")===0){ const which=kind.slice(7);
+                    const val = which==="proroTermine" ? lastProroga(dp) : which==="proroAvvio" ? proroAvvioAuto(dp) : which==="trasfAvvio" ? trasfAvvioAuto(dp) : "";
+                    const ph = which==="trasfAvvio" ? "(nessuna trasformazione)" : "(nessuna proroga)";
+                    const tip = which==="proroAvvio" ? "Automatica: giorno dopo la scadenza precedente. La data che conta si registra in fondo alla scheda, riquadro Trasformaz./proroghe."
+                              : which==="trasfAvvio" ? "Automatica: decorrenza dell'ultima trasformazione registrata in fondo alla scheda, riquadro Trasformaz./proroghe."
+                              : "Automatica: ultima proroga registrata in fondo alla scheda, riquadro Trasformaz./proroghe.";
+                    return <div key={key} className="field" style={{margin:0}} title={tip}><label>{lbl}</label><input value={val} disabled placeholder={ph} style={{ background:"#f1f5f9", borderColor:"#cbd5e1", color:"#475569" }} /></div>; }
                   if (kind==="roblock"){ return <div key={key} className="field" style={{margin:0}}><label>{lbl}</label><input value="" disabled placeholder="—" style={{ background:"#f1f5f9", borderColor:"#cbd5e1", color:"#94a3b8" }} /></div>; }
                   if (kind==="sex") return <div key={key} className="field" style={{margin:0}}><label>{lbl}</label>
                     <select value={anaVal(dp,"sesso")||""} onChange={function(e){ props.onAnaField(dp.id,"sesso",e.target.value); }}>
@@ -3143,6 +3193,25 @@ function App(){
     Object.keys(patch).forEach(function(k){ if (ANA_SHARED[k]) dp[k]=patch[k]; else dp.ana[k]=patch[k]; });
     touch(next);
   };
+  const onMensTutti = function(ids, mese, anno){                                   // mensilizzazione su piu' persone, con conferma esplicita
+    const mm=parseInt(mese,10), yy=parseInt(anno,10);
+    if (!(mm>=1 && mm<=12) || !(yy>=2000 && yy<=2100)){ window.alert("Scegli un mese valido e un anno di 4 cifre (es. 2026)."); return null; }
+    const dal = "01/" + (mm<10?"0":"") + mm + "/" + yy;
+    const sel = (state.dipendenti||[]).filter(function(d){ return ids.indexOf(d.id)>=0; });
+    if (sel.length===0){ window.alert("Non hai selezionato nessuna persona."); return null; }
+    const daCambiare = sel.filter(function(d){ return !(d.mensilizzato && d.mensilizzatoDal===dal); });
+    if (daCambiare.length===0){ window.alert("Nessuna persona da cambiare: quelle selezionate sono gia' mensilizzate dal " + dal + "."); return null; }
+    const nomi = daCambiare.map(function(d){ return d.nome; }).join("\n\u00b7 ");
+    const quante = daCambiare.length + (daCambiare.length===1 ? " persona" : " persone");
+    if (!window.confirm("Imposto la mensilizzazione dal " + dal + " su " + quante + ":\n\n\u00b7 " + nomi + "\n\nProcedo?")) return null;
+    const next = JSON.parse(JSON.stringify(state));
+    let n = 0;
+    next.dipendenti.forEach(function(d){
+      if (daCambiare.some(function(x){ return x.id===d.id; })){ d.mensilizzato = true; d.mensilizzatoDal = dal; n++; }
+    });
+    touch(next);
+    return { ok:true, n:n, dal:dal };
+  };
   const onCessCleanup = function(dipId){
     const dp0 = state.dipendenti.find(function(d){ return d.id===dipId; }); if(!dp0) return;
     const ce = cessEffStr(dp0); const ceInt = ymdIt(ce); if(!ceInt){ window.alert("Nessuna data di cessazione impostata."); return; }
@@ -3176,11 +3245,17 @@ function App(){
   const onExportAna = function(){
     const dips = dipSorted(state);
     const cols = [];
-    ANA_SECTIONS.forEach(function(sec){ sec.f.forEach(function(f){ const k=f[2]; if (k!=="auto" && k!=="cess" && k!=="roblock" && !(k&&String(k).indexOf("roauto:")===0)) cols.push([f[0], f[1]]); }); });
+    ANA_SECTIONS.forEach(function(sec){ sec.f.forEach(function(f){ const k=f[2];
+      if (k && String(k).indexOf("roauto:")===0){ const w=String(k).slice(7); if (w==="proroAvvio" || w==="trasfAvvio") cols.push([f[0], f[1]]); return; }  // le due date automatiche restano nell'export, al posto di prima
+      if (k!=="auto" && k!=="cess" && k!=="roblock") cols.push([f[0], f[1]]); }); });
     cols.push(["impTot","Importo orario totale €"]);
     const hdrStyle = { font:{ name:"Arial", bold:true, color:{rgb:"FFFFFFFF"} }, fill:{ patternType:"solid", fgColor:{rgb:"FF0F2740"} }, alignment:{horizontal:"center"} };
     const aoa = [cols.map(function(c){ return c[1].toUpperCase(); })];
-    dips.forEach(function(dp){ aoa.push(cols.map(function(c){ return c[0]==="impTot" ? anaTot(dp) : String(anaVal(dp, c[0])); })); });
+    dips.forEach(function(dp){ aoa.push(cols.map(function(c){
+      if (c[0]==="impTot") return anaTot(dp);
+      if (c[0]==="__proroAvvio") return proroAvvioAuto(dp);
+      if (c[0]==="__trasfAvvio") return trasfAvvioAuto(dp);
+      return String(anaVal(dp, c[0])); })); });
     const wb = XLSX.utils.book_new();
     wb.Props = { Title:"Anagrafica dipendenti", Author:"Christian Canonica", Company:"Spazio Ireos Società Cooperativa Sociale", CreatedDate:new Date() };
     const ws = XLSX.utils.aoa_to_sheet(aoa);
@@ -3435,7 +3510,7 @@ function App(){
 
       <div className="content" style={{ zoom: zoom / 100 }}>
         {vista === "rep" ? <Riepiloghi state={state} anno={anno} /> :
-         vista === "ana" ? <Anagrafica key={"ana-"+(anaSel||"")} selInit={anaSel} onDipPatch={onDipPatch} state={state} onAnaField={onAnaField} onAnaSet={onAnaSet} onCessCleanup={onCessCleanup} onTemplateChanged={onTemplateChanged} onImportAna={onImportAna} onExportAna={onExportAna} onAddDip={addDipDiretto} onEditDip={apriScheda} onSave={doSave} dirty={dirty} /> :
+         vista === "ana" ? <Anagrafica key={"ana-"+(anaSel||"")} selInit={anaSel} onDipPatch={onDipPatch} onMensTutti={onMensTutti} state={state} onAnaField={onAnaField} onAnaSet={onAnaSet} onCessCleanup={onCessCleanup} onTemplateChanged={onTemplateChanged} onImportAna={onImportAna} onExportAna={onExportAna} onAddDip={addDipDiretto} onEditDip={apriScheda} onSave={doSave} dirty={dirty} /> :
          vista === "query" ? <QueryPanel state={state} /> :
           <div>
             <div className="toolbar">
