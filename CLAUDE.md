@@ -74,6 +74,14 @@ Banca ore, tetto annuo, contratti e export.
   scritto accanto. I dati veri stanno su Firebase e l'app li carica all'accesso: **non
   reintrodurre mai elenchi, anagrafiche, note o ore di persone reali in questo file**, nemmeno
   "solo come esempio".
+- 🔴 **STORIA AZZERATA il 02/11/2026**: rimuovere i dati dal file non bastava, perché restavano
+  leggibili nei commit vecchi. Christian ha **cancellato il repository** (dopo aver scaricato il
+  contenuto) e lo si è **ricreato con un unico commit**, la ver68. Quindi: `main` ha **un solo
+  commit**, non c'è passato e **non esiste più** il ramo `stabile-30ott26`. Il punto di ripristino
+  è il ramo **`ripristino-ver67`** (un commit, la ver67: tutto come adesso ma senza la scelta dei
+  giorni in "Compila veloce"). Da ricordare: cancellare il repository **spegne l'app** pubblicata
+  su Pages e butta i rami non ancora scaricati; la prossima volta si ricrea la storia senza
+  cancellare il repository.
 - **Verifica prima del commit**: compilare l'intero blocco `<script type="text/babel">` con
   Babel preset-react e fare `node --check` sull'output.
 - **Non toccare senza richiesta esplicita**: Banca ore, tetto annuo, `monteFissoMese`,
