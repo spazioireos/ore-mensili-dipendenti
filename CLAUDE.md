@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver69 · 02nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver70 · 02nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -80,6 +80,25 @@ Banca ore, tetto annuo, contratti e export.
   `<style>`). ⚠️ **L'altezza delle caselle non si tocca** (resta 38px): si stringono solo gli
   spazi, non i bersagli da toccare col dito. Misurato: modulo da 3298px a 3171px, stessi 53
   campi, zero caselle sotto i 32px.
+- **I "+ Aggiungi …" aprono le caselle** (da ver70, 02/11/2026). Nei quattro riquadri in fondo
+  alla scheda (proroghe, trasformazioni, monte ore temporaneo, massimali annui) le caselle non
+  stanno più sempre a vista: si vede **solo il pulsante**, che le apre; poi **✔ Aggiungi** registra
+  e **Annulla** richiude svuotando quello che era stato scritto. Stati `apPro`/`apTra`/`apOt`/
+  `apTet`, funzioni di chiusura `chiudiPro`/`chiudiTra`/`chiudiOt`/`chiudiTet`.
+  ⚠️ Gli `add…` ora **restituiscono `true`/`false`** (prima facevano `return` muto) e, quando non
+  registrano, scrivono il motivo in `errPro`/`errTra`/`errOt`/`errTet`: senza quel messaggio il
+  clic su ✔ non avrebbe spiegazione. **Le regole di validazione sono rimaste identiche**, è
+  cambiato solo cosa succede dopo. Misurato: i riquadri in fondo passano da 976 a 922 px.
+  *+ Aggiungi sostituzione* e *+ Aggiungi voce* (vista del mese) **non sono stati toccati**: lì il
+  pulsante aggiunge subito una riga vuota, è un meccanismo diverso.
+- **Mensilizzazione: normale dal 01/10/2026** (da ver70, decisione di Christian del 02/11/2026).
+  Costante **`MENS_DAL_DEFAULT = "01/10/2026"`**. Un **dipendente nuovo** nasce con
+  `mensilizzato:true` e `mensilizzatoDal:"01/10/2026"`; il pannello "Mensilizza tutti" e la casella
+  *Dal mese/Anno* della scheda partono da quella data invece che dal mese corrente. ⚠️ **Nessun
+  dipendente esistente è stato cambiato dal codice**: su quelli si usa il pulsante "Mensilizza
+  tutti", che chiede conferma. La spunta resta un dato della persona (scelta **2a**): l'idea di
+  considerare mensilizzati tutti per difetto, con una spunta "eccezione" al contrario (2b), è
+  stata **scartata**, perché toglierebbe la traccia di chi è mensilizzato e da quando.
 - **Funzione presente**: confronto non vincolante con l'app "Fogli ore" (SOLA LETTURA delle
   collection `users` e `timesheets` dello stesso progetto Firebase). Non scrivere MAI lì.
 - **Leggibilità (ver66, 31/10/2026)**: blocco in fondo al `<style>`. Le scritte sotto i 12px
