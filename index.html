@@ -249,7 +249,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver77";
+const APP_VER = "ver78";
 const APP_DATA = "03nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -4066,6 +4066,64 @@ function App(){
   };
 
 
+  /* ---- ver78: PUBBLICA AI DIPENDENTI il residuo del tetto annuo ----------------
+     Scrive nella collection "residui" del progetto condiviso: UN documento per
+     operatore, doc-id = suo uid in Fogli ore, contenuto SOLO numeri (nessun nome,
+     nessun dato personale). Lo legge soltanto il diretto interessato.
+     ⚠️ E' l'unica scrittura che questa app fa fuori dal proprio documento, ed e'
+     SEMPRE manuale: nessun salvataggio automatico. Le collection "users" e
+     "timesheets" restano in sola lettura, come sempre. */
+  const [pubEsito, setPubEsito] = useState("");
+  const pubblicaResidui = function(){
+    if (!FB_READY || !dbRef.current){ window.alert("Serve il collegamento al database: questa funzione non lavora in modalità locale."); return; }
+    const righe = [];
+    dipSorted(state).forEach(function(dp){
+      const tetto = tettoForPeriod(dp, anno, mese);
+      if (isNaN(tetto) || tetto <= 0) return;
+      const usate = consumoTetto(state, dp, anno, mese);
+      righe.push({ nome:dp.nome, periodo:(dp.tettoPeriodo==="civile"?"civile":"scolastico"),
+                   annoRif: tettoStartYear(dp, anno, mese),
+                   tetto:R2(tetto,3), usate:R2(usate,3), restano:R2(tetto-usate,3) });
+    });
+    if (!righe.length){ window.alert("Nessun dipendente ha un massimale annuo impostato per questo periodo: non c'è niente da pubblicare."); return; }
+    setPubEsito("lettura degli operatori di Fogli ore in corso…");
+    foLeggiUtenti(dbRef.current, foCacheRef.current).then(function(utenti){
+      const perNome = {}; Object.keys(utenti).forEach(function(uid){ perNome[foNorm(utenti[uid])] = uid; });
+      const daScrivere = [], senzaAccount = [];
+      righe.forEach(function(r){
+        const uid = perNome[foNorm(r.nome)];
+        if (uid) daScrivere.push(Object.assign({ uid:uid }, r)); else senzaAccount.push(r.nome);
+      });
+      if (!daScrivere.length){
+        setPubEsito("");
+        window.alert("Nessuno dei dipendenti con un massimale ha un account in Fogli ore con lo stesso COGNOME NOME:\n\n" + senzaAccount.join("\n"));
+        return;
+      }
+      const elenco = daScrivere.map(function(r){ return "• " + r.nome + ": restano " + fmt3(r.restano) + " h su " + fmt3(r.tetto); }).join("\n");
+      const avviso = senzaAccount.length ? ("\n\nSENZA ACCOUNT in Fogli ore (saltati):\n" + senzaAccount.join("\n")) : "";
+      if (!window.confirm("Vuoi pubblicare il residuo a questi " + daScrivere.length + " dipendenti?\nLo vedranno dentro Fogli ore, ciascuno solo il proprio.\n\n" + elenco + avviso)){ setPubEsito(""); return; }
+      setPubEsito("pubblicazione in corso…");
+      const db = dbRef.current;
+      Promise.all(daScrivere.map(function(r){
+        return db.collection("residui").doc(r.uid).set({
+          tetto:r.tetto, usate:r.usate, restano:r.restano, periodo:r.periodo, anno:r.annoRif,
+          aggiornato: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge:true }).then(function(){ return { ok:true, nome:r.nome }; })
+          .catch(function(e){ console.error("residui", r.nome, e); return { ok:false, nome:r.nome, err:(e && e.message) || "errore" }; });
+      })).then(function(esiti){
+        const ko = esiti.filter(function(x){ return !x.ok; });
+        setPubEsito("");
+        if (!ko.length){ window.alert("Pubblicati " + esiti.length + " residui. Ogni dipendente vede il proprio dentro Fogli ore."); return; }
+        window.alert("Pubblicati " + (esiti.length - ko.length) + " su " + esiti.length + ".\n\nNON riusciti:\n" +
+          ko.map(function(x){ return "• " + x.nome + " — " + x.err; }).join("\n") +
+          "\n\nSe l'errore parla di permessi, le regole di sicurezza nuove non sono ancora pubblicate in console Firebase.");
+      });
+    }).catch(function(e){
+      console.error("residui", e); setPubEsito("");
+      window.alert("Non sono riuscito a leggere gli operatori di Fogli ore: " + ((e && e.message) || "errore"));
+    });
+  };
+
   /* ---- confronto NON VINCOLANTE con l'app "Fogli ore" (sola lettura, una lettura per mese/anno) ---- */
   const [foData, setFoData] = useState(null);
   const [foErr, setFoErr] = useState(false);
@@ -4163,6 +4221,9 @@ function App(){
               <button className={"btn " + (mLocked ? "btn-red" : "btn-gray")} title={mLocked ? "Sblocca il mese per poterlo modificare" : "Blocca il mese: nessuna cella potrà più essere modificata"}
                 onClick={toggleLock}>{mLocked ? "🔓 Sblocca mese" : "🔒 Blocca mese"}</button>
               <button className="btn btn-blue" disabled={mLocked} onClick={addDipDiretto}>+ Dipendente</button>
+              <button className="btn btn-gray" onClick={pubblicaResidui} disabled={!!pubEsito}
+                title="Manda a ogni dipendente, dentro Fogli ore, quante ore gli restano del suo massimale annuo. Ognuno vede solo il proprio.">📤 Pubblica i residui</button>
+              {pubEsito ? <span style={{ fontSize:"12.5px", color:"#475569" }}>{pubEsito}</span> : null}
             </div>
             {mLocked ? <div className="lock-info">Questo mese è bloccato: le celle non sono modificabili. Premi "Sblocca mese" per riaprirlo.</div> : null}
             {foErr ? <div style={{ background:"#f8fafc", border:"1px solid #e2e8f0", borderRadius:"8px", color:"#64748b", fontSize:"11px", padding:"4px 9px", margin:"6px 0", display:"inline-block" }}>confronto Fogli ore non disponibile (permessi)</div> : null}

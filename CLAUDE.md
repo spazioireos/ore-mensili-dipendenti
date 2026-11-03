@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver77 · 03nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver78 · 03nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -190,6 +190,21 @@ Banca ore, tetto annuo, contratti e export.
   - Funzioni aggiunte sopra il Tetto annuo: `eroOn`, `isAbsCell`, `oreEroseMese` (+ `svcCapsList`,
     `svcCapLabel`, `svcCapMesi`, `svcCapAttivo`, **non ancora usate**: erano per l'ipotesi «per
     servizio», lasciate per il pezzo che il dipendente vedrà dentro Fogli ore).
+- 📤 **PUBBLICA I RESIDUI AI DIPENDENTI** (ver78, 03/11/2026). Pulsante nella barra della vista
+  del mese. Calcola, per ogni dipendente con un **tetto annuo** in vigore nel periodo che
+  contiene il mese guardato, `tetto / usate / restano`, abbina il nome all'operatore di Fogli ore
+  (stesso "COGNOME NOME", via `foLeggiUtenti`) e scrive **un documento per persona** nella
+  collection **`residui`** del progetto condiviso: doc-id = uid dell'operatore, dentro **solo
+  numeri**.
+  - ⚠️ **È l'unica scrittura che questa app fa fuori dal proprio documento.** `users` e
+    `timesheets` restano in **sola lettura**, come sempre.
+  - **Mai automatica**: pulsante + **conferma** che elenca nome per nome quanto verrà pubblicato,
+    e che segnala a parte chi **non ha un account** in Fogli ore con lo stesso nome.
+  - **L'esito non mente**: alla fine dice quanti sono riusciti e **chi no, con il motivo**; se
+    l'errore parla di permessi, avvisa che **le regole di sicurezza nuove non sono ancora
+    pubblicate** in console.
+  - ⚠️ **Serve che Christian pubblichi** `regole-firestore/regole-residui-03nov26.rules` (sta nel
+    repo di Fogli ore). Finché non lo fa, il pulsante fallisce e lo dice.
 - 🔴 **I FESTIVI NON SI COMPILANO** (ver77, richiesta di Christian, opzione **A** = blocco totale).
   Sui giorni rossi (festività e domeniche) non si scrive più **niente**, né ore né codici:
   `nonScriv = blocked || rosso` disattiva la casella e il pulsante del permesso orario.
