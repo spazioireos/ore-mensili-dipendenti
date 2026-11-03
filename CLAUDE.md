@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver78 · 03nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver79 · 03nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -190,6 +190,47 @@ Banca ore, tetto annuo, contratti e export.
   - Funzioni aggiunte sopra il Tetto annuo: `eroOn`, `isAbsCell`, `oreEroseMese` (+ `svcCapsList`,
     `svcCapLabel`, `svcCapMesi`, `svcCapAttivo`, **non ancora usate**: erano per l'ipotesi «per
     servizio», lasciate per il pezzo che il dipendente vedrà dentro Fogli ore).
+- 💶 **COSTO ORARIO: SETTE CORREZIONI AI CRITERI** (ver79, 03/11/2026, tutte decise da Christian
+  dopo aver visto un caso reale che dava **27,81 €/h** su un mese singolo invece di ~20).
+  La causa di quel numero: **le festività erano due numeri fissi annui** (11 godute, 3 non godute)
+  tolti **per intero** da qualunque periodo, anche da un mese solo. Su 1 mese restavano 1,76
+  settimane lavorabili su 4,35, e quasi tutte le ore diventavano straordinario al +27%.
+  1. **INPS 26,40 → 26,90%** (valore comune): i 26,40 non comprendevano lo 0,50%.
+  2. **TFR meno lo 0,50%**: `J20 = imponibile II × 0,50%`, `J19 = base/13,5 − J20`. È una quota
+     dei contributi dovuti all'INPS, quindi sulla **stessa base dei contributi**. Operazione
+     **neutra sul totale**: quello che si aggiunge all'INPS si toglie dal TFR (provato: +6,38 e
+     −6,38 sullo stesso caso). La **rivalutazione** si calcola sul TFR già al netto.
+     A video due righe (*TFR maturato* lordo e *0,50% già nei contributi*), così le voci
+     **continuano a sommare** al Costo totale: verificato, 29.456,05 contro 29.456,04.
+  3. **Festività non godute FUORI dall'imponibile TFR**: `H19 = (L15 − J12) + …`.
+  4. **Assistenza sanitaria proporzionata**: `(132/12) × mesi`, **solo indeterminati**.
+     ⚠️ **Ribalta la decisione del 02/11/2026** («fissa a 132 indipendentemente dai mesi»):
+     è stato Christian a cambiarla il 03/11. Su 12 mesi il risultato è identico (132).
+  5. **Formazione: 250 € per ogni anno iniziato** (`250 × max(1, ceil(mesi/12))`, scelta **B**).
+     Fino a 12 mesi è come la «secca»: 250. A 18 mesi diventa 500. Motivo di Christian: «sono
+     250 annui, ma se uno lavora solo un mese lo devo formare lo stesso».
+  6. **Festività contate dal calendario del periodo**, con **`contaFestivita(pairs)`**:
+     **goduta** = cade in giorno lavorativo (lun-sab); **non goduta** = cade di **domenica**,
+     **più il 4 novembre sempre** (`FEST_NON_GOD_FISSE`). I due valori comuni restano a video ma
+     **non sono più usati**: etichetta grigia e nota «non in uso: ora si contano dal calendario»,
+     con accanto quanti ne conta il periodo scelto. `campoNum` accetta ora come sesto parametro
+     anche una **stringa**, che diventa il testo della nota.
+     ⚠️ **Il 4 novembre NON sta in `festivitaSet`**: quel giorno si lavora, la cella resta
+     compilabile e non è rossa.
+  7. **Sant'Ambrogio (7 dicembre) aggiunto a `festivitaSet`**. ⚠️ Da ver77 i giorni rossi **non
+     si compilano**: dal 7/12 in poi quella casella è bloccata e le ore già scritte sui 7
+     dicembre passati non sono più correggibili. Con Sant'Ambrogio dentro, il 2026 conta
+     **11 godute**, cioè esattamente il valore che Christian aveva messo a mano: era quello il
+     pezzo mancante.
+  - **Numeri verificati in esecuzione** (persona a 15 h/sett., 64 h dichiarate):
+    | Periodo | Godute / non godute | Costo orario prima | dopo |
+    |---|---|---|---|
+    | nov 2026 (1 mese) | 0 / 2 | 27,81 €/h | **23,49 €/h** |
+    | anno 2026 (12 mesi) | 11 / 4 | 19,65 €/h | **19,68 €/h** |
+    | a.s. 2026/27 | 9 / 6 | — | 19,66 €/h |
+    Sull'**anno intero il risultato non si muove** (3 centesimi): le correzioni si vedono sui
+    periodi corti, che prima erano sbagliati.
+  - ⚠️ **I costi orari calcolati finora su periodi più corti dell'anno erano sovrastimati.**
 - 📤 **PUBBLICA I RESIDUI AI DIPENDENTI** (ver78, 03/11/2026). Pulsante nella barra della vista
   del mese. Calcola, per ogni dipendente con un **tetto annuo** in vigore nel periodo che
   contiene il mese guardato, `tetto / usate / restano`, abbina il nome all'operatore di Fogli ore

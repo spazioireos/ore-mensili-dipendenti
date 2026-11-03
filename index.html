@@ -249,7 +249,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver78";
+const APP_VER = "ver79";
 const APP_DATA = "03nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -406,7 +406,8 @@ function pasqua(anno){
 }
 function festivitaSet(anno){
   const s = {};
-  [[1,1],[1,6],[4,25],[5,1],[6,2],[8,15],[10,4],[11,1],[12,8],[12,25],[12,26]].forEach(function(f){ s[f[0]+"-"+f[1]] = true; });
+  /* ver79: aggiunto il 7 dicembre (Sant'Ambrogio), richiesta di Christian del 03/11/2026. */
+  [[1,1],[1,6],[4,25],[5,1],[6,2],[8,15],[10,4],[11,1],[12,7],[12,8],[12,25],[12,26]].forEach(function(f){ s[f[0]+"-"+f[1]] = true; });
   const pa = pasqua(anno); s[pa.m+"-"+pa.d] = true;
   const pd = new Date(anno, pa.m-1, pa.d); pd.setDate(pd.getDate()+1);
   s[(pd.getMonth()+1)+"-"+pd.getDate()] = true;
@@ -473,6 +474,28 @@ function bancaPrecA(state,dp,anno,mese){                                    // b
   let s=0; for(let i=startIdx;i<months.length;i++){ const bm=bancaMeseA(state,dp,months[i].y,months[i].m); if(bm!=null) s+=bm; }
   return R2(s,3);
 }
+/* ===== FESTIVITA' DEL PERIODO (ver79) =======================================
+   Prima erano due numeri fissi fra i valori comuni (11 godute, 3 non godute),
+   giusti sull'anno intero e sbagliati su qualunque periodo piu' corto.
+   Ora si contano dal calendario dei mesi scelti:
+     - GODUTA     = festivita' che cade in un giorno lavorativo (lun-sab): toglie ore lavorabili;
+     - NON GODUTA = festivita' che cade di DOMENICA, piu' il 4 NOVEMBRE sempre.
+   ⚠️ Il 4 novembre NON sta in festivitaSet: quel giorno si lavora, la cella resta
+   compilabile e non e' rossa. Regole decise da Christian il 03/11/2026.          */
+const FEST_NON_GOD_FISSE = [[11,4]];   // [mese, giorno] — sempre non godute, mai rosse
+function contaFestivita(pairs){
+  let god=0, non=0;
+  (pairs||[]).forEach(function(pr){
+    const f=festivitaSet(pr.y), nd=daysInMonth(pr.y,pr.m);
+    for(let d=1; d<=nd; d++){
+      if(!isFestivo(f, pr.m, d)) continue;
+      if(weekdayOf(pr.y, pr.m, d)===0) non++; else god++;
+    }
+    FEST_NON_GOD_FISSE.forEach(function(x){ if(x[0]===pr.m) non++; });
+  });
+  return { god:god, non:non };
+}
+
 /* ===== MASSIMALI DI SERVIZIO (ver77) =========================================
    Il massimale si imposta QUI (dp.svcCaps) e si consuma con le ore erogate su
    quel servizio (lette da Fogli ore, sola lettura) PIU' le ore delle giornate di
@@ -2157,7 +2180,7 @@ const COSTO_COMUNE_DEF = {
   tabella:"Ott25", ggSett:6, quattordic:50, ferie:30, festNonGod:3, festGodute:11,
   festNonGodCoef:1, malattiaMese:2, integrMater:20, altriPermessi:0, suppPct:10,
   tfrSupp:"SI", tfrDiv:13.5, anniTfr:2, istat:2, prevCompl:1.5, prevComplPag:0,
-  inps:26.4, inpsPag:100, fis:0.53333, fisPag:100, inail:0.4, inailPag:100,
+  inps:26.90, inpsPag:100, fis:0.53333, fisPag:100, inail:0.4, inailPag:100,
   irap:3.9, irapPag:0, sanitaria:132, paghe:25, formazione:250, kmMese:0
 };
 
@@ -2238,13 +2261,15 @@ function calcCosto(o){
   const J5 = H5*(H2-I2);                                // retribuzione mensilizzata
   const J6 = H5*(H3/12);                                // tredicesima
   const J8 = H5*((H3/12)/100*c.quattordic);             // quattordicesima
-  const J12 = (H5/26)*c.festNonGod*c.festNonGodCoef;    // festivita' non godute
+  const fGod = (o.festGodute!=null) ? o.festGodute : c.festGodute;   // ver79: contate dal calendario del periodo
+  const fNon = (o.festNonGod!=null) ? o.festNonGod : c.festNonGod;
+  const J12 = (H5/26)*fNon*c.festNonGodCoef;            // festivita' non godute
   const E13 = (H2-I2)*c.malattiaMese;                   // giorni di malattia presunti
   const J14 = H5*I2*c.integrMater/100;                  // integrazione maternita'
   const L15 = J5+J6+J8+J12+J14;                         // imponibile I
   const O5calc = (H2-I2)*4.3452;                        // settimane del periodo, come le calcola il foglio
   const O5 = (o.settPeriodoOv>0) ? o.settPeriodoOv : O5calc;
-  const O6calc = O5-((c.ferie+c.altriPermessi)*H3/12 + c.festGodute + E13)/Q2;
+  const O6calc = O5-((c.ferie+c.altriPermessi)*H3/12 + fGod + E13)/Q2;
   const O6 = (o.settLavOv>0) ? o.settLavOv : O6calc;    // settimane davvero lavorabili (si possono scrivere)
   const O8 = O6*O2;                                     // ore ordinarie lavorate
   const O11 = o.sottoSoglia||0;
@@ -2254,8 +2279,12 @@ function calcCosto(o){
   const J18 = H18*H2;                                   // ore aggiuntive
   const J17 = (o.premiMese||0)*(H2-(o.premiMesiTolti||0));
   const L18 = L15+J17+J18;                              // imponibile II
-  const H19 = L15 + ((O2>=38)? J18 : ((c.tfrSupp==="SI")? E18*J2*H2 : 0)) + H5*I2*(100-c.integrMater)/100;
-  const J19 = H19/c.tfrDiv;                             // TFR
+  /* ver79: le festivita' NON GODUTE (J12) non entrano nell'imponibile TFR. */
+  const H19 = (L15-J12) + ((O2>=38)? J18 : ((c.tfrSupp==="SI")? E18*J2*H2 : 0)) + H5*I2*(100-c.integrMater)/100;
+  /* ver79: dal TFR si toglie lo 0,50%, che e' una quota dei contributi dovuti all'INPS
+     e si calcola sulla stessa base dei contributi (imponibile II). */
+  const J20 = L18*0.005;                                // 0,50% a carico dei contributi
+  const J19 = H19/c.tfrDiv - J20;                       // TFR al netto dello 0,50%
   const J21 = J19*c.anniTfr*1.5/100 + J19*c.anniTfr*c.istat/100*75/100;
   const J23 = H19*(c.prevCompl/100*c.prevComplPag)/100;
   const J25 = L18*(c.inps/100*c.inpsPag)/100;
@@ -2263,16 +2292,19 @@ function calcCosto(o){
   const J27 = L18*(c.fis/100*c.fisPag)/100;
   const b28 = L18/100*(c.inail/100*c.inailPag); const J28 = b28 + b28*0.01;
   const J29 = L18*(c.irap/100*c.irapPag)/100;
-  const J30 = o.indeterminato ? c.sanitaria : 0;        // assistenza sanitaria: fissa, solo TI
+  /* ver79: assistenza sanitaria proporzionata ai mesi (132/anno = 11 al mese), solo indeterminati. */
+  const J30 = o.indeterminato ? (c.sanitaria/12)*H3 : 0;
   const J31 = c.paghe*H3;
-  const J32 = c.formazione/12*H3;
+  /* ver79: formazione "secca" 250 per ogni anno iniziato (scelta B di Christian). */
+  const J32 = c.formazione*Math.max(1, Math.ceil(H3/12));
   const J34 = (o.kmMese!=null?o.kmMese:c.kmMese)*(H2-(o.kmMesiTolti||0));
   const J35 = J5+J6+J8+J12+J14+J17+J18+J19+J21+J23+J25+J26+J27+J28+J29+J30+J31+J32+J34;
   const F38 = O8 + P2*(c.suppPct/100)*H2 - O11*H2;      // ore teoriche rendicontabili
   const H38 = (G38>0)? G38 : F38;                       // ore usate nel calcolo
   return { J2:J2,P2:P2,H5:H5,J5:J5,J6:J6,J8:J8,J12:J12,E13:E13,J14:J14,L15:L15,
            O5:O5,O6:O6,O8:O8,O5calc:O5calc,O6calc:O6calc,E18:E18,J17:J17,J18:J18,L18:L18,H19:H19,J19:J19,J21:J21,
-           J23:J23,J25:J25,J26:J26,J27:J27,J28:J28,J29:J29,J30:J30,J31:J31,J32:J32,J34:J34,
+           J20:J20,J23:J23,J25:J25,J26:J26,J27:J27,J28:J28,J29:J29,J30:J30,J31:J31,J32:J32,J34:J34,
+           fGod:fGod, fNon:fNon,
            J35:J35,F38:F38,H38:H38, orario:(H38>0? J35/H38 : 0) };
 }
 
@@ -2289,6 +2321,7 @@ function datiCosto(state, dp, pairs){
   const minimoAuto = (MINIMI_CCNL[tab] && MINIMI_CCNL[tab][liv]) ? MINIMI_CCNL[tab][liv] : 0;
   const addizAuto = addizTDAuto(dp, pairs);
   const oreDaRiep = oreRendPeriodo(state, dp, pairs);
+  const ff = contaFestivita(pairs);
   const o = {
     com:c, indeterminato:indet, tab:tab, liv:liv,
     mesiAuto:mesiAuto, oreSettAuto:oreSettAuto, minimoAuto:minimoAuto, addizAuto:addizAuto, oreDaRiep:oreDaRiep,
@@ -2306,6 +2339,7 @@ function datiCosto(state, dp, pairs){
     premiMese: cNum(p.premiMese, 0),
     premiMesiTolti: cNum(p.premiMesiTolti, 0),
     sottoSoglia: cNum(p.sottoSoglia, 0),
+    festGodute: ff.god, festNonGod: ff.non,                // ver79: contate dal calendario del periodo
     settPeriodoOv: cNum(p.settPeriodo, 0),                 // 0 = usa il valore calcolato
     settLavOv: cNum(p.settLav, 0),
     oreManuali: 0
@@ -2360,7 +2394,7 @@ function CostoOrario(props){
     return <label style={cella} title={titoloAiuto||""}><span style={spento ? Object.assign({}, etich, { color:"#64748b" }) : etich}>{lbl}</span>
       <input value={valore==null?"":String(valore)} inputMode="decimal" style={giallo} onChange={function(e){ onCh(e.target.value); }} />
       {segno ? <span style={{ fontSize:"12.5px", color:"#475569" }}>{segno}</span> : null}
-      {spento ? <span style={{ display:"block", fontSize:"13px", fontWeight:700, color:"#64748b" }}>non in uso: serve solo con le ore «Teoriche»</span> : null}</label>;
+      {spento ? <span style={{ display:"block", fontSize:"13px", fontWeight:700, color:"#64748b" }}>{(typeof spento==="string") ? spento : "non in uso: serve solo con le ore «Teoriche»"}</span> : null}</label>;
   };
 
   if (!dp) return <div style={{ padding:"20px", color:"#475569" }}>Nessun dipendente: aggiungine uno dalla scheda ANAGRAFICA.</div>;
@@ -2431,8 +2465,8 @@ function CostoOrario(props){
             {campoNum("Giorni settimanali", cMostra(sc.ggSett, COSTO_COMUNE_DEF.ggSett), function(v){ setComune("ggSett", v); }, "divisore giornaliero")}
             {campoNum("Quattordicesima %", cMostra(sc.quattordic, COSTO_COMUNE_DEF.quattordic), function(v){ setComune("quattordic", v); }, "50 = metà mensilità")}
             {campoNum("Ferie + permessi (gg/anno)", cMostra(sc.ferie, COSTO_COMUNE_DEF.ferie), function(v){ setComune("ferie", v); }, "26 ferie + 4 permessi")}
-            {campoNum("Festività godute (gg/anno)", cMostra(sc.festGodute, COSTO_COMUNE_DEF.festGodute), function(v){ setComune("festGodute", v); })}
-            {campoNum("Festività NON godute (gg/anno)", cMostra(sc.festNonGod, COSTO_COMUNE_DEF.festNonGod), function(v){ setComune("festNonGod", v); })}
+            {campoNum("Festività godute (gg/anno)", cMostra(sc.festGodute, COSTO_COMUNE_DEF.festGodute), function(v){ setComune("festGodute", v); }, "nel periodo scelto: " + fmt2(d.res.fGod), "", "non in uso: ora si contano dal calendario")}
+            {campoNum("Festività NON godute (gg/anno)", cMostra(sc.festNonGod, COSTO_COMUNE_DEF.festNonGod), function(v){ setComune("festNonGod", v); }, "nel periodo scelto: " + fmt2(d.res.fNon), "", "non in uso: ora si contano dal calendario")}
             {campoNum("Malattia presunta (gg/mese)", cMostra(sc.malattiaMese, COSTO_COMUNE_DEF.malattiaMese), function(v){ setComune("malattiaMese", v); })}
             {campoNum("Altri permessi (gg/anno)", cMostra(sc.altriPermessi, COSTO_COMUNE_DEF.altriPermessi), function(v){ setComune("altriPermessi", v); })}
             {campoNum("Ore supplementari stimate %", cMostra(sc.suppPct, COSTO_COMUNE_DEF.suppPct), function(v){ setComune("suppPct", v); }, "% delle ore del mese", "", !suppAttiva)}
@@ -2597,7 +2631,8 @@ function CostoOrario(props){
                   {voce("Premi", r.J17)}
                   {voce("Ore aggiuntive", r.J18)}
                   {voce("Imponibile II", r.L18, true)}
-                  {voce("TFR maturato", r.J19)}
+                  {voce("TFR maturato", r.J19 + r.J20)}
+                  {voce("0,50% già nei contributi, tolto dal TFR", -r.J20)}
                   {voce("Rivalutazione TFR", r.J21)}
                   {voce("Previdenza complementare", r.J23)}
                   {voce("Contributi INPS", r.J25)}
