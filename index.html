@@ -229,8 +229,8 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver70";
-const APP_DATA = "02nov26";
+const APP_VER = "ver71";
+const APP_DATA = "03nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
 const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
@@ -718,6 +718,7 @@ function migrate(obj){
     if (d.ana.struttura && !d.ana.specificaStruttura){ d.ana.specificaStruttura = d.ana.struttura; delete d.ana.struttura; }
     if (d.ana.locStruttura && !d.ana.ubicazione){ d.ana.ubicazione = d.ana.locStruttura; delete d.ana.locStruttura; }
     if (!Array.isArray(d.orariTemp)) d.orariTemp = [];
+    if (!d.costo || typeof d.costo !== "object") d.costo = {};   // ver71: parametri del costo orario
     if (typeof d.mensilizzato !== "boolean") d.mensilizzato = false;
     if (d.mensilizzatoDal == null) d.mensilizzatoDal = "";
     if (d.tettoAnnuo == null) d.tettoAnnuo = "";
@@ -2053,6 +2054,431 @@ function SchedaContratto(props){
   );
 }
 
+/* ===================== COSTO ORARIO (da ver71, 03/11/2026) =====================
+   Ricostruisce il foglio "Criteri orari" del file Excel di Christian
+   ("Costo orario dipendenti - 02nov26 - ver8"). Verificato sui 5 casi del file:
+   30h/12 mesi = 20,73 (20,63 con TFR-supplementari NO), 19h/10 mesi con 850 h a
+   consuntivo = 20,88, 19h/8 mesi = 21,74, 38h/12 mesi = 20,40 euro/ora.
+   NON tocca nessun calcolo esistente: legge i dati del dipendente e le ore dei mesi
+   (stesso motore dei Riepiloghi) e scrive solo in dp.costo e state.costoComune.
+   Regole decise da Christian il 02/11/2026:
+   - addizionale tempo determinato: 1,40% al primo contratto, +0,5 a ogni proroga,
+     0 se il contratto e' diventato indeterminato;
+   - assistenza sanitaria: 132 euro fissi, SOLO indeterminati, non proporzionati ai mesi
+     (nel foglio Excel era legata all'addizionale: qui e' legata al tipo di contratto);
+   - mesi contati INTERI (prudenziale) anche se il contratto inizia o finisce a meta' mese. */
+
+const MINIMI_CCNL = {
+  "Ott25": { "B1":1436.78, "C1":1545.21, "D1":1637.57, "D2":1727.83, "E1":1839.16, "E2":1985.42 },
+  "Ott24": { "B1":1408.89, "C1":1515.21, "D1":1605.99, "D2":1694.41, "E1":1803.62, "E2":1947.00 }
+};
+const LIV_CCNL = ["B1","C1","D1","D2","E1","E2"];
+const TAB_CCNL = ["Ott25","Ott24"];
+
+const COSTO_COMUNE_DEF = {
+  tabella:"Ott25", ggSett:6, quattordic:50, ferie:30, festNonGod:3, festGodute:11,
+  festNonGodCoef:1, malattiaMese:2, integrMater:20, altriPermessi:0, suppPct:10,
+  tfrSupp:"SI", tfrDiv:13.5, anniTfr:2, istat:2, prevCompl:1.5, prevComplPag:0,
+  inps:26.4, inpsPag:100, fis:0.53333, fisPag:100, inail:0.4, inailPag:100,
+  irap:3.9, irapPag:0, sanitaria:132, paghe:25, formazione:250, kmMese:30
+};
+
+function cNum(v, def){
+  if (v==null || v==="") return def;
+  let t = String(v).trim();
+  if (t.indexOf(",")>=0) t = t.replace(/\./g,"").replace(",",".");   // 1.545,21 -> 1545.21
+  const n = parseFloat(t);
+  return isNaN(n)? def : n;
+}
+// come far vedere un numero dentro una casella: se l'utente ha scritto qualcosa si lascia
+// esattamente com'e' (altrimenti mentre digita "20," la virgola sparirebbe); se invece il
+// valore e' calcolato da noi, si mostra con i separatori italiani.
+function cMostra(rawVal, auto){
+  if (rawVal!=null && String(rawVal)!=="") return String(rawVal);
+  if (auto==null || auto==="") return "";
+  const n = Number(auto);
+  if (isNaN(n)) return String(auto);
+  return Number.isInteger(n) ? String(n) : fmt2(n);
+}
+function costoComune(state){
+  const raw = Object.assign({}, COSTO_COMUNE_DEF, (state && state.costoComune) || {});
+  const out = {};
+  Object.keys(COSTO_COMUNE_DEF).forEach(function(k){
+    const def = COSTO_COMUNE_DEF[k];
+    out[k] = (typeof def === "number") ? cNum(raw[k], def)
+           : ((raw[k]==null || raw[k]==="") ? def : String(raw[k]));
+  });
+  return out;
+}
+function costoPar(dp){ return (dp && dp.costo) ? dp.costo : {}; }
+
+// mesi del periodo in cui il contratto e' in piedi; mese INTERO (prudenziale)
+function mesiInPeriodo(dp, pairs){
+  let n=0;
+  pairs.forEach(function(pr){
+    const primo = pr.y*10000 + pr.m*100 + 1;
+    const ultimo = pr.y*10000 + pr.m*100 + daysInMonth(pr.y, pr.m);
+    if (inForceAt(dp, primo) || inForceAt(dp, ultimo)) n++;
+  });
+  return n;
+}
+// ore davvero lavorate nel periodo: stesso conto dei Riepiloghi (le assenze valgono 0)
+function oreRendPeriodo(state, dp, pairs){
+  let t=0;
+  pairs.forEach(function(pr){ t += totOfRec(getRecFrom(state, pr.y, pr.m, dp.id), pr.y, pr.m); });
+  return Math.round(t*100)/100;
+}
+function indetAFine(dp, pairs){
+  if(!pairs.length) return tipoNow(dp)!=="determinato";
+  const u=pairs[pairs.length-1];
+  return tipoAt(dp, u.y, u.m)!=="determinato";
+}
+// 1,40 al primo contratto, +0,5 a ogni proroga, 0 se indeterminato
+function addizTDAuto(dp, pairs){
+  if (indetAFine(dp, pairs)) return 0;
+  return Math.round((1.40 + 0.5*prorogheList(dp).length)*100)/100;
+}
+// ore settimanali del periodo: quelle dell'ultimo mese in cui il contratto e' in piedi
+function oreSettPeriodo(dp, pairs){
+  let v = Number(dp.oreSett)||0;
+  pairs.forEach(function(pr){
+    const primo = pr.y*10000 + pr.m*100 + 1;
+    if (inForceAt(dp, primo) || inForceAt(dp, pr.y*10000+pr.m*100+daysInMonth(pr.y,pr.m))) v = oreSettAt(dp, pr.y, pr.m);
+  });
+  return v;
+}
+
+/* Il calcolo. Ogni riga porta la cella del foglio Excel da cui viene. */
+function calcCosto(o){
+  const c = o.com;
+  const K=o.minimo, L=o.scatti, M=o.premiTP, N=o.superminimo;
+  const O2=o.oreSett, Q2=o.ggSett, H2=o.mesi, I2=o.mesiMater, H3=Math.round(H2);
+  const tot=K+L+M+N;
+  const J2 = tot/165;                                   // importo orario globale
+  const P2 = O2*165/38;                                 // ore mese teoriche
+  const H5 = tot/38*O2;                                 // mensile fisso
+  const J5 = H5*(H2-I2);                                // retribuzione mensilizzata
+  const J6 = H5*(H3/12);                                // tredicesima
+  const J8 = H5*((H3/12)/100*c.quattordic);             // quattordicesima
+  const J12 = (H5/26)*c.festNonGod*c.festNonGodCoef;    // festivita' non godute
+  const E13 = (H2-I2)*c.malattiaMese;                   // giorni di malattia presunti
+  const J14 = H5*I2*c.integrMater/100;                  // integrazione maternita'
+  const L15 = J5+J6+J8+J12+J14;                         // imponibile I
+  const O5 = (H2-I2)*4.3452;                            // settimane del periodo
+  const O6 = O5-((c.ferie+c.altriPermessi)*H3/12 + c.festGodute + E13)/Q2;
+  const O8 = O6*O2;                                     // ore ordinarie lavorate
+  const O11 = o.sottoSoglia||0;
+  const G38 = (o.oreManuali>0)? o.oreManuali : 0;
+  const E18 = (G38>0)? Math.max(0,(G38-O8+O11*H2))/H2 : P2*(c.suppPct/100);
+  const H18 = E18*(J2 + ((O2>=38)? (K/165*15/100) : (J2*27/100)));
+  const J18 = H18*H2;                                   // ore aggiuntive
+  const J17 = (o.premiMese||0)*(H2-(o.premiMesiTolti||0));
+  const L18 = L15+J17+J18;                              // imponibile II
+  const H19 = L15 + ((O2>=38)? J18 : ((c.tfrSupp==="SI")? E18*J2*H2 : 0)) + H5*I2*(100-c.integrMater)/100;
+  const J19 = H19/c.tfrDiv;                             // TFR
+  const J21 = J19*c.anniTfr*1.5/100 + J19*c.anniTfr*c.istat/100*75/100;
+  const J23 = H19*(c.prevCompl/100*c.prevComplPag)/100;
+  const J25 = L18*(c.inps/100*c.inpsPag)/100;
+  const J26 = L18*o.addizTD/100;                        // addizionale tempo determinato
+  const J27 = L18*(c.fis/100*c.fisPag)/100;
+  const b28 = L18/100*(c.inail/100*c.inailPag); const J28 = b28 + b28*0.01;
+  const J29 = L18*(c.irap/100*c.irapPag)/100;
+  const J30 = o.indeterminato ? c.sanitaria : 0;        // assistenza sanitaria: fissa, solo TI
+  const J31 = c.paghe*H3;
+  const J32 = c.formazione/12*H3;
+  const J34 = (o.kmMese!=null?o.kmMese:c.kmMese)*(H2-(o.kmMesiTolti||0));
+  const J35 = J5+J6+J8+J12+J14+J17+J18+J19+J21+J23+J25+J26+J27+J28+J29+J30+J31+J32+J34;
+  const F38 = O8 + P2*(c.suppPct/100)*H2 - O11*H2;      // ore teoriche rendicontabili
+  const H38 = (G38>0)? G38 : F38;                       // ore usate nel calcolo
+  return { J2:J2,P2:P2,H5:H5,J5:J5,J6:J6,J8:J8,J12:J12,E13:E13,J14:J14,L15:L15,
+           O5:O5,O6:O6,O8:O8,E18:E18,J17:J17,J18:J18,L18:L18,H19:H19,J19:J19,J21:J21,
+           J23:J23,J25:J25,J26:J26,J27:J27,J28:J28,J29:J29,J30:J30,J31:J31,J32:J32,J34:J34,
+           J35:J35,F38:F38,H38:H38, orario:(H38>0? J35/H38 : 0) };
+}
+
+// mette insieme i dati della scheda, i valori comuni e gli scostamenti della persona
+function datiCosto(state, dp, pairs){
+  const c = costoComune(state);
+  const p = costoPar(dp);
+  const indet = indetAFine(dp, pairs);
+  const mesiAuto = mesiInPeriodo(dp, pairs);
+  const oreSettAuto = oreSettPeriodo(dp, pairs);
+  const tab = p.tabella || c.tabella;
+  const livAuto = (function(){ const l=String(dp.livello||"").toUpperCase().trim(); return MINIMI_CCNL[tab] && MINIMI_CCNL[tab][l] ? l : ""; })();
+  const liv = p.livello!=null && p.livello!=="" ? p.livello : livAuto;
+  const minimoAuto = (MINIMI_CCNL[tab] && MINIMI_CCNL[tab][liv]) ? MINIMI_CCNL[tab][liv] : 0;
+  const addizAuto = addizTDAuto(dp, pairs);
+  const oreDaRiep = oreRendPeriodo(state, dp, pairs);
+  const o = {
+    com:c, indeterminato:indet, tab:tab, liv:liv,
+    mesiAuto:mesiAuto, oreSettAuto:oreSettAuto, minimoAuto:minimoAuto, addizAuto:addizAuto, oreDaRiep:oreDaRiep,
+    mesi: cNum(p.mesi, mesiAuto),
+    mesiMater: cNum(p.mesiMater, 0),
+    minimo: cNum(p.minimo, minimoAuto),
+    scatti: cNum(p.scatti, 0),
+    premiTP: cNum(p.premiTP, 0),
+    superminimo: cNum(p.superminimo, 0),
+    oreSett: cNum(p.oreSett, oreSettAuto),
+    ggSett: cNum(p.ggSett, c.ggSett),
+    addizTD: cNum(p.addizTD, addizAuto),
+    kmMese: (p.kmMese==null||p.kmMese==="")? null : cNum(p.kmMese, c.kmMese),
+    kmMesiTolti: cNum(p.kmMesiTolti, 0),
+    premiMese: cNum(p.premiMese, 0),
+    premiMesiTolti: cNum(p.premiMesiTolti, 0),
+    sottoSoglia: cNum(p.sottoSoglia, 0),
+    oreManuali: 0
+  };
+  // da dove arrivano le ore rendicontate: teoriche del foglio, dai Riepiloghi, o scritte a mano
+  o.fonte = (p.fonteOre==="teoriche" || p.fonteOre==="mano") ? p.fonteOre : "riepiloghi";
+  o.oreAMano = cNum(p.oreManuali, 0);
+  if (o.fonte === "mano") o.oreManuali = o.oreAMano;
+  else if (o.fonte === "riepiloghi") o.oreManuali = oreDaRiep;
+  o.raw = p;
+  o.res = calcCosto(o);
+  return o;
+}
+
+/* La linguetta COSTO ORARIO. */
+function CostoOrario(props){
+  const state = props.state;
+  const dips = dipSorted(state);
+  const c = costoComune(state);
+  const anniDisp = (function(){ const o={}; (state.anni||[]).forEach(function(y){ o[y]=true; }); o[props.anno]=true; return Object.keys(o).map(function(y){ return parseInt(y,10); }).sort(function(a,b){ return a-b; }); })();
+  const [faY, setFaY] = useState(props.anno); const [faM, setFaM] = useState(1);
+  const [taY, setTaY] = useState(props.anno); const [taM, setTaM] = useState(12);
+  const [selId, setSelId] = useState(dips.length ? dips[0].id : null);
+  const [apriComuni, setApriComuni] = useState(false);
+  const [apriDett, setApriDett] = useState(true);
+
+  const pairs = monthsBetween(parseInt(faY,10), parseInt(faM,10), parseInt(taY,10), parseInt(taM,10));
+  const periodoLabel = pairs.length ? (mLabelY(pairs[0].y, pairs[0].m) + " → " + mLabelY(pairs[pairs.length-1].y, pairs[pairs.length-1].m)) : "";
+  const dp = dips.find(function(x){ return x.id===selId; }) || dips[0];
+
+  const giallo = { border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px", padding:"7px 9px", fontFamily:"inherit", fontSize:"14px", width:"100%" };
+  const etich = { fontSize:"12px", fontWeight:700, color:"#374151", marginBottom:"2px" };
+  const cella = { display:"block" };
+  const box = function(bg,bd){ return { background:bg, border:"1px solid "+bd, borderRadius:"10px", padding:"12px", marginBottom:"12px" }; };
+  const titolo = { fontWeight:800, fontSize:"14px", marginBottom:"6px", display:"block" };
+  const aiuto = { fontSize:"12.5px", color:"#475569", lineHeight:1.5, margin:"0 0 8px" };
+
+  const sc = (state && state.costoComune) || {};
+  const setComune = function(campo, val){ if (props.onCostoComune) props.onCostoComune(campo, val); };
+  const setPar = function(campo, val){ if (dp && props.onCostoPatch) props.onCostoPatch(dp.id, campo, val); };
+
+  const campoNum = function(lbl, valore, onCh, segno, titoloAiuto){
+    return <label style={cella} title={titoloAiuto||""}><span style={etich}>{lbl}</span>
+      <input value={valore==null?"":String(valore)} inputMode="decimal" style={giallo} onChange={function(e){ onCh(e.target.value); }} />
+      {segno ? <span style={{ fontSize:"11.5px", color:"#475569" }}>{segno}</span> : null}</label>;
+  };
+
+  if (!dp) return <div style={{ padding:"20px", color:"#475569" }}>Nessun dipendente: aggiungine uno dalla scheda ANAGRAFICA.</div>;
+
+  const d = datiCosto(state, dp, pairs);
+  const r = d.res;
+
+  const esporta = function(){
+    const righe = [["COGNOME NOME","PERIODO","TIPO CONTRATTO","MESI","ORE SETT.","LIVELLO","MINIMO €","ORE RENDICONTATE","ORIGINE ORE","COSTO TOTALE €","COSTO ORARIO €/h"]];
+    dips.forEach(function(x){
+      const dd = datiCosto(state, x, pairs);
+      const org = dd.fonte==="mano" ? "scritte a mano" : (dd.fonte==="riepiloghi" ? "dai Riepiloghi" : "teoriche");
+      righe.push([x.nome, periodoLabel, dd.indeterminato?"Indeterminato":"Determinato", dd.mesi, dd.oreSett, dd.liv||"", dd.minimo,
+                  Math.round(dd.res.H38*100)/100, org, Math.round(dd.res.J35*100)/100, Math.round(dd.res.orario*100)/100]);
+    });
+    const wb = XLSX.utils.book_new();
+    wb.Props = { Title:"Costo orario dipendenti", Author:"Christian Canonica", Company:"Spazio Ireos Società Cooperativa Sociale", CreatedDate:new Date() };
+    const ws = XLSX.utils.aoa_to_sheet(righe);
+    const hdr = { font:{ name:"Arial", bold:true, color:{rgb:"FFFFFFFF"} }, fill:{ patternType:"solid", fgColor:{rgb:"FF0F2740"} }, alignment:{horizontal:"center"} };
+    (righe[0]||[]).forEach(function(_,i){ const ref=XLSX.utils.encode_cell({r:0,c:i}); if (ws[ref]) ws[ref].s=hdr; });
+    ws["!cols"] = righe[0].map(function(){ return { wch:18 }; });
+    XLSX.utils.book_append_sheet(wb, ws, "Costo orario");
+    const ora=new Date(); const p2=function(n){ return (n<10?"0":"")+n; };
+    XLSX.writeFile(wb, "Spazio Ireos Costo orario - " + p2(ora.getDate()) + MESE_ABBR_FILE[ora.getMonth()] + String(ora.getFullYear()).slice(2) + " - " + APP_VER + " - " + p2(ora.getHours()) + "." + p2(ora.getMinutes()) + ".xlsx");
+  };
+
+  const voce = function(lbl, val, forte){
+    return <div style={{ display:"flex", justifyContent:"space-between", gap:"10px", padding:"3px 0", borderBottom:"1px dotted #e2e8f0", fontSize:"13px", fontWeight:forte?800:400 }}>
+      <span>{lbl}</span><span>{fmt2(val)} €</span></div>;
+  };
+
+  return (
+    <div>
+      <div className="toolbar">
+        <strong style={{ fontSize:"15px", color:"#DE4C8A" }}>💶 Costo orario</strong>
+        <button className={"btn btn-save" + (props.dirty ? " dirty" : "")} disabled={!props.dirty} onClick={props.onSave} style={{ marginLeft:"12px" }} title="Salva le modifiche (cloud + copia locale)">💾 Salva</button>
+        <div className="spacer"></div>
+        <button className="btn btn-blue" onClick={esporta} title="Scarica la tabella di tutti i dipendenti">📊 Esporta Excel</button>
+      </div>
+
+      <div style={{ background:"#f8fafc", border:"1px dashed #94a3b8", borderRadius:"10px", padding:"10px 14px", marginBottom:"12px", fontSize:"13px", color:"#334155", lineHeight:1.5 }}>
+        <b>Come si usa:</b> 1) scegli il <b>periodo</b> · 2) scegli la persona a sinistra · 3) controlla i campi <span style={{ background:"#fffde7", border:"1px solid #f59e0b", borderRadius:"4px", padding:"0 5px", fontWeight:700 }}>giallini</span>, che partono già compilati dalla sua scheda · 4) in fondo leggi <b>costo totale</b> e <b>costo orario</b>. Le cose uguali per tutti stanno in <b>Valori comuni</b>. Premi <b>💾 Salva</b> per conservare.
+      </div>
+
+      <div style={{ display:"flex", gap:"10px", alignItems:"end", flexWrap:"wrap", marginBottom:"12px" }}>
+        <div><div style={etich}>Dal mese</div>
+          <select value={faM} onChange={function(e){ setFaM(parseInt(e.target.value,10)); }} style={{ padding:"8px" }}>{MONTH_LABEL.map(function(l,i){ return <option key={i} value={i+1}>{l}</option>; })}</select></div>
+        <div><div style={etich}>Anno</div>
+          <select value={faY} onChange={function(e){ setFaY(parseInt(e.target.value,10)); }} style={{ padding:"8px" }}>{anniDisp.map(function(y){ return <option key={y} value={y}>{y}</option>; })}</select></div>
+        <div><div style={etich}>Al mese</div>
+          <select value={taM} onChange={function(e){ setTaM(parseInt(e.target.value,10)); }} style={{ padding:"8px" }}>{MONTH_LABEL.map(function(l,i){ return <option key={i} value={i+1}>{l}</option>; })}</select></div>
+        <div><div style={etich}>Anno</div>
+          <select value={taY} onChange={function(e){ setTaY(parseInt(e.target.value,10)); }} style={{ padding:"8px" }}>{anniDisp.map(function(y){ return <option key={y} value={y}>{y}</option>; })}</select></div>
+        <div style={{ fontSize:"13px", color:"#334155" }}>Periodo: <b>{periodoLabel}</b> ({pairs.length} mesi)</div>
+        <button className="btn btn-gray" onClick={function(){ setApriComuni(!apriComuni); }}>{apriComuni ? "▲ Chiudi valori comuni" : "⚙ Valori comuni"}</button>
+      </div>
+
+      {apriComuni ?
+        <div style={box("#eef6ff","#bfdbfe")}>
+          <label style={titolo}>Valori comuni a tutti i dipendenti</label>
+          <div style={aiuto}>Sono i numeri che non cambiano da persona a persona: contributi, festività, assenze presunte, voci fisse. Si scrivono <b>una volta sola</b> e valgono per tutte le schede. Dove serve, nella scheda della singola persona si può scrivere un valore diverso.</div>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(190px, 1fr))", gap:"8px" }}>
+            <label style={cella}><span style={etich}>Tabella CCNL</span>
+              <select value={c.tabella} style={{ padding:"8px", width:"100%" }} onChange={function(e){ setComune("tabella", e.target.value); }}>
+                {TAB_CCNL.map(function(t){ return <option key={t} value={t}>{t}</option>; })}</select></label>
+            {campoNum("Giorni settimanali", cMostra(sc.ggSett, COSTO_COMUNE_DEF.ggSett), function(v){ setComune("ggSett", v); }, "divisore giornaliero")}
+            {campoNum("Quattordicesima %", cMostra(sc.quattordic, COSTO_COMUNE_DEF.quattordic), function(v){ setComune("quattordic", v); }, "50 = metà mensilità")}
+            {campoNum("Ferie + permessi (gg/anno)", cMostra(sc.ferie, COSTO_COMUNE_DEF.ferie), function(v){ setComune("ferie", v); }, "26 ferie + 4 permessi")}
+            {campoNum("Festività godute (gg/anno)", cMostra(sc.festGodute, COSTO_COMUNE_DEF.festGodute), function(v){ setComune("festGodute", v); })}
+            {campoNum("Festività NON godute (gg/anno)", cMostra(sc.festNonGod, COSTO_COMUNE_DEF.festNonGod), function(v){ setComune("festNonGod", v); })}
+            {campoNum("Malattia presunta (gg/mese)", cMostra(sc.malattiaMese, COSTO_COMUNE_DEF.malattiaMese), function(v){ setComune("malattiaMese", v); })}
+            {campoNum("Altri permessi (gg/anno)", cMostra(sc.altriPermessi, COSTO_COMUNE_DEF.altriPermessi), function(v){ setComune("altriPermessi", v); })}
+            {campoNum("Ore supplementari stimate %", cMostra(sc.suppPct, COSTO_COMUNE_DEF.suppPct), function(v){ setComune("suppPct", v); }, "% delle ore del mese")}
+            <label style={cella}><span style={etich}>Supplementari nel TFR</span>
+              <select value={c.tfrSupp} style={{ padding:"8px", width:"100%" }} onChange={function(e){ setComune("tfrSupp", e.target.value); }}>
+                <option value="SI">SI</option><option value="NO">NO</option></select></label>
+            {campoNum("Divisore TFR", cMostra(sc.tfrDiv, COSTO_COMUNE_DEF.tfrDiv), function(v){ setComune("tfrDiv", v); }, "13,5")}
+            {campoNum("Anni per rivalutazione TFR", cMostra(sc.anniTfr, COSTO_COMUNE_DEF.anniTfr), function(v){ setComune("anniTfr", v); })}
+            {campoNum("ISTAT anno prec. %", cMostra(sc.istat, COSTO_COMUNE_DEF.istat), function(v){ setComune("istat", v); })}
+            {campoNum("Previdenza compl. %", cMostra(sc.prevCompl, COSTO_COMUNE_DEF.prevCompl), function(v){ setComune("prevCompl", v); })}
+            {campoNum("Previdenza compl. — quota pagata %", cMostra(sc.prevComplPag, COSTO_COMUNE_DEF.prevComplPag), function(v){ setComune("prevComplPag", v); })}
+            {campoNum("INPS %", cMostra(sc.inps, COSTO_COMUNE_DEF.inps), function(v){ setComune("inps", v); }, "26,40 netta")}
+            {campoNum("FIS %", cMostra(sc.fis, COSTO_COMUNE_DEF.fis), function(v){ setComune("fis", v); })}
+            {campoNum("INAIL %", cMostra(sc.inail, COSTO_COMUNE_DEF.inail), function(v){ setComune("inail", v); }, "+1% di addizionale")}
+            {campoNum("IRAP %", cMostra(sc.irap, COSTO_COMUNE_DEF.irap), function(v){ setComune("irap", v); })}
+            {campoNum("IRAP — quota pagata %", cMostra(sc.irapPag, COSTO_COMUNE_DEF.irapPag), function(v){ setComune("irapPag", v); }, "0 se esente")}
+            {campoNum("Integrazione maternità %", cMostra(sc.integrMater, COSTO_COMUNE_DEF.integrMater), function(v){ setComune("integrMater", v); })}
+            {campoNum("Assistenza sanitaria €/anno", cMostra(sc.sanitaria, COSTO_COMUNE_DEF.sanitaria), function(v){ setComune("sanitaria", v); }, "solo indeterminati, fissa")}
+            {campoNum("Paghe e dichiarazioni €/mese", cMostra(sc.paghe, COSTO_COMUNE_DEF.paghe), function(v){ setComune("paghe", v); })}
+            {campoNum("Formazione €/anno", cMostra(sc.formazione, COSTO_COMUNE_DEF.formazione), function(v){ setComune("formazione", v); })}
+            {campoNum("Rimborso km €/mese", cMostra(sc.kmMese, COSTO_COMUNE_DEF.kmMese), function(v){ setComune("kmMese", v); })}
+          </div>
+        </div> : null}
+
+      <div style={{ display:"flex", gap:"14px", alignItems:"flex-start" }}>
+        <div style={{ minWidth:"210px", display:"flex", flexDirection:"column", gap:"4px" }}>
+          {dips.map(function(x){
+            const dd = datiCosto(state, x, pairs);
+            return (
+              <button key={x.id} onClick={function(){ setSelId(x.id); }}
+                style={{ textAlign:"left", padding:"8px 10px", borderRadius:"8px", border:"1px solid " + (x.id===dp.id?"#DE4C8A":"#e2e8f0"), background:(x.id===dp.id?"#DE4C8A":"#fff"), color:(x.id===dp.id?"#fff":"#DE4C8A"), fontWeight:700, fontSize:"13px", cursor:"pointer" }}>
+                {x.nome}<br/><span style={{ fontSize:"12px", fontWeight:400 }}>{fmt2(dd.res.orario)} €/h</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div style={{ flex:1, background:"#fff", border:"2px solid #94a3b8", borderRadius:"12px", padding:"14px" }}>
+          <div style={{ fontSize:"18px", fontWeight:800, color:"#DE4C8A", marginBottom:"8px" }}>{dp.nome}</div>
+
+          <div style={{ background:"#f8fafc", border:"1px solid #e2e8f0", borderRadius:"8px", padding:"8px 10px", marginBottom:"10px", fontSize:"13px", color:"#334155", lineHeight:1.6 }}>
+            Dalla sua scheda: <b>{d.indeterminato ? "Indeterminato" : "Determinato"}</b>
+            {dp.dataAssunzione ? <span> · assunto il <b>{dp.dataAssunzione}</b></span> : null}
+            {!d.indeterminato && scadEff(dp) ? <span> · scadenza <b>{scadEff(dp)}</b></span> : null}
+            {prorogheList(dp).length ? <span> · <b>{prorogheList(dp).length}</b> {prorogheList(dp).length===1?"proroga":"proroghe"}</span> : null}
+            {cessEffStr(dp) ? <span> · cessazione <b>{cessEffStr(dp)}</b></span> : null}
+            <span> · nel periodo risulta in forza per <b>{d.mesiAuto}</b> {d.mesiAuto===1?"mese":"mesi"}</span>
+          </div>
+
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(190px, 1fr))", gap:"8px", marginBottom:"10px" }}>
+            {campoNum("Mesi di contratto", cMostra(d.raw.mesi, d.mesiAuto), function(v){ setPar("mesi", v); }, "proposti: " + d.mesiAuto)}
+            {campoNum("Mesi di maternità", cMostra(d.raw.mesiMater, ""), function(v){ setPar("mesiMater", v); })}
+            <label style={cella}><span style={etich}>Tabella</span>
+              <select value={d.tab} style={{ padding:"8px", width:"100%" }} onChange={function(e){ setPar("tabella", e.target.value); }}>
+                {TAB_CCNL.map(function(t){ return <option key={t} value={t}>{t}</option>; })}</select></label>
+            <label style={cella}><span style={etich}>Livello</span>
+              <select value={d.liv} style={{ padding:"8px", width:"100%" }} onChange={function(e){ setPar("livello", e.target.value); setPar("minimo", ""); }}>
+                <option value="">— scegli —</option>
+                {LIV_CCNL.map(function(l){ return <option key={l} value={l}>{l}</option>; })}</select></label>
+            {campoNum("Minimo tabellare €", cMostra(d.raw.minimo, d.minimoAuto), function(v){ setPar("minimo", v); }, d.minimoAuto ? ("da tabella: " + fmt2(d.minimoAuto)) : "scrivilo a mano")}
+            {campoNum("Scatti di anzianità €", cMostra(d.raw.scatti, ""), function(v){ setPar("scatti", v); })}
+            {campoNum("Premi (tempo pieno) €", cMostra(d.raw.premiTP, ""), function(v){ setPar("premiTP", v); })}
+            {campoNum("Superminimo €", cMostra(d.raw.superminimo, ""), function(v){ setPar("superminimo", v); })}
+            {campoNum("Ore settimanali", cMostra(d.raw.oreSett, d.oreSettAuto), function(v){ setPar("oreSett", v); }, "dalla scheda: " + hoursDisp(d.oreSettAuto))}
+            {campoNum("Giorni settimanali", cMostra(d.raw.ggSett, c.ggSett), function(v){ setPar("ggSett", v); }, "comune: " + c.ggSett)}
+            {campoNum("Addizionale tempo determ. %", cMostra(d.raw.addizTD, d.addizAuto), function(v){ setPar("addizTD", v); }, d.indeterminato ? "indeterminato: 0" : ("1,40 + 0,5 × " + prorogheList(dp).length + " proroghe = " + fmt2(d.addizAuto)))}
+            {campoNum("Rimborso km €/mese", cMostra(d.raw.kmMese, c.kmMese), function(v){ setPar("kmMese", v); }, "comune: " + fmt2(c.kmMese))}
+            {campoNum("Premio €/mese", cMostra(d.raw.premiMese, ""), function(v){ setPar("premiMese", v); }, "0 = nessuno")}
+            {campoNum("Ore/mese sotto soglia perse", cMostra(d.raw.sottoSoglia, ""), function(v){ setPar("sottoSoglia", v); })}
+          </div>
+
+          <div style={box("#f0fdf4","#bbf7d0")}>
+            <label style={titolo}>Ore rendicontabili del periodo</label>
+            <div style={aiuto}>Sono le ore che dichiari al Comune: <b>solo quelle davvero lavorate</b> (le assenze non si dichiarano). Scegli da dove prenderle.</div>
+            <div style={{ display:"flex", flexDirection:"column", gap:"6px", fontSize:"13.5px" }}>
+              <label style={{ display:"flex", alignItems:"center", gap:"8px", cursor:"pointer" }}>
+                <input type="radio" name={"fonte-"+dp.id} checked={d.fonte==="riepiloghi"} onChange={function(){ setPar("fonteOre","riepiloghi"); }} />
+                <span>Dai <b>Riepiloghi</b> — ore davvero inserite nei mesi del periodo: <b>{hoursDisp(d.oreDaRiep)} h</b>{d.oreDaRiep===0 ? <span style={{ color:"#b91c1c", fontWeight:700 }}> (attenzione: nessuna ora inserita in questo periodo)</span> : null}</span>
+              </label>
+              <label style={{ display:"flex", alignItems:"center", gap:"8px", flexWrap:"wrap", cursor:"pointer" }}>
+                <input type="radio" name={"fonte-"+dp.id} checked={d.fonte==="mano"} onChange={function(){ setPar("fonteOre","mano"); }} />
+                <span>Scritte <b>a mano</b>:</span>
+                <input value={d.raw.oreManuali==null?"":String(d.raw.oreManuali)} inputMode="decimal" placeholder="es. 850" disabled={d.fonte!=="mano"}
+                  style={{ width:"110px", border:"2px solid #f59e0b", background: d.fonte==="mano" ? "#fffde7" : "#f1f5f9", borderRadius:"6px", padding:"7px 9px", fontSize:"14px" }}
+                  onChange={function(e){ setPar("oreManuali", e.target.value); }} /> <span>h</span>
+              </label>
+              <label style={{ display:"flex", alignItems:"center", gap:"8px", cursor:"pointer" }}>
+                <input type="radio" name={"fonte-"+dp.id} checked={d.fonte==="teoriche"} onChange={function(){ setPar("fonteOre","teoriche"); }} />
+                <span><b>Teoriche</b> calcolate dal foglio (ordinarie + supplementari stimate): <b>{hoursDisp(Math.round(r.F38*100)/100)} h</b></span>
+              </label>
+            </div>
+          </div>
+
+          <div style={{ display:"flex", gap:"14px", flexWrap:"wrap", alignItems:"stretch", marginBottom:"10px" }}>
+            <div style={{ flex:"1 1 240px", background:"#fdf0f6", border:"2px solid #DE4C8A", borderRadius:"10px", padding:"12px", textAlign:"center" }}>
+              <div style={{ fontSize:"13px", fontWeight:700, color:"#334155" }}>COSTO TOTALE DEL PERIODO</div>
+              <div style={{ fontSize:"26px", fontWeight:800, color:"#DE4C8A" }}>{fmt2(r.J35)} €</div>
+            </div>
+            <div style={{ flex:"1 1 240px", background:"#eef6ff", border:"2px solid #1d4ed8", borderRadius:"10px", padding:"12px", textAlign:"center" }}>
+              <div style={{ fontSize:"13px", fontWeight:700, color:"#334155" }}>COSTO ORARIO</div>
+              <div style={{ fontSize:"26px", fontWeight:800, color:"#1d4ed8" }}>{fmt2(r.orario)} €/h</div>
+              <div style={{ fontSize:"12.5px", color:"#475569" }}>su <b>{hoursDisp(Math.round(r.H38*100)/100)} h</b> rendicontate</div>
+            </div>
+          </div>
+
+          <button className="btn btn-gray" onClick={function(){ setApriDett(!apriDett); }}>{apriDett ? "▲ Nascondi il dettaglio" : "▼ Mostra il dettaglio del calcolo"}</button>
+          {apriDett ?
+            <div style={{ marginTop:"10px" }}>
+              {voce("Retribuzione mensilizzata (ferie, festività, malattia comprese)", r.J5)}
+              {voce("Tredicesima", r.J6)}
+              {voce("Quattordicesima", r.J8)}
+              {voce("Festività non godute", r.J12)}
+              {voce("Integrazione maternità", r.J14)}
+              {voce("Imponibile I", r.L15, true)}
+              {voce("Premi", r.J17)}
+              {voce("Ore aggiuntive (supplementari/straordinario)", r.J18)}
+              {voce("Imponibile II", r.L18, true)}
+              {voce("TFR maturato", r.J19)}
+              {voce("Rivalutazione TFR", r.J21)}
+              {voce("Previdenza complementare", r.J23)}
+              {voce("Contributi INPS", r.J25)}
+              {voce("Addizionale tempo determinato", r.J26)}
+              {voce("Contributi FIS", r.J27)}
+              {voce("INAIL (con addizionale 1%)", r.J28)}
+              {voce("IRAP", r.J29)}
+              {voce("Assistenza sanitaria", r.J30)}
+              {voce("Paghe e dichiarazioni", r.J31)}
+              {voce("Formazione", r.J32)}
+              {voce("Rimborso km", r.J34)}
+              {voce("COSTO TOTALE", r.J35, true)}
+              <div style={{ fontSize:"12.5px", color:"#475569", marginTop:"8px", lineHeight:1.6 }}>
+                Ore ordinarie lavorabili nel periodo: <b>{hoursDisp(Math.round(r.O8*100)/100)} h</b> · settimane lavorabili: <b>{fmt2(r.O6)}</b> · ore aggiuntive al mese: <b>{fmt2(r.E18)}</b> · mensile fisso: <b>{fmt2(r.H5)} €</b>.
+              </div>
+            </div> : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Anagrafica(props){
   const state = props.state;
   const dips = dipSorted(state);
@@ -3257,6 +3683,19 @@ function App(){
     touch(next);
     return { ok:true, n:n, dal:dal };
   };
+  const onCostoPatch = function(dipId, campo, val){                               // ver71: scostamenti del singolo dipendente
+    const next = JSON.parse(JSON.stringify(state));
+    const dp = next.dipendenti.find(function(d){ return d.id===dipId; }); if (!dp) return;
+    if (!dp.costo || typeof dp.costo !== "object") dp.costo = {};
+    dp.costo[campo] = val;
+    touch(next);
+  };
+  const onCostoComune = function(campo, val){                                     // ver71: valori uguali per tutti
+    const next = JSON.parse(JSON.stringify(state));
+    if (!next.costoComune || typeof next.costoComune !== "object") next.costoComune = {};
+    next.costoComune[campo] = val;
+    touch(next);
+  };
   const onCessCleanup = function(dipId){
     const dp0 = state.dipendenti.find(function(d){ return d.id===dipId; }); if(!dp0) return;
     const ce = cessEffStr(dp0); const ceInt = ymdIt(ce); if(!ceInt){ window.alert("Nessuna data di cessazione impostata."); return; }
@@ -3527,7 +3966,7 @@ function App(){
         {!FB_READY ? <button className="btn btn-ghost" onClick={changePin}>🔑 PIN</button> : null}
         {FB_READY ? <button className="btn btn-ghost" onClick={function(){ if (dirty && !window.confirm("Ci sono modifiche non salvate. Uscire comunque?")) return; firebase.auth().signOut(); }}>Esci</button> : null}
         <input ref={fileRef} type="file" accept=".xlsx,.xls,.json" className="hidden-file" onChange={onImportFile} />
-        <div className="monthstrip">{vista === "rep" ? "📊 Riepiloghi" : (vista === "ana" ? "📇 Anagrafica" : ("📅 " + MONTH_LABEL[mese-1] + " " + anno + (mLocked ? "  🔒 bloccato" : "")))}</div>
+        <div className="monthstrip">{vista === "rep" ? "📊 Riepiloghi" : (vista === "ana" ? "📇 Anagrafica" : (vista === "costo" ? "💶 Costo orario" : ("📅 " + MONTH_LABEL[mese-1] + " " + anno + (mLocked ? "  🔒 bloccato" : ""))))}</div>
       </div>
 
       {!FB_READY ? <div className="banner">Modalità LOCALE (localStorage, accesso con PIN).</div> : null}
@@ -3540,6 +3979,7 @@ function App(){
         })}
         <div className={"tab rep" + (vista==="rep"?" active":"")} onClick={function(){ setVista("rep"); }}>📊 Riepiloghi</div>
         <div className={"tab rep" + (vista==="ana"?" active":"")} onClick={function(){ setVista("ana"); }}>📇 Anagrafica</div>
+        <div className={"tab rep" + (vista==="costo"?" active":"")} onClick={function(){ setVista("costo"); }}>💶 Costo orario</div>
         <div className={"tab rep" + (vista==="query"?" active":"")} onClick={function(){ setVista("query"); }}>🔎 Query personale</div>
       </div>
 
@@ -3556,6 +3996,7 @@ function App(){
       <div className="content" style={{ zoom: zoom / 100 }}>
         {vista === "rep" ? <Riepiloghi state={state} anno={anno} /> :
          vista === "ana" ? <Anagrafica key={"ana-"+(anaSel||"")} selInit={anaSel} onDipPatch={onDipPatch} onMensTutti={onMensTutti} state={state} onAnaField={onAnaField} onAnaSet={onAnaSet} onCessCleanup={onCessCleanup} onTemplateChanged={onTemplateChanged} onImportAna={onImportAna} onExportAna={onExportAna} onAddDip={addDipDiretto} onEditDip={apriScheda} onSave={doSave} dirty={dirty} /> :
+         vista === "costo" ? <CostoOrario state={state} anno={anno} onCostoPatch={onCostoPatch} onCostoComune={onCostoComune} onSave={doSave} dirty={dirty} /> :
          vista === "query" ? <QueryPanel state={state} /> :
           <div>
             <div className="toolbar">

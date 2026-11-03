@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver70 · 02nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver71 · 03nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -99,6 +99,30 @@ Banca ore, tetto annuo, contratti e export.
   tutti", che chiede conferma. La spunta resta un dato della persona (scelta **2a**): l'idea di
   considerare mensilizzati tutti per difetto, con una spunta "eccezione" al contrario (2b), è
   stata **scartata**, perché toglierebbe la traccia di chi è mensilizzato e da quando.
+- 💶 **COSTO ORARIO** (nuova linguetta, da ver71, 03/11/2026). Ricostruisce il foglio
+  *Criteri orari* del file Excel di Christian (*Costo orario dipendenti - 02nov26 - ver8*):
+  costo totale del dipendente ÷ ore effettivamente rendicontate. **Verificata sui 5 casi del
+  file**: 20,73 · 20,63 (TFR-supplementari NO) · 20,88 · 21,74 · 20,40 €/h, al centesimo.
+  Funzioni: `calcCosto(o)` (il motore, specchio delle celle J5…J35/F38/H38 del foglio),
+  `datiCosto(state,dp,pairs)` (mette insieme scheda + valori comuni + scostamenti),
+  `mesiInPeriodo`, `oreRendPeriodo`, `addizTDAuto`, `oreSettPeriodo`, `indetAFine`,
+  componente **`CostoOrario`**. Tabelle `MINIMI_CCNL` (Ott25/Ott24, livelli B1→E2) e
+  `COSTO_COMUNE_DEF`.
+  - **Dati**: `state.costoComune` (valori uguali per tutti) e `dp.costo` (scostamenti della
+    singola persona). **Nessun calcolo preesistente è stato toccato**: il costo orario legge e
+    basta (ore dei mesi con lo stesso `totOfRec` dei Riepiloghi, contratto dalla scheda).
+  - **Ore rendicontabili**: tre scelte — *dai Riepiloghi* (predefinita: somma delle ore vere del
+    periodo, le assenze valgono 0), *a mano*, *teoriche* (formula del foglio).
+  - **Regole decise da Christian il 02/11/2026**: addizionale tempo determinato **1,40% al primo
+    contratto, +0,5 a ogni proroga, 0 se diventa indeterminato** (calcolata da sé dalle proroghe
+    registrate, modificabile a mano); **assistenza sanitaria 132 € fissi, solo indeterminati**,
+    non proporzionata ai mesi — ⚠️ nel foglio Excel era legata all'addizionale
+    (`F30 = SE(E26=0;100;0)`), qui è legata **al tipo di contratto**: è l'unica differenza voluta
+    rispetto all'xlsx; **mesi contati INTERI** (prudenziale) anche se il contratto inizia o
+    finisce a metà mese.
+  - ⚠️ **Numeri all'italiana**: `cNum` capisce sia `1545.21` sia `1.545,21`; `cMostra` fa vedere
+    il **grezzo** mentre scrivi (senza, digitando "20," la virgola sparirebbe) e il valore
+    calcolato con i separatori italiani. Non sostituirle con `parseFloat` secco.
 - **Funzione presente**: confronto non vincolante con l'app "Fogli ore" (SOLA LETTURA delle
   collection `users` e `timesheets` dello stesso progetto Firebase). Non scrivere MAI lì.
 - **Leggibilità (ver66, 31/10/2026)**: blocco in fondo al `<style>`. Le scritte sotto i 12px
