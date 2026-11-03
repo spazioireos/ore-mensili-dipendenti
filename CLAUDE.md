@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver74 · 03nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver75 · 03nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -130,6 +130,19 @@ Banca ore, tetto annuo, contratti e export.
     settimane, e il costo orario si rifà da sé. **Finché non si preme 💾 non si salva nulla.**
   - **Rimborso km: il valore comune è 0** (da ver73, richiesta di Christian). Chi ha davvero il
     rimborso se lo scrive nella propria scheda.
+  - ⚠️ **La «% di ore supplementari stimate» vale SOLO per le ore «Teoriche»** (chiarito in ver75,
+    domanda di Christian del 03/11/2026: «se mettiamo le ore effettive prese dai TS, perché dare
+    una percentuale convenzionale?»). Con le ore **dai Riepiloghi** o **a mano** (`G38>0`) le
+    supplementari si ricavano dal dato vero — `E18 = max(0, (G38 − O8 + O11·H2))/H2`, cioè ore
+    rese meno ore ordinarie attese (già al netto di ferie, permessi, festività e malattia
+    presunta) — e `c.suppPct` **non entra in nessun conto**: `F38`, l'unico altro punto che la
+    usa, viene scartato da `H38 = (G38>0)? G38 : F38`. Nessun doppio conteggio.
+    In ver75 il campo lo **dice**: `suppAttiva` (in `CostoOrario`) è vero solo se almeno un
+    dipendente ha `costo.fonteOre === "teoriche"`; quando è falso l'etichetta diventa grigia
+    (`#64748b`) e compare la riga «non in uso: serve solo con le ore «Teoriche»». ⚠️ La casella
+    **resta scrivibile e giallina**: è spenta nei conti, non bloccata — serve per impostarla
+    prima di una simulazione. `campoNum` ha un **sesto parametro facoltativo `spento`**; le altre
+    34 chiamate non lo passano e sono invariate. **Nessun calcolo è stato toccato.**
   - ⚠️ **Numeri all'italiana**: `cNum` capisce sia `1545.21` sia `1.545,21`; `cMostra` fa vedere
     il **grezzo** mentre scrivi (senza, digitando "20," la virgola sparirebbe) e il valore
     calcolato con i separatori italiani. Non sostituirle con `parseFloat` secco.

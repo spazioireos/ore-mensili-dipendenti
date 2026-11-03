@@ -229,7 +229,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver74";
+const APP_VER = "ver75";
 const APP_DATA = "03nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -2278,13 +2278,16 @@ function CostoOrario(props){
   const cifre = { fontVariantNumeric:"tabular-nums" };
 
   const sc = (state && state.costoComune) || {};
+  // ver75: la % di supplementari agisce SOLO sulle ore "Teoriche"; con le ore vere (Riepiloghi/a mano) non entra nei conti
+  const suppAttiva = dips.some(function(x){ return costoPar(x).fonteOre === "teoriche"; });
   const setComune = function(campo, val){ if (props.onCostoComune) props.onCostoComune(campo, val); };
   const setPar = function(campo, val){ if (dp && props.onCostoPatch) props.onCostoPatch(dp.id, campo, val); };
 
-  const campoNum = function(lbl, valore, onCh, segno, titoloAiuto){
-    return <label style={cella} title={titoloAiuto||""}><span style={etich}>{lbl}</span>
+  const campoNum = function(lbl, valore, onCh, segno, titoloAiuto, spento){
+    return <label style={cella} title={titoloAiuto||""}><span style={spento ? Object.assign({}, etich, { color:"#64748b" }) : etich}>{lbl}</span>
       <input value={valore==null?"":String(valore)} inputMode="decimal" style={giallo} onChange={function(e){ onCh(e.target.value); }} />
-      {segno ? <span style={{ fontSize:"11.5px", color:"#475569" }}>{segno}</span> : null}</label>;
+      {segno ? <span style={{ fontSize:"11.5px", color:"#475569" }}>{segno}</span> : null}
+      {spento ? <span style={{ display:"block", fontSize:"12.5px", fontWeight:700, color:"#64748b" }}>non in uso: serve solo con le ore «Teoriche»</span> : null}</label>;
   };
 
   if (!dp) return <div style={{ padding:"20px", color:"#475569" }}>Nessun dipendente: aggiungine uno dalla scheda ANAGRAFICA.</div>;
@@ -2359,7 +2362,7 @@ function CostoOrario(props){
             {campoNum("Festività NON godute (gg/anno)", cMostra(sc.festNonGod, COSTO_COMUNE_DEF.festNonGod), function(v){ setComune("festNonGod", v); })}
             {campoNum("Malattia presunta (gg/mese)", cMostra(sc.malattiaMese, COSTO_COMUNE_DEF.malattiaMese), function(v){ setComune("malattiaMese", v); })}
             {campoNum("Altri permessi (gg/anno)", cMostra(sc.altriPermessi, COSTO_COMUNE_DEF.altriPermessi), function(v){ setComune("altriPermessi", v); })}
-            {campoNum("Ore supplementari stimate %", cMostra(sc.suppPct, COSTO_COMUNE_DEF.suppPct), function(v){ setComune("suppPct", v); }, "% delle ore del mese")}
+            {campoNum("Ore supplementari stimate %", cMostra(sc.suppPct, COSTO_COMUNE_DEF.suppPct), function(v){ setComune("suppPct", v); }, "% delle ore del mese", "", !suppAttiva)}
             <label style={cella}><span style={etich}>Supplementari nel TFR</span>
               <select value={c.tfrSupp} style={{ padding:"8px", width:"100%" }} onChange={function(e){ setComune("tfrSupp", e.target.value); }}>
                 <option value="SI">SI</option><option value="NO">NO</option></select></label>
