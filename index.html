@@ -229,7 +229,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver72";
+const APP_VER = "ver73";
 const APP_DATA = "03nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -2080,7 +2080,7 @@ const COSTO_COMUNE_DEF = {
   festNonGodCoef:1, malattiaMese:2, integrMater:20, altriPermessi:0, suppPct:10,
   tfrSupp:"SI", tfrDiv:13.5, anniTfr:2, istat:2, prevCompl:1.5, prevComplPag:0,
   inps:26.4, inpsPag:100, fis:0.53333, fisPag:100, inail:0.4, inailPag:100,
-  irap:3.9, irapPag:0, sanitaria:132, paghe:25, formazione:250, kmMese:30
+  irap:3.9, irapPag:0, sanitaria:132, paghe:25, formazione:250, kmMese:0
 };
 
 function cNum(v, def){
@@ -2164,8 +2164,10 @@ function calcCosto(o){
   const E13 = (H2-I2)*c.malattiaMese;                   // giorni di malattia presunti
   const J14 = H5*I2*c.integrMater/100;                  // integrazione maternita'
   const L15 = J5+J6+J8+J12+J14;                         // imponibile I
-  const O5 = (H2-I2)*4.3452;                            // settimane del periodo
-  const O6 = O5-((c.ferie+c.altriPermessi)*H3/12 + c.festGodute + E13)/Q2;
+  const O5calc = (H2-I2)*4.3452;                        // settimane del periodo, come le calcola il foglio
+  const O5 = (o.settPeriodoOv>0) ? o.settPeriodoOv : O5calc;
+  const O6calc = O5-((c.ferie+c.altriPermessi)*H3/12 + c.festGodute + E13)/Q2;
+  const O6 = (o.settLavOv>0) ? o.settLavOv : O6calc;    // settimane davvero lavorabili (si possono scrivere)
   const O8 = O6*O2;                                     // ore ordinarie lavorate
   const O11 = o.sottoSoglia||0;
   const G38 = (o.oreManuali>0)? o.oreManuali : 0;
@@ -2191,7 +2193,7 @@ function calcCosto(o){
   const F38 = O8 + P2*(c.suppPct/100)*H2 - O11*H2;      // ore teoriche rendicontabili
   const H38 = (G38>0)? G38 : F38;                       // ore usate nel calcolo
   return { J2:J2,P2:P2,H5:H5,J5:J5,J6:J6,J8:J8,J12:J12,E13:E13,J14:J14,L15:L15,
-           O5:O5,O6:O6,O8:O8,E18:E18,J17:J17,J18:J18,L18:L18,H19:H19,J19:J19,J21:J21,
+           O5:O5,O6:O6,O8:O8,O5calc:O5calc,O6calc:O6calc,E18:E18,J17:J17,J18:J18,L18:L18,H19:H19,J19:J19,J21:J21,
            J23:J23,J25:J25,J26:J26,J27:J27,J28:J28,J29:J29,J30:J30,J31:J31,J32:J32,J34:J34,
            J35:J35,F38:F38,H38:H38, orario:(H38>0? J35/H38 : 0) };
 }
@@ -2226,6 +2228,8 @@ function datiCosto(state, dp, pairs){
     premiMese: cNum(p.premiMese, 0),
     premiMesiTolti: cNum(p.premiMesiTolti, 0),
     sottoSoglia: cNum(p.sottoSoglia, 0),
+    settPeriodoOv: cNum(p.settPeriodo, 0),                 // 0 = usa il valore calcolato
+    settLavOv: cNum(p.settLav, 0),
     oreManuali: 0
   };
   // da dove arrivano le ore rendicontate: teoriche del foglio, dai Riepiloghi, o scritte a mano
@@ -2449,8 +2453,33 @@ function CostoOrario(props){
                   </label>
                   <label style={{ display:"flex", alignItems:"center", gap:"8px", cursor:"pointer" }}>
                     <input type="radio" name={"fonte-"+dp.id} checked={d.fonte==="teoriche"} onChange={function(){ setPar("fonteOre","teoriche"); }} />
-                    <span><b>Teoriche</b>, calcolate dal foglio: <b style={cifre}>{fmt2(r.F38)} h</b></span>
+                    <span><b>Teoriche</b>, calcolate dalla tabella qui sotto: <b style={cifre}>{fmt2(r.F38)} h</b></span>
                   </label>
+                </div>
+
+                <div style={{ marginTop:"8px", borderTop:"1px solid #b9d5f1", paddingTop:"7px" }}>
+                  <div style={{ fontSize:"13.5px", fontWeight:800, color:"#1f4e82", marginBottom:"2px" }}>Da dove escono le ore teoriche</div>
+                  <div style={{ fontSize:"12.5px", color:"#475569", lineHeight:1.45, marginBottom:"6px" }}>Le due caselle <b>giallino</b> si possono scrivere: servono a <b>simulare</b> — per esempio «in quel periodo si lavorano davvero 18 settimane». Lasciate vuote, l'app le calcola da sé.</div>
+                  <table style={{ width:"100%", borderCollapse:"collapse" }}><tbody>
+                    <tr><td style={tdE}>Settimane del periodo</td>
+                        <td style={{ padding:"2px 0", width:"130px" }}>
+                          <input value={d.raw.settPeriodo==null?"":String(d.raw.settPeriodo)} inputMode="decimal" placeholder={fmt2(r.O5calc)}
+                            style={{ width:"120px", border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px", padding:"6px 8px", fontSize:"14px", fontVariantNumeric:"tabular-nums" }}
+                            onChange={function(e){ setPar("settPeriodo", e.target.value); }} /></td>
+                        <td style={{ padding:"2px 0 2px 8px", fontSize:"12.5px", color:"#475569" }}>calcolate: <b style={cifre}>{fmt2(r.O5calc)}</b></td></tr>
+                    <tr><td style={tdE}>Settimane davvero lavorabili</td>
+                        <td style={{ padding:"2px 0" }}>
+                          <input value={d.raw.settLav==null?"":String(d.raw.settLav)} inputMode="decimal" placeholder={fmt2(r.O6calc)}
+                            style={{ width:"120px", border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px", padding:"6px 8px", fontSize:"14px", fontVariantNumeric:"tabular-nums" }}
+                            onChange={function(e){ setPar("settLav", e.target.value); }} /></td>
+                        <td style={{ padding:"2px 0 2px 8px", fontSize:"12.5px", color:"#475569" }}>tolte ferie, festività e malattia: <b style={cifre}>{fmt2(r.O6calc)}</b></td></tr>
+                    <tr><td style={tdE}>Ore settimanali</td><td style={Object.assign({}, tdV, cifre)}>{hoursDisp(d.oreSett)}</td><td></td></tr>
+                    <tr><td style={tdE}>Ore lavorabili sul periodo</td><td style={Object.assign({}, tdV, cifre)}>{fmt2(r.O8)} h</td>
+                        <td style={{ padding:"2px 0 2px 8px", fontSize:"12.5px", color:"#475569" }}>settimane × ore settimanali</td></tr>
+                  </tbody></table>
+                  {(d.raw.settPeriodo || d.raw.settLav) ?
+                    <button className="btn btn-gray" style={{ marginTop:"6px" }}
+                      onClick={function(){ setPar("settPeriodo",""); setPar("settLav",""); }}>↺ Rimetti i valori calcolati</button> : null}
                 </div>
               </div>
             </div>

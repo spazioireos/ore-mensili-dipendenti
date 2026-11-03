@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver72 · 03nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver73 · 03nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -120,6 +120,16 @@ Banca ore, tetto annuo, contratti e export.
     (`F30 = SE(E26=0;100;0)`), qui è legata **al tipo di contratto**: è l'unica differenza voluta
     rispetto all'xlsx; **mesi contati INTERI** (prudenziale) anche se il contratto inizia o
     finisce a metà mese.
+  - **Simulazione (da ver73, 03/11/2026)**: sotto le tre scelte c'è la tabellina del foglio Excel
+    (`O5` → `O8`) con **due caselle scrivibili** — *Settimane del periodo* e *Settimane davvero
+    lavorabili*. Scritte, prevalgono sul calcolo (`settPeriodoOv`/`settLavOv` in `calcCosto`,
+    campi `dp.costo.settPeriodo` e `dp.costo.settLav`); vuote, l'app calcola come prima. Accanto
+    a ciascuna si vede sempre il valore calcolato, e un pulsante **«↺ Rimetti i valori
+    calcolati»** svuota entrambe. Serve a rispondere a «quanto costa questa persona per 6 mesi
+    del 2027 se si lavorano davvero 18 settimane»: si sceglie il periodo, si scrivono i mesi e le
+    settimane, e il costo orario si rifà da sé. **Finché non si preme 💾 non si salva nulla.**
+  - **Rimborso km: il valore comune è 0** (da ver73, richiesta di Christian). Chi ha davvero il
+    rimborso se lo scrive nella propria scheda.
   - ⚠️ **Numeri all'italiana**: `cNum` capisce sia `1545.21` sia `1.545,21`; `cMostra` fa vedere
     il **grezzo** mentre scrivi (senza, digitando "20," la virgola sparirebbe) e il valore
     calcolato con i separatori italiani. Non sostituirle con `parseFloat` secco.
