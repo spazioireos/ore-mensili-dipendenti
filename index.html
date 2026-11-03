@@ -198,6 +198,23 @@
 input:focus,select:focus,textarea:focus{outline:3px solid #1d4ed8;outline-offset:1px}
 .btn:focus-visible{outline:3px solid #1d4ed8;outline-offset:2px}
 /* ================= fine aggiunta leggibilita' ================= */
+
+  /* ===== COSTO ORARIO — due sotto-colonne solo su schermi larghi (ver76) ===== */
+  /* Sotto i 1500px NON cambia nulla: .co-sub resta a tutta larghezza, come prima. */
+  /* su telefono e tablet stretto le caselle stanno in due per riga invece che in una sola */
+  @media (max-width:900px){
+    .co-grid { grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)) !important; }
+    /* su telefono la tabellina delle settimane usciva di lato: le etichette vanno a capo */
+    .co-sub table td { white-space:normal !important; }
+  }
+  @media (min-width:1500px){
+    .co-wrap { flex-grow:2; }
+    .co-sub  { flex:1 1 360px !important; }
+    .co-det  { flex:1 1 320px !important; }
+    /* nelle colonne strette le etichette delle tabelle devono poter andare a capo,
+       altrimenti la tabellina delle settimane esce dal riquadro (provato il 03/11/2026) */
+    .co-sub table td { white-space:normal !important; }
+  }
 </style>
 </head>
 <body>
@@ -229,7 +246,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver75";
+const APP_VER = "ver76";
 const APP_DATA = "03nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -2263,18 +2280,18 @@ function CostoOrario(props){
   const periodoLabel = pairs.length ? (mLabelY(pairs[0].y, pairs[0].m) + " → " + mLabelY(pairs[pairs.length-1].y, pairs[pairs.length-1].m)) : "";
   const dp = dips.find(function(x){ return x.id===selId; }) || dips[0];
 
-  const giallo = { border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px", padding:"7px 9px", fontFamily:"inherit", fontSize:"14px", width:"100%" };
-  const etich = { fontSize:"12px", fontWeight:700, color:"#374151", marginBottom:"2px" };
+  const giallo = { border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px", padding:"7px 9px", fontFamily:"inherit", fontSize:"15px", width:"100%" };
+  const etich = { fontSize:"13px", fontWeight:700, color:"#374151", marginBottom:"2px" };
   const cella = { display:"block" };
-  const box = function(bg,bd){ return { background:bg, border:"1px solid "+bd, borderRadius:"10px", padding:"9px 11px", marginBottom:"8px" }; };
-  const titolo = { fontWeight:800, fontSize:"14px", marginBottom:"6px", display:"block" };
-  const aiuto = { fontSize:"12.5px", color:"#475569", lineHeight:1.5, margin:"0 0 8px" };
+  const box = function(bg,bd){ return { background:bg, border:"1px solid "+bd, borderRadius:"10px", padding:"7px 10px", marginBottom:"6px" }; };
+  const titolo = { fontWeight:800, fontSize:"15px", marginBottom:"4px", display:"block" };
+  const aiuto = { fontSize:"13px", color:"#475569", lineHeight:1.35, margin:"0 0 6px" };
   // ver72: tre blocchi con un titolo che dice cosa stai guardando, importi incolonnati
-  const blocco = { border:"1px solid #d7dde5", borderLeft:"4px solid #5a9ce2", borderRadius:"8px", padding:"9px 11px", marginBottom:"8px", background:"#fff" };
-  const capo = { fontSize:"15px", fontWeight:800, color:"#1f4e82", marginBottom:"4px" };
-  const tdE = { padding:"2px 10px 2px 0", color:"#475569", whiteSpace:"nowrap", verticalAlign:"top", width:"36%", fontSize:"13.5px" };
-  const tdV = { padding:"2px 0", fontWeight:700, color:"#0F2740", fontSize:"13.5px" };
-  const grigliaCampi = { display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(165px, 1fr))", gap:"6px", marginTop:"7px" };
+  const blocco = { border:"1px solid #d7dde5", borderLeft:"4px solid #5a9ce2", borderRadius:"8px", padding:"7px 10px", marginBottom:"6px", background:"#fff" };
+  const capo = { fontSize:"16px", fontWeight:800, color:"#1f4e82", marginBottom:"3px" };
+  const tdE = { padding:"1px 10px 1px 0", color:"#475569", whiteSpace:"nowrap", verticalAlign:"top", width:"36%", fontSize:"14.5px" };
+  const tdV = { padding:"1px 0", fontWeight:700, color:"#0F2740", fontSize:"14.5px" };
+  const grigliaCampi = { display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(165px, 1fr))", gap:"5px", marginTop:"5px" };
   const cifre = { fontVariantNumeric:"tabular-nums" };
 
   const sc = (state && state.costoComune) || {};
@@ -2286,8 +2303,8 @@ function CostoOrario(props){
   const campoNum = function(lbl, valore, onCh, segno, titoloAiuto, spento){
     return <label style={cella} title={titoloAiuto||""}><span style={spento ? Object.assign({}, etich, { color:"#64748b" }) : etich}>{lbl}</span>
       <input value={valore==null?"":String(valore)} inputMode="decimal" style={giallo} onChange={function(e){ onCh(e.target.value); }} />
-      {segno ? <span style={{ fontSize:"11.5px", color:"#475569" }}>{segno}</span> : null}
-      {spento ? <span style={{ display:"block", fontSize:"12.5px", fontWeight:700, color:"#64748b" }}>non in uso: serve solo con le ore «Teoriche»</span> : null}</label>;
+      {segno ? <span style={{ fontSize:"12.5px", color:"#475569" }}>{segno}</span> : null}
+      {spento ? <span style={{ display:"block", fontSize:"13px", fontWeight:700, color:"#64748b" }}>non in uso: serve solo con le ore «Teoriche»</span> : null}</label>;
   };
 
   if (!dp) return <div style={{ padding:"20px", color:"#475569" }}>Nessun dipendente: aggiungine uno dalla scheda ANAGRAFICA.</div>;
@@ -2315,9 +2332,9 @@ function CostoOrario(props){
   };
 
   const voce = function(lbl, val, forte){
-    return <div style={{ display:"flex", justifyContent:"space-between", gap:"12px", padding:"2px 0",
+    return <div style={{ display:"flex", justifyContent:"space-between", gap:"12px", padding:"1px 0",
       borderTop: forte ? "1px solid #1f4e82" : "none", borderBottom: forte ? "none" : "1px dotted #e2e8f0",
-      fontSize:"13.5px", fontWeight:forte?800:400, color: forte? "#1f4e82" : "#334155" }}>
+      fontSize:"14.5px", fontWeight:forte?800:400, color: forte? "#1f4e82" : "#334155" }}>
       <span>{lbl}</span><span style={{ fontVariantNumeric:"tabular-nums", whiteSpace:"nowrap" }}>{fmt2(val)} €</span></div>;
   };
 
@@ -2330,7 +2347,7 @@ function CostoOrario(props){
         <button className="btn btn-blue" onClick={esporta} title="Scarica la tabella di tutti i dipendenti">📊 Esporta Excel</button>
       </div>
 
-      <div style={{ background:"#f8fafc", border:"1px dashed #94a3b8", borderRadius:"10px", padding:"8px 12px", marginBottom:"8px", fontSize:"13px", color:"#334155", lineHeight:1.45 }}>
+      <div style={{ background:"#f8fafc", border:"1px dashed #94a3b8", borderRadius:"10px", padding:"7px 10px", marginBottom:"6px", fontSize:"14px", color:"#334155", lineHeight:1.35 }}>
         Scegli il <b>periodo</b> e la persona: la scheda si compila da sola con quello che l'app sa già. Correggi i campi <span style={{ background:"#fffde7", border:"1px solid #f59e0b", borderRadius:"4px", padding:"0 5px", fontWeight:700 }}>giallini</span> dove serve: il risultato si aggiorna da solo. I numeri uguali per tutti stanno in <b>Valori comuni</b>. Premi <b>💾 Salva</b> per conservare.
       </div>
 
@@ -2343,7 +2360,7 @@ function CostoOrario(props){
           <select value={taM} onChange={function(e){ setTaM(parseInt(e.target.value,10)); }} style={{ padding:"8px" }}>{MONTH_LABEL.map(function(l,i){ return <option key={i} value={i+1}>{l}</option>; })}</select></div>
         <div><div style={etich}>Anno</div>
           <select value={taY} onChange={function(e){ setTaY(parseInt(e.target.value,10)); }} style={{ padding:"8px" }}>{anniDisp.map(function(y){ return <option key={y} value={y}>{y}</option>; })}</select></div>
-        <div style={{ fontSize:"13px", color:"#334155" }}>Periodo: <b>{periodoLabel}</b> ({pairs.length} mesi)</div>
+        <div style={{ fontSize:"14px", color:"#334155" }}>Periodo: <b>{periodoLabel}</b> ({pairs.length} mesi)</div>
         <button className="btn btn-gray" onClick={function(){ setApriComuni(!apriComuni); }}>{apriComuni ? "▲ Chiudi valori comuni" : "⚙ Valori comuni"}</button>
       </div>
 
@@ -2384,25 +2401,27 @@ function CostoOrario(props){
           </div>
         </div> : null}
 
-      <div style={{ display:"flex", gap:"14px", alignItems:"flex-start", flexWrap:"wrap" }}>
+      <div style={{ display:"flex", gap:"10px", alignItems:"flex-start", flexWrap:"wrap" }}>
         <div style={{ flex:"0 1 210px", minWidth:"150px", display:"flex", flexDirection:"column", gap:"4px" }}>
           {dips.map(function(x){
             const dd = datiCosto(state, x, pairs);
             return (
               <button key={x.id} onClick={function(){ setSelId(x.id); }}
-                style={{ textAlign:"left", padding:"8px 10px", borderRadius:"8px", border:"1px solid " + (x.id===dp.id?"#2f6fae":"#e2e8f0"), background:(x.id===dp.id?"#2f6fae":"#fff"), color:(x.id===dp.id?"#fff":"#1f4e82"), fontWeight:700, fontSize:"13px", cursor:"pointer" }}>
-                {x.nome}<br/><span style={{ fontSize:"12px", fontWeight:400 }}>{fmt2(dd.res.orario)} €/h</span>
+                style={{ textAlign:"left", padding:"8px 10px", borderRadius:"8px", border:"1px solid " + (x.id===dp.id?"#2f6fae":"#e2e8f0"), background:(x.id===dp.id?"#2f6fae":"#fff"), color:(x.id===dp.id?"#fff":"#1f4e82"), fontWeight:700, fontSize:"14px", cursor:"pointer" }}>
+                {x.nome}<br/><span style={{ fontSize:"13px", fontWeight:400 }}>{fmt2(dd.res.orario)} €/h</span>
               </button>
             );
           })}
         </div>
 
-        <div style={{ flex:"1 1 420px", minWidth:0, background:"#fff", border:"2px solid #5a9ce2", borderRadius:"12px", padding:"10px" }}>
-          <div style={{ fontSize:"18px", fontWeight:800, color:"#1f4e82", marginBottom:"6px" }}>{dp.nome}</div>
+        <div style={{ flex:"1 1 420px", minWidth:0, background:"#fff", border:"2px solid #5a9ce2", borderRadius:"12px", padding:"9px" }}>
+          <div style={{ fontSize:"19px", fontWeight:800, color:"#1f4e82", marginBottom:"4px" }}>{dp.nome}</div>
 
-          <div style={{ display:"flex", gap:"10px", flexWrap:"wrap", alignItems:"flex-start" }}>
+          <div style={{ display:"flex", gap:"8px", flexWrap:"wrap", alignItems:"flex-start" }}>
 
-            <div style={{ flex:"1 1 470px", minWidth:0 }}>
+            <div className="co-wrap" style={{ flex:"1 1 470px", minWidth:0, display:"flex", flexWrap:"wrap", gap:"8px", alignItems:"flex-start" }}>
+
+            <div className="co-sub" style={{ flex:"1 1 100%", minWidth:0 }}>
 
               <div style={blocco}>
                 <div style={capo}>Il contratto</div>
@@ -2414,7 +2433,7 @@ function CostoOrario(props){
                   {cessEffStr(dp) ? <tr><td style={tdE}>Cessazione</td><td style={tdV}>{cessEffStr(dp)}</td></tr> : null}
                   <tr><td style={tdE}>Nel periodo</td><td style={tdV}>in forza per {d.mesiAuto} {d.mesiAuto===1?"mese":"mesi"}</td></tr>
                 </tbody></table>
-                <div style={grigliaCampi}>
+                <div className="co-grid" style={grigliaCampi}>
                   {campoNum("Mesi di contratto", cMostra(d.raw.mesi, d.mesiAuto), function(v){ setPar("mesi", v); }, "proposti: " + d.mesiAuto)}
                   {campoNum("Mesi di maternità", cMostra(d.raw.mesiMater, ""), function(v){ setPar("mesiMater", v); })}
                   {campoNum("Ore settimanali", cMostra(d.raw.oreSett, d.oreSettAuto), function(v){ setPar("oreSett", v); }, "dalla scheda: " + hoursDisp(d.oreSettAuto))}
@@ -2425,8 +2444,8 @@ function CostoOrario(props){
 
               <div style={blocco}>
                 <div style={capo}>La retribuzione</div>
-                <div style={{ fontSize:"12.5px", color:"#475569", lineHeight:1.5 }}>Scegli il livello e il minimo si compila da sé. Le caselle <b>giallino</b> si possono scrivere; quello che non è giallino lo calcola l'app.</div>
-                <div style={grigliaCampi}>
+                <div style={{ fontSize:"13px", color:"#475569", lineHeight:1.35 }}>Scegli il livello e il minimo si compila da sé. Le caselle <b>giallino</b> si possono scrivere; quello che non è giallino lo calcola l'app.</div>
+                <div className="co-grid" style={grigliaCampi}>
                   <label style={cella}><span style={etich}>Tabella</span>
                     <select value={d.tab} style={{ padding:"8px", width:"100%" }} onChange={function(e){ setPar("tabella", e.target.value); }}>
                       {TAB_CCNL.map(function(t){ return <option key={t} value={t}>{t}</option>; })}</select></label>
@@ -2444,10 +2463,14 @@ function CostoOrario(props){
                 </div>
               </div>
 
+            </div>
+
+            <div className="co-sub" style={{ flex:"1 1 100%", minWidth:0 }}>
+
               <div style={blocco}>
                 <div style={capo}>Le ore da dichiarare</div>
-                <div style={{ fontSize:"12.5px", color:"#475569", lineHeight:1.5, marginBottom:"8px" }}>Al Comune si dichiarano <b>solo le ore davvero lavorate</b>: le assenze non si dichiarano. Scegli da dove prenderle.</div>
-                <div style={{ display:"flex", flexDirection:"column", gap:"7px", fontSize:"13.5px" }}>
+                <div style={{ fontSize:"13px", color:"#475569", lineHeight:1.35, marginBottom:"6px" }}>Al Comune si dichiarano <b>solo le ore davvero lavorate</b>: le assenze non si dichiarano. Scegli da dove prenderle.</div>
+                <div style={{ display:"flex", flexDirection:"column", gap:"6px", fontSize:"14.5px" }}>
                   <label style={{ display:"flex", alignItems:"center", gap:"8px", cursor:"pointer" }}>
                     <input type="radio" name={"fonte-"+dp.id} checked={d.fonte==="riepiloghi"} onChange={function(){ setPar("fonteOre","riepiloghi"); }} />
                     <span>Dai <b>Riepiloghi</b>, ore inserite nei mesi del periodo: <b style={cifre}>{fmt2(d.oreDaRiep)} h</b>{d.oreDaRiep===0 ? <span style={{ color:"#b91c1c", fontWeight:700 }}> — in questo periodo non hai inserito nessuna ora</span> : null}</span>
@@ -2456,7 +2479,7 @@ function CostoOrario(props){
                     <input type="radio" name={"fonte-"+dp.id} checked={d.fonte==="mano"} onChange={function(){ setPar("fonteOre","mano"); }} />
                     <span>Scritte <b>a mano</b>:</span>
                     <input value={d.raw.oreManuali==null?"":String(d.raw.oreManuali)} inputMode="decimal" placeholder="es. 850" disabled={d.fonte!=="mano"}
-                      style={{ width:"110px", border:"2px solid #f59e0b", background: d.fonte==="mano" ? "#fffde7" : "#f1f5f9", borderRadius:"6px", padding:"7px 9px", fontSize:"14px", fontVariantNumeric:"tabular-nums" }}
+                      style={{ width:"110px", border:"2px solid #f59e0b", background: d.fonte==="mano" ? "#fffde7" : "#f1f5f9", borderRadius:"6px", padding:"7px 9px", fontSize:"15px", fontVariantNumeric:"tabular-nums" }}
                       onChange={function(e){ setPar("oreManuali", e.target.value); }} /> <span>h</span>
                   </label>
                   <label style={{ display:"flex", alignItems:"center", gap:"8px", cursor:"pointer" }}>
@@ -2465,25 +2488,25 @@ function CostoOrario(props){
                   </label>
                 </div>
 
-                <div style={{ marginTop:"8px", borderTop:"1px solid #b9d5f1", paddingTop:"7px" }}>
-                  <div style={{ fontSize:"13.5px", fontWeight:800, color:"#1f4e82", marginBottom:"2px" }}>Da dove escono le ore teoriche</div>
-                  <div style={{ fontSize:"12.5px", color:"#475569", lineHeight:1.45, marginBottom:"6px" }}>Le due caselle <b>giallino</b> si possono scrivere: servono a <b>simulare</b> — per esempio «in quel periodo si lavorano davvero 18 settimane». Lasciate vuote, l'app le calcola da sé.</div>
+                <div style={{ marginTop:"6px", borderTop:"1px solid #b9d5f1", paddingTop:"5px" }}>
+                  <div style={{ fontSize:"14.5px", fontWeight:800, color:"#1f4e82", marginBottom:"2px" }}>Da dove escono le ore teoriche</div>
+                  <div style={{ fontSize:"13px", color:"#475569", lineHeight:1.3, marginBottom:"5px" }}>Le due caselle <b>giallino</b> si possono scrivere: servono a <b>simulare</b> — per esempio «in quel periodo si lavorano davvero 18 settimane». Lasciate vuote, l'app le calcola da sé.</div>
                   <table style={{ width:"100%", borderCollapse:"collapse" }}><tbody>
                     <tr><td style={tdE}>Settimane del periodo</td>
-                        <td style={{ padding:"2px 0", width:"130px" }}>
+                        <td style={{ padding:"1px 0", width:"130px" }}>
                           <input value={d.raw.settPeriodo==null?"":String(d.raw.settPeriodo)} inputMode="decimal" placeholder={fmt2(r.O5calc)}
-                            style={{ width:"120px", border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px", padding:"6px 8px", fontSize:"14px", fontVariantNumeric:"tabular-nums" }}
+                            style={{ width:"120px", border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px", padding:"6px 8px", fontSize:"15px", fontVariantNumeric:"tabular-nums" }}
                             onChange={function(e){ setPar("settPeriodo", e.target.value); }} /></td>
-                        <td style={{ padding:"2px 0 2px 8px", fontSize:"12.5px", color:"#475569" }}>calcolate: <b style={cifre}>{fmt2(r.O5calc)}</b></td></tr>
+                        <td style={{ padding:"1px 0 1px 8px", fontSize:"13px", color:"#475569" }}>calcolate: <b style={cifre}>{fmt2(r.O5calc)}</b></td></tr>
                     <tr><td style={tdE}>Settimane davvero lavorabili</td>
-                        <td style={{ padding:"2px 0" }}>
+                        <td style={{ padding:"1px 0" }}>
                           <input value={d.raw.settLav==null?"":String(d.raw.settLav)} inputMode="decimal" placeholder={fmt2(r.O6calc)}
-                            style={{ width:"120px", border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px", padding:"6px 8px", fontSize:"14px", fontVariantNumeric:"tabular-nums" }}
+                            style={{ width:"120px", border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px", padding:"6px 8px", fontSize:"15px", fontVariantNumeric:"tabular-nums" }}
                             onChange={function(e){ setPar("settLav", e.target.value); }} /></td>
-                        <td style={{ padding:"2px 0 2px 8px", fontSize:"12.5px", color:"#475569" }}>tolte ferie, festività e malattia: <b style={cifre}>{fmt2(r.O6calc)}</b></td></tr>
+                        <td style={{ padding:"1px 0 1px 8px", fontSize:"13px", color:"#475569" }}>tolte ferie, festività e malattia: <b style={cifre}>{fmt2(r.O6calc)}</b></td></tr>
                     <tr><td style={tdE}>Ore settimanali</td><td style={Object.assign({}, tdV, cifre)}>{hoursDisp(d.oreSett)}</td><td></td></tr>
                     <tr><td style={tdE}>Ore lavorabili sul periodo</td><td style={Object.assign({}, tdV, cifre)}>{fmt2(r.O8)} h</td>
-                        <td style={{ padding:"2px 0 2px 8px", fontSize:"12.5px", color:"#475569" }}>settimane × ore settimanali</td></tr>
+                        <td style={{ padding:"1px 0 1px 8px", fontSize:"13px", color:"#475569" }}>settimane × ore settimanali</td></tr>
                   </tbody></table>
                   {(d.raw.settPeriodo || d.raw.settLav) ?
                     <button className="btn btn-gray" style={{ marginTop:"6px" }}
@@ -2492,14 +2515,16 @@ function CostoOrario(props){
               </div>
             </div>
 
-            <div style={{ flex:"1 1 340px", minWidth:0 }}>
+            </div>
+
+            <div className="co-det" style={{ flex:"1 1 340px", minWidth:0 }}>
               <div style={{ border:"2px solid #1f4e82", borderRadius:"12px", padding:"13px 12px", background:"#fff" }}>
                 <div style={{ textAlign:"center", fontSize:"22px", fontWeight:700, color:"#0F2740", ...cifre }}>{fmt2(r.J35)} €</div>
                 <div style={{ height:"2px", background:"#1f4e82", margin:"6px 0" }}></div>
                 <div style={{ textAlign:"center", fontSize:"22px", fontWeight:700, color:"#0F2740", ...cifre }}>{fmt2(r.H38)} ore</div>
-                <div style={{ textAlign:"center", fontSize:"12.5px", color:"#475569", margin:"8px 0 2px" }}>costo del periodo diviso le ore dichiarate</div>
+                <div style={{ textAlign:"center", fontSize:"13px", color:"#475569", margin:"6px 0 2px" }}>costo del periodo diviso le ore dichiarate</div>
                 <div style={{ textAlign:"center", fontSize:"34px", fontWeight:800, color:"#1f4e82", lineHeight:1.1, ...cifre }}>{fmt2(r.orario)}</div>
-                <div style={{ textAlign:"center", fontSize:"14px", fontWeight:700, color:"#1f4e82" }}>euro all'ora</div>
+                <div style={{ textAlign:"center", fontSize:"15px", fontWeight:700, color:"#1f4e82" }}>euro all'ora</div>
               </div>
 
               <div style={{ marginTop:"12px" }}>

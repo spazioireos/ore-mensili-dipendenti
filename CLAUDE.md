@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver75 · 03nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver76 · 03nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -146,6 +146,31 @@ Banca ore, tetto annuo, contratti e export.
   - ⚠️ **Numeri all'italiana**: `cNum` capisce sia `1545.21` sia `1.545,21`; `cMostra` fa vedere
     il **grezzo** mentre scrivi (senza, digitando "20," la virgola sparirebbe) e il valore
     calcolato con i separatori italiani. Non sostituirle con `parseFloat` secco.
+- 📐 **Costo orario più compatto e più leggibile** (ver76, 03/11/2026, richiesta di Christian:
+  «riesci a compattare meglio la scheda costo orario e a ingrandire in pt le scritte?»). Due cose
+  insieme, in direzioni opposte: **scritte più grandi** e **spazi più stretti**.
+  - **Caratteri** (solo dentro `CostoOrario`): etichette 12→**13px**, aiutini sotto le caselle
+    11,5→**12,5px**, tabelle del contratto e del dettaglio 13,5→**14,5px**, testi di spiegazione
+    12,5→**13px**, titoli dei blocchi 15→**16px**, nome della persona 18→**19px**, caselle
+    14→**15px**. Dentro la scheda **non resta niente sotto i 12,5px**. ⚠️ Restano a 11-12px
+    **fuori** dalla scheda: targhetta della revisione, avviso «Modalità LOCALE» e barra «Zoom
+    vista» — sono di altre parti dell'app, **non toccate**.
+  - **Spazi**: imbottiture dei riquadri 9/11→**7/10px**, margini fra blocchi 8→**6px**, righe
+    delle tabelle 2→**1px**, interlinea degli aiutini 1,5→**1,35**, griglia dei campi gap
+    6→**5px**. ⚠️ **L'altezza delle caselle e dei pulsanti non è cambiata**: 10 comandi sotto i
+    32px prima, 10 dopo.
+  - **Due sotto-colonne sugli schermi larghi**: la colonna dei blocchi è diventata un contenitore
+    `.co-wrap` con due `.co-sub` (*Il contratto* + *La retribuzione* | *Le ore da dichiarare*);
+    il riquadro del risultato ha la classe `.co-det`. ⚠️ **Sotto i 1500px non cambia niente**:
+    la regola CSS che le affianca sta in `@media (min-width:1500px)` e le `.co-sub` restano a
+    tutta larghezza. Misurato: pagina da 1439 a **1299px** a 1680, da 1315 a **1279px** a 1920;
+    a 1280 e 1440 resta com'era ma **con le scritte più grandi**.
+  - **Telefono**: `.co-grid` (le due griglie dei campi) sotto i 900px passa a `minmax(150px)` →
+    **due caselle per riga** invece di una, pagina da 3756 a **3368px**; e le etichette delle
+    tabelle vanno a capo, così la tabellina delle settimane **non esce più di lato** (difetto
+    **preesistente**: la ver75 a 390px scorreva in orizzontale).
+  - ⚠️ **Nessuna dicitura cambiata, nessun calcolo toccato**: le prove di ver75 danno gli stessi
+    numeri (20,65 / 20,46 / 20,73 €/h), zero errori in console.
 - 🎨 **COLORI: il rosa non esiste più** (da ver72, 03/11/2026, richiesta di Christian: «in luogo
   del rosa usa 5a9ce2 e gradazioni successive»). Il vecchio `#DE4C8A` era in **43 punti**: tutti
   sostituiti con una scala ricavata dal blu dato da Christian.
