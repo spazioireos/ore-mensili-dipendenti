@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver71 · 03nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver72 · 03nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -123,6 +123,23 @@ Banca ore, tetto annuo, contratti e export.
   - ⚠️ **Numeri all'italiana**: `cNum` capisce sia `1545.21` sia `1.545,21`; `cMostra` fa vedere
     il **grezzo** mentre scrivi (senza, digitando "20," la virgola sparirebbe) e il valore
     calcolato con i separatori italiani. Non sostituirle con `parseFloat` secco.
+- 🎨 **COLORI: il rosa non esiste più** (da ver72, 03/11/2026, richiesta di Christian: «in luogo
+  del rosa usa 5a9ce2 e gradazioni successive»). Il vecchio `#DE4C8A` era in **43 punti**: tutti
+  sostituiti con una scala ricavata dal blu dato da Christian.
+  | Ruolo | Colore |
+  |---|---|
+  | sfondi con **scritte bianche** sopra (testata, linguette attive, `table.rep th`, pulsanti selezionati) | **`#2f6fae`** |
+  | **testo** blu su bianco (nomi, titoli, totali) | **`#1f4e82`** |
+  | **bordi e accenti** (cornice della scheda, barretta dei blocchi) | **`#5a9ce2`** |
+  | velature chiare (ex `#fdf0f6`, `#f7c6dd`, `#f3bcd6`) | **`#eef5fc`**, **`#b9d5f1`** |
+  ⚠️ **Non mettere `#5a9ce2` sotto a scritte bianche**: il contrasto è 2,7 e non si legge. Con
+  `#2f6fae` è 4,4 (va per testo grande e grassetto), con `#1f4e82` è 6,9. Le altre tre app NON
+  sono state toccate: il rosa era solo qui.
+- **Costo orario, disposizione (ver72)**: la scheda è divisa in **tre blocchi con un titolo** —
+  *Il contratto* (con una tabellina dei dati del rapporto), *La retribuzione*, *Le ore da
+  dichiarare* — e il risultato è **una frazione sola** (costo sopra, ore sotto, €/ora in grande)
+  invece di due cartelli gemelli. Importi con **cifre tabulari** allineati a destra; gli
+  imponibili separati da una riga. Tolte le scritte TUTTE MAIUSCOLE e le catene di «·».
 - **Funzione presente**: confronto non vincolante con l'app "Fogli ore" (SOLA LETTURA delle
   collection `users` e `timesheets` dello stesso progetto Firebase). Non scrivere MAI lì.
 - **Leggibilità (ver66, 31/10/2026)**: blocco in fondo al `<style>`. Le scritte sotto i 12px
@@ -322,6 +339,11 @@ esplicitamente**: una valutazione teorica del codice non sostituisce una verific
 
 - **Celle editabili sempre giallino con bordo ambra**: segnale visivo immediato di cosa si può
   modificare.
+- **Spaziature compatte, sempre** (regola permanente di Christian, 03/11/2026): imbottiture e
+  distanze strette — riquadri ~9px, blocchi ~8px, griglie ~6px — così sullo schermo ci sta più
+  roba e si scorre meno. ⚠️ Si stringono **gli spazi**, non i comandi: l'altezza di caselle e
+  pulsanti NON si riduce (restano comodi da centrare col dito) e nessuna scritta scende sotto i
+  12,5px fuori dalle griglie dense.
 - Struttura chiara e intuitiva, palette coerente, distinzioni a colpo d'occhio (colori per anno,
   badge di stato, semafori); **intuitiva come se la usasse un ragazzo preadolescente da
   telefono**.
