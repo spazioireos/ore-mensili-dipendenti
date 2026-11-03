@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver76 · 03nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver77 · 03nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -171,6 +171,37 @@ Banca ore, tetto annuo, contratti e export.
     **preesistente**: la ver75 a 390px scorreva in orizzontale).
   - ⚠️ **Nessuna dicitura cambiata, nessun calcolo toccato**: le prove di ver75 danno gli stessi
     numeri (20,65 / 20,46 / 20,73 €/h), zero errori in console.
+- 🎯 **GIORNATE EROSIVE e tetto annuo** (ver77, 03/11/2026). Regola stabilita da Christian: un'ora
+  di assenza **consuma il massimale solo se quel giorno il servizio era aperto** («se stai a casa
+  durante l'anno scolastico io ti pago e le ore incidono; se stai in ferie a Natale no»).
+  - **Dove si segna**: il numerino sotto le celle di assenza (`.teor-abs`, già presente, mostrava
+    solo la quota del giorno) è diventato **cliccabile**. In chiaro = **erosiva**; barrato e
+    grigio (`.no-ero`) = **non erosiva**. Predefinito **erosiva**: nei dati finisce **solo
+    l'eccezione**, `dati[mese][dipId].ero[giorno] = false`. Gestore **`onEro(dipId, day, erosiva)`**,
+    che cancella la chiave quando si torna a erosiva (niente spazzatura nel documento).
+  - **Chi la usa**: solo **`prodottoMese`**, cioè il **Tetto annuo** (`dp.tettiAnnui`, riquadro
+    «🎯 Tetto annuo» nella vista del mese), che ora somma `totOfRec + oreEroseMese`.
+    ⚠️ **`coverAbsHours` NON è stato toccato**: lo **straordinario** (`bancaMeseA`) continua a
+    contare **tutte** le assenze, come da regola del 31/10/2026. Verificato: il riquadro del
+    conguaglio non si muove, il tetto cala di 5,010 h per ogni giornata spenta.
+  - **Decisione di Christian (03/11/2026)**: niente secondo tipo di massimale «per servizio».
+    Si usa il **Tetto annuo che c'era già**, per anno scolastico; i servizi si mescolano e a lui
+    va bene. Cade così la dipendenza da Fogli ore, la collection nuova e i mensilizzati.
+  - Funzioni aggiunte sopra il Tetto annuo: `eroOn`, `isAbsCell`, `oreEroseMese` (+ `svcCapsList`,
+    `svcCapLabel`, `svcCapMesi`, `svcCapAttivo`, **non ancora usate**: erano per l'ipotesi «per
+    servizio», lasciate per il pezzo che il dipendente vedrà dentro Fogli ore).
+- 🔴 **I FESTIVI NON SI COMPILANO** (ver77, richiesta di Christian, opzione **A** = blocco totale).
+  Sui giorni rossi (festività e domeniche) non si scrive più **niente**, né ore né codici:
+  `nonScriv = blocked || rosso` disattiva la casella e il pulsante del permesso orario.
+  ⚠️ **Conseguenze accettate da Christian**, dopo averle avute scritte: non si può più registrare
+  chi lavora davvero a Natale o di domenica, e **le ore già scritte sui festivi negli anni
+  passati restano visibili ma non più correggibili**. Il colore rosso e il messaggio «Giorno
+  festivo/domenica — non si compila» restano, `blocked` continua a significare «fuori dal periodo
+  di rapporto / mese bloccato» (colore e messaggio diversi).
+  In **Compila veloce** la spunta *«Salta i giorni festivi e le domeniche»* è ora **forzata e
+  disattivata**: senza, il riempimento avrebbe scritto in celle non più correggibili. La dicitura
+  non è stata toccata. `onFestConfirm` (la conferma «vuoi davvero inserire ore in un festivo?»)
+  resta nel file ma **non può più scattare**.
 - 🎨 **COLORI: il rosa non esiste più** (da ver72, 03/11/2026, richiesta di Christian: «in luogo
   del rosa usa 5a9ce2 e gradazioni successive»). Il vecchio `#DE4C8A` era in **43 punti**: tutti
   sostituiti con una scala ricavata dal blu dato da Christian.

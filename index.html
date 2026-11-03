@@ -96,7 +96,10 @@
   .foot-line .foot-tot { font-size:12px; color:#1f4e82; font-weight:700; }
   .foot-line label { font-size:12px; color:#64748b; font-weight:700; }
   .dich-in { width:80px; border:2px solid #f59e0b; background:#fffde7; border-radius:6px; padding:4px 6px; font-family:inherit; font-size:14px; font-weight:800; text-align:center; }
-  .teor-abs { font-size:9px; font-weight:800; color:#7c2d12; text-align:center; line-height:1.1; margin-top:1px; }
+  .teor-abs { font-size:9px; font-weight:800; color:#7c2d12; text-align:center; line-height:1.1; margin-top:1px; cursor:pointer; border-radius:3px; }
+  .teor-abs:hover { background:#fde68a; }
+  .teor-abs.no-ero { color:#94a3b8; text-decoration:line-through; }
+  .teor-abs.no-ero:hover { background:#e2e8f0; }
   .provv-lbl { display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:700; color:#92400e; background:#fffbeb; border:1px solid #fcd34d; border-radius:6px; padding:3px 8px; cursor:pointer; }
   .provv-base { font-size:12px; font-weight:700; border:1px solid #fcd34d; border-radius:6px; padding:3px 6px; background:#fff; }
   .conguaglio-warn { display:inline-flex; align-items:center; gap:8px; font-size:13px; font-weight:800; color:#7c2d12; background:#ffedd5; border:2px solid #fb923c; border-radius:8px; padding:4px 10px; }
@@ -246,7 +249,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver76";
+const APP_VER = "ver77";
 const APP_DATA = "03nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -470,10 +473,50 @@ function bancaPrecA(state,dp,anno,mese){                                    // b
   let s=0; for(let i=startIdx;i<months.length;i++){ const bm=bancaMeseA(state,dp,months[i].y,months[i].m); if(bm!=null) s+=bm; }
   return R2(s,3);
 }
+/* ===== MASSIMALI DI SERVIZIO (ver77) =========================================
+   Il massimale si imposta QUI (dp.svcCaps) e si consuma con le ore erogate su
+   quel servizio (lette da Fogli ore, sola lettura) PIU' le ore delle giornate di
+   assenza che "bruciano uno slot" — quelle in cui il servizio era aperto.
+   La giornata e' EROSIVA per difetto; le eccezioni (servizio chiuso: Natale,
+   Pasqua, agosto) si segnano a mano e si salvano in rec.ero[giorno] = false.
+   ⚠️ coverAbsHours NON e' stato toccato: il Tetto annuo e lo straordinario
+   continuano a contare TUTTE le assenze, come prima.                           */
+function eroOn(rec,d){ return !(rec && rec.ero && rec.ero[d] === false); }   // predefinito: erosiva
+function isAbsCell(v){ const c=String(v==null?"":v).trim(); return !!(CODE_SET[c] && c!=="--" && c!=="AN"); }
+function oreEroseMese(rec,dp,y,m){                                         // ore bruciate dalle assenze del mese
+  if(!rec||!rec.giorni) return 0;
+  const q=quotaGiorno(dp,y,m); const nd=daysInMonth(y,m); let days=0;
+  for(let d=1; d<=nd; d++){ if(isAbsCell(rec.giorni[d]) && eroOn(rec,d)) days++; }
+  return R2(days*q,3);
+}
+function svcCapsList(dp){
+  return (Array.isArray(dp.svcCaps)?dp.svcCaps:[]).map(function(c){
+    return { si: parseInt(c&&c.si,10), label: String(c&&c.label||""), ore: parseFloat(String(c&&c.ore).replace(",",".")),
+             periodo: (c&&c.periodo==="civile")?"civile":"scolastico", anno: parseInt(c&&c.anno,10)||0 };
+  }).filter(function(c){ return !isNaN(c.si) && c.si>=0 && !isNaN(c.ore) && c.ore>0 && c.anno>0; });
+}
+function svcCapLabel(c){
+  const per = c.periodo==="civile" ? ("anno "+c.anno) : ("a.s. "+c.anno+"/"+String((c.anno+1)%100).padStart(2,"0"));
+  return (c.label||("servizio "+(c.si+1))) + " — " + fmt2(c.ore) + " h · " + per;
+}
+function svcCapMesi(c){                                                    // elenco [y,m] del periodo del massimale
+  const out=[];
+  if(c.periodo==="civile"){ for(let m=1;m<=12;m++) out.push([c.anno,m]); }
+  else { for(let m=9;m<=12;m++) out.push([c.anno,m]); for(let m=1;m<=8;m++) out.push([c.anno+1,m]); }
+  return out;
+}
+function svcCapAttivo(c,y,m){                                             // il massimale copre il mese guardato?
+  const ym=y*100+m; const l=svcCapMesi(c);
+  return ym>=(l[0][0]*100+l[0][1]) && ym<=(l[11][0]*100+l[11][1]);
+}
+
 /* ===== Tetto annuo (attribuzione) — progetto unico, periodo scolastico o civile ===== */
-function prodottoMese(rec,dp,y,m){                                         // ore che consumano il tetto nel mese: ore rese (celle) + assenze coperte
+function prodottoMese(rec,dp,y,m){                                         // ore che consumano il tetto nel mese: ore rese (celle) + assenze EROSIVE
   if(!rec || !recHasData(rec)) return null;
-  return totOfRec(rec,y,m) + coverAbsHours(rec,dp,y,m);
+  /* ver77: le giornate spente con il clic (servizio chiuso) NON consumano piu' il tetto.
+     Il predefinito resta "erosiva", quindi finche' non si spegne nulla il numero e' identico a prima.
+     ⚠️ Lo straordinario (bancaMeseA) continua a usare coverAbsHours: NON e' stato toccato. */
+  return totOfRec(rec,y,m) + oreEroseMese(rec,dp,y,m);
 }
 function tettoWindow(periodo,y,m){                                         // finestra YM (incluso) del periodo che contiene (y,m)
   if(periodo==="civile") return { fromYM:y*100+1, toYM:y*100+12 };
@@ -1244,6 +1287,7 @@ function EmployeeCard(props){
     if (CODE_SET[s]) base = CODE_SET[s].l;
     else if (isNumeric(s)){ const hm = decToHM(s); base = hm !== "" ? hm : (fmt2(s) + " ore"); }
     else if (rosso) base = "Giorno festivo/domenica";
+    if (rosso && !blocked) base = (base ? base + " — " : "") + "non si compila";
     if (perm) base = (base ? base + " — " : "") + "Permesso orario " + fmt2(perm.ore) + " h (" + perm.tipo + ")";
     return base;
   };
@@ -1301,6 +1345,9 @@ function EmployeeCard(props){
               const val = rec.giorni[d] === undefined ? "" : rec.giorni[d];
               const rosso = isRosso(fset, y, m, d);
               const blocked = isBlockedDay(dp, y, m, d) || mLocked;
+              /* ver77: sui giorni rossi (festivi e domeniche) non si scrive piu' niente, ne' ore ne' codici.
+                 "blocked" resta il blocco per periodo/mese chiuso (colore e messaggio diversi). */
+              const nonScriv = blocked || rosso;
               const perm = (rec.permessi && rec.permessi[d]) ? rec.permessi[d] : null;
               const svalC = String(val).trim();
               const isCovAbs = (CODE_SET[svalC] && svalC!=="--" && svalC!=="AN");
@@ -1308,15 +1355,24 @@ function EmployeeCard(props){
               return (
                 <td key={"c"+d} style={{ padding:"1px", verticalAlign:"top" }}>
                   <div className="cell-wrap">
-                    <CellInput value={val} disabled={blocked} rosso={rosso} style={cellStyle(val, rosso, blocked)}
+                    <CellInput value={val} disabled={nonScriv} rosso={rosso} style={cellStyle(val, rosso, blocked)}
                       title={cellTitle(val, blocked, rosso, perm)}
                       onChange={function(nv){ props.onCell(dp.id, d, nv); }}
                       onBlur={function(nv){ if (rosso && isNumeric(nv)) props.onFestConfirm(dp.id, d, nv); }} />
-                    {(!blocked) ? <button className={"perm-flag" + (perm ? " on" : "")}
+                    {(!nonScriv) ? <button className={"perm-flag" + (perm ? " on" : "")}
                       title={perm ? ("Permesso orario " + fmt2(perm.ore) + " h (" + perm.tipo + ") — clic per modificare") : "Aggiungi permesso orario"}
                       onClick={function(){ props.onOpenPerm(dp.id, d); }}></button> : null}
                   </div>
-                  {isCovAbs ? <div className="teor-abs" title="Ore teoriche del giorno (orario sett ÷ 6) coperte da questa assenza retribuita">{fmt3(quotaDay)}</div> : null}
+                  {isCovAbs ? (function(){
+                    const ero = eroOn(rec, d);
+                    return <div className={"teor-abs" + (ero ? "" : " no-ero")} role="button" tabIndex={0}
+                      title={ero
+                        ? ("Giornata EROSIVA: brucia " + fmt3(quotaDay) + " h dal massimale del servizio. Clic se quel giorno il servizio era CHIUSO.")
+                        : ("Giornata NON erosiva (servizio chiuso): non brucia niente. Clic per rimetterla erosiva.")}
+                      onClick={function(){ if(!blocked) props.onEro(dp.id, d, !ero); }}
+                      onKeyDown={function(e){ if(!blocked && (e.key==="Enter"||e.key===" ")){ e.preventDefault(); props.onEro(dp.id, d, !ero); } }}
+                      >{fmt3(quotaDay)}</div>;
+                  })() : null}
                 </td>
               );
             })}
@@ -1448,7 +1504,7 @@ function EmployeeCard(props){
               <span className="cong-status">{over ? "⚠️ superato" : (quasi ? "quasi finito" : "ancora disponibili")}</span>
             </div>
             <div className="cong-bar"><div className="cong-bar-fill" style={{ width: pct + "%" }}></div></div>
-            <div className="cong-res">Si consuma con le <b>ore fatte</b> (dal foglio) più <b>ferie e malattia</b>. Periodo: {per}. <span style={{ fontSize:"11px", color:"#9a3412" }}>Numeri a 3 decimali.</span></div>
+            <div className="cong-res">Si consuma con le <b>ore fatte</b> (dal foglio) più <b>ferie e malattia</b>. Periodo: {per}. Le giornate di assenza <b>spente col clic</b> (servizio chiuso) non consumano. <span style={{ fontSize:"11px", color:"#9a3412" }}>Numeri a 3 decimali.</span></div>
           </div>;
         })()}
       </div>
@@ -3098,7 +3154,7 @@ function QuickFillModal(props){
     if (modo === "elenco"){ if (elencoSet[d]) target.push(d); continue; }
     if (modo === "intervallo" && (d < dalN || d > alN)) continue;
     const gd = weekdayOf(y,m,d); if (!sel[gd]) continue;
-    if (skipFest && isRosso(fset,y,m,d)) continue;
+    if (isRosso(fset,y,m,d)) continue;   /* ver77: i festivi non si compilano mai */
     target.push(d);
   }
   const occupied = target.filter(function(d){ const v=(rec.giorni||{})[d]; return v!==undefined && String(v).trim()!==""; }).length;
@@ -3160,7 +3216,7 @@ function QuickFillModal(props){
           </div>
         </div>
         <label style={{ display:"flex", alignItems:"center", gap:"8px", fontSize:"13px", marginBottom:"6px" }}>
-          <input type="checkbox" checked={skipFest} onChange={function(){ setSkipFest(!skipFest); }} /> Salta i giorni festivi e le domeniche (lasciali con il trattino)
+          <input type="checkbox" checked={true} disabled={true} readOnly /> Salta i giorni festivi e le domeniche (lasciali con il trattino)
         </label>
         <label style={{ display:"flex", alignItems:"center", gap:"8px", fontSize:"13px", marginBottom:"6px" }}>
           <input type="checkbox" checked={overwrite} onChange={function(){ setOverwrite(!overwrite); }} /> Sovrascrivi anche i valori già presenti
@@ -3707,6 +3763,17 @@ function App(){
     else next.dati[mk][dipId].giorni[day] = value;
     touch(next);
   };
+  /* ver77: segna una giornata di assenza come erosiva (predefinito) o non erosiva.
+     Nei dati finisce SOLO l'eccezione: rec.ero[giorno] = false. */
+  const onEro = function(dipId, day, erosiva){
+    const next = JSON.parse(JSON.stringify(state)); const mk = monthKey(anno, mese);
+    if (!next.dati[mk]) next.dati[mk] = {};
+    if (!next.dati[mk][dipId]) next.dati[mk][dipId] = { giorni:{}, nota:"" };
+    const r = next.dati[mk][dipId];
+    if (erosiva){ if (r.ero) { delete r.ero[day]; if (!Object.keys(r.ero).length) delete r.ero; } }
+    else { if (!r.ero) r.ero = {}; r.ero[day] = false; }
+    touch(next);
+  };
   const onNota = function(dipId, value){
     const next = JSON.parse(JSON.stringify(state)); const mk = monthKey(anno, mese);
     if (!next.dati[mk]) next.dati[mk] = {};
@@ -4119,7 +4186,7 @@ function App(){
                 const ferieApr = (mese===4) ? { year:anno-1, mat:ferieMaturato(dp,anno-1), god:ferieGodute(state,dp,anno-1), res:ferieResiduo(state,dp,anno-1), noData:!annoHasData(state,anno-1) } : null;
                 const foDiff = (function(){ try { if (!foPerNome) return null; const agg = foPerNome[foNorm(dp.nome)]; return agg ? foConfronta(recDp, anno, mese, agg) : null; } catch (e){ console.error("confronto Fogli ore", e); return null; } })();
                 return <EmployeeCard key={dp.id} dp={dp} rec={recDp} fuoriPeriodo={fuoriPeriodo} anno={anno} mese={mese} fset={fset} mLocked={mLocked}
-                  dipList={dipList} onCell={onCell} onNota={onNota} onFestConfirm={onFestConfirm} onQuickFill={onQuickFill}
+                  dipList={dipList} onCell={onCell} onEro={onEro} onNota={onNota} onFestConfirm={onFestConfirm} onQuickFill={onQuickFill}
                   onVoceSet={onVoceSet} onVoceAdd={onVoceAdd} onVoceDel={onVoceDel} ferieApr={ferieApr} fogliOre={foDiff}
                   onDich={onDich} onSvuotaMese={onSvuotaMese} saldoPrec={saldoP} bancaPrec={bancaP} tettoConsumo={tettoC} onAzzeraSaldo={onAzzeraSaldo} onAnnullaAzzera={onAnnullaAzzera}
                   onSostAdd={onSostAdd} onSostChange={onSostChange} onSostDel={onSostDel} onOpenPerm={onOpenPerm}
