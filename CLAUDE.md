@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver73 · 03nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver74 · 03nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -150,6 +150,15 @@ Banca ore, tetto annuo, contratti e export.
   dichiarare* — e il risultato è **una frazione sola** (costo sopra, ore sotto, €/ora in grande)
   invece di due cartelli gemelli. Importi con **cifre tabulari** allineati a destra; gli
   imponibili separati da una riga. Tolte le scritte TUTTE MAIUSCOLE e le catene di «·».
+- 🔢 **ARROTONDAMENTO: usare SEMPRE `R2`, mai `Math.round(x*100)/100`** (da ver74, 03/11/2026).
+  Stesso difetto trovato da Christian in USOINT: il computer non tiene i decimali in modo esatto,
+  `67,5 × 22,99` vale `1551,8249999999998` e il vecchio modo lo buttava **giù** a 1551,82 invece
+  di 1551,83. Succede quando il terzo decimale è esattamente 5. **`R2(v,dec)`** (sopra `fmt2`)
+  ripulisce con `toPrecision(12)`; messa in **32 punti** (tutti i `Math.round(...*100)/100` e
+  `...*1000)/1000`, questi ultimi come `R2(x,3)`) e dentro **`fmt2`** e **`fmt3`**, che
+  formattavano il numero sporco. ⚠️ Sui **negativi** l'arrotondamento è ora **simmetrico**
+  (−1551,825 → −1551,83), cioè commerciale. I 5 casi del foglio di Christian sul costo orario
+  **tornano ancora al centesimo** dopo la correzione.
 - **Funzione presente**: confronto non vincolante con l'app "Fogli ore" (SOLA LETTURA delle
   collection `users` e `timesheets` dello stesso progetto Firebase). Non scrivere MAI lì.
 - **Leggibilità (ver66, 31/10/2026)**: blocco in fondo al `<style>`. Le scritte sotto i 12px

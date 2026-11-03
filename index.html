@@ -229,7 +229,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver73";
+const APP_VER = "ver74";
 const APP_DATA = "03nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -299,10 +299,15 @@ function mAbbrY(y, m){ return MONTH_ABBR[m-1] + " " + String(y).slice(2); }
 function weekdayOf(y, m, d){ return new Date(y, m - 1, d).getDay(); }
 
 // formatta un numero con ESATTAMENTE 2 decimali, separatori italiani
+/* R2: arrotonda SENZA farsi ingannare dal modo in cui il computer tiene i decimali.
+   67,5 x 22,99 dentro la macchina vale 1551,8249999999998 e R2(x) lo
+   butta giu' a 1551,82 invece di 1551,83 (segnalato da Christian il 03/11/2026).
+   toPrecision(12) ripulisce il pelo prima di arrotondare. Vale anche per toFixed. */
+function R2(v,dec){dec=(dec==null)?2:dec;var n=Number(v);if(!isFinite(n))return 0;var seg=n<0?-1:1;n=Math.abs(n);var p=Math.pow(10,dec);return seg*(Math.round(Number((n*p).toPrecision(12)))/p)}
 function fmt2(num){
   let n = parseFloat(String(num).replace(",", "."));
   if (isNaN(n)) n = 0;
-  const neg = n < 0; n = Math.abs(n);
+  const neg = n < 0; n = Math.abs(R2(n,2));
   const s = n.toFixed(2);
   const parts = s.split(".");
   let out = "";
@@ -316,7 +321,7 @@ function fmt2(num){
 function fmt3(num){
   let n = parseFloat(String(num).replace(",", "."));
   if (isNaN(n)) n = 0;
-  const neg = n < 0; n = Math.abs(n);
+  const neg = n < 0; n = Math.abs(R2(n,3));
   const s = n.toFixed(3);
   const parts = s.split(".");
   let out = "";
@@ -437,7 +442,7 @@ function bancaMeseA(state,dp,y,m){                                          // b
   if(!recHasData(rec)) return null;                                         // mese non compilato -> non conteggiato
   const rese=totOfRec(rec,y,m);                                            // ore effettivamente rese = somma delle celle
   const eff=rese + coverAbsHours(rec,dp,y,m);                               // prodotto = rese + assenze coperte
-  return Math.round((eff - monteFissoMese(dp,y,m))*1000)/1000;
+  return R2((eff - monteFissoMese(dp,y,m)),3);
 }
 function bancaPrecA(state,dp,anno,mese){                                    // banca cumulata dei mesi PRECEDENTI (dopo l'ultimo azzeramento, dalla decorrenza mensilizzazione)
   const dal=mensDalYM(dp);
@@ -446,7 +451,7 @@ function bancaPrecA(state,dp,anno,mese){                                    // b
   months.sort(function(a,b){ return a.key-b.key; });
   let startIdx=0; for(let i=0;i<months.length;i++){ if(months[i].rec.saldoAzzerato) startIdx=i+1; }
   let s=0; for(let i=startIdx;i<months.length;i++){ const bm=bancaMeseA(state,dp,months[i].y,months[i].m); if(bm!=null) s+=bm; }
-  return Math.round(s*1000)/1000;
+  return R2(s,3);
 }
 /* ===== Tetto annuo (attribuzione) — progetto unico, periodo scolastico o civile ===== */
 function prodottoMese(rec,dp,y,m){                                         // ore che consumano il tetto nel mese: ore rese (celle) + assenze coperte
@@ -462,7 +467,7 @@ function consumoTetto(state,dp,anno,mese){                                 // so
   const per=(dp.tettoPeriodo==="civile")?"civile":"scolastico";
   const w=tettoWindow(per,anno,mese); let s=0;
   Object.keys(state.dati||{}).forEach(function(k){ const mm=k.match(/^(\d{4})-(\d{1,2})$/); if(!mm) return; const y=parseInt(mm[1],10), mo=parseInt(mm[2],10); const ym=y*100+mo; if(ym<w.fromYM||ym>w.toYM) return; const rec=state.dati[k][dp.id]; if(!rec) return; const p=prodottoMese(rec,dp,y,mo); if(p!=null) s+=p; });
-  return Math.round(s*1000)/1000;
+  return R2(s,3);
 }
 /* ===== Base mensile (ore in più / in meno del mese, no accumulo) — per tutti dal 01/10/2026 ===== */
 const BM_DAL_YM = 202610;   // decorrenza globale base mensile = ottobre 2026
@@ -478,7 +483,7 @@ function straoRange(state, dp, fromYM, toYM){   // somma per persona dei delta m
     if(bm==null) return;
     if(bm>0) piu+=bm; else if(bm<0) meno+=(-bm);
   });
-  return { piu:Math.round(piu*1000)/1000, meno:Math.round(meno*1000)/1000 };
+  return { piu:R2(piu,3), meno:R2(meno,3) };
 }
 /* ===== Ferie da smaltire (controllo al 30 aprile sull'anno precedente) ===== */
 const FERIE_GG_ANNO = 26;                 // giorni ferie annui (pieni)
@@ -499,8 +504,8 @@ function mesiInForzaAnno(dp, year){        // mesi dell'anno in cui l'operatore 
   for(let mo=1; mo<=12; mo++){ if(inForceAt(dp, year*10000+mo*100+15)) n++; }
   return n;
 }
-function ferieMaturato(dp, year){ return Math.round(FERIE_GG_MESE*mesiInForzaAnno(dp,year)*1000)/1000; }
-function ferieResiduo(state, dp, year){ return Math.round((ferieMaturato(dp,year)-ferieGodute(state,dp,year))*1000)/1000; }
+function ferieMaturato(dp, year){ return R2(FERIE_GG_MESE*mesiInForzaAnno(dp,year),3); }
+function ferieResiduo(state, dp, year){ return R2((ferieMaturato(dp,year)-ferieGodute(state,dp,year)),3); }
 function annoHasData(state, year){ const ks=Object.keys(state.dati||{}); for(let i=0;i<ks.length;i++){ if(ks[i].indexOf(String(year)+"-")===0) return true; } return false; }
 function tettiList(dp){ return (Array.isArray(dp.tettiAnnui)?dp.tettiAnnui:[]).map(function(t){ return { anno:parseInt(t&&t.anno,10)||0, ore:parseFloat(String(t&&t.ore).replace(",",".")) }; }).filter(function(t){ return !isNaN(t.ore) && t.ore>0; }).sort(function(a,b){ return a.anno-b.anno; }); }
 function tettoStartYear(dp,y,m){ return (dp.tettoPeriodo==="civile") ? y : (m>=9 ? y : y-1); } // anno iniziale del periodo che contiene (y,m)
@@ -851,7 +856,7 @@ function esportaExcel(state, pairs){
     // TOT
     const rTot = 2 + nd;
     put(rTot, 0, "TOT", styTotLbl);
-    dips.forEach(function(dp, i){ put(rTot, i+1, Math.round(tot[i]*100)/100, styTot); });
+    dips.forEach(function(dp, i){ put(rTot, i+1, R2(tot[i]), styTot); });
     // note e permessi del mese, sotto
     let rr = rTot + 2;
     dips.forEach(function(dp){
@@ -963,7 +968,7 @@ function esportaPDF(state, pairs){
         row.push(dayLabel);
         body.push(row);
       }
-      const totRow = ["TOT ORE RESE"].concat(tot.map(function(t){ return pdfHM(Math.round(t*100)/100); })).concat(["TOT ORE RESE"]);
+      const totRow = ["TOT ORE RESE"].concat(tot.map(function(t){ return pdfHM(R2(t)); })).concat(["TOT ORE RESE"]);
       body.push(totRow);
       const ncols = 2 + chunk.length;
       const lastIdx = chunk.length + 1;
@@ -1038,8 +1043,8 @@ function esportaPDF(state, pairs){
           const deb = Math.max(0, -bp);
           if (deb <= 0.0005) return;
           const rec = (bm > 0) ? Math.min(bm, deb) : 0;
-          const nuo = Math.round((bm - rec)*1000)/1000;
-          recupLines.push(dp.nome + " — debito pregresso " + fmt3(deb) + " h: recupero " + fmt3(Math.round(rec*1000)/1000) + " h, ore nuove " + fmt3(nuo) + " h");
+          const nuo = R2((bm - rec),3);
+          recupLines.push(dp.nome + " — debito pregresso " + fmt3(deb) + " h: recupero " + fmt3(R2(rec,3)) + " h, ore nuove " + fmt3(nuo) + " h");
         });
         if (recupLines.length > 0){
           ensureY(8);
@@ -1325,7 +1330,7 @@ function EmployeeCard(props){
           let assDays=0; for(let dd=1; dd<=nd; dd++){ const cv=String(rec.giorni[dd]==null?"":rec.giorni[dd]).trim(); if(CODE_SET[cv] && cv!=="--" && cv!=="AN") assDays++; }
           const assOre = assDays*quota;
           const rese = tot;
-          const delta = Math.round((rese + assOre - base)*1000)/1000;                 // delta del mese (no accumulo)
+          const delta = R2((rese + assOre - base),3);                 // delta del mese (no accumulo)
           const bcls = delta > 0.0005 ? "warn" : (delta < -0.0005 ? "over" : "ok");
           const segno = delta>0.0005 ? "+" : "";
           const esito = delta>0.0005 ? "ore in più (straordinario)" : (delta<-0.0005 ? "ore in meno" : "in pari");
@@ -1409,8 +1414,8 @@ function EmployeeCard(props){
         {(function(){
           const tetto = tettoForPeriod(dp, y, m);
           if (isNaN(tetto) || tetto <= 0) return null;
-          const consumo = Math.round((props.tettoConsumo||0)*1000)/1000;
-          const rimaste = Math.round((tetto - consumo)*1000)/1000;
+          const consumo = R2((props.tettoConsumo||0),3);
+          const rimaste = R2((tetto - consumo),3);
           const pct = tetto>0 ? Math.max(0, Math.min(100, Math.round(consumo/tetto*100))) : 0;
           const per = dp.tettoPeriodo==="civile" ? "anno civile (1/1 → 31/12)" : "anno scolastico (1/9 → 31/8)";
           const over = rimaste < -0.0005;
@@ -2126,7 +2131,7 @@ function mesiInPeriodo(dp, pairs){
 function oreRendPeriodo(state, dp, pairs){
   let t=0;
   pairs.forEach(function(pr){ t += totOfRec(getRecFrom(state, pr.y, pr.m, dp.id), pr.y, pr.m); });
-  return Math.round(t*100)/100;
+  return R2(t);
 }
 function indetAFine(dp, pairs){
   if(!pairs.length) return tipoNow(dp)!=="determinato";
@@ -2136,7 +2141,7 @@ function indetAFine(dp, pairs){
 // 1,40 al primo contratto, +0,5 a ogni proroga, 0 se indeterminato
 function addizTDAuto(dp, pairs){
   if (indetAFine(dp, pairs)) return 0;
-  return Math.round((1.40 + 0.5*prorogheList(dp).length)*100)/100;
+  return R2((1.40 + 0.5*prorogheList(dp).length));
 }
 // ore settimanali del periodo: quelle dell'ultimo mese in cui il contratto e' in piedi
 function oreSettPeriodo(dp, pairs){
@@ -2293,7 +2298,7 @@ function CostoOrario(props){
       const dd = datiCosto(state, x, pairs);
       const org = dd.fonte==="mano" ? "scritte a mano" : (dd.fonte==="riepiloghi" ? "dai Riepiloghi" : "teoriche");
       righe.push([x.nome, periodoLabel, dd.indeterminato?"Indeterminato":"Determinato", dd.mesi, dd.oreSett, dd.liv||"", dd.minimo,
-                  Math.round(dd.res.H38*100)/100, org, Math.round(dd.res.J35*100)/100, Math.round(dd.res.orario*100)/100]);
+                  R2(dd.res.H38), org, R2(dd.res.J35), R2(dd.res.orario)]);
     });
     const wb = XLSX.utils.book_new();
     wb.Props = { Title:"Costo orario dipendenti", Author:"Christian Canonica", Company:"Spazio Ireos Società Cooperativa Sociale", CreatedDate:new Date() };
@@ -2820,14 +2825,14 @@ function QueryPanel(props){
   const totSPiu = rowsS.reduce(function(a,r){ return a+r.piu; },0);
   const totSMeno = rowsS.reduce(function(a,r){ return a+r.meno; },0);
   const sLabel = function(ym){ return MONTH_LABEL[(ym%100)-1]+" "+Math.floor(ym/100); };
-  function expS(){ const aoa=[["STRAORDINARIO (base mensile) — da "+sLabel(sFromYM)+" a "+sLabel(sToYM)],["Conteggiati solo i mesi da ottobre 2026 in poi. Ore in più = straordinario pagato; ore in meno = ore tolte. Nessuna compensazione tra i due."],[],["COGNOME NOME","ORE IN PIU' (STRAORDINARIO)","ORE IN MENO"]]; rowsS.forEach(function(r){ aoa.push([r.nome, Math.round(r.piu*1000)/1000, Math.round(r.meno*1000)/1000]); }); aoa.push([]); aoa.push(["TOTALE COMPLESSIVO", Math.round(totSPiu*1000)/1000, Math.round(totSMeno*1000)/1000]); qExport("Query - Straordinario "+sLabel(sFromYM).replace(/ /g,"-")+"_"+sLabel(sToYM).replace(/ /g,"-")+".xlsx", aoa); }
+  function expS(){ const aoa=[["STRAORDINARIO (base mensile) — da "+sLabel(sFromYM)+" a "+sLabel(sToYM)],["Conteggiati solo i mesi da ottobre 2026 in poi. Ore in più = straordinario pagato; ore in meno = ore tolte. Nessuna compensazione tra i due."],[],["COGNOME NOME","ORE IN PIU' (STRAORDINARIO)","ORE IN MENO"]]; rowsS.forEach(function(r){ aoa.push([r.nome, R2(r.piu,3), R2(r.meno,3)]); }); aoa.push([]); aoa.push(["TOTALE COMPLESSIVO", R2(totSPiu,3), R2(totSMeno,3)]); qExport("Query - Straordinario "+sLabel(sFromYM).replace(/ /g,"-")+"_"+sLabel(sToYM).replace(/ /g,"-")+".xlsx", aoa); }
 
   // --- Ferie da smaltire: residuo (26 GG/anno, 2,1666 GG/mese sui mesi lavorati) per l'anno scelto ---
   const fY = parseInt(fAnno,10)||0;
   const fHasData = fY>0 && annoHasData(state, fY);
-  const rowsF = fY>0 ? dips.map(function(dp){ const mat=ferieMaturato(dp,fY), god=ferieGodute(state,dp,fY), res=Math.round((mat-god)*1000)/1000; return { nome:nomeOf(dp), mat:mat, god:god, res:res }; }) : [];
+  const rowsF = fY>0 ? dips.map(function(dp){ const mat=ferieMaturato(dp,fY), god=ferieGodute(state,dp,fY), res=R2((mat-god),3); return { nome:nomeOf(dp), mat:mat, god:god, res:res }; }) : [];
   const daSmaltire = rowsF.filter(function(r){ return r.res>0.0005; });
-  function expF(){ const aoa=[["FERIE DA SMALTIRE — anno "+fY+" (verifica al 30 aprile "+(fY+1)+")"],["26 GG annui = 2,1666 GG/mese riproporzionati sui mesi in forza. Residuo = maturate − godute. In rosso chi ha residuo > 0."],[],["COGNOME NOME","FERIE MATURATE (GG)","FERIE GODUTE (GG)","RESIDUO DA SMALTIRE (GG)"]]; rowsF.forEach(function(r){ aoa.push([r.nome, Math.round(r.mat*1000)/1000, r.god, Math.round(r.res*1000)/1000]); }); qExport("Query - Ferie da smaltire "+fY+".xlsx", aoa); }
+  function expF(){ const aoa=[["FERIE DA SMALTIRE — anno "+fY+" (verifica al 30 aprile "+(fY+1)+")"],["26 GG annui = 2,1666 GG/mese riproporzionati sui mesi in forza. Residuo = maturate − godute. In rosso chi ha residuo > 0."],[],["COGNOME NOME","FERIE MATURATE (GG)","FERIE GODUTE (GG)","RESIDUO DA SMALTIRE (GG)"]]; rowsF.forEach(function(r){ aoa.push([r.nome, R2(r.mat,3), r.god, R2(r.res,3)]); }); qExport("Query - Ferie da smaltire "+fY+".xlsx", aoa); }
 
   return (
     <div style={{ padding:"14px" }}>
@@ -3225,13 +3230,13 @@ function Riepiloghi(props){
   const tabPeriodo = dips.map(function(dp){
     const perMese = scopePairs.map(function(pr){ return totOfRec(getRecFrom(state, pr.y, pr.m, dp.id), pr.y, pr.m); });
     const tot = perMese.reduce(function(a,b){ return a+b; }, 0);
-    return { dp:dp, perMese:perMese, tot:Math.round(tot*100)/100 };
+    return { dp:dp, perMese:perMese, tot:R2(tot) };
   });
   const tabTeor = dips.map(function(dp){
     let lav=0, teor=0;
     scopePairs.forEach(function(pr){ lav += totOfRec(getRecFrom(state, pr.y, pr.m, dp.id), pr.y, pr.m); teor += oreSettAt(dp, pr.y, pr.m) * daysInMonth(pr.y, pr.m) / 7; });
-    lav=Math.round(lav*100)/100; teor=Math.round(teor*100)/100;
-    return { dp:dp, lav:lav, teor:teor, scost:Math.round((lav-teor)*100)/100 };
+    lav=R2(lav); teor=R2(teor);
+    return { dp:dp, lav:lav, teor:teor, scost:R2((lav-teor)) };
   });
   const codiciUsati = {};
   dips.forEach(function(dp){ scopePairs.forEach(function(pr){ const rec=getRecFrom(state,pr.y,pr.m,dp.id);
@@ -3287,7 +3292,7 @@ function Riepiloghi(props){
       XLSX.utils.book_append_sheet(wb, ws, name);
     };
     const aAnnuo=[["DIPENDENTE"].concat(scopePairs.map(function(pr){ return mAbbrY(pr.y,pr.m); })).concat(["TOT"])];
-    tabPeriodo.forEach(function(r){ aAnnuo.push([r.dp.nome].concat(r.perMese.map(function(v){ return Math.round(v*100)/100; })).concat([r.tot])); }); mkSheet("Per mese", aAnnuo);
+    tabPeriodo.forEach(function(r){ aAnnuo.push([r.dp.nome].concat(r.perMese.map(function(v){ return R2(v); })).concat([r.tot])); }); mkSheet("Per mese", aAnnuo);
     const aTeor=[["DIPENDENTE","ORE LAVORATE","ORE TEORICHE","SCOSTAMENTO"]];
     tabTeor.forEach(function(r){ aTeor.push([r.dp.nome, r.lav, r.teor, r.scost]); }); mkSheet("Ore vs teoriche", aTeor);
     const aAss=[["DIPENDENTE"].concat(codeCols)];
