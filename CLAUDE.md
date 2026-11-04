@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver85 · 04nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver86 · 04nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -317,6 +317,43 @@ Banca ore, tetto annuo, contratti e export.
   - ⚠️ **NON REGRESSIONE verificata**: su tre casi senza cambiamenti (indeterminato; determinato
     senza proroghe; ore scritte a mano) ver83 e ver84 danno numeri **identici al centesimo**
     (20,50 · 18,71 · 21,53 €/h).
+- 👁️ **SI VEDE MEGLIO QUELLO CHE CONTA** (ver86, 04/11/2026, due richieste di Christian:
+  «ingrossiamo le cornici nelle schede in cui inserisco le ore, perché la vista mi si confonde»
+  e «il risultato del mese evidenzialo bene»). Blocco CSS in fondo al `<style>` + una modifica
+  alla riga del confronto con Fogli ore. **Nessuna dicitura cambiata, nessun calcolo toccato.**
+  - **Griglia del mese**: `table.cal td` da `1px #e2e8f0` (quasi invisibile) a **2px `#94a3b8`**;
+    `.cell-in` da 2 a **3px**; `.cell-in.blocked` resta tratteggiata ma a 2px. Scelta **B** fra le
+    tre provate. ⚠️ La tabella passa da **2.140 a 2.172px** (+32), ma sta dentro `.grid-wrap` che
+    ha già `overflow-x:auto`: **la larghezza della pagina non cambia** (misurato a 390 e 1500px).
+    **Scartata** (per ora) la riga più spessa dopo ogni domenica: richiederebbe una classe nuova
+    nel codice che disegna la riga, e Christian ha scelto solo «b».
+  - **Risultato del mese**: `.cong-chip.strong` da pastiglia bianca a **badge pieno** (numero a
+    26px bianco), con lo stesso colore del cartellino accanto — `#c2410c` ore in più, `#8A7080`
+    ore in meno, `#059669` in pari. Il testo è ≥19px in neretto, quindi il contrasto basta anche
+    sul viola (che da solo sarebbe 4,46 contro i 4,5 richiesti per il testo piccolo).
+  - **TOT calcolato**: `.foot-line .foot-tot` da 12px a **16px**, il numero a **22px**.
+- 📋 **LA RIGA DEL CONFRONTO CON FOGLI ORE DICE ANCHE LE ASSENZE** (ver86, richiesta di Christian:
+  «oltre alle ore tratte dai fogli ore indicami anche se hanno segnato ferie, malattie ed altre
+  assenze in gg»).
+  - `foAggregaMese` restituisce ora anche **`assConta`**: quante giornate per ogni codice di
+    assenza di Fogli ore. ⚠️ L'assenza in Fogli ore è scritta su **tutti i servizi** dello stesso
+    giorno: `ass[giorno]` la tiene già una volta sola, quindi il conteggio **non si moltiplica**
+    (provato con due documenti `timesheets` dello stesso mese).
+  - `foConfronta` **non torna più `null`** quando tutto combacia: torna un esito con
+    **`soloInfo:true`**. Così la riga esce **sempre** (scelta di Christian del 04/11/2026),
+    altrimenti le assenze non si vedrebbero mai. Quando non c'è niente da segnalare il riquadro
+    è **grigio sobrio** (`#f1f5f9`), quando c'è una differenza resta **arancione** come prima.
+  - La riga mostra ora, in quest'ordine: nome · **ore sul foglio ore** · **assenze segnate**
+    («FERIE 3 gg · MALATTIA 2 gg», oppure «nessuna») · il totale discordante e i giorni
+    discordanti **solo se ci sono**. La frase finale («è solo un avviso informativo e
+    ignorabile») è rimasta identica.
+  - ⚠️ La riga compare **solo per chi ha un account in Fogli ore** con lo stesso "COGNOME NOME":
+    `foDiff` resta `null` per gli altri. `users` e `timesheets` restano in **sola lettura**.
+  - **Provato in esecuzione** con due documenti `timesheets` e i formati orari storici
+    (`900`, `9`, `14.30`, `16h30`): ore 19,00 e assenze FERIE 2 gg · MALATTIA 2 gg ·
+    ALTRO AUTORIZ. 1 gg, corrette. Provata a video sia la riga grigia (tutto combacia) sia
+    quella arancione (totale diverso). Zero errori di pagina.
+
 - ⏱️ **SI VEDE QUANTE ORE SONO LE «ORE AGGIUNTIVE»** (ver85, 04/11/2026, richiesta di Christian:
   «vorrei vedere in costo orario quante ore metti nelle aggiuntive»). Il numero c'era già nei
   conti (`E18`, ore aggiuntive **al mese**) e una riga lo mostrava, ma **senza unità di misura e

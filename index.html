@@ -218,6 +218,28 @@ input:focus,select:focus,textarea:focus{outline:3px solid #1d4ed8;outline-offset
        altrimenti la tabellina delle settimane esce dal riquadro (provato il 03/11/2026) */
     .co-sub table td { white-space:normal !important; }
   }
+
+  /* ===== ver86 (04/11/2026) — si vede meglio quello che conta ==================
+     Richieste di Christian: "ingrossiamo le cornici nelle schede in cui inserisco
+     le ore, perche' la vista mi si confonde" e "il risultato del mese evidenzialo
+     bene". Solo aspetto: nessuna dicitura, nessun calcolo. */
+  /* a) griglia del mese: le righe della tabella passano da 1px quasi invisibile
+        (#e2e8f0) a 2px di grigio medio, e la casella in cui scrivi da 2 a 3px.
+        La tabella si allarga di ~32px ma sta dentro .grid-wrap, che gia' scorre. */
+  table.cal td { border:2px solid #94a3b8; }
+  .cell-in { border-width:3px; }
+  .cell-in.blocked { border:2px dashed #cbd5e1; }
+  /* b) il risultato del mese: da pastiglia piccola a badge pieno, con lo stesso
+        colore del cartellino che gli sta accanto (arancione / viola / verde). */
+  .cong-row { gap:8px; }
+  .cong-chip.strong { border:none; color:#fff; padding:5px 16px; font-size:19px; font-weight:800; box-shadow:0 2px 6px rgba(0,0,0,.25); }
+  .cong-chip.strong b { font-size:26px; font-weight:900; letter-spacing:.3px; }
+  .cong.warn .cong-chip.strong { background:#c2410c; }
+  .cong.over .cong-chip.strong { background:#8A7080; }
+  .cong.ok   .cong-chip.strong { background:#059669; }
+  /* c) TOT calcolato: era a 12px sotto la griglia, ora si legge da lontano. */
+  .foot-line .foot-tot { font-size:16px; }
+  .foot-line .foot-tot b { font-size:22px; font-weight:900; color:#0F2740; }
 </style>
 </head>
 <body>
@@ -249,7 +271,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver85";
+const APP_VER = "ver86";
 const APP_DATA = "04nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -1340,8 +1362,17 @@ function EmployeeCard(props){
       {props.fuoriPeriodo ? <div style={{ background:"#fef3c7", borderBottom:"2px solid #f59e0b", color:"#92400e", fontSize:"12px", fontWeight:700, padding:"5px 10px" }}>⚠️ Mese fuori dal periodo di rapporto (prima dell'assunzione o dopo la cessazione), ma contiene ore già inserite: controlla e, se vanno tolte, usa 🧹 Pulisci ore dopo nella scheda (✎).</div> : null}
       {props.fogliOre ? (function(){
         const fo = props.fogliOre;
-        return <div style={{ background:"#fffbeb", borderLeft:"4px solid #f97316", borderBottom:"1px solid #fde68a", color:"#78350f", fontSize:"12px", fontWeight:600, padding:"6px 10px", lineHeight:"1.5" }}>
+        const info = !!fo.soloInfo;
+        const cassette = Object.keys(fo.assConta || {}).sort();
+        const stile = info
+          ? { background:"#f1f5f9", borderLeft:"4px solid #94a3b8", borderBottom:"1px solid #cbd5e1", color:"#334155" }
+          : { background:"#fffbeb", borderLeft:"4px solid #f97316", borderBottom:"1px solid #fde68a", color:"#78350f" };
+        return <div style={Object.assign({ fontSize:"12px", fontWeight:600, padding:"6px 10px", lineHeight:"1.5" }, stile)}>
           <b>ℹ️ Confronto con "Fogli ore"</b> — {dp.nome}
+          <span> · ore sul foglio ore: <b>{fmt2(fo.totFo)} h</b></span>
+          {cassette.length > 0
+            ? <span> · assenze segnate: {cassette.map(function(k){ return k + " " + fo.assConta[k] + " gg"; }).join(" · ")}</span>
+            : <span> · assenze segnate: nessuna</span>}
           {fo.diffTot ? <span> · totale mese: tu: <b>{fmt2(fo.totMio)} h</b> · Fogli ore: <b>{fmt2(fo.totFo)} h</b></span> : null}
           {fo.giorni.length > 0 ? <span> · giorni discordanti: {fo.giorni.map(function(g){ return g.g + " (tu: " + g.mio + " / Fogli ore: " + g.fo + ")"; }).join(" · ")}</span> : null}
           <span style={{ fontWeight:500, fontStyle:"italic" }}> — è solo un avviso informativo e ignorabile: l'inserimento manuale resta quello valido.</span>
@@ -3818,7 +3849,11 @@ function foAggregaMese(daysList){
   });
   let tot = 0;
   Object.keys(ore).forEach(function(d){ if (!ass[d]) tot += ore[d]; });
-  return { tot: Math.round(tot * 100) / 100, ore: ore, ass: ass };
+  /* ver86: quante giornate di ogni tipo di assenza ha segnato l'operatore in Fogli ore.
+     L'assenza e' scritta su TUTTI i servizi del giorno: "ass" la tiene gia' una volta sola. */
+  const assConta = {};
+  Object.keys(ass).forEach(function(d){ const a = ass[d]; if (!a) return; assConta[a] = (assConta[a] || 0) + 1; });
+  return { tot: Math.round(tot * 100) / 100, ore: ore, ass: ass, assConta: assConta };
 }
 /* codice-assenza di QUESTA app per una cella: null se vuota, numerica, "--" o "AN" */
 function foCodiceMio(v){
@@ -3856,8 +3891,12 @@ function foConfronta(rec, y, m, agg){
       if (mieOre > 0.005) giorni.push({ g:d, mio:fmt2(mieOre) + " h", fo:foAbs });
     }
   }
-  if (!diffTot && giorni.length === 0) return null;
-  return { totMio:totMio, totFo:totFo, diffTot:diffTot, giorni:giorni };
+  /* ver86: la riga esce SEMPRE (scelta di Christian del 04/11/2026), perche' serve anche
+     a far vedere le assenze segnate in Fogli ore. Quando non c'e' niente da segnalare
+     "soloInfo" e' vero e il riquadro si colora in modo sobrio. */
+  return { totMio:totMio, totFo:totFo, diffTot:diffTot, giorni:giorni,
+           assConta: (agg && agg.assConta) ? agg.assConta : {},
+           soloInfo: (!diffTot && giorni.length === 0) };
 }
 /* lettura utenti di Fogli ore (uid -> "COGNOME NOME"), solo ruoli che compilano i fogli ore */
 function foLeggiUtenti(db, cache){
