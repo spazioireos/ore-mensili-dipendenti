@@ -249,7 +249,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver81";
+const APP_VER = "ver82";
 const APP_DATA = "04nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -2240,6 +2240,18 @@ function addizTDAuto(dp, pairs){
   return R2((1.40 + 0.5*prorogheList(dp).length));
 }
 // ore settimanali del periodo: quelle dell'ultimo mese in cui il contratto e' in piedi
+/* ver82: livello del periodo = quello dell'ultimo mese in cui il contratto e' in piedi.
+   Prima si usava dp.livello, cioe' il livello di ASSUNZIONE: chi veniva promosso restava al
+   livello vecchio nel Costo orario (segnalato da Christian il 04/11/2026). valoriAt tiene
+   conto delle trasformazioni registrate nella scheda. */
+function livelloPeriodo(dp, pairs){
+  let v = (dp.livello==null ? "" : String(dp.livello));
+  (pairs||[]).forEach(function(pr){
+    const primo = pr.y*10000 + pr.m*100 + 1;
+    if (inForceAt(dp, primo) || inForceAt(dp, pr.y*10000+pr.m*100+daysInMonth(pr.y,pr.m))) v = livelloAt(dp, pr.y, pr.m);
+  });
+  return v;
+}
 function oreSettPeriodo(dp, pairs){
   let v = Number(dp.oreSett)||0;
   pairs.forEach(function(pr){
@@ -2320,7 +2332,7 @@ function datiCosto(state, dp, pairs){
   const mesiAuto = mesiInPeriodo(dp, pairs);
   const oreSettAuto = oreSettPeriodo(dp, pairs);
   const tab = p.tabella || c.tabella;
-  const livAuto = (function(){ const l=String(dp.livello||"").toUpperCase().trim(); return MINIMI_CCNL[tab] && MINIMI_CCNL[tab][l] ? l : ""; })();
+  const livAuto = (function(){ const l=String(livelloPeriodo(dp, pairs)||"").toUpperCase().trim(); return MINIMI_CCNL[tab] && MINIMI_CCNL[tab][l] ? l : ""; })();
   const liv = p.livello!=null && p.livello!=="" ? p.livello : livAuto;
   const minimoAuto = (MINIMI_CCNL[tab] && MINIMI_CCNL[tab][liv]) ? MINIMI_CCNL[tab][liv] : 0;
   const addizAuto = addizTDAuto(dp, pairs);

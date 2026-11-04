@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver81 · 04nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver82 · 04nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -248,6 +248,23 @@ Banca ore, tetto annuo, contratti e export.
   - **Etichetta cambiata in «Rimborso km €»** (ver81, 04/11/2026): «€/mese» era falso quando la
     tendina sta su *secco*. ⚠️ Il cambio è stato **chiesto da Christian** («cambia pure la parola
     Rimborso»), non fatto di iniziativa: le diciture restano sue.
+- 🎓 **IL LIVELLO SEGUE LE TRASFORMAZIONI** (ver82, 04/11/2026, difetto segnalato da Christian:
+  «Boccalari fu assunta a livello D1, poi cambiò, ma nel costo orario lascia D1 come
+  riferimento»). `datiCosto` ricavava il livello da **`dp.livello`**, cioè quello di
+  **assunzione**: chi veniva promosso restava al livello vecchio, con il **minimo tabellare
+  sbagliato**. Ora c'è **`livelloPeriodo(dp, pairs)`**, gemella di `oreSettPeriodo`: prende il
+  livello dell'**ultimo mese in cui il contratto è in piedi** dentro il periodo, usando
+  `livelloAt` → `valoriAt`, che legge le **trasformazioni** registrate nella scheda.
+  Provato con una persona assunta D1 e promossa D2 dal 01/06/2026, periodo gen→dic 2026:
+  | | Livello | Minimo | Costo orario |
+  |---|---|---|---|
+  | ver81 (prima) | D1 | 1.637,57 | 19,65 €/h |
+  | **ver82** | **D2** | **1.727,83** | **20,71 €/h** |
+  ⚠️ **Approssimazione dichiarata**: se il livello cambia **a metà periodo**, si applica il
+  livello finale a **tutto** il periodo — esattamente come già faceva (e fa) `oreSettPeriodo`
+  per le ore settimanali. Per un conto esatto si spezza il periodo in due tronconi.
+  ⚠️ Se nella scheda del Costo orario il livello è stato **scritto a mano** (`dp.costo.livello`),
+  quello continua a prevalere: il calcolo automatico non lo sovrascrive.
 - 🏷️ **«Valori comuni» si chiama «Aliquote e costi fissi validi per tutti»** (ver80, dicitura
   **scelta da Christian** il 04/11/2026, dopo che aveva chiesto di renderla comprensibile).
   Cambiata nel **pulsante** (chiuso: «⚙ Aliquote e costi fissi validi per tutti»; aperto:
