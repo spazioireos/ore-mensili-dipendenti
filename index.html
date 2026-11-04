@@ -249,8 +249,8 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver79";
-const APP_DATA = "03nov26";
+const APP_VER = "ver80";
+const APP_DATA = "04nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
 const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
@@ -2297,7 +2297,11 @@ function calcCosto(o){
   const J31 = c.paghe*H3;
   /* ver79: formazione "secca" 250 per ogni anno iniziato (scelta B di Christian). */
   const J32 = c.formazione*Math.max(1, Math.ceil(H3/12));
-  const J34 = (o.kmMese!=null?o.kmMese:c.kmMese)*(H2-(o.kmMesiTolti||0));
+  /* ver80: il rimborso puo' essere "al mese" (× i mesi) oppure "secco" (una volta sola).
+     ⚠️ Non entra in nessun imponibile: e' esente da imposte e contributi (confermato da
+     Christian il 04/11/2026). Finisce solo nel totale J35. */
+  const kmVal = (o.kmMese!=null?o.kmMese:c.kmMese);
+  const J34 = (o.kmTipo==="secco") ? kmVal : kmVal*(H2-(o.kmMesiTolti||0));
   const J35 = J5+J6+J8+J12+J14+J17+J18+J19+J21+J23+J25+J26+J27+J28+J29+J30+J31+J32+J34;
   const F38 = O8 + P2*(c.suppPct/100)*H2 - O11*H2;      // ore teoriche rendicontabili
   const H38 = (G38>0)? G38 : F38;                       // ore usate nel calcolo
@@ -2335,6 +2339,7 @@ function datiCosto(state, dp, pairs){
     ggSett: cNum(p.ggSett, c.ggSett),
     addizTD: cNum(p.addizTD, addizAuto),
     kmMese: (p.kmMese==null||p.kmMese==="")? null : cNum(p.kmMese, c.kmMese),
+    kmTipo: (p.kmTipo==="secco") ? "secco" : "mese",            // ver80: secco oppure al mese
     kmMesiTolti: cNum(p.kmMesiTolti, 0),
     premiMese: cNum(p.premiMese, 0),
     premiMesiTolti: cNum(p.premiMesiTolti, 0),
@@ -2438,7 +2443,7 @@ function CostoOrario(props){
       </div>
 
       <div style={{ background:"#f8fafc", border:"1px dashed #94a3b8", borderRadius:"10px", padding:"7px 10px", marginBottom:"6px", fontSize:"14px", color:"#334155", lineHeight:1.35 }}>
-        Scegli il <b>periodo</b> e la persona: la scheda si compila da sola con quello che l'app sa già. Correggi i campi <span style={{ background:"#fffde7", border:"1px solid #f59e0b", borderRadius:"4px", padding:"0 5px", fontWeight:700 }}>giallini</span> dove serve: il risultato si aggiorna da solo. I numeri uguali per tutti stanno in <b>Valori comuni</b>. Premi <b>💾 Salva</b> per conservare.
+        Scegli il <b>periodo</b> e la persona: la scheda si compila da sola con quello che l'app sa già. Correggi i campi <span style={{ background:"#fffde7", border:"1px solid #f59e0b", borderRadius:"4px", padding:"0 5px", fontWeight:700 }}>giallini</span> dove serve: il risultato si aggiorna da solo. I numeri uguali per tutti stanno in <b>Aliquote e costi fissi validi per tutti</b>. Premi <b>💾 Salva</b> per conservare.
       </div>
 
       <div style={{ display:"flex", gap:"8px", alignItems:"end", flexWrap:"wrap", marginBottom:"8px" }}>
@@ -2451,12 +2456,12 @@ function CostoOrario(props){
         <div><div style={etich}>Anno</div>
           <select value={taY} onChange={function(e){ setTaY(parseInt(e.target.value,10)); }} style={{ padding:"8px" }}>{anniDisp.map(function(y){ return <option key={y} value={y}>{y}</option>; })}</select></div>
         <div style={{ fontSize:"14px", color:"#334155" }}>Periodo: <b>{periodoLabel}</b> ({pairs.length} mesi)</div>
-        <button className="btn btn-gray" onClick={function(){ setApriComuni(!apriComuni); }}>{apriComuni ? "▲ Chiudi valori comuni" : "⚙ Valori comuni"}</button>
+        <button className="btn btn-gray" onClick={function(){ setApriComuni(!apriComuni); }}>{apriComuni ? "▲ Chiudi" : "⚙ Aliquote e costi fissi validi per tutti"}</button>
       </div>
 
       {apriComuni ?
         <div style={box("#eef6ff","#bfdbfe")}>
-          <label style={titolo}>Valori comuni a tutti i dipendenti</label>
+          <label style={titolo}>Aliquote e costi fissi validi per tutti</label>
           <div style={aiuto}>Sono i numeri che non cambiano da persona a persona: contributi, festività, assenze presunte, voci fisse. Si scrivono <b>una volta sola</b> e valgono per tutte le schede. Dove serve, nella scheda della singola persona si può scrivere un valore diverso.</div>
           <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(190px, 1fr))", gap:"8px" }}>
             <label style={cella}><span style={etich}>Tabella CCNL</span>
@@ -2487,7 +2492,7 @@ function CostoOrario(props){
             {campoNum("Assistenza sanitaria €/anno", cMostra(sc.sanitaria, COSTO_COMUNE_DEF.sanitaria), function(v){ setComune("sanitaria", v); }, "solo indeterminati, fissa")}
             {campoNum("Paghe e dichiarazioni €/mese", cMostra(sc.paghe, COSTO_COMUNE_DEF.paghe), function(v){ setComune("paghe", v); })}
             {campoNum("Formazione €/anno", cMostra(sc.formazione, COSTO_COMUNE_DEF.formazione), function(v){ setComune("formazione", v); })}
-            {campoNum("Rimborso km €/mese", cMostra(sc.kmMese, COSTO_COMUNE_DEF.kmMese), function(v){ setComune("kmMese", v); })}
+            {campoNum("Rimborso km €/mese", cMostra(sc.kmMese, COSTO_COMUNE_DEF.kmMese || ""), function(v){ setComune("kmMese", v); }, "vuoto = nessun rimborso")}
           </div>
         </div> : null}
 
@@ -2548,7 +2553,12 @@ function CostoOrario(props){
                   {campoNum("Premi (tempo pieno) €", cMostra(d.raw.premiTP, ""), function(v){ setPar("premiTP", v); })}
                   {campoNum("Superminimo €", cMostra(d.raw.superminimo, ""), function(v){ setPar("superminimo", v); })}
                   {campoNum("Premio €/mese", cMostra(d.raw.premiMese, ""), function(v){ setPar("premiMese", v); })}
-                  {campoNum("Rimborso km €/mese", cMostra(d.raw.kmMese, c.kmMese), function(v){ setPar("kmMese", v); }, "comune: " + fmt2(c.kmMese))}
+                  {campoNum("Rimborso km €/mese", cMostra(d.raw.kmMese, c.kmMese || ""), function(v){ setPar("kmMese", v); }, "comune: " + fmt2(c.kmMese))}
+                  <label style={cella}><span style={etich}>Rimborso: come si conta</span>
+                    <select value={d.kmTipo} style={{ padding:"8px", width:"100%" }} onChange={function(e){ setPar("kmTipo", e.target.value); }}>
+                      <option value="mese">al mese (× i mesi del periodo)</option>
+                      <option value="secco">secco (una volta sola)</option>
+                    </select></label>
                   {campoNum("Ore/mese sotto soglia perse", cMostra(d.raw.sottoSoglia, ""), function(v){ setPar("sottoSoglia", v); })}
                 </div>
               </div>

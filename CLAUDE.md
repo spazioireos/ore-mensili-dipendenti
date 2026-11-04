@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver79 · 03nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver80 · 04nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -231,6 +231,29 @@ Banca ore, tetto annuo, contratti e export.
     Sull'**anno intero il risultato non si muove** (3 centesimi): le correzioni si vedono sui
     periodi corti, che prima erano sbagliati.
   - ⚠️ **I costi orari calcolati finora su periodi più corti dell'anno erano sovrastimati.**
+- 🚗 **RIMBORSO KM: casella usabile e scelta secco/mensile** (ver80, 04/11/2026).
+  - **Difetto corretto**: la casella *Rimborso km €/mese* mostrava uno **"0"** (il valore comune),
+    così cliccando e scrivendo 50 dentro restava **"050"** — il conto era giusto ma sembrava
+    rotto. Causa: `cMostra(raw, auto)` stampa l'`auto` anche quando vale 0. Ora le due caselle
+    (comune e di persona) ricevono `c.kmMese || ""`: **vuoto = nessun rimborso**.
+  - **Nuova tendina «Rimborso: come si conta»** nella scheda della persona: **al mese**
+    (× i mesi del periodo, com'era) oppure **secco** (una volta sola). Campo `dp.costo.kmTipo`
+    ("mese" | "secco"), usato in `J34`. Provato: 50 € → **600,00** al mese, **50,00** secco.
+  - ⚠️ **Il rimborso non entra in nessun imponibile** (confermato da Christian il 04/11/2026:
+    «è esente da imposte e contributi»): non tocca Imponibile I, Imponibile II, TFR, INPS,
+    INAIL, FIS, IRAP. Finisce **solo** nel totale `J35`. Vale finché è un rimborso chilometrico
+    per trasferte fuori dal Comune entro le tariffe ACI; se diventasse forfettario sarebbe
+    imponibile e il calcolo andrebbe rivisto.
+  - ⚠️ `kmMesiTolti` esiste nei dati ma **non ha una casella**: è sempre 0.
+  - ⚠️ L'etichetta resta **«Rimborso km €/mese»** anche quando la tendina è su *secco*:
+    **segnalato a Christian, non corretto di iniziativa** (le diciture sono sue).
+- 🏷️ **«Valori comuni» si chiama «Aliquote e costi fissi validi per tutti»** (ver80, dicitura
+  **scelta da Christian** il 04/11/2026, dopo che aveva chiesto di renderla comprensibile).
+  Cambiata nel **pulsante** (chiuso: «⚙ Aliquote e costi fissi validi per tutti»; aperto:
+  «▲ Chiudi»), nel **titolo del riquadro** e nella **frase d'aiuto** in cima alla scheda, così
+  combaciano. Dentro ci sono 25 numeri: aliquote (INPS, INAIL, FIS, IRAP, previdenza),
+  parametri del TFR, assenze presunte, spese fisse per persona, tabella CCNL. Quello che si
+  scrive nella scheda della singola persona **prevale** su quello comune.
 - 📤 **PUBBLICA I RESIDUI AI DIPENDENTI** (ver78, 03/11/2026). Pulsante nella barra della vista
   del mese. Calcola, per ogni dipendente con un **tetto annuo** in vigore nel periodo che
   contiene il mese guardato, `tetto / usate / restano`, abbina il nome all'operatore di Fogli ore
