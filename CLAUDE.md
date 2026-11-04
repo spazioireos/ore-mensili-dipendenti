@@ -332,10 +332,9 @@ Banca ore, tetto annuo, contratti e export.
   - ⚠️ **Perché una barretta e non lo sfondo pieno**: i dieci colori di `PALETTE` sono chiari
     (giallo `#FFC000`, rosa `#FFDDFF`, verde acqua `#9AD0C2`); come sfondo di riga renderebbero
     i numeri meno leggibili, come barretta si vedono benissimo. Non riempire le righe.
-  - ⚠️ **Export Excel e PDF NON toccati**: stanno nella lista delle cose da non toccare senza
-    richiesta esplicita e Christian non ha ancora risposto sulla domanda. Se un giorno dice di
-    sì: cella del nome colorata nei fogli dei Riepiloghi e dell'Anagrafica, colonna del nome nel
-    PDF A4.
+  - 🚫 **Export Excel e PDF: NO, deciso da Christian il 04/11/2026.** Gli era stato proposto di
+    colorare la cella del nome nei fogli Excel e la colonna del nome nel PDF A4: ha risposto
+    **no**. Il colore resta **solo a video**. **Idea scartata: non riproporla.**
   - **Provato in esecuzione**: cornice 8px del colore giusto; barretta da 7px con il colore
     esatto di ciascuno (`#00B0F0`, `#FFC000`, `#9AD0C2`) nelle 5 tabelle dei Riepiloghi e in
     tutte e 3 quelle della Query personale; numeri del Costo orario **identici** a prima su
