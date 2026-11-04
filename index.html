@@ -234,9 +234,14 @@ input:focus,select:focus,textarea:focus{outline:3px solid #1d4ed8;outline-offset
   .cong-row { gap:8px; }
   .cong-chip.strong { border:none; color:#fff; padding:5px 16px; font-size:19px; font-weight:800; box-shadow:0 2px 6px rgba(0,0,0,.25); }
   .cong-chip.strong b { font-size:26px; font-weight:900; letter-spacing:.3px; }
-  .cong.warn .cong-chip.strong { background:#c2410c; }
-  .cong.over .cong-chip.strong { background:#8A7080; }
-  .cong.ok   .cong-chip.strong { background:#059669; }
+  /* ver88 (04/11/2026, colori scelti da Christian): ROSSO se il mese e' SOPRA la base
+     (ore in piu'), VERDE ACQUA se e' SOTTO (ore in meno), VERDE se e' IN PARI.
+     ⚠️ Qui il rosso NON vuol dire "pericolo": e' stato Christian a chiederlo per lo
+     straordinario. Il cartellino accanto (.cong-status) segue gli stessi tre colori,
+     altrimenti nella stessa riga ci sarebbero due colori diversi per la stessa cosa. */
+  .cong.warn .cong-chip.strong, .cong.warn .cong-status { background:#b91c1c; }
+  .cong.over .cong-chip.strong, .cong.over .cong-status { background:#0d9488; }
+  .cong.ok   .cong-chip.strong, .cong.ok   .cong-status { background:#15803d; }
   /* c) TOT calcolato: era a 12px sotto la griglia, ora si legge da lontano. */
   .foot-line .foot-tot { font-size:16px; }
   .foot-line .foot-tot b { font-size:22px; font-weight:900; color:#0F2740; }
@@ -271,7 +276,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver87";
+const APP_VER = "ver88";
 const APP_DATA = "04nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)

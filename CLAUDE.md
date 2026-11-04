@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver87 · 04nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver88 · 04nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -317,6 +317,25 @@ Banca ore, tetto annuo, contratti e export.
   - ⚠️ **NON REGRESSIONE verificata**: su tre casi senza cambiamenti (indeterminato; determinato
     senza proroghe; ore scritte a mano) ver83 e ver84 danno numeri **identici al centesimo**
     (20,50 · 18,71 · 21,53 €/h).
+- 🚦 **I COLORI DEL RISULTATO DEL MESE** (ver88, 04/11/2026, scelti da Christian: «risultato del
+  mese verde se in pari, rosso se sopra e verde acqua se sotto»).
+  | Esito | Colore |
+  |---|---|
+  | **sopra** la base (ore in più, straordinario) | **`#b91c1c`** rosso |
+  | **sotto** la base (ore in meno) | **`#0d9488`** verde acqua |
+  | **in pari** | **`#15803d`** verde |
+  - Gli stessi tre colori valgono per il **badge del risultato** (`.cong-chip.strong`) e per il
+    **cartellino accanto** (`.cong-status`): tenerli diversi avrebbe messo due colori per la
+    stessa cosa nella stessa riga.
+  - ⚠️ **Qui il rosso NON vuol dire «pericolo»**: altrove nelle app di Christian il rosso è
+    riservato alle cancellazioni e agli allarmi (regola del 03/11/2026 scritta nel CLAUDE.md di
+    Collaboratori), ma per lo straordinario l'ha chiesto lui esplicitamente. Non estendere questa
+    eccezione ad altri punti.
+  - Lo sfondo e il bordo del riquadro (`.cong.warn` arancione, `.cong.over` azzurro, `.cong.ok`
+    verde chiaro) **non sono stati toccati**: cambia solo il badge.
+  - **Provati in esecuzione tutti e tre gli stati** (+37,737 h rosso · −19,500 h verde acqua ·
+    0,000 h verde), leggendo il colore calcolato dal browser.
+
 - 🖨️ **PDF A4: le ore in ORE,MINUTI e il totale in centesimi** (ver87, 04/11/2026, richiesta di
   Christian: «il pdf a4 mi deve dare le ore come in precedenza, non con A o P, indicando 5,30 in
   caso di mezz'ora oppure 5,45 in caso di 5 ore e 45 minuti. il totale finale deve essere però in
