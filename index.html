@@ -249,7 +249,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver84";
+const APP_VER = "ver85";
 const APP_DATA = "04nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -2470,6 +2470,7 @@ function datiCosto(state, dp, pairs){
         const p0=x.b.pairs[0], p1=x.b.pairs[x.b.pairs.length-1];
         return { da: mLabelY(p0.y,p0.m), a: mLabelY(p1.y,p1.m), mesi: x.ob.mesi, liv: x.liv || "—",
                  oreSett: x.ob.oreSett, addiz: x.ob.addizTD, indet: x.indet,
+                 agg: R2((Number(x.res.E18)||0) * x.ob.mesi, 2),
                  ore: R2(x.res.H38,2), costo: R2(x.res.J35 - x.res.J32, 2) };
       });
       o.formazTot = res.J32;
@@ -2777,9 +2778,16 @@ function CostoOrario(props){
                   <table style={{ width:"100%", borderCollapse:"collapse", marginTop:"10px" }}><tbody>
                     <tr><td style={tdE}>Ore ordinarie lavorabili</td><td style={Object.assign({}, tdV, cifre)}>{fmt2(r.O8)} h</td></tr>
                     <tr><td style={tdE}>Settimane lavorabili</td><td style={Object.assign({}, tdV, cifre)}>{fmt2(r.O6)}</td></tr>
-                    <tr><td style={tdE}>Ore aggiuntive al mese</td><td style={Object.assign({}, tdV, cifre)}>{fmt2(r.E18)}</td></tr>
+                    <tr><td style={tdE}>Ore aggiuntive al mese</td><td style={Object.assign({}, tdV, cifre)}>{fmt2(r.E18)} h</td></tr>
+                    <tr><td style={tdE}>Ore aggiuntive sul periodo</td><td style={Object.assign({}, tdV, cifre)}>{fmt2((Number(r.E18)||0)*d.mesi)} h</td></tr>
                     <tr><td style={tdE}>Mensile fisso</td><td style={Object.assign({}, tdV, cifre)}>{fmt2(r.H5)} €</td></tr>
                   </tbody></table>
+                  <div style={{ fontSize:"13px", color:"#475569", lineHeight:1.35, marginTop:"5px" }}>
+                    {d.fonte === "teoriche"
+                      ? <span>Le ore aggiuntive sono <b>stimate</b>: ore del mese teoriche (<b style={cifre}>{fmt2(r.P2)}</b> h) × <b style={cifre}>{fmt2(c.suppPct)}%</b>.</span>
+                      : <span>Le ore aggiuntive vengono <b>dal dato vero</b>: ore dichiarate (<b style={cifre}>{fmt2(r.H38)}</b> h) meno le ore ordinarie lavorabili (<b style={cifre}>{fmt2(r.O8)}</b> h){(d.sottoSoglia > 0) ? <span>, più le ore perse sotto soglia (<b style={cifre}>{fmt2(d.sottoSoglia * d.mesi)}</b> h)</span> : null}; mai sotto zero.</span>}
+                    {" "}Si pagano con la maggiorazione del <b>{d.oreSett >= 38 ? "15% sul minimo" : "27%"}</b>.
+                  </div>
                 </div> : null}
 
               {d.blocchi ? (
@@ -2792,16 +2800,18 @@ function CostoOrario(props){
                       <td style={{ padding:"1px 6px" }}>Liv.</td>
                       <td style={{ padding:"1px 6px" }}>h/sett</td>
                       <td style={{ padding:"1px 6px" }}>Addiz.</td>
+                      <td style={{ padding:"1px 6px", textAlign:"right" }}>Aggiunt.</td>
                       <td style={{ padding:"1px 6px", textAlign:"right" }}>Ore</td>
                       <td style={{ padding:"1px 0", textAlign:"right" }}>Costo</td>
                     </tr>
                     {d.blocchi.map(function(bb, bi){
                       return (
                         <tr key={"bl" + bi} style={{ borderTop:"1px dotted #e2e8f0" }}>
-                          <td style={{ padding:"1px 6px 1px 0", whiteSpace:"nowrap" }}>{bb.da === bb.a ? bb.da : (bb.da + " → " + bb.a)}</td>
+                          <td style={{ padding:"1px 6px 1px 0" }}>{bb.da === bb.a ? bb.da : (bb.da + " → " + bb.a)}</td>
                           <td style={{ padding:"1px 6px" }}>{bb.liv}</td>
                           <td style={Object.assign({ padding:"1px 6px" }, cifre)}>{fmt2(bb.oreSett)}</td>
                           <td style={Object.assign({ padding:"1px 6px" }, cifre)}>{bb.indet ? "—" : (fmt2(bb.addiz) + "%")}</td>
+                          <td style={Object.assign({ padding:"1px 6px", textAlign:"right" }, cifre)}>{fmt2(bb.agg)}</td>
                           <td style={Object.assign({ padding:"1px 6px", textAlign:"right" }, cifre)}>{fmt2(bb.ore)}</td>
                           <td style={Object.assign({ padding:"1px 0", textAlign:"right" }, cifre)}>{fmt2(bb.costo)} €</td>
                         </tr>

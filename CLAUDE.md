@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver84 · 04nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver85 · 04nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -317,6 +317,30 @@ Banca ore, tetto annuo, contratti e export.
   - ⚠️ **NON REGRESSIONE verificata**: su tre casi senza cambiamenti (indeterminato; determinato
     senza proroghe; ore scritte a mano) ver83 e ver84 danno numeri **identici al centesimo**
     (20,50 · 18,71 · 21,53 €/h).
+- ⏱️ **SI VEDE QUANTE ORE SONO LE «ORE AGGIUNTIVE»** (ver85, 04/11/2026, richiesta di Christian:
+  «vorrei vedere in costo orario quante ore metti nelle aggiuntive»). Il numero c'era già nei
+  conti (`E18`, ore aggiuntive **al mese**) e una riga lo mostrava, ma **senza unità di misura e
+  senza il totale**: si vedeva solo l'importo in euro (`J18`). **Nessun calcolo è stato toccato**,
+  si fa vedere un numero che esisteva già.
+  - Nella tabellina in fondo al dettaglio: la riga *Ore aggiuntive al mese* ora porta la **h**, e
+    sotto c'è la riga nuova **«Ore aggiuntive sul periodo»** = `E18 × mesi`.
+  - Sotto la tabellina una **nota** che dice da dove vengono: con le ore *dai Riepiloghi* o *a
+    mano* «dal dato vero: ore dichiarate meno le ore ordinarie lavorabili» (e, **solo se è
+    impostata**, «più le ore perse sotto soglia»), con le ore *Teoriche* «stimate: ore del mese
+    teoriche × la %». In coda la **maggiorazione** applicata: 15% sul minimo a 38 h/sett.,
+    altrimenti 27%.
+  - Nella tabella «Come si divide il periodo» una **colonna nuova «Aggiunt.»** con le ore
+    aggiuntive di ciascun blocco (campo `agg` in `o.blocchi` = `E18 del blocco × mesi del
+    blocco`). La somma delle colonne torna al totale del periodo (156,32 h su 4 blocchi, provato).
+  - ⚠️ **Una conseguenza necessaria**: la colonna in più allargava la tabella, quindi alla cella
+    del periodo è stato tolto il `whiteSpace:"nowrap"` (va a capo quando non ci sta). Misurato: a
+    **1280px la pagina non scorre più di lato** (ver84: 1282px, ver85: 1280), a 390px la larghezza
+    scende da 490 a **429px**. L'altezza cresce (1.508→1.569px a 1680, 3.704→3.909 a 390): è il
+    prezzo della riga e della nota in più.
+  - **Non regressione provata in esecuzione** su quattro casi (indeterminato; determinato senza
+    proroghe; ore a mano; promozione + due proroghe che si taglia in 4 blocchi): ore, costo
+    totale, €/h ed `E18` **identici al centesimo** fra ver84 e ver85; l'unica differenza è il
+    campo `agg`. Zero errori di pagina.
 - 🏷️ **«Valori comuni» si chiama «Aliquote e costi fissi validi per tutti»** (ver80, dicitura
   **scelta da Christian** il 04/11/2026, dopo che aveva chiesto di renderla comprensibile).
   Cambiata nel **pulsante** (chiuso: «⚙ Aliquote e costi fissi validi per tutti»; aperto:
