@@ -276,7 +276,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver89";
+const APP_VER = "ver90";
 const APP_DATA = "04nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -4438,7 +4438,7 @@ function App(){
         {!FB_READY ? <button className="btn btn-ghost" onClick={changePin}>🔑 PIN</button> : null}
         {FB_READY ? <button className="btn btn-ghost" onClick={function(){ if (dirty && !window.confirm("Ci sono modifiche non salvate. Uscire comunque?")) return; firebase.auth().signOut(); }}>Esci</button> : null}
         <input ref={fileRef} type="file" accept=".xlsx,.xls,.json" className="hidden-file" onChange={onImportFile} />
-        <div className="monthstrip">{vista === "rep" ? "📊 Riepiloghi" : (vista === "ana" ? "📇 Anagrafica" : (vista === "costo" ? "💶 Costo orario" : ("📅 " + MONTH_LABEL[mese-1] + " " + anno + (mLocked ? "  🔒 bloccato" : ""))))}</div>
+        <div className="monthstrip">{vista === "rep" ? "📊 Riepiloghi" : (vista === "ana" ? "📇 Anagrafica" : (vista === "costo" ? "💶 Costo orario" : (vista === "query" ? "🔎 Query personale" : ("📅 " + MONTH_LABEL[mese-1] + " " + anno + (mLocked ? "  🔒 bloccato" : "")))))}</div>
       </div>
 
       {!FB_READY ? <div className="banner">Modalità LOCALE (localStorage, accesso con PIN).</div> : null}

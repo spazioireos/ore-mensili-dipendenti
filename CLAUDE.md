@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver89 · 04nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver90 · 04nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -340,10 +340,12 @@ Banca ore, tetto annuo, contratti e export.
     esatto di ciascuno (`#00B0F0`, `#FFC000`, `#9AD0C2`) nelle 5 tabelle dei Riepiloghi e in
     tutte e 3 quelle della Query personale; numeri del Costo orario **identici** a prima su
     quattro casi. Zero errori di pagina.
-  - 🐞 **Difetto preesistente visto durante la prova, NON corretto**: nella vista *Query
-    personale* la fascia in alto scrive «📅 undefined 2026», perché `mese` è `null` fuori dalle
-    viste mensili. È lo stesso difetto corretto in ver62 per l'Anagrafica, rimasto qui.
-    Da segnalare a Christian prima di toccarlo.
+  - 🐞 **Difetto preesistente, CORRETTO in ver90** (04/11/2026, su richiesta di Christian):
+    nella vista *Query personale* la fascia in alto scriveva «📅 undefined 2026», perché `mese`
+    è `null` fuori dalle viste mensili — lo stesso difetto corretto in ver62 per l'Anagrafica,
+    qui rimasto. Ora la catena in `.monthstrip` ha anche `vista === "query"` e mostra
+    «🔎 Query personale», **la stessa dicitura della linguetta**. Provate tutte e cinque le
+    viste: Novembre 2026 · Riepiloghi · Anagrafica · Costo orario · Query personale.
 
 - 🚦 **I COLORI DEL RISULTATO DEL MESE** (ver88, 04/11/2026, scelti da Christian: «risultato del
   mese verde se in pari, rosso se sopra e verde acqua se sotto»).
