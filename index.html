@@ -271,7 +271,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver86";
+const APP_VER = "ver87";
 const APP_DATA = "04nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -1004,13 +1004,17 @@ function esportaExcel(state, pairs){
 }
 
 /* ===================== EXPORT PDF A4 verticale (matrice) ===================== */
+/* ver87: nel PDF le ore si scrivono ORE,MINUTI — "5,30" = 5 ore e mezza, "5,45" = 5 h 45 min.
+   (Richiesta di Christian del 04/11/2026: "il pdf a4 mi deve dare le ore come in precedenza".)
+   ATTENZIONE: non e' un numero decimale, e' ora,minuti: 5,45 NON vale 5,75.
+   Il TOTALE in fondo e' invece in centesimi (fmt2), perche' li' serve il numero vero. */
 function pdfHM(v){
   const n = parseFloat(String(v == null ? "" : v).replace(",", "."));
   if (isNaN(n)) return String(v == null ? "" : v);
   const neg = n < 0; const a = Math.abs(n);
   let h = Math.floor(a); let mm = Math.round((a - h) * 60);
   if (mm === 60){ h += 1; mm = 0; }
-  return (neg ? "-" : "") + h + " h e " + (mm < 10 ? "0" : "") + mm + " min";
+  return (neg ? "-" : "") + h + "," + (mm < 10 ? "0" : "") + mm;
 }
 function esportaPDF(state, pairs){
   const JsPDF = window.jspdf.jsPDF;
@@ -1064,7 +1068,8 @@ function esportaPDF(state, pairs){
           let txt;
           if (sv === "--") txt = "R";                                       // riposo settimanale -> R (in rosso)
           else if (sv === "") txt = isDom ? "R" : (rosso ? "–" : "");       // domenica senza dato -> riposo (per tutti)
-          else if (dp.mensilizzato && isNumeric(sv)) txt = "P";            // mensilizzato: giorno lavorato = presenza (LUL)
+          /* ver87: anche per i mensilizzati si scrivono le ORE, non piu' la "P" di presenza
+             (richiesta di Christian del 04/11/2026). */
           else if (CODE_SET[sv]) txt = sv;
           else txt = pdfHM(v);
           if (perm){ txt = (txt === "*" || txt === "" ? "*" : txt + "*"); permMese.push(dp.nome + " g." + d + " " + fmt2(perm.ore) + " h (" + perm.tipo + ")"); }
@@ -1073,7 +1078,8 @@ function esportaPDF(state, pairs){
         row.push(dayLabel);
         body.push(row);
       }
-      const totRow = ["TOT ORE RESE"].concat(tot.map(function(t){ return pdfHM(R2(t)); })).concat(["TOT ORE RESE"]);
+      /* ver87: il totale finale resta in CENTESIMI (numero decimale vero), non in ore,minuti. */
+      const totRow = ["TOT ORE RESE"].concat(tot.map(function(t){ return fmt2(R2(t)); })).concat(["TOT ORE RESE"]);
       body.push(totRow);
       const ncols = 2 + chunk.length;
       const lastIdx = chunk.length + 1;
@@ -1089,9 +1095,11 @@ function esportaPDF(state, pairs){
           if (data.section !== "body") return;
           const ri = data.row.index;
           const raw = String(data.cell.raw || "").trim();
-          const isNum = /^\d+ h e \d{2} min\*?$/.test(raw); // ore in formato "H h e MM min"
-          const isWhole = /^\d+ h e 00 min\*?$/.test(raw); // ore intere -> "00 min" in grigio
-          if (!isDayCol && isWhole){ data.cell.__hm00 = true; data.cell.text = [""]; }
+          const isNum = /^-?\d+,\d{2}\*?$/.test(raw);   // ore in formato ORE,MINUTI
+          const isWhole = /^-?\d+,00\*?$/.test(raw);    // ore intere -> ",00" in grigio
+          /* ver87: lo sbiadito del ",00" vale solo per le celle dei giorni, non per la riga
+             del TOTALE, che ormai e' un numero decimale vero. */
+          if (!isDayCol && isWhole && ri !== nd){ data.cell.__hm00 = true; data.cell.text = [""]; }
           if (ri === nd){ data.cell.styles.fontStyle = "bold"; data.cell.styles.fillColor = [238,242,255]; if (!isDayCol) data.cell.styles.fontSize = 7; return; }
           const day = ri + 1;
           if (isDayCol){
@@ -1115,8 +1123,8 @@ function esportaPDF(state, pairs){
           if (!data.cell.__hm00) return;
           let raw = String(data.cell.raw || "").trim();
           let star = ""; if (raw.slice(-1) === "*"){ star = "*"; raw = raw.slice(0, -1); }
-          const p2 = "00 min" + star;
-          const p1 = raw.slice(0, raw.length - "00 min".length);
+          const p2 = ",00" + star;
+          const p1 = raw.slice(0, raw.length - ",00".length);
           const fs = data.cell.styles.fontSize || 9;
           doc.setFontSize(fs); doc.setFont(undefined, "bold");
           const w1 = doc.getTextWidth(p1); const w2 = doc.getTextWidth(p2);
@@ -1136,7 +1144,7 @@ function esportaPDF(state, pairs){
         const ensureY = function(h){ if (yy + h > 287){ doc.addPage(); yy = 18; } };
         // Legenda simboli (LUL)
         doc.setFontSize(6.5); doc.setTextColor(90,90,90); doc.setFont(undefined,"normal");
-        ensureY(4); doc.text("Legenda: R (rosso) = riposo/domenica · P = presenza (mensilizzati) · TOT ORE RESE = somma delle ore effettivamente rese (dal totale delle celle).", 14, yy); yy += 5;
+        ensureY(4); doc.text("Legenda: R (rosso) = riposo/domenica · ore scritte come ORE,MINUTI (5,30 = cinque ore e mezza; 5,45 = cinque ore e tre quarti) · TOT ORE RESE = somma delle ore effettivamente rese, in centesimi.", 14, yy); yy += 5;
         // RECUPERO / ORE NUOVE (mensilizzati con debito pregresso)
         const recupLines = [];
         dipsMese.forEach(function(dp){
