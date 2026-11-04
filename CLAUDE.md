@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver88 · 04nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver89 · 04nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -317,6 +317,34 @@ Banca ore, tetto annuo, contratti e export.
   - ⚠️ **NON REGRESSIONE verificata**: su tre casi senza cambiamenti (indeterminato; determinato
     senza proroghe; ore scritte a mano) ver83 e ver84 danno numeri **identici al centesimo**
     (20,50 · 18,71 · 21,53 €/h).
+- 🎨 **IL COLORE DELLA PERSONA VALE OVUNQUE** (ver89, 04/11/2026, richiesta di Christian:
+  «volevo le cornici dei box di ogni singolo utente più spesse, tra l'altro sarebbe bene che il
+  colore scelto divenisse il colore ufficiale di quel dipendente ovunque»).
+  - **Cornice della scheda del mese**: `.emp-card` da **3 a 8px** (misura scelta da Christian).
+    Il colore era già `dp.colore`, era solo sottile.
+  - **Il colore segue la persona** in tutte le viste, come **barretta a sinistra da 7px**:
+    elenco delle persone in **Costo orario** e in **ANAGRAFICA**, le **cinque tabelle dei
+    Riepiloghi** (cella `td.name`) e le **tre tabelle della Query personale** (*Totale su
+    intervallo*, *Straordinario*, *Ferie da smaltire*). Nelle due schede, davanti al **nome in
+    grande**, c'è un **quadratino** del colore.
+  - Per la Query personale il colore è stato aggiunto alle righe (`col: dp.colore` in `rowsB`,
+    `rowsS`, `rowsF`): è l'unica modifica al JavaScript, tutto il resto è stile.
+  - ⚠️ **Perché una barretta e non lo sfondo pieno**: i dieci colori di `PALETTE` sono chiari
+    (giallo `#FFC000`, rosa `#FFDDFF`, verde acqua `#9AD0C2`); come sfondo di riga renderebbero
+    i numeri meno leggibili, come barretta si vedono benissimo. Non riempire le righe.
+  - ⚠️ **Export Excel e PDF NON toccati**: stanno nella lista delle cose da non toccare senza
+    richiesta esplicita e Christian non ha ancora risposto sulla domanda. Se un giorno dice di
+    sì: cella del nome colorata nei fogli dei Riepiloghi e dell'Anagrafica, colonna del nome nel
+    PDF A4.
+  - **Provato in esecuzione**: cornice 8px del colore giusto; barretta da 7px con il colore
+    esatto di ciascuno (`#00B0F0`, `#FFC000`, `#9AD0C2`) nelle 5 tabelle dei Riepiloghi e in
+    tutte e 3 quelle della Query personale; numeri del Costo orario **identici** a prima su
+    quattro casi. Zero errori di pagina.
+  - 🐞 **Difetto preesistente visto durante la prova, NON corretto**: nella vista *Query
+    personale* la fascia in alto scrive «📅 undefined 2026», perché `mese` è `null` fuori dalle
+    viste mensili. È lo stesso difetto corretto in ver62 per l'Anagrafica, rimasto qui.
+    Da segnalare a Christian prima di toccarlo.
+
 - 🚦 **I COLORI DEL RISULTATO DEL MESE** (ver88, 04/11/2026, scelti da Christian: «risultato del
   mese verde se in pari, rosso se sopra e verde acqua se sotto»).
   | Esito | Colore |

@@ -276,7 +276,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver88";
+const APP_VER = "ver89";
 const APP_DATA = "04nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -1351,7 +1351,7 @@ function EmployeeCard(props){
   };
 
   return (
-    <div className="emp-card" style={{ borderColor: dp.colore || "#00B0F0", borderWidth:"3px" }}>
+    <div className="emp-card" style={{ borderColor: dp.colore || "#00B0F0", borderWidth:"8px" }}>
       <div className="emp-head" style={{ background: dp.colore || "#00B0F0" }}>
         <span className="nome" style={{ color:"#08344a" }}>{dp.nome}</span>
         {livelloAt(dp,y,m) ? <span className="pill">Liv. {livelloAt(dp,y,m)}</span> : null}
@@ -2666,7 +2666,7 @@ function CostoOrario(props){
             const dd = datiCosto(state, x, pairs);
             return (
               <button key={x.id} onClick={function(){ setSelId(x.id); }}
-                style={{ textAlign:"left", padding:"8px 10px", borderRadius:"8px", border:"1px solid " + (x.id===dp.id?"#2f6fae":"#e2e8f0"), background:(x.id===dp.id?"#2f6fae":"#fff"), color:(x.id===dp.id?"#fff":"#1f4e82"), fontWeight:700, fontSize:"14px", cursor:"pointer" }}>
+                style={{ textAlign:"left", padding:"8px 10px", borderRadius:"8px", border:"1px solid " + (x.id===dp.id?"#2f6fae":"#e2e8f0"), borderLeft:"7px solid " + (x.colore || "#94a3b8"), background:(x.id===dp.id?"#2f6fae":"#fff"), color:(x.id===dp.id?"#fff":"#1f4e82"), fontWeight:700, fontSize:"14px", cursor:"pointer" }}>
                 {x.nome}<br/><span style={{ fontSize:"13px", fontWeight:400 }}>{fmt2(dd.res.orario)} €/h</span>
               </button>
             );
@@ -2674,7 +2674,7 @@ function CostoOrario(props){
         </div>
 
         <div style={{ flex:"1 1 420px", minWidth:0, background:"#fff", border:"2px solid #5a9ce2", borderRadius:"12px", padding:"9px" }}>
-          <div style={{ fontSize:"19px", fontWeight:800, color:"#1f4e82", marginBottom:"4px" }}>{dp.nome}</div>
+          <div style={{ fontSize:"19px", fontWeight:800, color:"#1f4e82", marginBottom:"4px" }}><span style={{ display:"inline-block", width:"14px", height:"14px", borderRadius:"4px", background:(dp.colore||"#94a3b8"), border:"1px solid rgba(0,0,0,.25)", marginRight:"7px", verticalAlign:"-1px" }}></span>{dp.nome}</div>
 
           <div style={{ display:"flex", gap:"8px", flexWrap:"wrap", alignItems:"flex-start" }}>
 
@@ -3003,14 +3003,14 @@ function Anagrafica(props){
         <div style={{ minWidth:"210px", display:"flex", flexDirection:"column", gap:"4px" }}>
           {dips.map(function(x){ return (
             <button key={x.id} onClick={function(){ setSelId(x.id); setMsg(""); }}
-              style={{ textAlign:"left", padding:"8px 10px", borderRadius:"8px", border:"1px solid " + (x.id===dp.id?"#2f6fae":"#e2e8f0"), background:(x.id===dp.id?"#2f6fae":"#fff"), color:(x.id===dp.id?"#fff":"#1f4e82"), fontWeight:700, fontSize:"13px", cursor:"pointer" }}>
+              style={{ textAlign:"left", padding:"8px 10px", borderRadius:"8px", border:"1px solid " + (x.id===dp.id?"#2f6fae":"#e2e8f0"), borderLeft:"7px solid " + (x.colore || "#94a3b8"), background:(x.id===dp.id?"#2f6fae":"#fff"), color:(x.id===dp.id?"#fff":"#1f4e82"), fontWeight:700, fontSize:"13px", cursor:"pointer" }}>
               {x.nome}
             </button>
           ); })}
         </div>
         <div style={{ flex:1, background:"#fff", border:"2px solid #94a3b8", borderRadius:"12px", padding:"14px" }}>
           <div style={{ display:"flex", alignItems:"center", gap:"10px", marginBottom:"12px", flexWrap:"wrap" }}>
-            <div style={{ fontSize:"18px", fontWeight:800, color:"#1f4e82" }}>{dp.nome}</div>
+            <div style={{ fontSize:"18px", fontWeight:800, color:"#1f4e82" }}><span style={{ display:"inline-block", width:"14px", height:"14px", borderRadius:"4px", background:(dp.colore||"#94a3b8"), border:"1px solid rgba(0,0,0,.25)", marginRight:"7px", verticalAlign:"-1px" }}></span>{dp.nome}</div>
             <div className="spacer"></div>
             <div style={{ display:"flex", alignItems:"center", gap:"8px", background:"#eef5fc", border:"1px solid #b9d5f1", borderRadius:"10px", padding:"6px 10px" }}>
               <span style={{ fontSize:"12px", fontWeight:800, color:"#1e3a8a", whiteSpace:"nowrap" }}>Genera documento:</span>
@@ -3132,7 +3132,7 @@ function QueryPanel(props){
   const okB = isRealDate(bFrom) && isRealDate(bTo) && ymdIt(bFrom)<=ymdIt(bTo);
   const fromI = okB?ymdIt(bFrom):0, toI = okB?ymdIt(bTo):0;
   const unitB = bWhat==="ORE" ? "ore" : "giorni";
-  const rowsB = okB ? (bChi==="__ALL__" ? dips.map(function(dp){ return { nome:nomeOf(dp), val:sumOverRange(state,dp.id,fromI,toI,bWhat) }; }) : (function(){ const dp=dips.find(function(d){return d.id===bChi;}); return dp?[{ nome:nomeOf(dp), val:sumOverRange(state,dp.id,fromI,toI,bWhat) }]:[]; })()) : [];
+  const rowsB = okB ? (bChi==="__ALL__" ? dips.map(function(dp){ return { nome:nomeOf(dp), col:dp.colore, val:sumOverRange(state,dp.id,fromI,toI,bWhat) }; }) : (function(){ const dp=dips.find(function(d){return d.id===bChi;}); return dp?[{ nome:nomeOf(dp), col:dp.colore, val:sumOverRange(state,dp.id,fromI,toI,bWhat) }]:[]; })()) : [];
   const totB = rowsB.reduce(function(a,r){ return a+r.val; },0);
   const fmtVal = function(v){ return bWhat==="ORE" ? fmt2(v) : String(v); };
   function expB(){ const whatL=(codeOpts.find(function(o){return o.v===bWhat;})||{}).l||bWhat; const aoa=[["TOTALE "+whatL+" DAL "+bFrom+" AL "+bTo+" (in "+unitB+")"],[],["COGNOME NOME","TOTALE ("+unitB+")"]]; rowsB.forEach(function(r){ aoa.push([r.nome, r.val]); }); aoa.push([]); aoa.push(["TOTALE COMPLESSIVO", totB]); qExport("Query - Totale "+whatL+" "+bFrom.replace(/\//g,"-")+"_"+bTo.replace(/\//g,"-")+".xlsx", aoa); }
@@ -3154,7 +3154,7 @@ function QueryPanel(props){
   const sFromYM = (parseInt(sFromY,10)||0)*100 + (parseInt(sFromM,10)||0);
   const sToYM = (parseInt(sToY,10)||0)*100 + (parseInt(sToM,10)||0);
   const okS = sFromYM>=200001 && sToYM>=200001 && sFromYM<=sToYM;
-  const rowsS = okS ? dips.map(function(dp){ const r=straoRange(state,dp,sFromYM,sToYM); return { nome:nomeOf(dp), piu:r.piu, meno:r.meno }; }) : [];
+  const rowsS = okS ? dips.map(function(dp){ const r=straoRange(state,dp,sFromYM,sToYM); return { nome:nomeOf(dp), col:dp.colore, piu:r.piu, meno:r.meno }; }) : [];
   const totSPiu = rowsS.reduce(function(a,r){ return a+r.piu; },0);
   const totSMeno = rowsS.reduce(function(a,r){ return a+r.meno; },0);
   const sLabel = function(ym){ return MONTH_LABEL[(ym%100)-1]+" "+Math.floor(ym/100); };
@@ -3163,7 +3163,7 @@ function QueryPanel(props){
   // --- Ferie da smaltire: residuo (26 GG/anno, 2,1666 GG/mese sui mesi lavorati) per l'anno scelto ---
   const fY = parseInt(fAnno,10)||0;
   const fHasData = fY>0 && annoHasData(state, fY);
-  const rowsF = fY>0 ? dips.map(function(dp){ const mat=ferieMaturato(dp,fY), god=ferieGodute(state,dp,fY), res=R2((mat-god),3); return { nome:nomeOf(dp), mat:mat, god:god, res:res }; }) : [];
+  const rowsF = fY>0 ? dips.map(function(dp){ const mat=ferieMaturato(dp,fY), god=ferieGodute(state,dp,fY), res=R2((mat-god),3); return { nome:nomeOf(dp), col:dp.colore, mat:mat, god:god, res:res }; }) : [];
   const daSmaltire = rowsF.filter(function(r){ return r.res>0.0005; });
   function expF(){ const aoa=[["FERIE DA SMALTIRE — anno "+fY+" (verifica al 30 aprile "+(fY+1)+")"],["26 GG annui = 2,1666 GG/mese riproporzionati sui mesi in forza. Residuo = maturate − godute. In rosso chi ha residuo > 0."],[],["COGNOME NOME","FERIE MATURATE (GG)","FERIE GODUTE (GG)","RESIDUO DA SMALTIRE (GG)"]]; rowsF.forEach(function(r){ aoa.push([r.nome, R2(r.mat,3), r.god, R2(r.res,3)]); }); qExport("Query - Ferie da smaltire "+fY+".xlsx", aoa); }
 
@@ -3223,7 +3223,7 @@ function QueryPanel(props){
              <div style={{ overflowX:"auto", border:"1px solid #e2e8f0", borderRadius:"8px" }}>
                <table style={{ borderCollapse:"collapse", width:"100%", minWidth:"420px" }}>
                  <thead><tr><th style={th}>Cognome Nome</th><th style={Object.assign({},th,{textAlign:"right"})}>Totale ({unitB})</th></tr></thead>
-                 <tbody>{rowsB.map(function(r,i){ return <tr key={i}><td style={td}>{r.nome}</td><td style={Object.assign({},td,{textAlign:"right",fontWeight:700})}>{fmtVal(r.val)}</td></tr>; })}</tbody>
+                 <tbody>{rowsB.map(function(r,i){ return <tr key={i}><td style={Object.assign({},td,{borderLeft:"7px solid "+(r.col||"#94a3b8")})}>{r.nome}</td><td style={Object.assign({},td,{textAlign:"right",fontWeight:700})}>{fmtVal(r.val)}</td></tr>; })}</tbody>
                </table>
              </div>
            </div>}
@@ -3283,7 +3283,7 @@ function QueryPanel(props){
              <div style={{ overflowX:"auto", border:"1px solid #e2e8f0", borderRadius:"8px" }}>
                <table style={{ borderCollapse:"collapse", width:"100%", minWidth:"520px" }}>
                  <thead><tr><th style={th}>Cognome Nome</th><th style={Object.assign({},th,{textAlign:"right"})}>Ore in più (straordinario)</th><th style={Object.assign({},th,{textAlign:"right"})}>Ore in meno</th></tr></thead>
-                 <tbody>{rowsS.map(function(r,i){ return <tr key={i}><td style={td}>{r.nome}</td><td style={Object.assign({},td,{textAlign:"right",fontWeight:700,color:r.piu>0.0005?"#b45309":"#94a3b8"})}>{fmt3(r.piu)}</td><td style={Object.assign({},td,{textAlign:"right",fontWeight:700,color:r.meno>0.0005?"#475569":"#94a3b8"})}>{fmt3(r.meno)}</td></tr>; })}</tbody>
+                 <tbody>{rowsS.map(function(r,i){ return <tr key={i}><td style={Object.assign({},td,{borderLeft:"7px solid "+(r.col||"#94a3b8")})}>{r.nome}</td><td style={Object.assign({},td,{textAlign:"right",fontWeight:700,color:r.piu>0.0005?"#b45309":"#94a3b8"})}>{fmt3(r.piu)}</td><td style={Object.assign({},td,{textAlign:"right",fontWeight:700,color:r.meno>0.0005?"#475569":"#94a3b8"})}>{fmt3(r.meno)}</td></tr>; })}</tbody>
                </table>
              </div>
            </div>}
@@ -3308,7 +3308,7 @@ function QueryPanel(props){
              <div style={{ overflowX:"auto", border:"1px solid #e2e8f0", borderRadius:"8px" }}>
                <table style={{ borderCollapse:"collapse", width:"100%", minWidth:"560px" }}>
                  <thead><tr><th style={th}>Cognome Nome</th><th style={Object.assign({},th,{textAlign:"right"})}>Maturate (GG)</th><th style={Object.assign({},th,{textAlign:"right"})}>Godute (GG)</th><th style={Object.assign({},th,{textAlign:"right"})}>Residuo da smaltire (GG)</th></tr></thead>
-                 <tbody>{rowsF.map(function(r,i){ const flag=r.res>0.0005; return <tr key={i} style={flag?{background:"#fee2e2"}:undefined}><td style={Object.assign({},td,flag?{fontWeight:800,color:"#991b1b"}:undefined)}>{r.nome}</td><td style={Object.assign({},td,{textAlign:"right"})}>{fmt2(r.mat)}</td><td style={Object.assign({},td,{textAlign:"right"})}>{r.god}</td><td style={Object.assign({},td,{textAlign:"right",fontWeight:800,color:flag?"#dc2626":"#94a3b8"})}>{flag?fmt2(r.res):"0,00"}</td></tr>; })}</tbody>
+                 <tbody>{rowsF.map(function(r,i){ const flag=r.res>0.0005; return <tr key={i} style={flag?{background:"#fee2e2"}:undefined}><td style={Object.assign({},td,{borderLeft:"7px solid "+(r.col||"#94a3b8")},flag?{fontWeight:800,color:"#991b1b"}:undefined)}>{r.nome}</td><td style={Object.assign({},td,{textAlign:"right"})}>{fmt2(r.mat)}</td><td style={Object.assign({},td,{textAlign:"right"})}>{r.god}</td><td style={Object.assign({},td,{textAlign:"right",fontWeight:800,color:flag?"#dc2626":"#94a3b8"})}>{flag?fmt2(r.res):"0,00"}</td></tr>; })}</tbody>
                </table>
              </div>
            </div>}
@@ -3666,7 +3666,7 @@ function Riepiloghi(props){
         <div className="rep-scroll"><table className="rep"><thead><tr>
           <th style={{textAlign:"left"}}>Dipendente</th>{scopePairs.map(function(pr,i){ return <th key={i}>{mAbbrY(pr.y,pr.m)}</th>; })}<th>TOT</th>
         </tr></thead><tbody>
-          {tabPeriodo.map(function(r){ return <tr key={r.dp.id}><td className="name">{r.dp.nome}</td>
+          {tabPeriodo.map(function(r){ return <tr key={r.dp.id}><td className="name" style={{ borderLeft:"7px solid " + (r.dp.colore || "#94a3b8") }}>{r.dp.nome}</td>
             {r.perMese.map(function(v,i){ return <td key={i}>{v===0?"":fmt2(v)}</td>; })}<td className="tot">{fmt2(r.tot)}</td></tr>; })}
         </tbody></table></div>
       </div>
@@ -3676,7 +3676,7 @@ function Riepiloghi(props){
         <div className="rep-scroll"><table className="rep"><thead><tr>
           <th style={{textAlign:"left"}}>Dipendente</th><th>Ore lavorate</th><th>Ore teoriche</th><th>Scostamento</th>
         </tr></thead><tbody>
-          {tabTeor.map(function(r){ return <tr key={r.dp.id}><td className="name">{r.dp.nome}</td><td>{fmt2(r.lav)}</td><td>{fmt2(r.teor)}</td>
+          {tabTeor.map(function(r){ return <tr key={r.dp.id}><td className="name" style={{ borderLeft:"7px solid " + (r.dp.colore || "#94a3b8") }}>{r.dp.nome}</td><td>{fmt2(r.lav)}</td><td>{fmt2(r.teor)}</td>
             <td className={r.scost<0?"flag-red":""}>{fmt2(r.scost)}</td></tr>; })}
         </tbody></table></div>
       </div>
@@ -3687,7 +3687,7 @@ function Riepiloghi(props){
         <div className="rep-scroll"><table className="rep"><thead><tr>
           <th style={{textAlign:"left"}}>Dipendente</th>{codeCols.map(function(c){ return <th key={c} title={CODE_SET[c].l}>{c}</th>; })}
         </tr></thead><tbody>
-          {tabAssenze.map(function(r){ return <tr key={r.dp.id}><td className="name">{r.dp.nome}</td>
+          {tabAssenze.map(function(r){ return <tr key={r.dp.id}><td className="name" style={{ borderLeft:"7px solid " + (r.dp.colore || "#94a3b8") }}>{r.dp.nome}</td>
             {codeCols.map(function(c){ return <td key={c}>{r.counts[c]===0?"":r.counts[c]}</td>; })}</tr>; })}
         </tbody></table></div>}
       </div>
@@ -3697,7 +3697,7 @@ function Riepiloghi(props){
         <div className="rep-scroll"><table className="rep"><thead><tr>
           <th style={{textAlign:"left"}}>Dipendente</th><th>GG retribuiti</th><th>GG non retribuiti</th>
         </tr></thead><tbody>
-          {tabPay.map(function(r){ return <tr key={r.dp.id}><td className="name">{r.dp.nome}</td><td>{r.ret===0?"":r.ret}</td>
+          {tabPay.map(function(r){ return <tr key={r.dp.id}><td className="name" style={{ borderLeft:"7px solid " + (r.dp.colore || "#94a3b8") }}>{r.dp.nome}</td><td>{r.ret===0?"":r.ret}</td>
             <td className={r.non>0?"flag-amber":""}>{r.non===0?"":r.non}</td></tr>; })}
         </tbody></table></div>
       </div>
@@ -3709,7 +3709,7 @@ function Riepiloghi(props){
           <th style={{textAlign:"left"}}>Dipendente</th><th>Scadenza originale</th><th>Prorogato al</th><th>Scadenza effettiva</th><th>Giorni residui</th>
         </tr></thead><tbody>
           {tabScad.map(function(r){ const cls=r.gg<0?"flag-red":(r.gg<=30?"flag-red":(r.gg<=60?"flag-amber":""));
-            return <tr key={r.dp.id}><td className="name">{r.dp.nome}</td><td>{r.orig}</td><td>{r.prorog || "—"}</td><td style={{fontWeight:700}}>{r.eff}</td><td className={cls}>{r.gg<0?"scaduto":r.gg}</td></tr>; })}
+            return <tr key={r.dp.id}><td className="name" style={{ borderLeft:"7px solid " + (r.dp.colore || "#94a3b8") }}>{r.dp.nome}</td><td>{r.orig}</td><td>{r.prorog || "—"}</td><td style={{fontWeight:700}}>{r.eff}</td><td className={cls}>{r.gg<0?"scaduto":r.gg}</td></tr>; })}
         </tbody></table></div>}
       </div>
 
