@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver80 · 04nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver81 · 04nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -245,8 +245,9 @@ Banca ore, tetto annuo, contratti e export.
     per trasferte fuori dal Comune entro le tariffe ACI; se diventasse forfettario sarebbe
     imponibile e il calcolo andrebbe rivisto.
   - ⚠️ `kmMesiTolti` esiste nei dati ma **non ha una casella**: è sempre 0.
-  - ⚠️ L'etichetta resta **«Rimborso km €/mese»** anche quando la tendina è su *secco*:
-    **segnalato a Christian, non corretto di iniziativa** (le diciture sono sue).
+  - **Etichetta cambiata in «Rimborso km €»** (ver81, 04/11/2026): «€/mese» era falso quando la
+    tendina sta su *secco*. ⚠️ Il cambio è stato **chiesto da Christian** («cambia pure la parola
+    Rimborso»), non fatto di iniziativa: le diciture restano sue.
 - 🏷️ **«Valori comuni» si chiama «Aliquote e costi fissi validi per tutti»** (ver80, dicitura
   **scelta da Christian** il 04/11/2026, dopo che aveva chiesto di renderla comprensibile).
   Cambiata nel **pulsante** (chiuso: «⚙ Aliquote e costi fissi validi per tutti»; aperto:

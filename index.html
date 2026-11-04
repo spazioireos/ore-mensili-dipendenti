@@ -249,7 +249,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver80";
+const APP_VER = "ver81";
 const APP_DATA = "04nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -2492,7 +2492,7 @@ function CostoOrario(props){
             {campoNum("Assistenza sanitaria €/anno", cMostra(sc.sanitaria, COSTO_COMUNE_DEF.sanitaria), function(v){ setComune("sanitaria", v); }, "solo indeterminati, fissa")}
             {campoNum("Paghe e dichiarazioni €/mese", cMostra(sc.paghe, COSTO_COMUNE_DEF.paghe), function(v){ setComune("paghe", v); })}
             {campoNum("Formazione €/anno", cMostra(sc.formazione, COSTO_COMUNE_DEF.formazione), function(v){ setComune("formazione", v); })}
-            {campoNum("Rimborso km €/mese", cMostra(sc.kmMese, COSTO_COMUNE_DEF.kmMese || ""), function(v){ setComune("kmMese", v); }, "vuoto = nessun rimborso")}
+            {campoNum("Rimborso km €", cMostra(sc.kmMese, COSTO_COMUNE_DEF.kmMese || ""), function(v){ setComune("kmMese", v); }, "vuoto = nessun rimborso")}
           </div>
         </div> : null}
 
@@ -2553,7 +2553,7 @@ function CostoOrario(props){
                   {campoNum("Premi (tempo pieno) €", cMostra(d.raw.premiTP, ""), function(v){ setPar("premiTP", v); })}
                   {campoNum("Superminimo €", cMostra(d.raw.superminimo, ""), function(v){ setPar("superminimo", v); })}
                   {campoNum("Premio €/mese", cMostra(d.raw.premiMese, ""), function(v){ setPar("premiMese", v); })}
-                  {campoNum("Rimborso km €/mese", cMostra(d.raw.kmMese, c.kmMese || ""), function(v){ setPar("kmMese", v); }, "comune: " + fmt2(c.kmMese))}
+                  {campoNum("Rimborso km €", cMostra(d.raw.kmMese, c.kmMese || ""), function(v){ setPar("kmMese", v); }, "comune: " + fmt2(c.kmMese))}
                   <label style={cella}><span style={etich}>Rimborso: come si conta</span>
                     <select value={d.kmTipo} style={{ padding:"8px", width:"100%" }} onChange={function(e){ setPar("kmTipo", e.target.value); }}>
                       <option value="mese">al mese (× i mesi del periodo)</option>
