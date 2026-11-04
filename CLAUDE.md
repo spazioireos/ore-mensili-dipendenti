@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver82 · 04nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver83 · 04nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -265,6 +265,26 @@ Banca ore, tetto annuo, contratti e export.
   per le ore settimanali. Per un conto esatto si spezza il periodo in due tronconi.
   ⚠️ Se nella scheda del Costo orario il livello è stato **scritto a mano** (`dp.costo.livello`),
   quello continua a prevalere: il calcolo automatico non lo sovrascrive.
+- 📈 **L'ADDIZIONALE TEMPO DETERMINATO SEGUE LE DATE DELLE PROROGHE** (ver83, 04/11/2026,
+  stessa segnalazione del livello). `addizTDAuto` contava **tutte** le proroghe registrate,
+  anche quelle che partivano **dopo** il periodo guardato: chi aveva già due proroghe scritte in
+  scheda si vedeva 2,40% anche calcolando un periodo in cui ne era partita una sola.
+  - **`prorogheAttiveA(dp, ymdFine)`**: una proroga decorre dal **giorno dopo la scadenza
+    precedente**, quindi la catena è `[scadenza originale, proroga 1, proroga 2, …]` e si conta
+    la proroga *i* solo se `chain[i-1] < fine del periodo`.
+  - **`fineperiodoYmd(pairs)`** = ultimo giorno dell'ultimo mese del periodo.
+  - L'**aiutino sotto la casella** mostra ora il numero davvero usato (`d.nProroghe`): prima
+    scriveva `prorogheList(dp).length`, cioè mentiva.
+  - Provato con scadenza 31/03/2026 e proroghe 30/06 e 31/12:
+    | Periodo | ver82 (prima) | **ver83** |
+    |---|---|---|
+    | gen → dic 2026 | 2,40 % | **2,40 %** (giusto: entrambe partite) |
+    | gen → mag 2026 | 2,40 % | **1,90 %** (la seconda parte il 1° luglio) |
+  - ⚠️ Come per il livello: si guarda la situazione **alla fine del periodo**, non si fa la media
+    pesata dentro il periodo — Christian l'ha **scartata** il 03/11/2026. Se una proroga cade a
+    metà e si vuole il conto esatto, si spezza il periodo in due.
+  - ⚠️ Una proroga la cui **scadenza precedente non è scritta o è illeggibile** non viene
+    contata: il numero scende e si vede nell'aiutino. La casella resta scrivibile a mano.
 - 🏷️ **«Valori comuni» si chiama «Aliquote e costi fissi validi per tutti»** (ver80, dicitura
   **scelta da Christian** il 04/11/2026, dopo che aveva chiesto di renderla comprensibile).
   Cambiata nel **pulsante** (chiuso: «⚙ Aliquote e costi fissi validi per tutti»; aperto:

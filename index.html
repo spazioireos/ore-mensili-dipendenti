@@ -249,7 +249,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver82";
+const APP_VER = "ver83";
 const APP_DATA = "04nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -2235,9 +2235,30 @@ function indetAFine(dp, pairs){
   return tipoAt(dp, u.y, u.m)!=="determinato";
 }
 // 1,40 al primo contratto, +0,5 a ogni proroga, 0 se indeterminato
+/* ver83: quante proroghe sono GIA' PARTITE entro la fine del periodo.
+   Una proroga decorre dal giorno dopo la scadenza precedente: la catena e'
+   [scadenza originale, proroga 1, proroga 2, …]. Prima si contavano TUTTE quelle
+   registrate, anche quelle che partivano dopo il periodo guardato (segnalato da
+   Christian il 04/11/2026, come per il livello). */
+function prorogheAttiveA(dp, ymdFine){
+  const ps = prorogheList(dp);
+  if (!ps.length || !ymdFine) return 0;
+  const chain = [dp.scadenza || ""].concat(ps);
+  let n = 0;
+  for (let i = 1; i < chain.length; i++){
+    const prec = ymdIt(chain[i-1]);
+    if (prec && prec < ymdFine) n++;
+  }
+  return n;
+}
+function fineperiodoYmd(pairs){
+  if (!pairs || !pairs.length) return 0;
+  const u = pairs[pairs.length-1];
+  return u.y*10000 + u.m*100 + daysInMonth(u.y, u.m);
+}
 function addizTDAuto(dp, pairs){
   if (indetAFine(dp, pairs)) return 0;
-  return R2((1.40 + 0.5*prorogheList(dp).length));
+  return R2((1.40 + 0.5*prorogheAttiveA(dp, fineperiodoYmd(pairs))));
 }
 // ore settimanali del periodo: quelle dell'ultimo mese in cui il contratto e' in piedi
 /* ver82: livello del periodo = quello dell'ultimo mese in cui il contratto e' in piedi.
@@ -2336,11 +2357,12 @@ function datiCosto(state, dp, pairs){
   const liv = p.livello!=null && p.livello!=="" ? p.livello : livAuto;
   const minimoAuto = (MINIMI_CCNL[tab] && MINIMI_CCNL[tab][liv]) ? MINIMI_CCNL[tab][liv] : 0;
   const addizAuto = addizTDAuto(dp, pairs);
+  const nProroghe = prorogheAttiveA(dp, fineperiodoYmd(pairs));   // ver83: quelle gia' partite
   const oreDaRiep = oreRendPeriodo(state, dp, pairs);
   const ff = contaFestivita(pairs);
   const o = {
     com:c, indeterminato:indet, tab:tab, liv:liv,
-    mesiAuto:mesiAuto, oreSettAuto:oreSettAuto, minimoAuto:minimoAuto, addizAuto:addizAuto, oreDaRiep:oreDaRiep,
+    mesiAuto:mesiAuto, oreSettAuto:oreSettAuto, minimoAuto:minimoAuto, addizAuto:addizAuto, nProroghe:nProroghe, oreDaRiep:oreDaRiep,
     mesi: cNum(p.mesi, mesiAuto),
     mesiMater: cNum(p.mesiMater, 0),
     minimo: cNum(p.minimo, minimoAuto),
@@ -2545,7 +2567,7 @@ function CostoOrario(props){
                   {campoNum("Mesi di maternità", cMostra(d.raw.mesiMater, ""), function(v){ setPar("mesiMater", v); })}
                   {campoNum("Ore settimanali", cMostra(d.raw.oreSett, d.oreSettAuto), function(v){ setPar("oreSett", v); }, "dalla scheda: " + hoursDisp(d.oreSettAuto))}
                   {campoNum("Giorni settimanali", cMostra(d.raw.ggSett, c.ggSett), function(v){ setPar("ggSett", v); }, "comune: " + c.ggSett)}
-                  {campoNum("Addizionale tempo determ. %", cMostra(d.raw.addizTD, d.addizAuto), function(v){ setPar("addizTD", v); }, d.indeterminato ? "indeterminato: 0" : ("1,40 + 0,5 × " + prorogheList(dp).length + " = " + fmt2(d.addizAuto)))}
+                  {campoNum("Addizionale tempo determ. %", cMostra(d.raw.addizTD, d.addizAuto), function(v){ setPar("addizTD", v); }, d.indeterminato ? "indeterminato: 0" : ("1,40 + 0,5 × " + d.nProroghe + " = " + fmt2(d.addizAuto)))}
                 </div>
               </div>
 
