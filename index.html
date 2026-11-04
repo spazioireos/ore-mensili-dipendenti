@@ -249,7 +249,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver83";
+const APP_VER = "ver84";
 const APP_DATA = "04nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -2265,6 +2265,24 @@ function addizTDAuto(dp, pairs){
    Prima si usava dp.livello, cioe' il livello di ASSUNZIONE: chi veniva promosso restava al
    livello vecchio nel Costo orario (segnalato da Christian il 04/11/2026). valoriAt tiene
    conto delle trasformazioni registrate nella scheda. */
+/* ver84: il periodo si taglia da solo in BLOCCHI omogenei. Un blocco finisce quando cambia
+   qualcosa che pesa sul costo: livello, ore settimanali, passaggio a indeterminato, oppure
+   entra in vigore una proroga (addizionale che sale). Richiesta di Christian del 04/11/2026:
+   «non puoi tu automaticamente dividere i periodi con trasformazioni in più blocchi?». */
+function firmaMese(dp, y, m){
+  const v = valoriAt(dp, y, m);
+  const np = prorogheAttiveA(dp, y*10000 + m*100 + daysInMonth(y, m));
+  return [String(v.livello==null?"":v.livello).toUpperCase().trim(), String(v.oreSett), String(v.tipo), String(np)].join("|");
+}
+function blocchiPeriodo(dp, pairs){
+  const out = [];
+  (pairs||[]).forEach(function(pr){
+    const f = firmaMese(dp, pr.y, pr.m);
+    const u = out.length ? out[out.length-1] : null;
+    if (u && u.firma === f) u.pairs.push(pr); else out.push({ firma:f, pairs:[pr] });
+  });
+  return out;
+}
 function livelloPeriodo(dp, pairs){
   let v = (dp.livello==null ? "" : String(dp.livello));
   (pairs||[]).forEach(function(pr){
@@ -2390,6 +2408,73 @@ function datiCosto(state, dp, pairs){
   else if (o.fonte === "riepiloghi") o.oreManuali = oreDaRiep;
   o.raw = p;
   o.res = calcCosto(o);
+
+  /* ===== ver84: se dentro il periodo cambia qualcosa, si calcola a BLOCCHI =====
+     Non si taglia quando l'utente ha scritto a mano un valore "strutturale" (mesi, ore
+     settimanali, livello, minimo, addizionale, settimane della simulazione) o quando ci sono
+     conteggi in mesi che non saprei ripartire (maternità, mesi tolti dal rimborso o dal premio):
+     in quei casi vale quello che ha scritto lui, su tutto il periodo, come prima. */
+  const scrittoAMano = (p.mesi!=null && p.mesi!=="") || (p.oreSett!=null && p.oreSett!=="") ||
+    (p.livello!=null && p.livello!=="") || (p.minimo!=null && p.minimo!=="") ||
+    (p.addizTD!=null && p.addizTD!=="") || cNum(p.settPeriodo,0)>0 || cNum(p.settLav,0)>0;
+  const contiInMesi = (o.mesiMater>0) || (o.kmMesiTolti>0) || (o.premiMesiTolti>0);
+  o.noTaglio = scrittoAMano ? "valori scritti a mano" : (contiInMesi ? "maternità o mesi tolti" : "");
+  o.blocchi = null;
+  o.tagliPossibili = (pairs && pairs.length) ? blocchiPeriodo(dp, pairs).length : 1;
+  if (!o.noTaglio && pairs && pairs.length > 1){
+    const bl = blocchiPeriodo(dp, pairs);
+    if (bl.length > 1){
+      /* primo giro: ogni blocco senza ore, per sapere quante ore ordinarie teoriche vale */
+      const prep = bl.map(function(b){
+        const pr0 = b.pairs[0];
+        const vv = valoriAt(dp, pr0.y, pr0.m);
+        const livB = (function(){ const l=String(vv.livello==null?"":vv.livello).toUpperCase().trim(); return (MINIMI_CCNL[tab] && MINIMI_CCNL[tab][l]) ? l : ""; })();
+        const indetB = String(vv.tipo) !== "determinato";
+        const fineB = (function(){ const u=b.pairs[b.pairs.length-1]; return u.y*10000+u.m*100+daysInMonth(u.y,u.m); })();
+        const ff = contaFestivita(b.pairs);
+        const ob = Object.assign({}, o, {
+          mesi: b.pairs.length, mesiMater: 0,
+          oreSett: vv.oreSett,
+          minimo: (livB && MINIMI_CCNL[tab][livB]) ? MINIMI_CCNL[tab][livB] : o.minimo,
+          indeterminato: indetB,
+          addizTD: indetB ? 0 : R2(1.40 + 0.5*prorogheAttiveA(dp, fineB)),
+          festGodute: ff.god, festNonGod: ff.non,
+          oreManuali: 0
+        });
+        return { b:b, ob:ob, liv:livB, indet:indetB, res0: calcCosto(ob) };
+      });
+      /* le ore di ogni blocco, secondo la fonte scelta */
+      const sommaO8 = prep.reduce(function(a,x){ return a + (x.res0.O8||0); }, 0);
+      prep.forEach(function(x){
+        if (o.fonte === "riepiloghi") x.ob.oreManuali = oreRendPeriodo(state, dp, x.b.pairs);
+        else if (o.fonte === "mano")  x.ob.oreManuali = (sommaO8>0) ? R2(o.oreAMano * (x.res0.O8/sommaO8), 3) : 0;
+        else x.ob.oreManuali = 0;                 /* teoriche: le calcola il blocco */
+        x.res = calcCosto(x.ob);
+      });
+      /* somma dei blocchi. La FORMAZIONE e' una spesa dell'anno, non del blocco:
+         si toglie da ogni blocco e si rimette una volta sola sul periodo intero. */
+      const campi = ["J5","J6","J8","J12","J14","J17","J18","J19","J20","J21","J23","J25","J26","J27","J28","J29","J30","J31","J34",
+                     "L15","L18","H19","O5","O6","O8","O5calc","O6calc","fGod","fNon","H38"];
+      const res = {};
+      campi.forEach(function(k){ res[k] = prep.reduce(function(a,x){ return a + (Number(x.res[k])||0); }, 0); });
+      res.J32 = o.res.J32;                                  /* formazione: una volta sola */
+      const mesiTot = prep.reduce(function(a,x){ return a + x.ob.mesi; }, 0);
+      ["E18","H5","J2","P2"].forEach(function(k){            /* valori "al mese": media pesata sui mesi */
+        res[k] = mesiTot>0 ? prep.reduce(function(a,x){ return a + (Number(x.res[k])||0)*x.ob.mesi; }, 0)/mesiTot : 0;
+      });
+      res.J35 = campi.reduce(function(a,k){ return a + (["L15","L18","H19","O5","O6","O8","O5calc","O6calc","fGod","fNon","H38","J20"].indexOf(k)>=0 ? 0 : (Number(res[k])||0)); }, 0) + res.J32;
+      res.F38 = res.H38;
+      res.orario = res.H38>0 ? res.J35/res.H38 : 0;
+      o.res = res;
+      o.blocchi = prep.map(function(x){
+        const p0=x.b.pairs[0], p1=x.b.pairs[x.b.pairs.length-1];
+        return { da: mLabelY(p0.y,p0.m), a: mLabelY(p1.y,p1.m), mesi: x.ob.mesi, liv: x.liv || "—",
+                 oreSett: x.ob.oreSett, addiz: x.ob.addizTD, indet: x.indet,
+                 ore: R2(x.res.H38,2), costo: R2(x.res.J35 - x.res.J32, 2) };
+      });
+      o.formazTot = res.J32;
+    }
+  }
   return o;
 }
 
@@ -2696,6 +2781,37 @@ function CostoOrario(props){
                     <tr><td style={tdE}>Mensile fisso</td><td style={Object.assign({}, tdV, cifre)}>{fmt2(r.H5)} €</td></tr>
                   </tbody></table>
                 </div> : null}
+
+              {d.blocchi ? (
+                <div style={blocco}>
+                  <div style={capo}>Come si divide il periodo</div>
+                  <div style={{ fontSize:"13px", color:"#475569", lineHeight:1.35, marginBottom:"6px" }}>Dentro il periodo che hai scelto è cambiato qualcosa (livello, ore settimanali, tipo di contratto o una proroga): il conto è stato fatto <b>a pezzi</b> e poi sommato. La <b>formazione</b> ({fmt2(d.formazTot)} €) è contata <b>una volta sola</b>{d.fonte === "mano" ? ", e le ore scritte a mano sono state divise in proporzione alle ore di ciascun pezzo" : ""}.</div>
+                  <table style={{ width:"100%", borderCollapse:"collapse", fontSize:"13.5px" }}><tbody>
+                    <tr style={{ fontWeight:800, color:"#1f4e82" }}>
+                      <td style={{ padding:"1px 6px 1px 0" }}>Periodo</td>
+                      <td style={{ padding:"1px 6px" }}>Liv.</td>
+                      <td style={{ padding:"1px 6px" }}>h/sett</td>
+                      <td style={{ padding:"1px 6px" }}>Addiz.</td>
+                      <td style={{ padding:"1px 6px", textAlign:"right" }}>Ore</td>
+                      <td style={{ padding:"1px 0", textAlign:"right" }}>Costo</td>
+                    </tr>
+                    {d.blocchi.map(function(bb, bi){
+                      return (
+                        <tr key={"bl" + bi} style={{ borderTop:"1px dotted #e2e8f0" }}>
+                          <td style={{ padding:"1px 6px 1px 0", whiteSpace:"nowrap" }}>{bb.da === bb.a ? bb.da : (bb.da + " → " + bb.a)}</td>
+                          <td style={{ padding:"1px 6px" }}>{bb.liv}</td>
+                          <td style={Object.assign({ padding:"1px 6px" }, cifre)}>{fmt2(bb.oreSett)}</td>
+                          <td style={Object.assign({ padding:"1px 6px" }, cifre)}>{bb.indet ? "—" : (fmt2(bb.addiz) + "%")}</td>
+                          <td style={Object.assign({ padding:"1px 6px", textAlign:"right" }, cifre)}>{fmt2(bb.ore)}</td>
+                          <td style={Object.assign({ padding:"1px 0", textAlign:"right" }, cifre)}>{fmt2(bb.costo)} €</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody></table>
+                </div>
+              ) : ((d.noTaglio && d.tagliPossibili > 1) ? (
+                <div style={{ background:"#FFF8E1", border:"1px solid #EAC87A", borderRadius:"8px", padding:"7px 10px", marginBottom:"6px", fontSize:"13px", lineHeight:1.35 }}>⚠️ In questo periodo qualcosa cambia (si dividerebbe in <b>{d.tagliPossibili}</b> pezzi), ma il conto è su <b>un pezzo solo</b> perché ci sono <b>{d.noTaglio}</b>. Per il conto preciso svuota quelle caselle, oppure calcola i periodi separatamente.</div>
+              ) : null)}
             </div>
           </div>
         </div>

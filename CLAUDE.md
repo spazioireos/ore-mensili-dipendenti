@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver83 · 04nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver84 · 04nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -285,6 +285,38 @@ Banca ore, tetto annuo, contratti e export.
     metà e si vuole il conto esatto, si spezza il periodo in due.
   - ⚠️ Una proroga la cui **scadenza precedente non è scritta o è illeggibile** non viene
     contata: il numero scende e si vede nell'aiutino. La casella resta scrivibile a mano.
+- 🧩 **IL PERIODO SI TAGLIA DA SOLO IN BLOCCHI** (ver84, 04/11/2026, richiesta di Christian:
+  «non puoi tu automaticamente dividere i periodi con trasformazioni in più blocchi se io ti do
+  un blocco unico?»). Risolve alla radice le approssimazioni di ver82 e ver83, che applicavano a
+  tutto il periodo il valore **di fine periodo**.
+  - **`firmaMese(dp,y,m)`** = livello + ore settimanali + tipo + proroghe già partite in quel
+    mese; **`blocchiPeriodo(dp,pairs)`** raggruppa i mesi contigui con la stessa firma.
+  - Ogni blocco si calcola con i **suoi** parametri (minimo del suo livello, sue ore settimanali,
+    suo addizionale, **sue festività** contate sui suoi mesi), poi si **sommano** le voci e
+    **costo orario = Σcosti ÷ Σore**. Il `res` restituito è la **somma delle voci**, così il
+    dettaglio a video continua a quadrare con il Costo totale.
+  - ⚠️ **La formazione è una spesa dell'anno, non del blocco**: si toglie da ogni blocco e si
+    rimette **una volta sola** sul periodo intero. Senza questo, due blocchi = 500 € invece di
+    250. Paghe e assistenza sanitaria sono mensili, quindi si sommano da sé.
+  - **Le ore**: *dai Riepiloghi* → ogni blocco prende i suoi mesi (esatto); *teoriche* → le
+    calcola il blocco (esatto); *a mano* → il numero unico si **ripartisce in proporzione alle
+    ore ordinarie teoriche** di ciascun blocco, ed è scritto a video che è una ripartizione.
+  - 🚫 **Quando NON si taglia** (`o.noTaglio`): se l'utente ha scritto a mano un valore
+    strutturale (**mesi, ore settimanali, livello, minimo, addizionale, settimane della
+    simulazione**) oppure ci sono conteggi in mesi non ripartibili (**maternità, mesi tolti dal
+    rimborso o dal premio**). In quei casi vale quello che ha scritto lui, su tutto il periodo,
+    **come prima**, e compare un **avviso giallo** che dice in quanti pezzi si dividerebbe e
+    perché non lo fa.
+  - **A video**: riquadro «Come si divide il periodo» sotto il dettaglio, con una riga per
+    blocco (periodo, livello, h/sett, addizionale, ore, costo).
+  - **Verificato in esecuzione**, persona 30 h/sett. assunta D1, promossa D2 dal 01/06/2026,
+    scadenza 31/03 con proroghe 30/06 e 31/12, periodo gen→dic 2026, ore *teoriche*:
+    **4 blocchi** (gen-mar D1 1,40% · apr-mag D1 1,90% · giu D2 1,90% · lug-dic D2 2,40%),
+    1.395,59 ore, **20,27 €/h** — contro i **20,76 €/h** della ver83 (tutto D2) e i 19,70 della
+    ver81 (tutto D1).
+  - ⚠️ **NON REGRESSIONE verificata**: su tre casi senza cambiamenti (indeterminato; determinato
+    senza proroghe; ore scritte a mano) ver83 e ver84 danno numeri **identici al centesimo**
+    (20,50 · 18,71 · 21,53 €/h).
 - 🏷️ **«Valori comuni» si chiama «Aliquote e costi fissi validi per tutti»** (ver80, dicitura
   **scelta da Christian** il 04/11/2026, dopo che aveva chiesto di renderla comprensibile).
   Cambiata nel **pulsante** (chiuso: «⚙ Aliquote e costi fissi validi per tutti»; aperto:
