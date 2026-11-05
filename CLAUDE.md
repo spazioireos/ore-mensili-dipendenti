@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver92 · 05nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver93 · 05nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -324,6 +324,61 @@ Banca ore, tetto annuo, contratti e export.
   dicitura **scelta da Christian**. ⚠️ La finestra che si apre resta «Esporta PDF — scegli il
   periodo»: quella dicitura non è stata toccata. Il titolo stampato dentro il Report è sempre
   «Spazio Ireos — Report Ore · <mese> <anno>», invariato.
+- ⏲️ **LE ORE DI PERMESSO CONTANO NEL RISULTATO DEL MESE** (ver93, 05/11/2026). Christian:
+  «nel tabellone non mi conti tra le ore conteggiabili i permessi?». Era vero: fino alla ver92 un
+  permesso orario **non muoveva nessun numero**, né il TOT né il Risultato del mese né i
+  Riepiloghi né il Costo orario né il Tetto annuo. Era solo un'annotazione.
+  - **Numero confermato da Christian** (come vuole la regola dello straordinario): persona a
+    30 h/sett., base del mese **130,263 h**, 20 giorni da 6 h = **120,00 h** più **2 h di EXF** il
+    giorno 10 → Risultato del mese **−8,263 h** (prima −10,263). Provato in esecuzione.
+  - **Dove conta e dove no**: il permesso si comporta come un'**assenza retribuita**, solo a ore
+    invece che a giornate. **Fuori dal TOT** (che resta le ore davvero rese, quelle che vanno in
+    rendicontazione e nel Costo orario) e **dentro al Risultato del mese**.
+    ⚠️ **NON toccati**: Riepiloghi, Costo orario, Tetto annuo e «Pubblica i residui» continuano a
+    usare `totOfRec`, quindi i permessi lì non entrano. Christian ha confermato un numero solo per
+    il Risultato del mese.
+  - **`permOreMese(rec)`** (sopra `eroOn`) torna `{pagate, altre}`: `pagate` sono le ore dei tipi
+    presenti nella tendina, `altre` quelle con un tipo **scritto a mano**. **Solo `pagate` entra
+    nel conto**: di un «VISITA MEDICA» l'app non sa se è retribuito.
+  - **La tendina ha ora solo i cinque tipi retribuiti per legge**, scelti da Christian:
+    **EXF, LUTTO, ELEZ, ESAMI, SIND**. ⚠️ **Tolti FLEX, MATR e CONGP**: i permessi già registrati
+    con quei tipi **non si perdono** — la finestrella li riapre in «Altro…» con il testo dentro
+    (provato: un FLEX da 2 h si riapre con «FLEX» nella casella) — ma **non contano più** nel
+    Risultato del mese, perché finiscono fra le «altre». Christian: «per il resto ci penseremo
+    quando capirò cosa è retribuito e cosa no».
+  - **A video**: nel riquadro una pastiglia nuova «**Permessi orari: 2,000 h**» e, se ce ne sono
+    di tipo scritto a mano, «(+ 3,500 h di tipo scritto a mano, non contate)». Così non c'è
+    niente di silenzioso. La pastiglia «Ferie/malattia/permessi» **non è stata toccata**.
+  - **Provato in esecuzione** su cinque casi: solo EXF → −8,263 · nessun permesso → −10,263 ·
+    solo tipo a mano → −10,263 (e 1,5 h segnalate come non contate) · misto → −8,263 ·
+    FLEX → −10,263. Il **TOT resta 120,00** in tutti. Numeri del Costo orario **identici** a prima.
+- 🖨️ **IL REPORT SI LEGGE SENZA OCCHIALI** (ver93, 05/11/2026, Christian: «i numeri sono molto
+  piccoli nel report, a prova di aquila»).
+  - **Misure**: le ore nelle celle da **7 a 9pt**, il corpo della tabella da **6 a 7,5pt**, il
+    capo-tabella da **5,6 a 6,5pt**, la riga del totale da 7 a **9pt**. Margine basso della
+    tabella da 40 (il valore di difetto di autotable) a **8mm**, per far stare le 33 righe in una
+    pagina sola.
+  - ⚠️ **Perché non più grandi**: A4 orizzontale è alto 210mm; tolti il bordo in alto (16) e
+    quello in basso (8) restano **186mm** per 33 righe (31 giorni + totale + capo-tabella). A 9pt
+    una riga è alta ~5,25mm → **173mm**, ci sta. A 10pt sarebbe 187mm e **la tabella si
+    spezzerebbe su due pagine**. Se servono numeri ancora più grandi, l'unico modo è mandare le
+    note in seconda pagina: da decidere con Christian.
+  - 🐞 **Difetto preesistente CORRETTO**: i controlli di fine pagina in calce usavano **287**,
+    cioè l'altezza del foglio **verticale**, mentre il Report è **orizzontale** (210mm). Tutto
+    quello che finiva sotto i 210 veniva disegnato **fuori dalla pagina e spariva senza dirlo**.
+    Ora c'è `PG_H = doc.internal.pageSize.getHeight()` e `FONDO = PG_H - 10`, usati nei **4**
+    punti. Con i caratteri più grandi la tabella è più alta, quindi senza questa correzione le
+    note sarebbero sparite.
+  - **La cella col permesso** non porta più solo `***`: sotto il valore si legge
+    **«+ aggiunta / come sotto ***»** in viola (dicitura scelta da Christian), su **due righe**
+    perché la colonna è larga 16-22mm. La riga della tabella cresce con
+    `styles.minCellHeight = 10.5`: senza, il disegno fatto a mano sarebbe finito sopra le righe
+    vicine. ⚠️ Ogni permesso alza la sua riga di ~5mm: con **tre o più permessi nello stesso
+    mese** la tabella potrebbe passare a due pagine.
+  - ⚠️ **Non provato**: il disegno vero del PDF. jsPDF non è raggiungibile da qui, quindi le
+    misure sopra sono **calcolate**, non viste. **Christian deve aprire un Report vero** e dire
+    se sta in una pagina e se i numeri sono abbastanza grandi.
+
 - 🟣 **IL PERMESSO ORARIO SI VEDE** (ver91, 05/11/2026, segnalazione di Christian: «la questione
   dei permessi è poco chiara»).
   - **Nel Tabellone**: fino a ver90 un permesso si vedeva **solo** come un pallino viola da 11px

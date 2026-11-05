@@ -280,7 +280,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver92";
+const APP_VER = "ver93";
 const APP_DATA = "05nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -447,7 +447,11 @@ function festivitaSet(anno){
 function isFestivo(fset, m, d){ return fset[m+"-"+d] === true; }
 function isRosso(fset, y, m, d){ return isFestivo(fset, m, d) || weekdayOf(y, m, d) === 0; }
 // tipi selezionabili per un permesso orario
-const PERM_CODES = ["EXF","FLEX","LUTTO","ELEZ","ESAMI","SIND","MATR","CONGP"];
+/* ver93 (05/11/2026, scelta di Christian): nella tendina del permesso orario restano SOLO i
+   cinque tipi retribuiti per legge. Questi contano come ore lavorate nel Risultato del mese.
+   FLEX, MATR e CONGP sono stati tolti dalla tendina; i permessi gia' registrati con quei tipi
+   NON si perdono: la finestrella li riapre in "Altro…" con il testo gia' dentro. */
+const PERM_CODES = ["EXF","LUTTO","ELEZ","ESAMI","SIND"];
 const PERM_TIPI = PERM_CODES.map(function(c){ return CODE_SET[c]; }).filter(function(x){ return x !== undefined; });
 function hashPin(p){ let h=5381; for (let i=0;i<p.length;i++){ h=((h<<5)+h)+p.charCodeAt(i); h=h&0xffffffff; } return String(h>>>0); }
 
@@ -535,6 +539,19 @@ function contaFestivita(pairs){
    Pasqua, agosto) si segnano a mano e si salvano in rec.ero[giorno] = false.
    ⚠️ coverAbsHours NON e' stato toccato: il Tetto annuo e lo straordinario
    continuano a contare TUTTE le assenze, come prima.                           */
+/* ver93: ore di permesso del mese, divise fra quelle RETRIBUITE (i cinque tipi della tendina)
+   e quelle con un tipo scritto a mano, di cui non sappiamo se sono retribuite.
+   Solo le prime entrano nel Risultato del mese; il TOT resta solo ore lavorate. */
+function permOreMese(rec){
+  let pag = 0, altre = 0;
+  const P = (rec && rec.permessi) ? rec.permessi : {};
+  Object.keys(P).forEach(function(d){
+    const v = P[d]; const o = Number(v && v.ore) || 0;
+    if (!(o > 0)) return;
+    if (PERM_CODES.indexOf(String((v && v.tipo) || "").trim().toUpperCase()) !== -1) pag += o; else altre += o;
+  });
+  return { pagate: R2(pag,3), altre: R2(altre,3) };
+}
 function eroOn(rec,d){ return !(rec && rec.ero && rec.ero[d] === false); }   // predefinito: erosiva
 function isAbsCell(v){ const c=String(v==null?"":v).trim(); return !!(CODE_SET[c] && c!=="--" && c!=="AN"); }
 function oreEroseMese(rec,dp,y,m){                                         // ore bruciate dalle assenze del mese
@@ -1028,6 +1045,12 @@ function pdfHM(v){
 function esportaPDF(state, pairs){
   const JsPDF = window.jspdf.jsPDF;
   const doc = new JsPDF({ orientation:"landscape", unit:"mm", format:"a4" });
+  /* ver93: il Report e' A4 ORIZZONTALE, quindi la pagina e' alta 210mm. Fino alla ver92 i
+     controlli in calce usavano 287 (l'altezza del foglio VERTICALE): tutto quello che finiva
+     sotto i 210mm veniva disegnato fuori dalla pagina e spariva senza dirlo. */
+  const PG_H = (doc.internal && doc.internal.pageSize && doc.internal.pageSize.getHeight)
+    ? doc.internal.pageSize.getHeight() : 210;
+  const FONDO = PG_H - 10;
   const dips = dipSorted(state);
   const MAXCOL = 14; // massimo dipendenti per pagina A4 orizzontale
   let first = true;
@@ -1095,9 +1118,11 @@ function esportaPDF(state, pairs){
       const ncols = 2 + chunk.length;
       const lastIdx = chunk.length + 1;
       doc.autoTable({
-        head: head, body: body, startY: 16, theme:"grid", margin:{ left:14, right:14 }, tableWidth: ncols*colW,
-        styles:{ fontSize:6, cellPadding:0.8, halign:"center", valign:"middle", lineColor:[210,210,210], lineWidth:0.1, overflow:"linebreak", cellWidth:colW, fontStyle:"bold" },
-        headStyles:{ fillColor:[15,39,64], textColor:[255,255,255], fontSize:5.6, valign:"middle", fontStyle:"bold", cellWidth:colW },
+        /* ver93: numeri piu' grandi (Christian: "i numeri sono molto piccoli nel report, a
+           prova di aquila") e margine basso stretto, per far stare le 33 righe in una pagina. */
+        head: head, body: body, startY: 16, theme:"grid", margin:{ left:14, right:14, top:16, bottom:8 }, tableWidth: ncols*colW,
+        styles:{ fontSize:7.5, cellPadding:0.8, halign:"center", valign:"middle", lineColor:[210,210,210], lineWidth:0.1, overflow:"linebreak", cellWidth:colW, fontStyle:"bold" },
+        headStyles:{ fillColor:[15,39,64], textColor:[255,255,255], fontSize:6.5, valign:"middle", fontStyle:"bold", cellWidth:colW },
         columnStyles:(function(){ const cs={ 0:{ halign:"left", fontStyle:"bold", cellWidth:colW } }; cs[lastIdx]={ halign:"left", fontStyle:"bold", cellWidth:colW }; return cs; })(),
         didParseCell: function(data){
           const ci = data.column.index;
@@ -1112,14 +1137,14 @@ function esportaPDF(state, pairs){
           /* ver87: lo sbiadito del ",00" vale solo per le celle dei giorni, non per la riga
              del TOTALE, che ormai e' un numero decimale vero.
              ver91: se la cella ha un permesso, se ne occupa il disegno dei tre asterischi. */
-          if (!isDayCol && isPerm && ri !== nd){ data.cell.__perm3 = true; data.cell.text = [""]; }
+          if (!isDayCol && isPerm && ri !== nd){ data.cell.__perm3 = true; data.cell.text = [""]; data.cell.styles.minCellHeight = 10.5; }
           else if (!isDayCol && isWhole && ri !== nd){ data.cell.__hm00 = true; data.cell.text = [""]; }
-          if (ri === nd){ data.cell.styles.fontStyle = "bold"; data.cell.styles.fillColor = [238,242,255]; if (!isDayCol) data.cell.styles.fontSize = 7; return; }
+          if (ri === nd){ data.cell.styles.fontStyle = "bold"; data.cell.styles.fillColor = [238,242,255]; if (!isDayCol) data.cell.styles.fontSize = 9; return; }
           const day = ri + 1;
           if (isDayCol){
             if (isRosso(fset, anno, m, day)){ data.cell.styles.fillColor = [178,34,34]; data.cell.styles.textColor = [255,255,255]; }
           } else {
-            if (isNum) data.cell.styles.fontSize = 7; // ore in formato esteso: un filo più grandi ma su una riga
+            if (isNum) data.cell.styles.fontSize = 9; // ver93: le ore si leggono senza occhiali
             const txt = raw.replace(/\*$/, "");
             if (txt === "R"){ data.cell.styles.textColor = [178,34,34]; data.cell.styles.fontStyle = "bold"; } // riposo: R in rosso
             else if (CODE_SET[txt]){
@@ -1135,18 +1160,21 @@ function esportaPDF(state, pairs){
             doc.line(data.cell.x, data.cell.y + data.cell.height, data.cell.x + data.cell.width, data.cell.y + data.cell.height);
           }
           if (data.cell.__perm3){
-            /* valore normale + *** piu' grandi, in viola, sotto il valore */
+            /* ver93 (dicitura scelta da Christian): sotto il valore si scrive
+               "+ aggiunta / come sotto / ***", su tre righe perche' la colonna e' stretta. */
             let raw = String(data.cell.raw || "").trim();
             const val = raw.slice(0, raw.length - 3);
-            const fs = data.cell.styles.fontSize || 7;
+            const fs = data.cell.styles.fontSize || 8;
             const cx = data.cell.x + data.cell.width / 2;
-            const cy = data.cell.y + data.cell.height / 2;
+            let y = data.cell.y + 1.6;
             doc.setFont(undefined, "bold");
             const tc = data.cell.styles.textColor;
             if (Array.isArray(tc)) doc.setTextColor(tc[0], tc[1], tc[2]); else doc.setTextColor(17, 24, 39);
-            if (val){ doc.setFontSize(fs); doc.text(val, cx, cy - 1.1, { align:"center", baseline:"middle" }); }
-            doc.setFontSize(fs + 3.5); doc.setTextColor(109, 40, 217);
-            doc.text("***", cx, cy + (val ? 1.9 : 0), { align:"center", baseline:"middle" });
+            if (val){ doc.setFontSize(fs); y += fs * 0.3528 * 0.8; doc.text(val, cx, y, { align:"center", baseline:"middle" }); }
+            doc.setTextColor(109, 40, 217);
+            doc.setFontSize(6);
+            y += 2.4; doc.text("+ aggiunta", cx, y, { align:"center", baseline:"middle" });
+            y += 2.4; doc.text("come sotto ***", cx, y, { align:"center", baseline:"middle" });
             return;
           }
           if (!data.cell.__hm00) return;
@@ -1170,7 +1198,7 @@ function esportaPDF(state, pairs){
 
       if (ci === chunks.length - 1){
         let yy = doc.lastAutoTable.finalY + 6;
-        const ensureY = function(h){ if (yy + h > 287){ doc.addPage(); yy = 18; } };
+        const ensureY = function(h){ if (yy + h > FONDO){ doc.addPage(); yy = 18; } };
         // Legenda simboli (LUL)
         doc.setFontSize(6.5); doc.setTextColor(90,90,90); doc.setFont(undefined,"normal");
         ensureY(4); doc.text("Legenda: R (rosso) = riposo/domenica · ore scritte come ORE,MINUTI (5,30 = cinque ore e mezza; 5,45 = cinque ore e tre quarti) · TOT ORE RESE = somma delle ore effettivamente rese, in centesimi.", 14, yy); yy += 5;
@@ -1191,7 +1219,7 @@ function esportaPDF(state, pairs){
         if (recupLines.length > 0){
           ensureY(8);
           const boxH = 7 + recupLines.length*4.2 + 2;
-          if (yy + boxH > 287){ doc.addPage(); yy = 18; }
+          if (yy + boxH > FONDO){ doc.addPage(); yy = 18; }
           doc.setFillColor(255,247,237); doc.setDrawColor(251,146,60); doc.setLineWidth(0.4);
           doc.rect(13, yy - 4, 184, boxH, "FD");
           doc.setFontSize(9); doc.setTextColor(124,45,18); doc.setFont(undefined,"bold");
@@ -1205,7 +1233,7 @@ function esportaPDF(state, pairs){
           ensureY(10);
           doc.setFillColor(255,249,224); doc.setDrawColor(245,158,11); doc.setLineWidth(0.4);
           const boxH = 6.5 + noteMese.reduce(function(a,n){ return a + 4.6 + n.righe.reduce(function(b,rg){ return b + Math.max(1, doc.splitTextToSize(rg, 165).length) * 4.2; }, 0); }, 0) + 3;
-          if (yy + boxH > 287){ doc.addPage(); yy = 18; }
+          if (yy + boxH > FONDO){ doc.addPage(); yy = 18; }
           doc.rect(13, yy - 4, 184, boxH, "FD");
           doc.setFontSize(10.5); doc.setTextColor(146,64,14); doc.setFont(undefined,"bold");
           doc.text("NOTE DEL MESE", 15, yy); yy += 6;
@@ -1235,7 +1263,7 @@ function esportaPDF(state, pairs){
           const lines = [];
           orfani.forEach(function(dp){ const ls = doc.splitTextToSize("•  " + dp.nome + " — ha ore registrate fuori rapporto (prima dell'assunzione o dopo la cessazione), NON incluse: verificare.", 178); ls.forEach(function(l){ lines.push(l); }); });
           const boxH = 7 + lines.length*4.2 + 2;
-          if (yy + boxH > 287){ doc.addPage(); yy = 18; }
+          if (yy + boxH > FONDO){ doc.addPage(); yy = 18; }
           doc.setFillColor(254,226,226); doc.setDrawColor(220,38,38); doc.setLineWidth(0.4);
           doc.rect(13, yy - 4, 184, boxH, "FD");
           doc.setFontSize(9.5); doc.setTextColor(153,27,27); doc.setFont(undefined,"bold");
@@ -1501,7 +1529,12 @@ function EmployeeCard(props){
           let assDays=0; for(let dd=1; dd<=nd; dd++){ const cv=String(rec.giorni[dd]==null?"":rec.giorni[dd]).trim(); if(CODE_SET[cv] && cv!=="--" && cv!=="AN") assDays++; }
           const assOre = assDays*quota;
           const rese = tot;
-          const delta = R2((rese + assOre - base),3);                 // delta del mese (no accumulo)
+          /* ver93 (confermato da Christian con un numero il 05/11/2026): le ore di permesso
+             RETRIBUITE contano come ore lavorate, esattamente come un giorno di ferie.
+             Esempio confermato: 120 h rese + 2 h di permesso su una base di 130,263
+             -> Risultato del mese -8,263 (prima era -10,263). */
+          const perm = permOreMese(rec);
+          const delta = R2((rese + assOre + perm.pagate - base),3);   // delta del mese (no accumulo)
           const bcls = delta > 0.0005 ? "warn" : (delta < -0.0005 ? "over" : "ok");
           const segno = delta>0.0005 ? "+" : "";
           const esito = delta>0.0005 ? "ore in più (straordinario)" : (delta<-0.0005 ? "ore in meno" : "in pari");
@@ -1514,6 +1547,9 @@ function EmployeeCard(props){
               <span className="cong-chip">Base del mese: <b>{fmt3(base)} h</b></span>
               <span className="cong-chip">Ore fatte (dal foglio): <b>{fmt3(rese)}</b></span>
               <span className="cong-chip">Ferie/malattia/permessi: <b>{assDays} gg = {fmt3(assOre)} h</b></span>
+              {(perm.pagate > 0.0005 || perm.altre > 0.0005) ?
+                <span className="cong-chip">Permessi orari: <b>{fmt3(perm.pagate)} h</b>{perm.altre > 0.0005 ? <span style={{ fontWeight:600 }}> (+ {fmt3(perm.altre)} h di tipo scritto a mano, non contate)</span> : null}</span>
+                : null}
               <span className="cong-chip strong">Risultato del mese: <b>{segno}{fmt3(delta)} h</b></span>
               <span className="cong-status">{esito}</span>
             </div>
