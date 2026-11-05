@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver96 · 05nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver97 · 05nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -375,6 +375,44 @@ Banca ore, tetto annuo, contratti e export.
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
 
+- 🧮 **IL TOTALE TEORICO NEL TABELLONE** (ver97, 05/11/2026, richiesta di Christian: «sotto il
+  totale delle effettive mettimi anche il totale teorico comprendente le assenze retribuite
+  erosive»). Numero nuovo **a video in due posti** (scelta di Christian: «in entrambi i posti»):
+  - **nella cella TOT** della griglia, sotto il numero grande: «teor. 112,02» (classe `.tot-teor`);
+  - **nella riga in fondo**, accanto a «TOT calcolato»: «TOT teorico (con assenze retribuite
+    erosive): 112,020» (classe `.foot-teor`).
+  - **Come si calcola**: `totTeor = R2(tot + oreEroseMese(rec,dp,y,m), 3)`, cioè ore effettive
+    **più** le ore delle sole giornate di assenza **EROSIVE** (quelle non barrate col clic). È
+    **esattamente** il numero che consuma il Tetto annuo (`prodottoMese`), così i due si leggono
+    insieme. `oreErose` è in un `useMemo`, `totTeor` e il testo del suggerimento (`TEOR_TITLE`)
+    stanno accanto a `tot` in `EmployeeCard`.
+  - ⚠️ **I permessi orari NON ci entrano**: non sono giornate di assenza e non hanno il
+    contrassegno erosiva/non erosiva. Il Risultato del mese, che invece li conta (ver93), resta
+    **identico**: provato, le cinque pastiglie non si muovono di un millesimo.
+  - ⚠️ **Nessun calcolo preesistente toccato**: si somma e si mostra. `totOfRec`, `oreEroseMese`,
+    `prodottoMese`, `coverAbsHours` **invariati**.
+  - **Misurato in esecuzione** (persona a 30 h/sett., novembre 2026: 17 giorni da 6 h = 102,00 h,
+    3 giornate di FERIE di cui **una spenta** col clic): cella «102,00 | teor. 112,02», riga in
+    fondo «112,020» = 102 + 2 × 5,010. Confronto ver96 → ver97: **riga della tabella identica**
+    (54px), tabella da 2.183 a **2.191px** (dentro `.grid-wrap` che già scorre), **larghezza di
+    pagina identica** (1500px), altezza 2.604 → 2.607px. Zero errori di pagina.
+- 🟡 **IL PULSANTE «📤 Pubblica i residui» SI VEDE** (ver97, 05/11/2026, Christian: «non vedo bene
+  il pulsante pubblica residui … mettimelo in sfondo giallo e scritta in blu elettrico»). Era
+  `.btn-gray` (grigio #e5e7eb su #374151) in mezzo ad altri pulsanti grigi. Ora **`.btn-yellow`**:
+  sfondo **#fde047**, scritta **#0033ff** (blu elettrico), più un filetto interno dello stesso blu.
+  Contrasto **5,45:1**, sopra il minimo di 4,5. Misurato in esecuzione: `rgb(253,224,71)` /
+  `rgb(0,51,255)`. **Dicitura invariata.**
+  - 🚫 **NON è stato reso automatico**, pur avendolo lui ipotizzato («potrebbe anche sempre essere
+    attivo senza doverlo schiacciare»): la pubblicazione scrive nella collection `residui` del
+    progetto **condiviso con gli esterni**, ed è l'unica scrittura che questa app fa fuori dal
+    proprio documento. Automatizzarla violerebbe il §10.1 («mai salvataggio automatico») e
+    toglierebbe la **conferma nome per nome**. **In attesa di decisione di Christian.**
+  - ⚠️ **Limite segnalato da Christian il 05/11/2026 e NON ancora risolto**: un dipendente può
+    avere **alcuni servizi con un tetto e altri senza**, e il Tetto annuo **mescola i servizi**;
+    quello che l'operatore vede in Fogli ore è quindi **un tetto complessivo**, non diviso per
+    servizio, e per chi ha lavori fuori dal tetto può risultare **non veritiero**. Oggi il
+    pulsante pubblica **tutti** quelli che hanno un tetto, senza poter scegliere chi. **Da
+    decidere con Christian** prima di toccare qualcosa.
 - 📅 **IL MESE SI VEDE SU OGNI PERSONA** (ver94, 05/11/2026, richiesta di Christian: «nel
   tabellone, a destra, scrivi bene grande come il nome dipendente il mese di riferimento
   cosicché io lo veda sempre»). Nella barra colorata di ogni scheda, **a destra subito prima dei
