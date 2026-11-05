@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver94 · 05nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver95 · 05nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -490,8 +490,12 @@ Banca ore, tetto annuo, contratti e export.
     (provato: 28,00 e 12,75 — cioè 12,75 in centesimi, non 12,45).
   - Il trucco che **sbiadisce i minuti a zero** vale ora per `",00"` invece di `"00 min"`, e
     **non si applica più alla riga del totale** (`ri !== nd`), che è un numero decimale vero.
-  - La **legenda** in fondo al PDF non nomina più la «P» (non esisterebbe più) e spiega il
-    formato ora,minuti: è l'unica dicitura toccata, ed era diventata falsa per forza di cose.
+  - La **legenda** in fondo al PDF non nominava più la «P» e spiegava il formato ora,minuti.
+    🚫 **In ver95 (05/11/2026) la riga di legenda è stata TOLTA del tutto**, su richiesta di
+    Christian («sopprimi la legenda nel pdf»). Restano il titolo, il blocco RECUPERO / ORE NUOVE,
+    le NOTE DEL MESE, i permessi orari e l'avviso sugli orfani. **Non rimetterla.**
+    ⚠️ I tre `setFontSize`/`setTextColor`/`setFont` che la precedevano **sono rimasti**: li usano
+    i blocchi che seguono, che non li reimpostano tutti.
   - **Provato in esecuzione** con un finto jsPDF che esegue davvero `didParseCell`/`didDrawCell`:
     un dipendente mensilizzato e uno no, con ore, FERIE e MAL. ⚠️ **Non provato**: il disegno
     vero del PDF (jsPDF e autotable non sono raggiungibili da qui), quindi impaginazione,

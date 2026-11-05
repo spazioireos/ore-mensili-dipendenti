@@ -283,7 +283,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver94";
+const APP_VER = "ver95";
 const APP_DATA = "05nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -1202,9 +1202,10 @@ function esportaPDF(state, pairs){
       if (ci === chunks.length - 1){
         let yy = doc.lastAutoTable.finalY + 6;
         const ensureY = function(h){ if (yy + h > FONDO){ doc.addPage(); yy = 18; } };
-        // Legenda simboli (LUL)
+        /* ver95 (05/11/2026): la riga di legenda e' stata TOLTA su richiesta di Christian
+           ("sopprimi la legenda nel pdf"). I tre setter restano perche' li usano i blocchi
+           che seguono, che non li rimettono tutti. */
         doc.setFontSize(6.5); doc.setTextColor(90,90,90); doc.setFont(undefined,"normal");
-        ensureY(4); doc.text("Legenda: R (rosso) = riposo/domenica · ore scritte come ORE,MINUTI (5,30 = cinque ore e mezza; 5,45 = cinque ore e tre quarti) · TOT ORE RESE = somma delle ore effettivamente rese, in centesimi.", 14, yy); yy += 5;
         // RECUPERO / ORE NUOVE (mensilizzati con debito pregresso)
         const recupLines = [];
         dipsMese.forEach(function(dp){
