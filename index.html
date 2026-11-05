@@ -93,6 +93,10 @@
   .cell-in.blocked { border:1px dashed #cbd5e1; cursor:not-allowed; }
   .cell-in.trattino::placeholder { color:#b91c1c; opacity:1; font-weight:800; font-size:20px; }
   .cell-in.trattino { color:#b91c1c; }
+  /* ver101: scritta che non e' ne' un numero ne' un codice. Rosso pieno, bordo spesso. */
+  .cell-in.ignota { background:#fee2e2 !important; border-color:#dc2626 !important; color:#7f1d1d !important; font-weight:900; }
+  .ignote-box { background:#fee2e2; border-bottom:3px solid #dc2626; color:#7f1d1d; font-size:13px; font-weight:800; padding:6px 10px; line-height:1.45; }
+  .ignote-box .det { font-weight:600; }
   .cell-wrap { position:relative; display:inline-block; line-height:0; }
   .perm-flag { position:absolute; top:1px; right:1px; width:11px; height:11px; border-radius:50%; border:2px solid #fff; background:#7c3aed; cursor:pointer; opacity:0.16; padding:0; box-shadow:0 0 2px rgba(0,0,0,.3); }
   .perm-flag.on { opacity:1; }
@@ -294,7 +298,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver100";
+const APP_VER = "ver101";
 const APP_DATA = "05nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -565,6 +569,24 @@ function permOreMese(rec){
     if (PERM_CODES.indexOf(String((v && v.tipo) || "").trim().toUpperCase()) !== -1) pag += o; else altre += o;
   });
   return { pagate: R2(pag,3), altre: R2(altre,3) };
+}
+/* ver101 (05/11/2026, Christian: «nel tabellone testi che non siano i codici permessi»).
+   Una cella puo' contenere SOLO un numero di ore oppure uno dei codici di CODICI. Se dentro
+   c'e' altro (es. «MALATTIA» scritto per esteso invece di «MAL»), quel giorno vale ZERO ore e
+   NON conta come assenza: non copre il monte ore e non consuma il tetto. Fino alla ver100 non
+   lo diceva nessuno. ⚠️ La scrittura NON viene rifiutata: mentre si scrive «FERIE» si passa
+   per «F», «FE», «FER»… e rifiutare cancellerebbe quello che si sta battendo. Si segnala. */
+function isCellaIgnota(v){
+  const t = String(v == null ? "" : v).trim();
+  if (t === "") return false;
+  if (CODE_SET[t] !== undefined) return false;
+  return !isNumeric(t);
+}
+function celleIgnoteMese(rec, y, m){
+  if (!rec || !rec.giorni) return [];
+  const nd = daysInMonth(y, m), out = [];
+  for (let d = 1; d <= nd; d++){ if (isCellaIgnota(rec.giorni[d])) out.push(d); }
+  return out;
 }
 function eroOn(rec,d){ return !(rec && rec.ero && rec.ero[d] === false); }   // predefinito: erosiva
 function isAbsCell(v){ const c=String(v==null?"":v).trim(); return !!(CODE_SET[c] && c!=="--" && c!=="AN"); }
@@ -1400,8 +1422,9 @@ function CellInput(props){
   else if (isNumeric(s)) display = fmt2(s);
   else display = String(val);
   const showTrattino = (s === "" && props.rosso && !props.disabled);
+  const ignota = !foc && isCellaIgnota(s);          /* ver101: mentre scrivi non si segnala niente */
   return (
-    <input className={"cell-in " + (isCode ? "is-code" : "is-num") + (props.disabled ? " blocked" : "") + (showTrattino ? " trattino" : "")}
+    <input className={"cell-in " + (isCode ? "is-code" : "is-num") + (props.disabled ? " blocked" : "") + (showTrattino ? " trattino" : "") + (ignota ? " ignota" : "")}
       style={props.style} list={foc ? "codici-list" : undefined} title={props.title} disabled={props.disabled}
       value={display} placeholder={showTrattino ? "–" : ""}
       onFocus={function(){ setFoc(true); }}
@@ -1469,6 +1492,7 @@ function EmployeeCard(props){
     if (CODE_SET[s]) base = CODE_SET[s].l;
     else if (isNumeric(s)){ const hm = decToHM(s); base = hm !== "" ? hm : (fmt2(s) + " ore"); }
     else if (rosso) base = "Giorno festivo/domenica";
+    if (isCellaIgnota(val)) base = "SCRITTA NON RICONOSCIUTA: non è un numero di ore né un codice. Questo giorno vale 0 ore e NON conta come assenza (non copre il monte ore e non consuma il tetto). Correggila con un numero o con un codice dell'elenco.";
     if (rosso && !blocked) base = (base ? base + " — " : "") + "non si compila";
     if (perm) base = (base ? base + " — " : "") + "Permesso orario " + fmt2(perm.ore) + " h (" + perm.tipo + ")";
     return base;
@@ -1497,6 +1521,14 @@ function EmployeeCard(props){
         if (f.res > 0.0005) return <div style={{ background:"#fee2e2", borderBottom:"3px solid #dc2626", color:"#991b1b", fontSize:"13px", fontWeight:800, padding:"6px 10px" }}>⚠️ FERIE DA SMALTIRE (anno {f.year}): <b>{fmt2(f.res)} GG</b> ancora da fare — maturate {fmt2(f.mat)} − godute {fmt2(f.god)}. Da far godere entro il 30 aprile.</div>;
         return <div style={{ background:"#dcfce7", borderBottom:"2px solid #16a34a", color:"#166534", fontSize:"12px", fontWeight:700, padding:"5px 10px" }}>✓ Ferie anno {f.year} in regola — nessun residuo (maturate {fmt2(f.mat)}, godute {fmt2(f.god)}).</div>;
       })() : null}
+      {(function(){   /* ver101: le celle con una scritta non riconosciuta */
+        const ign = celleIgnoteMese(rec, y, m);
+        if (!ign.length) return null;
+        return <div className="ignote-box">
+          ⚠️ {ign.length === 1 ? "Una cella contiene" : (ign.length + " celle contengono")} una <b>scritta non riconosciuta</b> — {ign.map(function(d){ return d + " (" + String(rec.giorni[d]).trim() + ")"; }).join(" · ")}
+          <div className="det">Vale <b>0 ore</b> e <b>non conta come assenza</b>: non copre il monte ore e non consuma il tetto. Scrivi un numero di ore oppure uno dei codici dell'elenco (FERIE, MAL, EXF, …).</div>
+        </div>;
+      })()}
       {props.fuoriPeriodo ? <div style={{ background:"#fef3c7", borderBottom:"2px solid #f59e0b", color:"#92400e", fontSize:"12px", fontWeight:700, padding:"5px 10px" }}>⚠️ Mese fuori dal periodo di rapporto (prima dell'assunzione o dopo la cessazione), ma contiene ore già inserite: controlla e, se vanno tolte, usa 🧹 Pulisci ore dopo nella scheda (✎).</div> : null}
       {props.fogliOre ? (function(){
         const fo = props.fogliOre;

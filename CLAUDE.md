@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver100 · 05nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver101 · 05nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -375,6 +375,32 @@ Banca ore, tetto annuo, contratti e export.
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
 
+- 🚨 **LE SCRITTE NON RICONOSCIUTE SI VEDONO** (ver101, 05/11/2026, Christian: «iniziamo nel
+  tabellone testi che non siano i codici permessi», dopo che il controllo sulle formule aveva
+  trovato il difetto).
+  - **Il problema**: in una cella si poteva scrivere **qualunque cosa** («MALATTIA» per esteso
+    invece di `MAL`, «pippo», un appunto). `CellInput` ha la tendina dei codici ma **non
+    validava**: quel giorno valeva **0 ore** e **non contava come assenza** — non copriva il
+    monte ore, non consumava il tetto — e **nessuno lo diceva**.
+  - **Funzioni nuove** (sopra `eroOn`): **`isCellaIgnota(v)`** (vero se la cella non è vuota, non
+    è un codice di `CODE_SET` e non è un numero) e **`celleIgnoteMese(rec,y,m)`** (l'elenco dei
+    giorni).
+  - **A video, due segnali**: la casella diventa **rossa piena con bordo spesso**
+    (`.cell-in.ignota`) e il messaggio al passaggio del mouse spiega tutto; sopra la griglia
+    compare una **fascia rossa** (`.ignote-box`) che elenca i giorni e ciò che c'è scritto
+    («9 (MALATTIA) · 10 (pippo)») e ripete la conseguenza.
+  - ⚠️ **La scrittura NON viene rifiutata**, di proposito: battendo «FERIE» si passa per «F»,
+    «FE», «FER»… e rifiutare cancellerebbe quello che si sta scrivendo. Il rosso compare **solo
+    quando si esce dalla cella** (`!foc`). Se Christian vuole il blocco vero si fa, ma va deciso.
+  - ⚠️ **Nessun calcolo è stato toccato**: una scritta ignota continua a valere 0 ore come prima.
+    È solo che adesso si vede. `--` e `AN` restano codici validi e non vengono segnalati.
+  - **Provato in esecuzione**: con `FERIE`, `MAL`, `--`, `MALATTIA` e `pippo` nello stesso mese
+    vengono segnalate **solo le ultime due**; il messaggio e la fascia dicono i giorni giusti;
+    scrivendo «FER» a metà parola **non** diventa rossa; finendo di scrivere «FERIE» resta
+    pulita; scrivendo «CIAO» diventa rossa e la fascia passa a 3. Zero errori di pagina.
+  - **Non regressione**: l'intero registro dei controlli sulle formule è stato **rieseguito sulla
+    ver101** e dà gli **stessi numeri** (9 formule, R2 su 9 casi, somma delle voci su 7 casi,
+    finestra del periodo 120,000).
 - 🧱 **IL MASSIMALE SI PUÒ SCRIVERE SERVIZIO PER SERVIZIO** (ver100, 05/11/2026, richiesta di
   Christian: «sarebbe bello che esso derivasse dalla somma di servizi da me inseriti
   singolarmente … più celle, una per servizio, con il loro massimale proprio, che danno poi un
@@ -835,7 +861,7 @@ Banca ore, tetto annuo, contratti e export.
 
 ## Registro dei controlli sulle formule (da ripetere a ogni versione)
 
-Controllo fatto il **05/11/2026 sulla ver100**, su richiesta di Christian («controlla ottimamente
+Controllo fatto il **05/11/2026 sulla ver100** e **rieseguito identico sulla ver101**, su richiesta di Christian («controlla ottimamente
 ogni formula»). Gli attesi sono **ricalcolati da zero** in uno script separato e confrontati con
 quello che l'app mostra **davvero a video** (Playwright). Gli script stanno nella cartella di
 lavoro della sessione: `formule100.cjs`, `arrot100.cjs`, `periodo100.cjs`.
@@ -874,11 +900,8 @@ set→ago **scavalca l'anno civile** correttamente.
 2. l'app apre sull'**ultimo anno** di `state.anni`: se nel seme ci sono 2026 e 2027, le linguette
    dei mesi mostrano il **2027** finché non si torna indietro con la barra dell'anno.
 
-🐞 **Difetto preesistente trovato durante il controllo, NON corretto** (non era richiesto):
-in una cella del Tabellone si può scrivere **un testo qualunque** (es. «MALATTIA» invece di
-`MAL`). `CellInput` ha la tendina dei codici ma **non valida**: il testo resta lì, vale **0 ore**
-e **non viene contato come assenza**, quindi non copre nemmeno il monte ore — senza nessun
-avviso. Da decidere con Christian se segnalare la cella in rosso o rifiutare la scrittura.
+🐞 **Difetto preesistente trovato durante il controllo — CORRETTO in ver101** (Christian:
+«iniziamo nel tabellone testi che non siano i codici permessi»): vedi la scheda della ver101.
 
 **Non verificabile da qui**: il disegno vero del **Report PDF** (jsPDF non è raggiungibile dal
 contenitore) e i numeri del **Costo orario** contro il foglio Excel originale, che dopo le sette
