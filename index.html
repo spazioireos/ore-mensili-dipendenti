@@ -301,7 +301,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver103";
+const APP_VER = "ver104";
 const APP_DATA = "05nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -2552,8 +2552,26 @@ function giorniInForzaMese(dp, y, m){
   for (let d = 1; d <= nd; d++){ if (inForceAt(dp, y*10000 + m*100 + d)) n++; }
   return n;
 }
+/* ver104 (05/11/2026, Christian: «la retribuzione è tarata sui gg veri, tutto il resto è
+   proporzionato, ma ferie, 13ma e 14ma maturano solo se ci sono almeno 15gg»).
+   Due conteggi DIVERSI dei mesi, e vanno tenuti separati:
+   · `mesiInPeriodo`  = mesi PROPORZIONATI ai giorni veri (un mese parziale vale la frazione
+     giorni-in-forza / giorni-del-mese). Lo usano la retribuzione e tutto ciò che si moltiplica
+     per i mesi: malattia presunta, settimane del periodo, premi, ore aggiuntive, TFR,
+     contributi, assistenza sanitaria, paghe, rimborso km.
+   · `mesiRateiPeriodo` = mesi INTERI che MATURANO I RATEI, contati solo se il contratto copre
+     almeno 15 giorni di calendario. Li usano **ferie, tredicesima e quattordicesima**. */
 function meseConta(dp, y, m){ return giorniInForzaMese(dp, y, m) >= 15 ? 1 : 0; }
-function mesiInPeriodo(dp, pairs){
+function meseFrazione(dp, y, m){
+  const nd = daysInMonth(y, m);
+  return nd > 0 ? giorniInForzaMese(dp, y, m) / nd : 0;
+}
+function mesiInPeriodo(dp, pairs){          // proporzionati ai giorni veri
+  let n=0;
+  pairs.forEach(function(pr){ n += meseFrazione(dp, pr.y, pr.m); });
+  return R2(n,3);
+}
+function mesiRateiPeriodo(dp, pairs){       // solo i mesi con almeno 15 giorni
   let n=0;
   pairs.forEach(function(pr){ n += meseConta(dp, pr.y, pr.m); });
   return n;
@@ -2639,7 +2657,10 @@ function oreSettPeriodo(dp, pairs){
 function calcCosto(o){
   const c = o.com;
   const K=o.minimo, L=o.scatti, M=o.premiTP, N=o.superminimo;
-  const O2=o.oreSett, Q2=o.ggSett, H2=o.mesi, I2=o.mesiMater, H3=Math.round(H2);
+  const O2=o.oreSett, Q2=o.ggSett, H2=o.mesi, I2=o.mesiMater;
+  /* ver104: H2 = mesi PROPORZIONATI ai giorni veri (retribuzione e tutto il resto);
+     H3 = mesi che MATURANO I RATEI, cioè quelli con almeno 15 giorni (ferie, 13ª e 14ª). */
+  const H3 = (o.mesiRatei!=null) ? o.mesiRatei : Math.round(H2);
   const tot=K+L+M+N;
   const J2 = tot/165;                                   // importo orario globale
   const P2 = O2*165/38;                                 // ore mese teoriche
@@ -2679,10 +2700,10 @@ function calcCosto(o){
   const b28 = L18/100*(c.inail/100*c.inailPag); const J28 = b28 + b28*0.01;
   const J29 = L18*(c.irap/100*c.irapPag)/100;
   /* ver79: assistenza sanitaria proporzionata ai mesi (132/anno = 11 al mese), solo indeterminati. */
-  const J30 = o.indeterminato ? (c.sanitaria/12)*H3 : 0;
-  const J31 = c.paghe*H3;
+  const J30 = o.indeterminato ? (c.sanitaria/12)*H2 : 0;     /* ver104: proporzionata ai giorni veri */
+  const J31 = c.paghe*H2;                               /* ver104: proporzionate ai giorni veri */
   /* ver79: formazione "secca" 250 per ogni anno iniziato (scelta B di Christian). */
-  const J32 = c.formazione*Math.max(1, Math.ceil(H3/12));
+  const J32 = c.formazione*Math.max(1, Math.ceil(H2/12));   /* ver104: anni iniziati sui mesi veri */
   /* ver80: il rimborso puo' essere "al mese" (× i mesi) oppure "secco" (una volta sola).
      ⚠️ Non entra in nessun imponibile: e' esente da imposte e contributi (confermato da
      Christian il 04/11/2026). Finisce solo nel totale J35. */
@@ -2704,6 +2725,7 @@ function datiCosto(state, dp, pairs){
   const p = costoPar(dp);
   const indet = indetAFine(dp, pairs);
   const mesiAuto = mesiInPeriodo(dp, pairs);
+  const mesiRateiAuto = mesiRateiPeriodo(dp, pairs);   /* ver104: ferie, 13ª e 14ª */
   const oreSettAuto = oreSettPeriodo(dp, pairs);
   const tab = p.tabella || c.tabella;
   const livAuto = (function(){ const l=String(livelloPeriodo(dp, pairs)||"").toUpperCase().trim(); return MINIMI_CCNL[tab] && MINIMI_CCNL[tab][l] ? l : ""; })();
@@ -2715,8 +2737,11 @@ function datiCosto(state, dp, pairs){
   const ff = contaFestivita(pairs);
   const o = {
     com:c, indeterminato:indet, tab:tab, liv:liv,
-    mesiAuto:mesiAuto, oreSettAuto:oreSettAuto, minimoAuto:minimoAuto, addizAuto:addizAuto, nProroghe:nProroghe, oreDaRiep:oreDaRiep,
+    mesiAuto:mesiAuto, mesiRateiAuto:mesiRateiAuto, oreSettAuto:oreSettAuto, minimoAuto:minimoAuto, addizAuto:addizAuto, nProroghe:nProroghe, oreDaRiep:oreDaRiep,
     mesi: cNum(p.mesi, mesiAuto),
+    /* ver104: se i mesi sono scritti a mano, anche i ratei seguono quel numero (arrotondato),
+       altrimenti varrebbe il conteggio automatico e i due numeri si contraddirebbero. */
+    mesiRatei: (p.mesi!=null && p.mesi!=="") ? Math.round(cNum(p.mesi, mesiAuto)) : mesiRateiAuto,
     mesiMater: cNum(p.mesiMater, 0),
     minimo: cNum(p.minimo, minimoAuto),
     scatti: cNum(p.scatti, 0),
@@ -2773,7 +2798,9 @@ function datiCosto(state, dp, pairs){
         const fineB = (function(){ const u=b.pairs[b.pairs.length-1]; return u.y*10000+u.m*100+daysInMonth(u.y,u.m); })();
         const ff = contaFestivita(b.pairs);
         const ob = Object.assign({}, o, {
-          mesi: b.pairs.reduce(function(acc,pr){ return acc + meseConta(dp, pr.y, pr.m); }, 0), mesiMater: 0,   /* ver103: stessa regola del periodo intero */
+          mesi: R2(b.pairs.reduce(function(acc,pr){ return acc + meseFrazione(dp, pr.y, pr.m); }, 0), 3),
+          mesiRatei: b.pairs.reduce(function(acc,pr){ return acc + meseConta(dp, pr.y, pr.m); }, 0),   /* ver104 */
+          mesiMater: 0,
           oreSett: vv.oreSett,
           minimo: (livB && MINIMI_CCNL[tab][livB]) ? MINIMI_CCNL[tab][livB] : o.minimo,
           indeterminato: indetB,
@@ -2988,10 +3015,10 @@ function CostoOrario(props){
                   {!d.indeterminato && scadEff(dp) ?
                     <tr><td style={tdE}>Scade il</td><td style={tdV}>{scadEff(dp)}{prorogheList(dp).length ? (" — dopo " + prorogheList(dp).length + (prorogheList(dp).length===1?" proroga":" proroghe")) : ""}</td></tr> : null}
                   {cessEffStr(dp) ? <tr><td style={tdE}>Cessazione</td><td style={tdV}>{cessEffStr(dp)}</td></tr> : null}
-                  <tr><td style={tdE}>Nel periodo</td><td style={tdV}>in forza per {d.mesiAuto} {d.mesiAuto===1?"mese":"mesi"}</td></tr>
+                  <tr><td style={tdE}>Nel periodo</td><td style={tdV}>in forza per {fmt2(d.mesiAuto)} mesi · ratei (ferie, 13ª, 14ª) su {d.mesiRateiAuto} {d.mesiRateiAuto===1?"mese":"mesi"}</td></tr>
                 </tbody></table>
                 <div className="co-grid" style={grigliaCampi}>
-                  {campoNum("Mesi di contratto", cMostra(d.raw.mesi, d.mesiAuto), function(v){ setPar("mesi", v); }, "proposti: " + d.mesiAuto)}
+                  {campoNum("Mesi di contratto", cMostra(d.raw.mesi, d.mesiAuto), function(v){ setPar("mesi", v); }, "proposti: " + fmt2(d.mesiAuto) + " (giorni veri) · ferie, 13ª e 14ª su " + d.mesiRateiAuto)}
                   {campoNum("Mesi di maternità", cMostra(d.raw.mesiMater, ""), function(v){ setPar("mesiMater", v); })}
                   {campoNum("Ore settimanali", cMostra(d.raw.oreSett, d.oreSettAuto), function(v){ setPar("oreSett", v); }, "dalla scheda: " + hoursDisp(d.oreSettAuto))}
                   {campoNum("Giorni settimanali", cMostra(d.raw.ggSett, c.ggSett), function(v){ setPar("ggSett", v); }, "comune: " + c.ggSett)}

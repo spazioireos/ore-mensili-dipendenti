@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver103 · 05nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver104 · 05nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -375,6 +375,41 @@ Banca ore, tetto annuo, contratti e export.
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
 
+- ⚖️ **DUE CONTEGGI DEI MESI: I GIORNI VERI E I RATEI** (ver104, 05/11/2026, Christian: «la
+  retribuzione è tarata sui gg veri, tutto il resto è proporzionato, ma ferie, 13ma e 14ma
+  maturano solo se ci sono almeno 15gg»). È la regola **definitiva**; supera la ver103.
+  - **`mesiInPeriodo`** ora torna i **mesi PROPORZIONATI ai giorni veri**: per ogni mese,
+    `giorni in forza ÷ giorni del mese` (`meseFrazione`). Esempio: assunta il 16/01 → gennaio
+    vale 16/31 = 0,516 → **11,52 mesi** sull'anno.
+  - **`mesiRateiPeriodo`** (nuova) torna i **mesi interi che maturano i ratei**: contati solo se
+    il contratto copre **almeno 15 giorni** (`meseConta`, invariata dalla ver103).
+  - **Chi usa quale**, dentro `calcCosto`:
+    | | conteggio |
+    |---|---|
+    | retribuzione mensilizzata, malattia presunta, settimane del periodo, premi, ore aggiuntive, TFR, contributi (INPS, FIS, INAIL, IRAP, addizionale), assistenza sanitaria, paghe e dichiarazioni, rimborso km «al mese», anni di formazione | **H2 = mesi proporzionati** |
+    | **ferie** (dentro `O6calc`), **tredicesima** (`J6`), **quattordicesima** (`J8`) | **H3 = mesi con almeno 15 giorni** |
+  - ⚠️ **`H3` non è più `Math.round(H2)`**: è un numero suo (`o.mesiRatei`). Se i mesi sono
+    **scritti a mano**, i ratei seguono quel numero arrotondato, altrimenti i due si
+    contraddirebbero.
+  - **Anche `blocchiPeriodo`** passa a ogni blocco i **due** conteggi, così la somma dei pezzi
+    torna al periodo intero.
+  - **A video**: nella tabellina del contratto si legge «in forza per **11,52 mesi** · ratei
+    (ferie, 13ª, 14ª) su **12 mesi**», e l'aiutino sotto *Mesi di contratto* dice
+    «proposti: 11,52 (giorni veri) · ferie, 13ª e 14ª su 12».
+  - **Misurato in esecuzione** (15 h/sett., gen→dic 2026, ore vere di ciascuno):
+    | | ver102 (un giorno = mese pieno) | ver103 (tutto o niente) | **ver104** |
+    |---|--:|--:|--:|
+    | in forza **tutto l'anno** | 13.080,54 € · 20,19 €/h | identica | **identica** |
+    | dal **16/01** (16 gg a gennaio) | 12.603,30 € · 20,70 €/h | 12.603,30 · 20,70 | **12.474,12 € · 20,48 €/h** |
+    | dal **20/01** (12 gg a gennaio) | 12.603,30 € · 20,70 €/h | 12.161,39 · 20,27 | **12.121,59 € · 20,20 €/h** |
+    Nel caso «dal 16/01» la **13ª e la 14ª restano piene** (646,41 e 323,20) perché gennaio ha
+    16 giorni; nel caso «dal 20/01» scendono a 592,54 e 296,27 (11 mesi di ratei). La
+    retribuzione invece scende in **tutti e due** i casi, perché segue i giorni veri.
+  - **Caso limite**: assunta il 20/12 con periodo annuale → 0,387 mesi → retribuzione 250,16 €
+    (nella ver103 era 0,00), **nessun NaN**.
+  - ⚠️ **Per chi lavora mesi interi non cambia assolutamente nulla** (verificato).
+  - **Non regressione**: registro delle formule del Tabellone **rieseguito sulla ver104**,
+    stessi numeri.
 - 📆 **IL MESE PARZIALE NON VALE PIÙ UN MESE INTERO** (ver103, 05/11/2026, Christian: «se uno
   cessa prima della fine del mese o inizia durante un mese, la retribuzione non è quella
   completa mensile»).
@@ -382,9 +417,10 @@ Banca ore, tetto annuo, contratti e export.
     l'ultimo giorno**. Bastava **un giorno**: chi veniva assunto il 25 si portava dietro un mese
     pieno di stipendio, tredicesima, quattordicesima, TFR, contributi, malattia presunta e
     settimane lavorabili.
-  - **Regola scelta da Christian** (fra tre proposte): **il mese vale 1 se il contratto copre
-    almeno 15 giorni di calendario, altrimenti 0**. È la regola dei ratei della tredicesima.
-    **Niente frazioni**: scartati i ventiseiesimi e i trentesimi.
+  - **Prima regola (ver103)**: il mese valeva 1 solo con almeno 15 giorni, altrimenti 0.
+    ⚠️ **SUPERATA LO STESSO GIORNO dalla ver104** (vedi sotto), che divide le due cose: la
+    retribuzione segue i **giorni veri**, il «almeno 15 giorni» resta **solo** per ferie, 13ª e
+    14ª. La ver103 **non è mai arrivata su `main`**.
   - **Funzioni nuove**: `giorniInForzaMese(dp,y,m)` (conta i giorni con `inForceAt`) e
     **`meseConta(dp,y,m)`** (1 o 0). `mesiInPeriodo` le usa; **anche `blocchiPeriodo`** usa
     `meseConta`, altrimenti la somma dei blocchi non tornerebbe al periodo intero.
@@ -927,7 +963,7 @@ Banca ore, tetto annuo, contratti e export.
 
 ## Registro dei controlli sulle formule (da ripetere a ogni versione)
 
-Controllo fatto il **05/11/2026 sulla ver100** e **rieseguito identico sulle ver101, ver102 e ver103**, su richiesta di Christian («controlla ottimamente
+Controllo fatto il **05/11/2026 sulla ver100** e **rieseguito identico sulle ver101 → ver104**, su richiesta di Christian («controlla ottimamente
 ogni formula»). Gli attesi sono **ricalcolati da zero** in uno script separato e confrontati con
 quello che l'app mostra **davvero a video** (Playwright). Gli script stanno nella cartella di
 lavoro della sessione: `formule100.cjs`, `arrot100.cjs`, `periodo100.cjs`.
