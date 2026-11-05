@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver90 · 04nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver91 · 05nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -317,6 +317,44 @@ Banca ore, tetto annuo, contratti e export.
   - ⚠️ **NON REGRESSIONE verificata**: su tre casi senza cambiamenti (indeterminato; determinato
     senza proroghe; ore scritte a mano) ver83 e ver84 danno numeri **identici al centesimo**
     (20,50 · 18,71 · 21,53 €/h).
+- 🏷️ **COME SI CHIAMANO LE DUE COSE** (deciso da Christian il 05/11/2026). La pagina del mese
+  con le celle di tutti si chiama **TABELLONE**; il PDF A4 si chiama **REPORT**. Usare queste
+  due parole in chat, nei commit e qui dentro.
+- 🟣 **IL PERMESSO ORARIO SI VEDE** (ver91, 05/11/2026, segnalazione di Christian: «la questione
+  dei permessi è poco chiara»).
+  - **Nel Tabellone**: fino a ver90 un permesso si vedeva **solo** come un pallino viola da 11px
+    nell'angolo della cella (`.perm-flag`) e nel messaggio che compare passandoci sopra: di fatto
+    invisibile. Ora **sotto la cella** compare una targhetta viola **`.perm-lbl`** con
+    **«+2,00 h EXF»**. Si può cliccare, e apre la stessa finestra del pallino.
+    ⚠️ La targhetta sta su **una riga sola** (`white-space:nowrap` + `text-overflow:ellipsis`,
+    `max-width:66px`): un tipo lungo come «VISITA MEDICA» diventa «+1,50 h VI…», e il testo
+    intero resta nel messaggio al passaggio del mouse. Senza questo la riga della tabella
+    cresceva di tre volte e si allargava tutto il mese.
+    Il **pallino viola resta dov'era**: non è stato tolto.
+  - **Titolo del Tabellone**: la fascia blu in cima mostra ora **«📅 Tabellone Novembre 2026»**
+    invece di «📅 Novembre 2026». ⚠️ Christian ha scritto «Tabellone ottobre 2026» in minuscolo:
+    il mese resta con l'iniziale maiuscola come in tutto il resto dell'app (`MONTH_LABEL`).
+  - **Nel Report (PDF A4)**: dove c'è un permesso la cella porta ora **tre asterischi grossi e
+    viola** sotto il valore (prima era **un** asterisco piccolo attaccato al numero). Disegnati a
+    mano in `didDrawCell` con il flag **`__perm3`**, come già si fa per il «,00» sbiadito: il
+    valore in alto alla misura normale, i `***` sotto a **+3,5pt** in `#6d28d9`.
+    ⚠️ Se una cella ha **sia** il permesso **sia** i minuti a zero, vince il disegno dei tre
+    asterischi e il «,00» **non** viene sbiadito: sono due disegni a mano che non possono
+    convivere nella stessa cella.
+  - **In calce al Report**: `permMese` non è più un elenco di stringhe ma di oggetti
+    `{nome, giorno, ore, tipo}`, e ogni riga dice
+    **«NOME — giorno 10: Aggiungere 2,00 ore di permesso (EXF)»**, la frase scelta da Christian.
+    L'intestazione del blocco dice ora «segnalati con ***» invece di «con *»: era diventata
+    falsa.
+  - ⚠️ **Le ore di permesso NON entrano nel TOT** e nessun calcolo è stato toccato: il permesso
+    resta un dato a parte, come prima.
+  - **Provato in esecuzione**: fascia «📅 Tabellone Novembre 2026»; tre targhette nel Tabellone
+    (`+2,00 h EXF`, `+1,50 h VISITA MEDICA`, `+1,00 h ELEZ`) su una riga sola; nel Report tre
+    celle con `***` e le tre righe in calce con «Aggiungere …». La tabella del mese resta larga
+    **2.172px**, come prima. ⚠️ **Non provato**: il disegno vero del PDF (jsPDF non è
+    raggiungibile da qui), quindi la posizione e la grandezza reali dei tre asterischi
+    **vanno guardate su un Report vero**.
+
 - 🎨 **IL COLORE DELLA PERSONA VALE OVUNQUE** (ver89, 04/11/2026, richiesta di Christian:
   «volevo le cornici dei box di ogni singolo utente più spesse, tra l'altro sarebbe bene che il
   colore scelto divenisse il colore ufficiale di quel dipendente ovunque»).

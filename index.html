@@ -97,6 +97,10 @@
   .foot-line label { font-size:12px; color:#64748b; font-weight:700; }
   .dich-in { width:80px; border:2px solid #f59e0b; background:#fffde7; border-radius:6px; padding:4px 6px; font-family:inherit; font-size:14px; font-weight:800; text-align:center; }
   .teor-abs { font-size:9px; font-weight:800; color:#7c2d12; text-align:center; line-height:1.1; margin-top:1px; cursor:pointer; border-radius:3px; }
+  /* ver91: il permesso orario si LEGGE nel Tabellone, non solo nel pallino viola */
+  .perm-lbl { font-size:10px; font-weight:800; color:#4c1d95; background:#ede9fe; border:1px solid #a78bfa; border-radius:4px; text-align:center; line-height:1.25; margin-top:1px; padding:0 2px; cursor:pointer;
+              white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:66px; }
+  .perm-lbl:hover { background:#ddd6fe; }
   .teor-abs:hover { background:#fde68a; }
   .teor-abs.no-ero { color:#94a3b8; text-decoration:line-through; }
   .teor-abs.no-ero:hover { background:#e2e8f0; }
@@ -276,8 +280,8 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver90";
-const APP_DATA = "04nov26";
+const APP_VER = "ver91";
+const APP_DATA = "05nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
 const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
@@ -1077,7 +1081,9 @@ function esportaPDF(state, pairs){
              (richiesta di Christian del 04/11/2026). */
           else if (CODE_SET[sv]) txt = sv;
           else txt = pdfHM(v);
-          if (perm){ txt = (txt === "*" || txt === "" ? "*" : txt + "*"); permMese.push(dp.nome + " g." + d + " " + fmt2(perm.ore) + " h (" + perm.tipo + ")"); }
+          /* ver91: nel Report il permesso si segnala con TRE asterischi grossi (richiesta di
+             Christian del 05/11/2026) e in calce si scrive quante ore vanno aggiunte. */
+          if (perm){ txt = (txt === "" ? "***" : txt + "***"); permMese.push({ nome:dp.nome, giorno:d, ore:perm.ore, tipo:perm.tipo }); }
           row.push(txt);
         });
         row.push(dayLabel);
@@ -1100,11 +1106,14 @@ function esportaPDF(state, pairs){
           if (data.section !== "body") return;
           const ri = data.row.index;
           const raw = String(data.cell.raw || "").trim();
-          const isNum = /^-?\d+,\d{2}\*?$/.test(raw);   // ore in formato ORE,MINUTI
-          const isWhole = /^-?\d+,00\*?$/.test(raw);    // ore intere -> ",00" in grigio
+          const isPerm = raw.slice(-3) === "***";        // ver91: cella con permesso orario
+          const isNum = /^-?\d+,\d{2}(\*\*\*)?$/.test(raw);   // ore in formato ORE,MINUTI
+          const isWhole = /^-?\d+,00(\*\*\*)?$/.test(raw);    // ore intere -> ",00" in grigio
           /* ver87: lo sbiadito del ",00" vale solo per le celle dei giorni, non per la riga
-             del TOTALE, che ormai e' un numero decimale vero. */
-          if (!isDayCol && isWhole && ri !== nd){ data.cell.__hm00 = true; data.cell.text = [""]; }
+             del TOTALE, che ormai e' un numero decimale vero.
+             ver91: se la cella ha un permesso, se ne occupa il disegno dei tre asterischi. */
+          if (!isDayCol && isPerm && ri !== nd){ data.cell.__perm3 = true; data.cell.text = [""]; }
+          else if (!isDayCol && isWhole && ri !== nd){ data.cell.__hm00 = true; data.cell.text = [""]; }
           if (ri === nd){ data.cell.styles.fontStyle = "bold"; data.cell.styles.fillColor = [238,242,255]; if (!isDayCol) data.cell.styles.fontSize = 7; return; }
           const day = ri + 1;
           if (isDayCol){
@@ -1124,6 +1133,21 @@ function esportaPDF(state, pairs){
           if (data.section === "body" && data.row.index < nd && weekdayOf(anno, m, data.row.index + 1) === 0){
             doc.setDrawColor(15, 39, 64); doc.setLineWidth(0.5);
             doc.line(data.cell.x, data.cell.y + data.cell.height, data.cell.x + data.cell.width, data.cell.y + data.cell.height);
+          }
+          if (data.cell.__perm3){
+            /* valore normale + *** piu' grandi, in viola, sotto il valore */
+            let raw = String(data.cell.raw || "").trim();
+            const val = raw.slice(0, raw.length - 3);
+            const fs = data.cell.styles.fontSize || 7;
+            const cx = data.cell.x + data.cell.width / 2;
+            const cy = data.cell.y + data.cell.height / 2;
+            doc.setFont(undefined, "bold");
+            const tc = data.cell.styles.textColor;
+            if (Array.isArray(tc)) doc.setTextColor(tc[0], tc[1], tc[2]); else doc.setTextColor(17, 24, 39);
+            if (val){ doc.setFontSize(fs); doc.text(val, cx, cy - 1.1, { align:"center", baseline:"middle" }); }
+            doc.setFontSize(fs + 3.5); doc.setTextColor(109, 40, 217);
+            doc.text("***", cx, cy + (val ? 1.9 : 0), { align:"center", baseline:"middle" });
+            return;
           }
           if (!data.cell.__hm00) return;
           let raw = String(data.cell.raw || "").trim();
@@ -1200,9 +1224,11 @@ function esportaPDF(state, pairs){
         if (permMese.length > 0){
           yy += 1; ensureY(4);
           doc.setFontSize(7); doc.setTextColor(15,39,64); doc.setFont(undefined,"bold");
-          doc.text("Permessi orari (segnalati con *, non inclusi nel TOT):", 14, yy); yy += 3.6; doc.setFont(undefined,"normal");
+          doc.text("Permessi orari (segnalati con ***, non inclusi nel TOT):", 14, yy); yy += 3.6; doc.setFont(undefined,"normal");
           doc.setFontSize(6.5); doc.setTextColor(70,70,70);
-          permMese.forEach(function(pp){ const ls = doc.splitTextToSize("•  " + pp, 269); ensureY(ls.length * 3.2); doc.text(ls, 14, yy); yy += ls.length * 3.2; });
+          permMese.forEach(function(pp){
+            const riga = pp.nome + " — giorno " + pp.giorno + ": Aggiungere " + fmt2(pp.ore) + " ore di permesso (" + pp.tipo + ")";
+            const ls = doc.splitTextToSize("•  " + riga, 269); ensureY(ls.length * 3.2); doc.text(ls, 14, yy); yy += ls.length * 3.2; });
         }
         if (orfani.length > 0){
           yy += 3;
@@ -1430,6 +1456,11 @@ function EmployeeCard(props){
                       title={perm ? ("Permesso orario " + fmt2(perm.ore) + " h (" + perm.tipo + ") — clic per modificare") : "Aggiungi permesso orario"}
                       onClick={function(){ props.onOpenPerm(dp.id, d); }}></button> : null}
                   </div>
+                  {perm ? <div className="perm-lbl" role="button" tabIndex={0}
+                      title={"Permesso orario " + fmt2(perm.ore) + " h (" + perm.tipo + ") — clic per modificare"}
+                      onClick={function(){ if(!nonScriv) props.onOpenPerm(dp.id, d); }}
+                      onKeyDown={function(e){ if(!nonScriv && (e.key==="Enter"||e.key===" ")){ e.preventDefault(); props.onOpenPerm(dp.id, d); } }}
+                      >+{fmt2(perm.ore)} h {perm.tipo}</div> : null}
                   {isCovAbs ? (function(){
                     const ero = eroOn(rec, d);
                     return <div className={"teor-abs" + (ero ? "" : " no-ero")} role="button" tabIndex={0}
@@ -4438,7 +4469,7 @@ function App(){
         {!FB_READY ? <button className="btn btn-ghost" onClick={changePin}>🔑 PIN</button> : null}
         {FB_READY ? <button className="btn btn-ghost" onClick={function(){ if (dirty && !window.confirm("Ci sono modifiche non salvate. Uscire comunque?")) return; firebase.auth().signOut(); }}>Esci</button> : null}
         <input ref={fileRef} type="file" accept=".xlsx,.xls,.json" className="hidden-file" onChange={onImportFile} />
-        <div className="monthstrip">{vista === "rep" ? "📊 Riepiloghi" : (vista === "ana" ? "📇 Anagrafica" : (vista === "costo" ? "💶 Costo orario" : (vista === "query" ? "🔎 Query personale" : ("📅 " + MONTH_LABEL[mese-1] + " " + anno + (mLocked ? "  🔒 bloccato" : "")))))}</div>
+        <div className="monthstrip">{vista === "rep" ? "📊 Riepiloghi" : (vista === "ana" ? "📇 Anagrafica" : (vista === "costo" ? "💶 Costo orario" : (vista === "query" ? "🔎 Query personale" : ("📅 Tabellone " + MONTH_LABEL[mese-1] + " " + anno + (mLocked ? "  🔒 bloccato" : "")))))}</div>
       </div>
 
       {!FB_READY ? <div className="banner">Modalità LOCALE (localStorage, accesso con PIN).</div> : null}
