@@ -833,6 +833,57 @@ Banca ore, tetto annuo, contratti e export.
 - **Non toccare senza richiesta esplicita**: Banca ore, tetto annuo, `monteFissoMese`,
   `quotaGiorno`, `coverAbsHours`, gli export Excel/PDF, la generazione dei contratti.
 
+## Registro dei controlli sulle formule (da ripetere a ogni versione)
+
+Controllo fatto il **05/11/2026 sulla ver100**, su richiesta di Christian («controlla ottimamente
+ogni formula»). Gli attesi sono **ricalcolati da zero** in uno script separato e confrontati con
+quello che l'app mostra **davvero a video** (Playwright). Gli script stanno nella cartella di
+lavoro della sessione: `formule100.cjs`, `arrot100.cjs`, `periodo100.cjs`.
+
+**Caso di prova**: 30 h/sett. · novembre 2026 · 22 giorni da 6,5 h · 2 FERIE (una spenta col clic)
+· 1 MAL · permessi: EXF 2 h, LUTTO 1,5 h **sul giorno spento**, VISITA MEDICA 1 h (tipo a mano).
+
+| Formula | Atteso (ricalcolato) | Letto a video | Esito |
+|---|--:|--:|---|
+| `monteFissoMese` = 165 × oreSett ÷ 38 | 130,263 | 130,26 | ✔ |
+| `totOfRec` (TOT calcolato) | 143,00 | 143,00 | ✔ |
+| `quotaGiorno` × gg di assenza | 15,030 (3 gg) | 15,030 (3 gg) | ✔ |
+| `permOreMese().pagate` | 3,500 | 3,500 | ✔ |
+| `permOreMese().altre` (tipo a mano) | 1,000 | 1,000 | ✔ |
+| Risultato del mese = rese + assenze + permessi − monte | +31,267 | +31,267 | ✔ |
+| **TOT teorico** = rese + assenze erosive + permessi erosi | 155,020 | 155,020 | ✔ |
+| `prodottoMese` → Tetto «Già usate» | 155,020 | 155,020 | ✔ |
+| Tetto «Restano» (su 500) | 344,980 | 344,980 | ✔ |
+
+**`R2` (arrotondamento), 9 casi in isolamento sul codice vero**: 67,5×22,99 → 1.551,83;
+162,5×22,99 → 3.735,88; 0,615 → 0,62; 2,675 → 2,68; i due negativi → −1.551,83 e −2,68
+(simmetrico); 1,0005 a 3 decimali → 1,001; 0 → 0; 5,005 → 5,01. **Tutti superati.** Il vecchio
+`Math.round(x*100)/100` sullo stesso primo caso dà ancora 1.551,82: è il difetto corretto in ver74.
+
+**Somma delle voci del massimale** (`tettoVoci` + `tettoVociSomma`), 7 casi: 200+208,5 = 408,5;
+0,1+0,2 = 0,3; 33,33+33,33+33,34 = 100; riga **senza nome** scartata; ore **negative** scartate;
+ore **non numeriche** scartate; elenco vuoto = 0. **Tutti superati.**
+
+**Finestra del periodo** (`consumoTetto` + `tettoWindow`), a.s. 2026/27 guardando novembre 2026,
+con mesi seminati apposta dentro e fuori: ago-26 50 h **fuori**, ott-26 50 h, nov-26 40 h,
+gen-27 30 h, set-27 70 h **fuori** → atteso **120,000**, letto **120,000**. ✔ La finestra
+set→ago **scavalca l'anno civile** correttamente.
+
+⚠️ **Due avvertenze per chi ripete queste prove** (sbagliate due volte il 05/11/2026):
+1. il codice della malattia è **`MAL`**, non «MALATTIA» (elenco in `CODICI`);
+2. l'app apre sull'**ultimo anno** di `state.anni`: se nel seme ci sono 2026 e 2027, le linguette
+   dei mesi mostrano il **2027** finché non si torna indietro con la barra dell'anno.
+
+🐞 **Difetto preesistente trovato durante il controllo, NON corretto** (non era richiesto):
+in una cella del Tabellone si può scrivere **un testo qualunque** (es. «MALATTIA» invece di
+`MAL`). `CellInput` ha la tendina dei codici ma **non valida**: il testo resta lì, vale **0 ore**
+e **non viene contato come assenza**, quindi non copre nemmeno il monte ore — senza nessun
+avviso. Da decidere con Christian se segnalare la cella in rosso o rifiutare la scrittura.
+
+**Non verificabile da qui**: il disegno vero del **Report PDF** (jsPDF non è raggiungibile dal
+contenitore) e i numeri del **Costo orario** contro il foglio Excel originale, che dopo le sette
+correzioni volute della ver79 **non è più il riferimento**.
+
 ## Regole di lavoro (valgono sempre)
 
 1. **Le modifiche a questa app le fa Claude**, lavorando direttamente su questo repository.
