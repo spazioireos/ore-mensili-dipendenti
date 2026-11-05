@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver107 · 05nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver108 · 05nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -375,6 +375,26 @@ Banca ore, tetto annuo, contratti e export.
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
 
+- 🟡 **AVVISO QUANDO I MESI SONO SCRITTI A MANO** (ver108, 05/11/2026, chiesto da Christian —
+  «avviso giallo ok» — dopo che la verifica aveva mostrato che un numero scritto a mano resta
+  fermo mentre il periodo cambia).
+  - **Dove**: nel Costo orario, **subito sotto la casella «Mesi di contratto»**, dentro la
+    griglia (`gridColumn:"1 / -1"`, quindi occupa tutta la riga).
+  - **Quando**: solo se la casella **è compilata** e il numero scritto **differisce** da quello
+    calcolato sul periodo scelto (tolleranza 0,005). Se coincide, o se la casella è vuota,
+    **non compare niente**.
+  - **Cosa dice**: quale numero sta usando l'app, quale risulterebbe dal periodo (con il periodo
+    scritto per esteso, es. «Gennaio 2026 → Dicembre 2026»), che **anche ferie, 13ª, 14ª e
+    assistenza sanitaria** seguono il numero scritto (arrotondato) e che **i cedolini** sono
+    l'arrotondamento per eccesso, e come tornare indietro: **svuotare la casella**.
+  - **Dato nuovo**: `o.periodoLabel` in `datiCosto` (solo per scriverlo nell'avviso).
+  - ⚠️ **Non cambia nessun calcolo**: il numero scritto a mano continua a prevalere, come prima.
+    L'avviso serve solo a non farlo passare inosservato.
+  - **Provato in esecuzione** (6 casi): senza niente scritto non compare; scrivendo 6 compare
+    con lo sfondo `rgb(255,248,225)` e il bordo ambra; cambiando periodo **si aggiorna**
+    (11,52 → 4,00); scrivendo il numero che coincide col calcolato **sparisce**; svuotando la
+    casella **sparisce**. Rieseguiti anche i 21 controlli della parte A, i 14 della parte B e il
+    registro delle formule: **tutti superati, zero errori di pagina**.
 - 🐞 **«↺ RIMETTI I VALORI CALCOLATI» NON RIMETTEVA NIENTE** (ver107, 05/11/2026, difetto
   **preesistente dalla ver73**, trovato con la verifica meticolosa chiesta da Christian).
   - **Il difetto**: il pulsante faceva `setPar("settPeriodo","")` e poi `setPar("settLav","")`.
