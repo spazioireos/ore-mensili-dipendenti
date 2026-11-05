@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver110 · 05nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver111 · 05nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -375,8 +375,18 @@ Banca ore, tetto annuo, contratti e export.
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
 
-- 🚫 **UN MESE TUTTO «AN» VUOL DIRE CHE NON C'ERA RAPPORTO** (ver110, 05/11/2026, decisione di
-  Christian: «se è tutto AN non c'è rapporto»).
+- 🔁 **IL MESE TUTTO «AN» SI SEGNALA, MA IL RAPPORTO VA AVANTI** (ver111, 05/11/2026, Christian:
+  «Frutaz ma anche altri hanno magari AN su un mese ma il rapporto va avanti, mica si ferma» —
+  **supera la ver110 di poche ore prima**). Un mese tutto AN **non toglie più niente** dai conti:
+  la persona resta assunta e pagata. Resta la **riga a video**, che ora dice «Mesi tutti «AN»:
+  Luglio 2026, Agosto 2026 — sono contati normalmente (il rapporto va avanti). Se in quei mesi il
+  rapporto era sospeso, scrivilo con le date nella scheda».
+  ⚠️ **Il codice dell'esclusione è rimasto**: `meseTuttoAN`, `mesiSenzaRapporto` e il parametro
+  `escludi` dei tre conteggi + `contaFestivita`. Per riattivarla basta ripassare `senzaRapp` in
+  `datiCosto` (4 punti). **La ver110 non è mai arrivata su `main`.**
+  **Verificato**: con luglio e agosto tutti AN i numeri sono tornati identici alla ver109
+  (12,00 mesi · 14.291,98 € · 19,85 €/h).
+  <details><summary>Com'era la ver110 (esclusione attiva)</summary>
   - **Quando scatta**: `meseTuttoAN(state,dp,y,m)` è vero se **tutti** i giorni compilabili del
     mese (quindi **non** domeniche e festivi, che dalla ver77 non si compilano) portano il codice
     **`AN`**. ⚠️ Basta **una cella vuota, un'ora o un altro codice** e il mese torna a contare
@@ -399,7 +409,8 @@ Banca ore, tetto annuo, contratti e export.
     scendono anche le ore ordinarie lavorabili, quindi una fetta più grande delle ore rese
     diventa **supplementare al +27%**. È il modello del foglio Excel, non un errore nuovo.
   - ⚠️ **Non tocca il Tabellone**: `AN` resta quello che era (0 ore, non è un'assenza, non
-    consuma il Tetto annuo). Cambia solo il **Costo orario**.
+    consuma il Tetto annuo). Cambiava solo il **Costo orario**.
+  </details>
 - 📈 **L'ADDIZIONALE SI FERMA ALLA FINE DEL RAPPORTO** (ver110, stessa richiesta: «ti do il via»).
   `addizTDAuto` e il conteggio delle proroghe usavano `fineperiodoYmd(pairs)`, cioè la **fine del
   periodo guardato**. Ora usano **`fineRapportoYmd(dp,pairs)`**, che si ferma alla **cessazione**
@@ -1145,6 +1156,28 @@ nei mesi lavorati, livello D1):
   del contratto gonfiava il costo. **Ora la terza riga della tabella dà 8.471,81 € e 19,61 €/h**,
   cioè lo stesso numero del periodo gen → giu: **quale periodo chiedi non cambia più il
   risultato** per i mesi fuori contratto.
+
+## 🔜 DA FARE, deciso da Christian il 05/11/2026 (sera) — NON ANCORA FATTO
+
+Due richieste precise, da affrontare **insieme** perché toccano lo stesso punto:
+
+1. **Le ore supplementari si contano MESE PER MESE, senza compensazione.** Parole di Christian:
+   «gennaio 95 ore fatte in luogo di 90 e febbraio 85 ore in luogo di 90 **non dà
+   compensazione**». Oggi `E18` confronta il **totale** delle ore rese con il **totale** delle
+   ore lavorabili del periodo (`(G38 − O8 + O11·H2)/H2`), quindi un mese sotto **compensa** un
+   mese sopra. Va cambiato in: per ogni mese `max(0, ore del mese − ore lavorabili del mese)`,
+   poi somma.
+2. **«Tabellone e costo orario si parlino».** Nella stessa app convivono due idee di «ore del
+   mese» che non coincidono (vedi la scheda ⚖️ più sopra): `monteFissoMese` nel Tabellone e le
+   «settimane lavorabili meno assenze presunte» nel Costo orario. Le ore lavorabili del mese
+   vanno prese **dal Tabellone** (ferie, permessi e malattia **veri**) invece che dai numeri
+   presunti.
+   ⚠️ Attenzione: il 05/11/2026 **mattina** Christian aveva detto «il resto lascia come è» su
+   questa stessa cosa; la **sera** ha cambiato idea. Vale l'ultima.
+
+⚠️ **Conseguenza da misurare prima di consegnare**: con il conto mese per mese le supplementari
+**crescono** (niente più compensazione) e quindi il costo totale sale. Va mostrato il confronto
+prima/dopo su almeno tre casi veri.
 
 ## Registro dei controlli sulle formule (da ripetere a ogni versione)
 
