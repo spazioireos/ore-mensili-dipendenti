@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver91 · 05nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver92 · 05nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -320,6 +320,10 @@ Banca ore, tetto annuo, contratti e export.
 - 🏷️ **COME SI CHIAMANO LE DUE COSE** (deciso da Christian il 05/11/2026). La pagina del mese
   con le celle di tutti si chiama **TABELLONE**; il PDF A4 si chiama **REPORT**. Usare queste
   due parole in chat, nei commit e qui dentro.
+  In **ver92** il pulsante in testata è stato rinominato da «🖨️ PDF A4» a **«🖨️ Report PDF A4»**,
+  dicitura **scelta da Christian**. ⚠️ La finestra che si apre resta «Esporta PDF — scegli il
+  periodo»: quella dicitura non è stata toccata. Il titolo stampato dentro il Report è sempre
+  «Spazio Ireos — Report Ore · <mese> <anno>», invariato.
 - 🟣 **IL PERMESSO ORARIO SI VEDE** (ver91, 05/11/2026, segnalazione di Christian: «la questione
   dei permessi è poco chiara»).
   - **Nel Tabellone**: fino a ver90 un permesso si vedeva **solo** come un pallino viola da 11px
