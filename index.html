@@ -94,6 +94,9 @@
   .cell-in.trattino::placeholder { color:#b91c1c; opacity:1; font-weight:800; font-size:20px; }
   .cell-in.trattino { color:#b91c1c; }
   /* ver101: scritta che non e' ne' un numero ne' un codice. Rosso pieno, bordo spesso. */
+  /* ver102: la scrittura e' stata rifiutata — bordo rosso che pulsa una volta */
+  .cell-in.rifiutata { border-color:#dc2626 !important; box-shadow:0 0 0 3px rgba(220,38,38,.35); animation:scossa .25s linear 1; }
+  @keyframes scossa { 0%,100%{ transform:translateX(0);} 25%{ transform:translateX(-2px);} 75%{ transform:translateX(2px);} }
   .cell-in.ignota { background:#fee2e2 !important; border-color:#dc2626 !important; color:#7f1d1d !important; font-weight:900; }
   .ignote-box { background:#fee2e2; border-bottom:3px solid #dc2626; color:#7f1d1d; font-size:13px; font-weight:800; padding:6px 10px; line-height:1.45; }
   .ignote-box .det { font-weight:600; }
@@ -298,7 +301,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver101";
+const APP_VER = "ver102";
 const APP_DATA = "05nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -335,6 +338,30 @@ const CODICI = [
 ];
 const CODE_SET = {};
 CODICI.forEach(function(x){ CODE_SET[x.c] = x; });
+/* ver102 (05/11/2026, Christian: «inibiamo» le scritte che non sono codici permessi).
+   CODE_UP: la scritta in MAIUSCOLO -> il codice vero (serve perche' «ASP 0h» ha la h minuscola,
+   e perche' chi scrive «ferie» intende FERIE). CODE_PREFIX: tutti i pezzi iniziali dei codici,
+   perche' battendo «FERIE» si passa per F, FE, FER, FERI: se si rifiutassero, il codice non si
+   potrebbe scrivere. */
+const CODE_UP = {}, CODE_PREFIX = {};
+CODICI.forEach(function(x){
+  const u = String(x.c).toUpperCase();
+  CODE_UP[u] = x.c;
+  for (let i = 1; i <= u.length; i++) CODE_PREFIX[u.slice(0, i)] = true;
+});
+function cellaScritturaAmmessa(t){        // va bene COME PEZZO mentre si scrive?
+  const v = String(t == null ? "" : t);
+  if (v === "") return true;
+  if (/^\d{0,2}([.,]\d{0,2})?$/.test(v)) return true;        // un numero, anche a meta' ("6," )
+  return CODE_PREFIX[v.toUpperCase()] === true;               // l'inizio di un codice
+}
+function cellaValoreFinale(t){            // alla fine: il codice vero, il numero, oppure null
+  const v = String(t == null ? "" : t).trim();
+  if (v === "") return "";
+  if (CODE_UP[v.toUpperCase()] !== undefined) return CODE_UP[v.toUpperCase()];
+  if (isNumeric(v)) return v;
+  return null;                                                 // non ammesso
+}
 
 const PALETTE = ["#00B0F0","#CCFF66","#FFC000","#FFDDFF","#B7A4D6","#9AD0C2","#F49AC2","#8FB9E0","#C3B091","#9CA3AF"];
 
@@ -1412,6 +1439,8 @@ function Toast(props){
 
 function CellInput(props){
   const [foc, setFoc] = useState(false);
+  const [rif, setRif] = useState(false);          /* ver102: lampeggio quando la scrittura e' rifiutata */
+  const iniz = useRef("");                        /* com'era la cella quando ci sono entrato */
   const val = (props.value === undefined || props.value === null) ? "" : props.value;
   const s = String(val).trim();
   const isCode = CODE_SET[s] !== undefined;
@@ -1424,12 +1453,37 @@ function CellInput(props){
   const showTrattino = (s === "" && props.rosso && !props.disabled);
   const ignota = !foc && isCellaIgnota(s);          /* ver101: mentre scrivi non si segnala niente */
   return (
-    <input className={"cell-in " + (isCode ? "is-code" : "is-num") + (props.disabled ? " blocked" : "") + (showTrattino ? " trattino" : "") + (ignota ? " ignota" : "")}
+    <input className={"cell-in " + (isCode ? "is-code" : "is-num") + (props.disabled ? " blocked" : "") + (showTrattino ? " trattino" : "") + (ignota ? " ignota" : "") + (rif ? " rifiutata" : "")}
       style={props.style} list={foc ? "codici-list" : undefined} title={props.title} disabled={props.disabled}
       value={display} placeholder={showTrattino ? "–" : ""}
-      onFocus={function(){ setFoc(true); }}
-      onBlur={function(e){ setFoc(false); if (props.onBlur) props.onBlur(e.target.value); }}
-      onChange={function(e){ props.onChange(e.target.value); }} />
+      onFocus={function(){ setFoc(true); setRif(false); iniz.current = String(val == null ? "" : val); }}
+      onBlur={function(e){
+        setFoc(false); setRif(false);
+        /* ver102: all'uscita la cella deve contenere un codice vero o un numero.
+           - «ferie» diventa «FERIE» (le maiuscole le mette l'app);
+           - un pezzo rimasto a meta' («FER») viene tolto, e l'app lo dice;
+           - ⚠️ una scritta che c'era GIA' PRIMA (vecchi dati) NON viene cancellata solo
+             perche' ci sono entrato e uscito: resta li', segnalata in rosso dalla ver101. */
+        const grezzo = String(e.target.value).trim();
+        const fin = cellaValoreFinale(grezzo);
+        if (fin === null){
+          if (grezzo !== "" && grezzo !== String(iniz.current).trim()){
+            props.onChange("");
+            if (props.onAvviso) props.onAvviso("«" + grezzo + "» non è un codice né un numero: la cella è stata lasciata vuota.", true);
+          }
+        } else if (fin !== grezzo){
+          props.onChange(fin);
+        }
+        if (props.onBlur) props.onBlur(e.target.value);
+      }}
+      onChange={function(e){
+        const v = e.target.value;
+        if (cellaScritturaAmmessa(v)){ setRif(false); props.onChange(v); }
+        else {
+          setRif(true);                               /* ver102: la scrittura NON entra */
+          if (props.onAvviso) props.onAvviso("Qui si scrive un numero di ore oppure un codice dell'elenco (FERIE, MAL, EXF…).", true);
+        }
+      }} />
   );
 }
 
@@ -1579,7 +1633,7 @@ function EmployeeCard(props){
               return (
                 <td key={"c"+d} style={{ padding:"1px", verticalAlign:"top" }}>
                   <div className="cell-wrap">
-                    <CellInput value={val} disabled={nonScriv} rosso={rosso} style={cellStyle(val, rosso, blocked)}
+                    <CellInput value={val} disabled={nonScriv} rosso={rosso} style={cellStyle(val, rosso, blocked)} onAvviso={props.onAvviso}
                       title={cellTitle(val, blocked, rosso, perm)}
                       onChange={function(nv){ props.onCell(dp.id, d, nv); }}
                       onBlur={function(nv){ if (rosso && isNumeric(nv)) props.onFestConfirm(dp.id, d, nv); }} />
@@ -4775,7 +4829,7 @@ function App(){
                   onVoceSet={onVoceSet} onVoceAdd={onVoceAdd} onVoceDel={onVoceDel} ferieApr={ferieApr} fogliOre={foDiff}
                   onDich={onDich} onSvuotaMese={onSvuotaMese} saldoPrec={saldoP} bancaPrec={bancaP} tettoConsumo={tettoC} onAzzeraSaldo={onAzzeraSaldo} onAnnullaAzzera={onAnnullaAzzera}
                   onSostAdd={onSostAdd} onSostChange={onSostChange} onSostDel={onSostDel} onOpenPerm={onOpenPerm}
-                  onEditDip={apriScheda} onDelDip={askDelDip} />;
+                  onEditDip={apriScheda} onDelDip={askDelDip} onAvviso={showToast} />;
               })
             }
             <div className="legend">

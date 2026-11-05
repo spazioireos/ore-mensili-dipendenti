@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver101 · 05nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver102 · 05nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -375,6 +375,39 @@ Banca ore, tetto annuo, contratti e export.
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
 
+- ⛔ **LE SCRITTE NON AMMESSE NON ENTRANO PIÙ** (ver102, 05/11/2026, Christian: «volevo dire
+  *inibiamo*»). La ver101 le **segnalava**; la ver102 le **impedisce**. Il rosso della ver101
+  **resta**, perché serve ancora per le scritte **già nei dati** di prima.
+  - **Due tabelle nuove**, costruite da `CODICI` subito dopo `CODE_SET`: **`CODE_UP`** (la
+    scritta in maiuscolo → il codice vero) e **`CODE_PREFIX`** (tutti i pezzi iniziali dei
+    codici). ⚠️ `CODE_UP` serve per due motivi: chi scrive «ferie» intende FERIE, e il codice
+    **`ASP 0h` ha la h minuscola**, quindi non basta fare `toUpperCase()`.
+  - **`cellaScritturaAmmessa(t)`** — va bene **come pezzo** mentre si scrive: vuoto, un numero
+    anche a metà (`^\d{0,2}([.,]\d{0,2})?$`) o **l'inizio di un codice**. ⚠️ Senza i prefissi
+    non si potrebbe battere «FERIE», perché si passa per F, FE, FER, FERI.
+  - **`cellaValoreFinale(t)`** — all'uscita dalla cella: torna il **codice vero** (con le
+    maiuscole giuste), il **numero**, oppure **`null`** se non è ammesso.
+  - **Cosa succede in `CellInput`**: mentre si scrive, un carattere non ammesso **non entra**
+    (la casella trema, bordo rosso `.cell-in.rifiutata`) e compare l'avviso in basso; all'uscita
+    «ferie» diventa **FERIE**, «asp 0h» diventa **ASP 0h**, e un pezzo rimasto a metà («FER»)
+    viene **tolto** dicendolo (««FER» non è un codice né un numero: la cella è stata lasciata
+    vuota»).
+  - 🛡️ **Un dato vecchio NON viene cancellato** solo perché ci si entra e si esce: `iniz`
+    (`useRef`) ricorda com'era la cella all'ingresso, e se non è stata toccata resta lì,
+    segnalata in rosso dalla ver101. Serviva a non violare la regola «niente cancellazioni a
+    secco» del §10.1.
+  - **L'avviso arriva a video**: `onAvviso` passa da `App` (`showToast`) a `EmployeeCard` e da
+    lì a `CellInput`. Un rifiuto silenzioso sarebbe stato peggio del difetto.
+  - ⚠️ **Conseguenze volute**: non si possono più scrivere **più di due cifre** prima della
+    virgola (999 rifiutato: in un giorno non si fanno 999 ore) né **numeri negativi**; incollare
+    «MALATTIA» o una frase **non scrive nulla**; battendo «MALATTIA» ci si ferma a **MAL**, che
+    è il codice giusto. **Compila veloce non passa da qui** e funziona come prima (provato).
+  - **Provato in esecuzione**: CIAO → resta «CA» e all'uscita la cella si svuota con l'avviso ·
+    FERIE → FERIE · ferie → **FERIE** · 6,5 → 6,50 · asp 0h → **ASP 0h** · FER → svuotata con
+    l'avviso · MALATTIA battuto → **MAL** · incollati «MALATTIA», una frase lunga, «-3» e «999»
+    → **non entrano** · «12,75» entra · il «MALATTIA» **già nei dati**, aperto e lasciato, resta
+    e resta rosso. Zero errori di pagina.
+  - **Non regressione**: registro delle formule **rieseguito sulla ver102**, stessi numeri.
 - 🚨 **LE SCRITTE NON RICONOSCIUTE SI VEDONO** (ver101, 05/11/2026, Christian: «iniziamo nel
   tabellone testi che non siano i codici permessi», dopo che il controllo sulle formule aveva
   trovato il difetto).
@@ -861,7 +894,7 @@ Banca ore, tetto annuo, contratti e export.
 
 ## Registro dei controlli sulle formule (da ripetere a ogni versione)
 
-Controllo fatto il **05/11/2026 sulla ver100** e **rieseguito identico sulla ver101**, su richiesta di Christian («controlla ottimamente
+Controllo fatto il **05/11/2026 sulla ver100** e **rieseguito identico sulla ver101 e sulla ver102**, su richiesta di Christian («controlla ottimamente
 ogni formula»). Gli attesi sono **ricalcolati da zero** in uno script separato e confrontati con
 quello che l'app mostra **davvero a video** (Playwright). Gli script stanno nella cartella di
 lavoro della sessione: `formule100.cjs`, `arrot100.cjs`, `periodo100.cjs`.
