@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver93 · 05nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver94 · 05nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -324,6 +324,19 @@ Banca ore, tetto annuo, contratti e export.
   dicitura **scelta da Christian**. ⚠️ La finestra che si apre resta «Esporta PDF — scegli il
   periodo»: quella dicitura non è stata toccata. Il titolo stampato dentro il Report è sempre
   «Spazio Ireos — Report Ore · <mese> <anno>», invariato.
+- 📅 **IL MESE SI VEDE SU OGNI PERSONA** (ver94, 05/11/2026, richiesta di Christian: «nel
+  tabellone, a destra, scrivi bene grande come il nome dipendente il mese di riferimento
+  cosicché io lo veda sempre»). Nella barra colorata di ogni scheda, **a destra subito prima dei
+  pulsanti**, c'è ora «**Novembre 2026**» con la classe **`.mese-ref`**: stessa misura (19px),
+  stesso peso (800), stessa spaziatura e stesso colore (`#08344a`) del nome della persona.
+  - Serve perché scorrendo un Tabellone lungo la fascia blu in cima esce dallo schermo e non si
+    sa più che mese si sta guardando.
+  - ⚠️ Sta **dopo lo `.spacer`**, quindi galleggia a destra; su telefono la barra va a capo
+    (`flex-wrap`) e il mese può finire sulla riga sotto: è il comportamento di sempre della barra,
+    non un difetto.
+  - **Provato in esecuzione** su tre schede a 1500px e a 390px: il mese c'è su tutte, misura e
+    peso identici al nome, e a 1500px è sempre a destra del nome.
+
 - ⏲️ **LE ORE DI PERMESSO CONTANO NEL RISULTATO DEL MESE** (ver93, 05/11/2026). Christian:
   «nel tabellone non mi conti tra le ore conteggiabili i permessi?». Era vero: fino alla ver92 un
   permesso orario **non muoveva nessun numero**, né il TOT né il Risultato del mese né i

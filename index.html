@@ -62,6 +62,9 @@
   .monthstrip { flex-basis:100%; background:#12324f; margin:8px -18px -10px; padding:7px 18px; font-size:17px; font-weight:800; letter-spacing:.6px; color:#fff; border-top:2px solid rgba(255,255,255,.15); }
   .emp-head { padding:9px 14px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
   .emp-head .nome { font-size:19px; font-weight:800; letter-spacing:.4px; }
+  /* ver94: il mese di riferimento, a destra nella barra della persona, grande come il nome
+     (richiesta di Christian del 05/11/2026: "cosicché io lo veda sempre"). */
+  .emp-head .mese-ref { font-size:19px; font-weight:800; letter-spacing:.4px; white-space:nowrap; }
   .emp-head .pill { background:rgba(255,255,255,.6); border-radius:20px; padding:3px 11px; font-size:12px; font-weight:700; }
   .emp-head .pill.cess { background:#7f1d1d; color:#fff; }
   .emp-head .edit-mini { background:rgba(0,0,0,.16); color:#fff; border:none; border-radius:6px; width:26px; height:26px; cursor:pointer; font-size:13px; }
@@ -280,7 +283,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver93";
+const APP_VER = "ver94";
 const APP_DATA = "05nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -1415,6 +1418,7 @@ function EmployeeCard(props){
         {orarioTempAt(dp,y,m)!=null ? <span className="pill" style={{ background:"#fde68a", color:"#78350f" }}>⏱ orario temp. {hoursDisp(orarioTempAt(dp,y,m))}h</span> : null}
         {(function(){ const ce=cessEffStr(dp); if(!ce) return null; const now=new Date(); const tInt=now.getFullYear()*10000+(now.getMonth()+1)*100+now.getDate(); const ceInt=ymdIt(ce); return (ceInt && ceInt < tInt) ? <span className="pill cess">CESSATO {ce}</span> : <span className="pill" style={{ background:"#fbe0ec", color:"#8A2358" }}>fino al {ce}</span>; })()}
         <div className="spacer"></div>
+        <span className="mese-ref" style={{ color:"#08344a" }}>{MONTH_LABEL[m-1]} {y}</span>
         {!mLocked ? <button className="edit-mini qf" title="Compila velocemente il mese (ore o codice sui giorni scelti)" onClick={function(){ props.onQuickFill(dp); }}>⚡ Compila</button> : null}
         {!mLocked ? <button className="edit-mini svuota" title="Svuota tutto il mese per questo dipendente (con conferma)" onClick={function(){ props.onSvuotaMese(dp.id); }}>🗑 Svuota mese</button> : null}
         <button className="edit-mini" title="Modifica anagrafica" onClick={function(){ props.onEditDip(dp); }}>✎</button>
