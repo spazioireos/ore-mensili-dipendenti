@@ -301,7 +301,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver109";
+const APP_VER = "ver110";
 const APP_DATA = "05nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -570,9 +570,10 @@ const FEST_NON_GOD_FISSE = [[11,4]];   // [mese, giorno] — sempre non godute, 
    scelto, e chiedere un periodo più largo del contratto gonfiava il conto (misurato: contratto
    fino al 30/06 guardato su gennaio→dicembre, «festività non godute» 99,45 € invece di 24,86).
    ⚠️ Il secondo parametro `dp` è FACOLTATIVO: senza, la funzione conta come prima. */
-function contaFestivita(pairs, dp){
+function contaFestivita(pairs, dp, escludi){
   let god=0, non=0;
   (pairs||[]).forEach(function(pr){
+    if (meseEscluso(escludi, pr.y, pr.m)) return;        /* ver110: mese tutto AN = nessun rapporto */
     const f=festivitaSet(pr.y), nd=daysInMonth(pr.y,pr.m);
     const inForza = function(d){ return dp ? inForceAt(dp, pr.y*10000 + pr.m*100 + d) : true; };
     for(let d=1; d<=nd; d++){
@@ -2570,27 +2571,52 @@ function giorniInForzaMese(dp, y, m){
      contributi, assistenza sanitaria, paghe, rimborso km.
    · `mesiRateiPeriodo` = mesi INTERI che MATURANO I RATEI, contati solo se il contratto copre
      almeno 15 giorni di calendario. Li usano **ferie, tredicesima e quattordicesima**. */
+/* ver110 (05/11/2026, decisione di Christian: «se è tutto AN non c'è rapporto»).
+   Un mese in cui TUTTI i giorni compilabili (quindi non le domeniche e non i festivi, che dalla
+   ver77 non si compilano) portano il codice **AN** vale come un mese **senza rapporto**: non si
+   paga, non matura ratei, non produce cedolini e le sue festività non si contano.
+   ⚠️ Serve che il mese sia scritto per intero: basta una cella vuota, un'ora o un altro codice
+   perché il mese torni a contare normalmente. */
+function meseTuttoAN(state, dp, y, m){
+  const rec = getRecFrom(state, y, m, dp.id);
+  if (!rec || !rec.giorni) return false;
+  const f = festivitaSet(y), nd = daysInMonth(y, m);
+  let visti = 0;
+  for (let d = 1; d <= nd; d++){
+    if (isRosso(f, y, m, d)) continue;
+    if (String(rec.giorni[d] == null ? "" : rec.giorni[d]).trim() !== "AN") return false;
+    visti++;
+  }
+  return visti > 0;
+}
+/* elenco dei mesi del periodo da trattare come «senza rapporto» (chiave "y-m") */
+function mesiSenzaRapporto(state, dp, pairs){
+  const out = {};
+  (pairs||[]).forEach(function(pr){ if (meseTuttoAN(state, dp, pr.y, pr.m)) out[pr.y + "-" + pr.m] = true; });
+  return out;
+}
+function meseEscluso(escludi, y, m){ return !!(escludi && escludi[y + "-" + m]); }
 function meseConta(dp, y, m){ return giorniInForzaMese(dp, y, m) >= 15 ? 1 : 0; }
 function meseFrazione(dp, y, m){
   const nd = daysInMonth(y, m);
   return nd > 0 ? giorniInForzaMese(dp, y, m) / nd : 0;
 }
-function mesiInPeriodo(dp, pairs){          // proporzionati ai giorni veri
+function mesiInPeriodo(dp, pairs, escludi){          // proporzionati ai giorni veri
   let n=0;
-  pairs.forEach(function(pr){ n += meseFrazione(dp, pr.y, pr.m); });
+  pairs.forEach(function(pr){ if(meseEscluso(escludi,pr.y,pr.m)) return; n += meseFrazione(dp, pr.y, pr.m); });
   return R2(n,3);
 }
-function mesiRateiPeriodo(dp, pairs){       // solo i mesi con almeno 15 giorni
+function mesiRateiPeriodo(dp, pairs, escludi){       // solo i mesi con almeno 15 giorni
   let n=0;
-  pairs.forEach(function(pr){ n += meseConta(dp, pr.y, pr.m); });
+  pairs.forEach(function(pr){ if(meseEscluso(escludi,pr.y,pr.m)) return; n += meseConta(dp, pr.y, pr.m); });
   return n;
 }
 /* ver106 (05/11/2026, Christian: «paghe è fisso, se fai 3 giorni o 30 il cedolino esce lo
    stesso e il costo c'è»). Terzo conteggio: i mesi in cui esce ALMENO UN CEDOLINO, cioè
    quelli con almeno un giorno di contratto. Lo usa solo «Paghe e dichiarazioni» (J31). */
-function mesiCedolinoPeriodo(dp, pairs){
+function mesiCedolinoPeriodo(dp, pairs, escludi){
   let n=0;
-  pairs.forEach(function(pr){ if (giorniInForzaMese(dp, pr.y, pr.m) > 0) n++; });
+  pairs.forEach(function(pr){ if(meseEscluso(escludi,pr.y,pr.m)) return; if (giorniInForzaMese(dp, pr.y, pr.m) > 0) n++; });
   return n;
 }
 // ore davvero lavorate nel periodo: stesso conto dei Riepiloghi (le assenze valgono 0)
@@ -2621,6 +2647,14 @@ function prorogheAttiveA(dp, ymdFine){
   }
   return n;
 }
+/* ver110 (05/11/2026, Christian: «ti do il via»): le proroghe si contano fino alla fine del
+   RAPPORTO, non fino alla fine del periodo che si guarda. Guardare gennaio→dicembre un
+   contratto cessato a giugno mostrava 2,40% invece di 1,90%. */
+function fineRapportoYmd(dp, pairs){
+  const finePer = fineperiodoYmd(pairs);
+  const fineCon = effEndInt(dp);
+  return (fineCon && fineCon < finePer) ? fineCon : finePer;
+}
 function fineperiodoYmd(pairs){
   if (!pairs || !pairs.length) return 0;
   const u = pairs[pairs.length-1];
@@ -2628,7 +2662,7 @@ function fineperiodoYmd(pairs){
 }
 function addizTDAuto(dp, pairs){
   if (indetAFine(dp, pairs)) return 0;
-  return R2((1.40 + 0.5*prorogheAttiveA(dp, fineperiodoYmd(pairs))));
+  return R2((1.40 + 0.5*prorogheAttiveA(dp, fineRapportoYmd(dp, pairs))));   /* ver110 */
 }
 // ore settimanali del periodo: quelle dell'ultimo mese in cui il contratto e' in piedi
 /* ver82: livello del periodo = quello dell'ultimo mese in cui il contratto e' in piedi.
@@ -2750,21 +2784,24 @@ function datiCosto(state, dp, pairs){
   const c = costoComune(state);
   const p = costoPar(dp);
   const indet = indetAFine(dp, pairs);
-  const mesiAuto = mesiInPeriodo(dp, pairs);
-  const mesiRateiAuto = mesiRateiPeriodo(dp, pairs);   /* ver104: ferie, 13ª e 14ª */
-  const mesiCedoAuto  = mesiCedolinoPeriodo(dp, pairs);   /* ver106: paghe e dichiarazioni */
+  const senzaRapp = mesiSenzaRapporto(state, dp, pairs);        /* ver110: i mesi tutti AN */
+  const mesiAuto = mesiInPeriodo(dp, pairs, senzaRapp);
+  const mesiRateiAuto = mesiRateiPeriodo(dp, pairs, senzaRapp);   /* ver104: ferie, 13ª e 14ª */
+  const mesiCedoAuto  = mesiCedolinoPeriodo(dp, pairs, senzaRapp);   /* ver106: paghe e dichiarazioni */
+  const mesiANlabel = Object.keys(senzaRapp).map(function(k){ const p=k.split("-"); return mLabelY(parseInt(p[0],10), parseInt(p[1],10)); }).join(", ");
   const oreSettAuto = oreSettPeriodo(dp, pairs);
   const tab = p.tabella || c.tabella;
   const livAuto = (function(){ const l=String(livelloPeriodo(dp, pairs)||"").toUpperCase().trim(); return MINIMI_CCNL[tab] && MINIMI_CCNL[tab][l] ? l : ""; })();
   const liv = p.livello!=null && p.livello!=="" ? p.livello : livAuto;
   const minimoAuto = (MINIMI_CCNL[tab] && MINIMI_CCNL[tab][liv]) ? MINIMI_CCNL[tab][liv] : 0;
   const addizAuto = addizTDAuto(dp, pairs);
-  const nProroghe = prorogheAttiveA(dp, fineperiodoYmd(pairs));   // ver83: quelle gia' partite
+  const nProroghe = prorogheAttiveA(dp, fineRapportoYmd(dp, pairs));   // ver83/ver110: quelle gia' partite, entro la fine del rapporto
   const oreDaRiep = oreRendPeriodo(state, dp, pairs);
-  const ff = contaFestivita(pairs, dp);          /* ver109: solo i giorni in cui il contratto è in piedi */
+  const ff = contaFestivita(pairs, dp, senzaRapp);   /* ver109/ver110 */
   const o = {
     com:c, indeterminato:indet, tab:tab, liv:liv,
     periodoLabel: pairs.length ? (mLabelY(pairs[0].y, pairs[0].m) + " → " + mLabelY(pairs[pairs.length-1].y, pairs[pairs.length-1].m)) : "",   /* ver108 */
+    mesiAN: mesiANlabel, nMesiAN: Object.keys(senzaRapp).length,   /* ver110 */
     mesiAuto:mesiAuto, mesiRateiAuto:mesiRateiAuto, mesiCedoAuto:mesiCedoAuto, oreSettAuto:oreSettAuto, minimoAuto:minimoAuto, addizAuto:addizAuto, nProroghe:nProroghe, oreDaRiep:oreDaRiep,
     mesi: cNum(p.mesi, mesiAuto),
     /* ver104: se i mesi sono scritti a mano, anche i ratei seguono quel numero (arrotondato),
@@ -2826,12 +2863,12 @@ function datiCosto(state, dp, pairs){
         const vv = valoriAt(dp, pr0.y, pr0.m);
         const livB = (function(){ const l=String(vv.livello==null?"":vv.livello).toUpperCase().trim(); return (MINIMI_CCNL[tab] && MINIMI_CCNL[tab][l]) ? l : ""; })();
         const indetB = String(vv.tipo) !== "determinato";
-        const fineB = (function(){ const u=b.pairs[b.pairs.length-1]; return u.y*10000+u.m*100+daysInMonth(u.y,u.m); })();
-        const ff = contaFestivita(b.pairs, dp);   /* ver109 */
+        const fineB = fineRapportoYmd(dp, b.pairs);   /* ver110: non oltre la fine del rapporto */
+        const ff = contaFestivita(b.pairs, dp, senzaRapp);   /* ver109/ver110 */
         const ob = Object.assign({}, o, {
-          mesi: R2(b.pairs.reduce(function(acc,pr){ return acc + meseFrazione(dp, pr.y, pr.m); }, 0), 3),
-          mesiRatei: b.pairs.reduce(function(acc,pr){ return acc + meseConta(dp, pr.y, pr.m); }, 0),   /* ver104 */
-          mesiCedolini: b.pairs.reduce(function(acc,pr){ return acc + (giorniInForzaMese(dp, pr.y, pr.m) > 0 ? 1 : 0); }, 0),   /* ver106 */
+          mesi: mesiInPeriodo(dp, b.pairs, senzaRapp),
+          mesiRatei: mesiRateiPeriodo(dp, b.pairs, senzaRapp),   /* ver104 */
+          mesiCedolini: mesiCedolinoPeriodo(dp, b.pairs, senzaRapp),   /* ver106 */
           mesiMater: 0,
           oreSett: vv.oreSett,
           minimo: (livB && MINIMI_CCNL[tab][livB]) ? MINIMI_CCNL[tab][livB] : o.minimo,
@@ -3050,6 +3087,7 @@ function CostoOrario(props){
                     <tr><td style={tdE}>Scade il</td><td style={tdV}>{scadEff(dp)}{prorogheList(dp).length ? (" — dopo " + prorogheList(dp).length + (prorogheList(dp).length===1?" proroga":" proroghe")) : ""}</td></tr> : null}
                   {cessEffStr(dp) ? <tr><td style={tdE}>Cessazione</td><td style={tdV}>{cessEffStr(dp)}</td></tr> : null}
                   <tr><td style={tdE}>Nel periodo</td><td style={tdV}>in forza per {fmt2(d.mesiAuto)} mesi · ratei (ferie, 13ª, 14ª) su {d.mesiRateiAuto} {d.mesiRateiAuto===1?"mese":"mesi"} · {d.mesiCedoAuto} {d.mesiCedoAuto===1?"cedolino":"cedolini"}</td></tr>
+                  {d.nMesiAN > 0 ? <tr><td style={tdE}>Mesi senza rapporto</td><td style={Object.assign({}, tdV, { color:"#7c4a03" })}>{d.mesiAN} — {d.nMesiAN===1?"è tutto «AN», quindi è stato escluso":"sono tutti «AN», quindi sono stati esclusi"} dal conto</td></tr> : null}
                 </tbody></table>
                 <div className="co-grid" style={grigliaCampi}>
                   {campoNum("Mesi di contratto", cMostra(d.raw.mesi, d.mesiAuto), function(v){ setPar("mesi", v); }, "proposti: " + fmt2(d.mesiAuto) + " (giorni veri) · ferie, 13ª e 14ª su " + d.mesiRateiAuto)}

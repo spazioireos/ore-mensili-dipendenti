@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver109 · 05nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver110 · 05nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -375,6 +375,41 @@ Banca ore, tetto annuo, contratti e export.
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
 
+- 🚫 **UN MESE TUTTO «AN» VUOL DIRE CHE NON C'ERA RAPPORTO** (ver110, 05/11/2026, decisione di
+  Christian: «se è tutto AN non c'è rapporto»).
+  - **Quando scatta**: `meseTuttoAN(state,dp,y,m)` è vero se **tutti** i giorni compilabili del
+    mese (quindi **non** domeniche e festivi, che dalla ver77 non si compilano) portano il codice
+    **`AN`**. ⚠️ Basta **una cella vuota, un'ora o un altro codice** e il mese torna a contare
+    normalmente — provato: scrivendo 4 ore in un giorno di luglio il mese rientra nel conto.
+  - **Cosa cambia**: quel mese **non** si paga, **non** matura ratei, **non** fa cedolino e le
+    sue **festività non si contano**. `mesiInPeriodo`, `mesiRateiPeriodo`, `mesiCedolinoPeriodo` e
+    `contaFestivita` accettano un terzo parametro **facoltativo** `escludi` (`mesiSenzaRapporto`
+    lo costruisce in `datiCosto`); senza, contano come prima. Lo usano anche i **blocchi**.
+  - **A video**: nella tabellina del contratto compare la riga **«Mesi senza rapporto»** con i
+    mesi elencati per nome: «Luglio 2026, Agosto 2026 — sono tutti «AN», quindi sono stati
+    esclusi dal conto».
+  - **Misurato in esecuzione** (15 h/sett., luglio e agosto tutti AN, periodo gen → dic):
+    | | ver109 | **ver110** |
+    |---|--:|--:|
+    | mesi · ratei · cedolini | 12,00 · 12 · 12 | **10,00 · 10 · 10** |
+    | retribuzione | 7.756,91 € | **6.464,09 €** |
+    | costo totale | 14.291,98 € | **14.026,86 €** |
+    | €/h | 19,85 | **19,48** |
+    ⚠️ Il costo scende **molto meno** dello stipendio (−265 € contro −1.293 €): con meno mesi
+    scendono anche le ore ordinarie lavorabili, quindi una fetta più grande delle ore rese
+    diventa **supplementare al +27%**. È il modello del foglio Excel, non un errore nuovo.
+  - ⚠️ **Non tocca il Tabellone**: `AN` resta quello che era (0 ore, non è un'assenza, non
+    consuma il Tetto annuo). Cambia solo il **Costo orario**.
+- 📈 **L'ADDIZIONALE SI FERMA ALLA FINE DEL RAPPORTO** (ver110, stessa richiesta: «ti do il via»).
+  `addizTDAuto` e il conteggio delle proroghe usavano `fineperiodoYmd(pairs)`, cioè la **fine del
+  periodo guardato**. Ora usano **`fineRapportoYmd(dp,pairs)`**, che si ferma alla **cessazione**
+  se è prima. Anche i blocchi (`fineB`).
+  - **Misurato** (contratto cessato il 30/06 con due proroghe registrate): la casella mostrava
+    **2,40 %** guardando gen → dic e **1,90 %** guardando gen → giu; ora mostra **1,90 %** in
+    tutti e due i casi. ⚠️ I **soldi non cambiano** in questo esempio (98,29 € e 8.504,10 € prima
+    e dopo), perché il periodo si taglia in blocchi e ogni blocco usava già il suo addizionale:
+    era la **percentuale a video** a mentire. Ma con il taglio in blocchi **disattivato** (valori
+    scritti a mano) la differenza sarebbe diventata anche denaro.
 - 🎌 **LE FESTIVITÀ SI CONTANO SOLO QUANDO IL CONTRATTO È IN PIEDI** (ver109, 05/11/2026,
   Christian: «non ti sembra che vada fatta una considerazione analoga a quella fatta per chi
   cessa prima della fine del mese o inizia durante il mese?»).
@@ -1100,7 +1135,8 @@ nei mesi lavorati, livello D1):
 
 - Se il contratto **resta in piedi** e la persona semplicemente non lavora quei due mesi (ma è
   **pagata** anche a luglio e agosto), l'app conta **12 mesi di stipendio** e le **ore dei 10
-  mesi**: è giusto così, quei due mesi si pagano davvero.
+  mesi**: è giusto così, quei due mesi si pagano davvero. ⚠️ **Dalla ver110**, se quei mesi sono
+  scritti **tutti «AN»**, l'app li considera **senza rapporto** e li esclude.
 - Se invece il rapporto **si interrompe**, va scritto nelle **date della scheda** (cessazione, e
   riassunzione quando riparte): l'app esclude da sé i mesi non coperti, anche se il periodo
   scelto è più largo.
