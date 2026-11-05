@@ -301,7 +301,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver104";
+const APP_VER = "ver105";
 const APP_DATA = "05nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -2700,7 +2700,10 @@ function calcCosto(o){
   const b28 = L18/100*(c.inail/100*c.inailPag); const J28 = b28 + b28*0.01;
   const J29 = L18*(c.irap/100*c.irapPag)/100;
   /* ver79: assistenza sanitaria proporzionata ai mesi (132/anno = 11 al mese), solo indeterminati. */
-  const J30 = o.indeterminato ? (c.sanitaria/12)*H2 : 0;     /* ver104: proporzionata ai giorni veri */
+  /* ver105 (05/11/2026, Christian: «assistenza sanitaria come ferie, permessi e ratei vari»):
+     NON proporzionata ai giorni veri, ma sui mesi che maturano i ratei (almeno 15 giorni),
+     esattamente come ferie, permessi, tredicesima e quattordicesima. */
+  const J30 = o.indeterminato ? (c.sanitaria/12)*H3 : 0;
   const J31 = c.paghe*H2;                               /* ver104: proporzionate ai giorni veri */
   /* ver79: formazione "secca" 250 per ogni anno iniziato (scelta B di Christian). */
   const J32 = c.formazione*Math.max(1, Math.ceil(H2/12));   /* ver104: anni iniziati sui mesi veri */

@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver104 · 05nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver105 · 05nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -375,6 +375,21 @@ Banca ore, tetto annuo, contratti e export.
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
 
+- 🏥 **L'ASSISTENZA SANITARIA STA COI RATEI** (ver105, 05/11/2026, Christian: «assistenza
+  sanitaria come ferie, permessi e ratei vari»). In ver104 era finita fra le voci
+  **proporzionate ai giorni veri**; è stata rimessa sui **mesi che maturano i ratei** (almeno 15
+  giorni), insieme a ferie, permessi, tredicesima e quattordicesima. Una riga sola: `J30` usa
+  **`H3`** invece di `H2`.
+  - **Misurato in esecuzione** (132 €/anno, indeterminati):
+    | | mesi proporzionati | ratei | ver104 | **ver105** |
+    |---|--:|--:|--:|--:|
+    | tutto l'anno | 12,00 | 12 | 132,00 € | **132,00 €** |
+    | dal **16/01** | 11,52 | **12** | 126,68 € | **132,00 €** |
+    | dal **20/01** | 11,39 | **11** | 125,26 € | **121,00 €** |
+    Costo totale: 12.474,12 → **12.479,45 €** (dal 16/01) e 12.121,59 → **12.117,33 €**
+    (dal 20/01). Per chi c'è tutto l'anno **non cambia nulla**.
+  - ⚠️ **Paghe e dichiarazioni** (`J31`) e gli **anni di formazione** (`J32`) restano sui **mesi
+    proporzionati**: Christian ha nominato solo l'assistenza sanitaria.
 - ⚖️ **DUE CONTEGGI DEI MESI: I GIORNI VERI E I RATEI** (ver104, 05/11/2026, Christian: «la
   retribuzione è tarata sui gg veri, tutto il resto è proporzionato, ma ferie, 13ma e 14ma
   maturano solo se ci sono almeno 15gg»). È la regola **definitiva**; supera la ver103.
@@ -386,8 +401,8 @@ Banca ore, tetto annuo, contratti e export.
   - **Chi usa quale**, dentro `calcCosto`:
     | | conteggio |
     |---|---|
-    | retribuzione mensilizzata, malattia presunta, settimane del periodo, premi, ore aggiuntive, TFR, contributi (INPS, FIS, INAIL, IRAP, addizionale), assistenza sanitaria, paghe e dichiarazioni, rimborso km «al mese», anni di formazione | **H2 = mesi proporzionati** |
-    | **ferie** (dentro `O6calc`), **tredicesima** (`J6`), **quattordicesima** (`J8`) | **H3 = mesi con almeno 15 giorni** |
+    | retribuzione mensilizzata, malattia presunta, settimane del periodo, premi, ore aggiuntive, TFR, contributi (INPS, FIS, INAIL, IRAP, addizionale), paghe e dichiarazioni, rimborso km «al mese», anni di formazione | **H2 = mesi proporzionati** |
+    | **ferie e permessi** (dentro `O6calc`), **tredicesima** (`J6`), **quattordicesima** (`J8`), **assistenza sanitaria** (`J30`, da ver105) | **H3 = mesi con almeno 15 giorni** |
   - ⚠️ **`H3` non è più `Math.round(H2)`**: è un numero suo (`o.mesiRatei`). Se i mesi sono
     **scritti a mano**, i ratei seguono quel numero arrotondato, altrimenti i due si
     contraddirebbero.
@@ -963,7 +978,7 @@ Banca ore, tetto annuo, contratti e export.
 
 ## Registro dei controlli sulle formule (da ripetere a ogni versione)
 
-Controllo fatto il **05/11/2026 sulla ver100** e **rieseguito identico sulle ver101 → ver104**, su richiesta di Christian («controlla ottimamente
+Controllo fatto il **05/11/2026 sulla ver100** e **rieseguito identico sulle ver101 → ver105**, su richiesta di Christian («controlla ottimamente
 ogni formula»). Gli attesi sono **ricalcolati da zero** in uno script separato e confrontati con
 quello che l'app mostra **davvero a video** (Playwright). Gli script stanno nella cartella di
 lavoro della sessione: `formule100.cjs`, `arrot100.cjs`, `periodo100.cjs`.
