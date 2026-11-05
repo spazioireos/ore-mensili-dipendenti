@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver97 · 05nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver98 · 05nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -375,6 +375,37 @@ Banca ore, tetto annuo, contratti e export.
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
 
+- ⏲️ **IL PERMESSO RETRIBUITO CONSUMA IL TETTO ANNUO** (ver98, 05/11/2026, decisione di
+  Christian: «il permesso potrebbe essere anche per tutto il giorno, funzionando quindi come il
+  giorno di ferie; e a mio avviso consuma certamente anche se è di un'ora»).
+  - **`prodottoMese`** (l'unica funzione che alimenta il Tetto annuo) ora fa:
+    `totOfRec + oreEroseMese + permOreMese(rec).pagate`. Il **totale teorico** del Tabellone
+    (ver97) somma gli stessi tre pezzi: i due numeri devono restare uguali, è il loro senso.
+  - ⚠️ **Contano solo i cinque tipi della tendina** (EXF, LUTTO, ELEZ, ESAMI, SIND). Quelli con
+    il **tipo scritto a mano** no: non si sa se sono retribuiti — stessa regola del Risultato del
+    mese (ver93). Provato: 1,5 h di «VISITA MEDICA» **non** entrano.
+  - ⚠️ **Il permesso non ha il barrato erosiva/non erosiva**, e non serve: sta su un giorno in
+    cui l'operatore **era al lavoro**, quindi il servizio era aperto.
+  - ⚠️ **`coverAbsHours` e `bancaMeseA` (lo straordinario) NON sono stati toccati**, e il
+    **Risultato del mese non cambia**: provato, −11,233 h prima e dopo.
+  - ⚠️ **I residui già pubblicati sono ora vecchi**: chi ha permessi registrati consuma di più.
+    Va premuto di nuovo **📤 Pubblica i residui**.
+  - **Due scritte aggiornate** perché sarebbero diventate false: la riga in fondo al Tabellone
+    («TOT teorico (assenze erosive + permessi retribuiti)») e la riga esplicativa del riquadro
+    🎯 Tetto annuo («Si consuma con le ore fatte (dal foglio), con ferie e malattia e con i
+    permessi retribuiti»). Sono due scritte **nate ieri e oggi**, non diciture storiche di
+    Christian.
+  - ⚠️ **NON toccata la frase corrispondente in Fogli ore** («Comprende le ore fatte e le assenze
+    retribuite dei giorni in cui il servizio era aperto»): è l'app degli esterni, e la frase non
+    è falsa, solo incompleta. **Da decidere con Christian.**
+  - **Misurato in esecuzione** (tetto 400 h, a.s. 2026/27; novembre: 102 h rese, 3 FERIE di cui
+    una spenta, 2 h di EXF, 1,5 h di permesso scritto a mano):
+    | | ver97 | **ver98** |
+    |---|--:|--:|
+    | TOT teorico del mese | 112,020 | **114,020** |
+    | Tetto annuo «Già usate» | 472,020 | **474,020** |
+    | Risultato del mese | −11,233 | **−11,233** |
+    | TOT calcolato (ore rese) | 102,00 | **102,00** |
 - 🧮 **IL TOTALE TEORICO NEL TABELLONE** (ver97, 05/11/2026, richiesta di Christian: «sotto il
   totale delle effettive mettimi anche il totale teorico comprendente le assenze retribuite
   erosive»). Numero nuovo **a video in due posti** (scelta di Christian: «in entrambi i posti»):
@@ -386,9 +417,9 @@ Banca ore, tetto annuo, contratti e export.
     **esattamente** il numero che consuma il Tetto annuo (`prodottoMese`), così i due si leggono
     insieme. `oreErose` è in un `useMemo`, `totTeor` e il testo del suggerimento (`TEOR_TITLE`)
     stanno accanto a `tot` in `EmployeeCard`.
-  - ⚠️ **I permessi orari NON ci entrano**: non sono giornate di assenza e non hanno il
-    contrassegno erosiva/non erosiva. Il Risultato del mese, che invece li conta (ver93), resta
-    **identico**: provato, le cinque pastiglie non si muovono di un millesimo.
+  - ⚠️ In ver97 i permessi orari **non** ci entravano; **dalla ver98 sì** (vedi sotto). Il
+    Risultato del mese resta comunque **identico**: provato, le cinque pastiglie non si muovono
+    di un millesimo.
   - ⚠️ **Nessun calcolo preesistente toccato**: si somma e si mostra. `totOfRec`, `oreEroseMese`,
     `prodottoMese`, `coverAbsHours` **invariati**.
   - **Misurato in esecuzione** (persona a 30 h/sett., novembre 2026: 17 giorni da 6 h = 102,00 h,

@@ -293,7 +293,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver97";
+const APP_VER = "ver98";
 const APP_DATA = "05nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -595,12 +595,20 @@ function svcCapAttivo(c,y,m){                                             // il 
 }
 
 /* ===== Tetto annuo (attribuzione) — progetto unico, periodo scolastico o civile ===== */
-function prodottoMese(rec,dp,y,m){                                         // ore che consumano il tetto nel mese: ore rese (celle) + assenze EROSIVE
+function prodottoMese(rec,dp,y,m){                                         // ore che consumano il tetto: ore rese + assenze EROSIVE + permessi retribuiti
   if(!rec || !recHasData(rec)) return null;
   /* ver77: le giornate spente con il clic (servizio chiuso) NON consumano piu' il tetto.
      Il predefinito resta "erosiva", quindi finche' non si spegne nulla il numero e' identico a prima.
      ⚠️ Lo straordinario (bancaMeseA) continua a usare coverAbsHours: NON e' stato toccato. */
-  return totOfRec(rec,y,m) + oreEroseMese(rec,dp,y,m);
+  /* ver98 (05/11/2026, decisione di Christian: «il permesso potrebbe essere anche per tutto
+     il giorno, funzionando quindi come il giorno di ferie; e a mio avviso consuma certamente
+     anche se e' di un'ora»): entrano anche le ore di PERMESSO RETRIBUITO (i cinque tipi della
+     tendina: EXF, LUTTO, ELEZ, ESAMI, SIND). Un permesso sta su un giorno in cui l'operatore
+     era al lavoro, quindi il servizio era aperto: conta sempre, non ha il barrato erosiva/non
+     erosiva. I permessi con il tipo scritto a mano NON contano: non si sa se sono retribuiti,
+     stessa regola del Risultato del mese (ver93).
+     ⚠️ coverAbsHours e bancaMeseA (lo straordinario) restano INVARIATI. */
+  return totOfRec(rec,y,m) + oreEroseMese(rec,dp,y,m) + permOreMese(rec).pagate;
 }
 function tettoWindow(periodo,y,m){                                         // finestra YM (incluso) del periodo che contiene (y,m)
   if(periodo==="civile") return { fromYM:y*100+1, toYM:y*100+12 };
@@ -1397,14 +1405,15 @@ function EmployeeCard(props){
   const nd = daysInMonth(y, m);
   const days = []; for (let d = 1; d <= nd; d++) days.push(d);
   const tot = useMemo(function(){ return totOfRec(rec, y, m); }, [rec, y, m]);
-  /* ver97: TOTALE TEORICO = ore effettive + ore delle giornate di assenza EROSIVE
-     (quelle non barrate col clic). E' lo stesso numero che consuma il Tetto annuo
-     (prodottoMese). I permessi orari NON ci entrano: non sono giornate di assenza
-     e non hanno il contrassegno erosiva/non erosiva. Nessun calcolo preesistente
-     e' stato toccato: qui si somma e si mostra, niente di piu'. */
+  /* ver97/ver98: TOTALE TEORICO = ore effettive + ore delle giornate di assenza
+     EROSIVE (quelle non barrate col clic) + ore di PERMESSO RETRIBUITO (i cinque
+     tipi della tendina). E' lo stesso numero che consuma il Tetto annuo
+     (prodottoMese): le due cose vanno tenute uguali. I permessi con il tipo
+     scritto a mano NON contano, come nel Risultato del mese (ver93). */
   const oreErose = useMemo(function(){ return oreEroseMese(rec, dp, y, m); }, [rec, dp, y, m]);
-  const totTeor = R2(tot + oreErose, 3);
-  const TEOR_TITLE = "Totale teorico = ore effettive + ore delle giornate di assenza EROSIVE (ferie, malattia e simili non barrate col clic). E' lo stesso numero che consuma il Tetto annuo. I permessi orari non sono compresi.";
+  const permPag  = useMemo(function(){ return permOreMese(rec).pagate; }, [rec]);
+  const totTeor = R2(tot + oreErose + permPag, 3);                  /* ver98: dentro anche i permessi retribuiti */
+  const TEOR_TITLE = "Totale teorico = ore effettive + ore delle giornate di assenza EROSIVE (ferie, malattia e simili non barrate col clic) + ore di permesso retribuito (i cinque tipi della tendina). E' lo stesso numero che consuma il Tetto annuo. I permessi con il tipo scritto a mano non sono compresi.";
 
   const mLocked = props.mLocked;
   const cellStyle = function(val, festivo, blocked){
@@ -1531,7 +1540,7 @@ function EmployeeCard(props){
       </div>
       <div className="foot-line">
         <span className="foot-tot">TOT calcolato: <b>{fmt2(tot)}</b></span>
-        <span className="foot-teor" title={TEOR_TITLE}>TOT teorico (con assenze retribuite erosive): <b>{fmt3(totTeor)}</b></span>
+        <span className="foot-teor" title={TEOR_TITLE}>TOT teorico (assenze erosive + permessi retribuiti): <b>{fmt3(totTeor)}</b></span>
         <label>Ore dichiarate (uso interno):</label>
         <input className="dich-in" value={rec.dich || ""} placeholder="—" disabled={mLocked}
           onChange={function(e){ props.onDich(dp.id, e.target.value); }} title="Ore dichiarate dal lavoratore. Se sono diverse dal totale calcolato, la differenza resta nel Conguaglio ore e te la ritrovi nei mesi dopo, finche' non la sistemi." />
@@ -1662,7 +1671,7 @@ function EmployeeCard(props){
               <span className="cong-status">{over ? "⚠️ superato" : (quasi ? "quasi finito" : "ancora disponibili")}</span>
             </div>
             <div className="cong-bar"><div className="cong-bar-fill" style={{ width: pct + "%" }}></div></div>
-            <div className="cong-res">Si consuma con le <b>ore fatte</b> (dal foglio) più <b>ferie e malattia</b>. Periodo: {per}. Le giornate di assenza <b>spente col clic</b> (servizio chiuso) non consumano. <span style={{ fontSize:"11px", color:"#9a3412" }}>Numeri a 3 decimali.</span></div>
+            <div className="cong-res">Si consuma con le <b>ore fatte</b> (dal foglio), con <b>ferie e malattia</b> e con i <b>permessi retribuiti</b>. Periodo: {per}. Le giornate di assenza <b>spente col clic</b> (servizio chiuso) non consumano. <span style={{ fontSize:"11px", color:"#9a3412" }}>Numeri a 3 decimali.</span></div>
           </div>;
         })()}
       </div>
