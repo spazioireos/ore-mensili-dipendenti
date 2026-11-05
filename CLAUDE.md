@@ -1060,6 +1060,33 @@ Banca ore, tetto annuo, contratti e export.
 - **Non toccare senza richiesta esplicita**: Banca ore, tetto annuo, `monteFissoMese`,
   `quotaGiorno`, `coverAbsHours`, gli export Excel/PDF, la generazione dei contratti.
 
+## Chi non lavora alcuni mesi dell'anno (misurato il 05/11/2026 sulla ver108)
+
+Domanda di Christian su un caso vero («non lavora luglio e agosto. Come calcoli il suo costo?»).
+Dipende **da cosa c'è scritto nella scheda**, e i numeri sono questi (15 h/sett., 72 h al mese
+nei mesi lavorati, livello D1):
+
+| Situazione | Periodo scelto | Mesi contati | Ore | Costo | €/h |
+|---|---|--:|--:|--:|--:|
+| contratto **in piedi tutto l'anno**, niente ore a luglio e agosto | gen → dic | **12,00** | 720,00 | 14.291,98 € | **19,85** |
+| la stessa persona | gen → giu | 6,00 | 432,00 | 8.471,81 € | 19,61 |
+| contratto **che finisce il 30/06** | gen → dic | **6,00** (l'app esclude da sé i mesi scoperti) | 432,00 | 8.777,08 € | **20,32** |
+| la stessa | gen → giu | 6,00 | 432,00 | 8.471,81 € | 19,61 |
+
+- Se il contratto **resta in piedi** e la persona semplicemente non lavora quei due mesi (ma è
+  **pagata** anche a luglio e agosto), l'app conta **12 mesi di stipendio** e le **ore dei 10
+  mesi**: è giusto così, quei due mesi si pagano davvero.
+- Se invece il rapporto **si interrompe**, va scritto nelle **date della scheda** (cessazione, e
+  riassunzione quando riparte): l'app esclude da sé i mesi non coperti, anche se il periodo
+  scelto è più largo.
+- 🐞 **LIMITE TROVATO IL 05/11/2026, NON CORRETTO**: le **festività** (`contaFestivita(pairs)`)
+  si contano sul **periodo scelto**, non sui mesi in cui il contratto è in piedi. Per un
+  contratto che finisce il 30/06, scegliendo gen → dic le *Festività non godute* valgono
+  **99,45 €** invece di 24,86 € e le ore ordinarie lavorabili scendono da 308,57 a 296,07:
+  il costo orario passa da **19,61 a 20,32 €/h**. **Finché non si corregge: scegliere un periodo
+  che non vada oltre la fine del contratto.** Da decidere con Christian se contare le festività
+  solo sui mesi in forza.
+
 ## Registro dei controlli sulle formule (da ripetere a ogni versione)
 
 **Controllo chiesto da Christian il 05/11/2026 («se nel costo orario chiedo costo da x a y
