@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver102 · 05nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver103 · 05nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -118,8 +118,8 @@ Banca ore, tetto annuo, contratti e export.
     registrate, modificabile a mano); **assistenza sanitaria 132 € fissi, solo indeterminati**,
     non proporzionata ai mesi — ⚠️ nel foglio Excel era legata all'addizionale
     (`F30 = SE(E26=0;100;0)`), qui è legata **al tipo di contratto**: è l'unica differenza voluta
-    rispetto all'xlsx; **mesi contati INTERI** (prudenziale) anche se il contratto inizia o
-    finisce a metà mese.
+    rispetto all'xlsx; i **mesi** erano contati **INTERI** anche con un giorno solo di contratto
+    (scelta «prudenziale» del 02/11) — ⚠️ **cambiato in ver103**: vedi la scheda sotto.
   - **Simulazione (da ver73, 03/11/2026)**: sotto le tre scelte c'è la tabellina del foglio Excel
     (`O5` → `O8`) con **due caselle scrivibili** — *Settimane del periodo* e *Settimane davvero
     lavorabili*. Scritte, prevalgono sul calcolo (`settPeriodoOv`/`settLavOv` in `calcCosto`,
@@ -375,6 +375,39 @@ Banca ore, tetto annuo, contratti e export.
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
 
+- 📆 **IL MESE PARZIALE NON VALE PIÙ UN MESE INTERO** (ver103, 05/11/2026, Christian: «se uno
+  cessa prima della fine del mese o inizia durante un mese, la retribuzione non è quella
+  completa mensile»).
+  - **Com'era**: `mesiInPeriodo` contava il mese se il contratto era in piedi **il primo oppure
+    l'ultimo giorno**. Bastava **un giorno**: chi veniva assunto il 25 si portava dietro un mese
+    pieno di stipendio, tredicesima, quattordicesima, TFR, contributi, malattia presunta e
+    settimane lavorabili.
+  - **Regola scelta da Christian** (fra tre proposte): **il mese vale 1 se il contratto copre
+    almeno 15 giorni di calendario, altrimenti 0**. È la regola dei ratei della tredicesima.
+    **Niente frazioni**: scartati i ventiseiesimi e i trentesimi.
+  - **Funzioni nuove**: `giorniInForzaMese(dp,y,m)` (conta i giorni con `inForceAt`) e
+    **`meseConta(dp,y,m)`** (1 o 0). `mesiInPeriodo` le usa; **anche `blocchiPeriodo`** usa
+    `meseConta`, altrimenti la somma dei blocchi non tornerebbe al periodo intero.
+  - 🛡️ **Guardia nuova**: con **0 mesi contati** `E18` non divide più per zero
+    (`(H2>0)? … : 0`). Provato: persona assunta il 20/12 con periodo annuale → retribuzione
+    0,00 €, costo 376,60 € (solo le spese fisse), **nessun NaN**.
+  - ⚠️ **Conseguenza da sapere**: le **ore** di quel mese continuano a contare (vengono dai
+    Riepiloghi), ma la **retribuzione no**. Quindi un mese sotto i 15 giorni **abbassa** il €/h.
+    È la conseguenza inevitabile della regola «tutto o niente» scelta; con i ventiseiesimi non
+    succederebbe. **Christian lo sa: gliel'ho scritto.**
+  - **Misurato in esecuzione** (3 persone identiche, 15 h/sett., gennaio→dicembre 2026, stesse
+    ore nei Riepiloghi, cambia solo la data di assunzione):
+    | | ver102 | **ver103** |
+    |---|--:|--:|
+    | assunta **01/01/2024** (tutti i mesi) | 13.080,54 € · 20,19 €/h | **identica** |
+    | assunta **16/01/2026** (16 gg a gennaio) | 13.080,54 € · 20,19 €/h | **identica** (il mese conta) |
+    | assunta **20/01/2026** (12 gg a gennaio) | 13.080,54 € · 20,19 €/h | **12.969,02 € · 20,01 €/h** |
+    Cessazioni: **10/12** → il mese **non** conta (retribuzione 7.110,50 invece di 7.756,91);
+    **20/12** → il mese conta, numeri invariati.
+  - ⚠️ **I costi orari calcolati finora su persone assunte o cessate a metà mese erano
+    sovrastimati.** Per chi lavora mesi interi **non cambia niente** (verificato).
+  - **Non regressione**: registro delle formule del Tabellone **rieseguito sulla ver103**,
+    stessi numeri.
 - ⛔ **LE SCRITTE NON AMMESSE NON ENTRANO PIÙ** (ver102, 05/11/2026, Christian: «volevo dire
   *inibiamo*»). La ver101 le **segnalava**; la ver102 le **impedisce**. Il rosso della ver101
   **resta**, perché serve ancora per le scritte **già nei dati** di prima.
@@ -894,7 +927,7 @@ Banca ore, tetto annuo, contratti e export.
 
 ## Registro dei controlli sulle formule (da ripetere a ogni versione)
 
-Controllo fatto il **05/11/2026 sulla ver100** e **rieseguito identico sulla ver101 e sulla ver102**, su richiesta di Christian («controlla ottimamente
+Controllo fatto il **05/11/2026 sulla ver100** e **rieseguito identico sulle ver101, ver102 e ver103**, su richiesta di Christian («controlla ottimamente
 ogni formula»). Gli attesi sono **ricalcolati da zero** in uno script separato e confrontati con
 quello che l'app mostra **davvero a video** (Playwright). Gli script stanno nella cartella di
 lavoro della sessione: `formule100.cjs`, `arrot100.cjs`, `periodo100.cjs`.

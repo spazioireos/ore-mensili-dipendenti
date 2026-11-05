@@ -301,7 +301,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver102";
+const APP_VER = "ver103";
 const APP_DATA = "05nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -2540,13 +2540,22 @@ function costoComune(state){
 function costoPar(dp){ return (dp && dp.costo) ? dp.costo : {}; }
 
 // mesi del periodo in cui il contratto e' in piedi; mese INTERO (prudenziale)
+/* ver103 (05/11/2026, Christian: «se uno cessa prima della fine del mese o inizia durante un
+   mese, la retribuzione non è quella completa mensile»). Fino alla ver102 bastava **un giorno**
+   di contratto perché il mese valesse 1 intero: chi veniva assunto il 25 si portava dietro un
+   mese di stipendio, tredicesima, ferie e contributi che non aveva maturato.
+   ⚠️ REGOLA SCELTA DA CHRISTIAN il 05/11/2026: **mese intero se il contratto copre almeno 15
+   giorni di calendario, altrimenti zero** — è la regola dei ratei della tredicesima. Niente
+   frazioni: scartate le altre due proposte (ventiseiesimi e trentesimi). */
+function giorniInForzaMese(dp, y, m){
+  const nd = daysInMonth(y, m); let n = 0;
+  for (let d = 1; d <= nd; d++){ if (inForceAt(dp, y*10000 + m*100 + d)) n++; }
+  return n;
+}
+function meseConta(dp, y, m){ return giorniInForzaMese(dp, y, m) >= 15 ? 1 : 0; }
 function mesiInPeriodo(dp, pairs){
   let n=0;
-  pairs.forEach(function(pr){
-    const primo = pr.y*10000 + pr.m*100 + 1;
-    const ultimo = pr.y*10000 + pr.m*100 + daysInMonth(pr.y, pr.m);
-    if (inForceAt(dp, primo) || inForceAt(dp, ultimo)) n++;
-  });
+  pairs.forEach(function(pr){ n += meseConta(dp, pr.y, pr.m); });
   return n;
 }
 // ore davvero lavorate nel periodo: stesso conto dei Riepiloghi (le assenze valgono 0)
@@ -2651,7 +2660,7 @@ function calcCosto(o){
   const O8 = O6*O2;                                     // ore ordinarie lavorate
   const O11 = o.sottoSoglia||0;
   const G38 = (o.oreManuali>0)? o.oreManuali : 0;
-  const E18 = (G38>0)? Math.max(0,(G38-O8+O11*H2))/H2 : P2*(c.suppPct/100);
+  const E18 = (G38>0)? ((H2>0)? Math.max(0,(G38-O8+O11*H2))/H2 : 0) : P2*(c.suppPct/100);   /* ver103: con 0 mesi non si divide */
   const H18 = E18*(J2 + ((O2>=38)? (K/165*15/100) : (J2*27/100)));
   const J18 = H18*H2;                                   // ore aggiuntive
   const J17 = (o.premiMese||0)*(H2-(o.premiMesiTolti||0));
@@ -2764,7 +2773,7 @@ function datiCosto(state, dp, pairs){
         const fineB = (function(){ const u=b.pairs[b.pairs.length-1]; return u.y*10000+u.m*100+daysInMonth(u.y,u.m); })();
         const ff = contaFestivita(b.pairs);
         const ob = Object.assign({}, o, {
-          mesi: b.pairs.length, mesiMater: 0,
+          mesi: b.pairs.reduce(function(acc,pr){ return acc + meseConta(dp, pr.y, pr.m); }, 0), mesiMater: 0,   /* ver103: stessa regola del periodo intero */
           oreSett: vv.oreSett,
           minimo: (livB && MINIMI_CCNL[tab][livB]) ? MINIMI_CCNL[tab][livB] : o.minimo,
           indeterminato: indetB,
