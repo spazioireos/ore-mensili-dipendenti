@@ -111,6 +111,7 @@
   .dich-in { width:80px; border:2px solid #f59e0b; background:#fffde7; border-radius:6px; padding:4px 6px; font-family:inherit; font-size:14px; font-weight:800; text-align:center; }
   .teor-abs { font-size:9px; font-weight:800; color:#7c2d12; text-align:center; line-height:1.1; margin-top:1px; cursor:pointer; border-radius:3px; }
   /* ver91: il permesso orario si LEGGE nel Tabellone, non solo nel pallino viola */
+  .perm-lbl.no-ero { color:#64748b; background:#f1f5f9; border-color:#cbd5e1; text-decoration:line-through; }
   .perm-lbl { font-size:10px; font-weight:800; color:#4c1d95; background:#ede9fe; border:1px solid #a78bfa; border-radius:4px; text-align:center; line-height:1.25; margin-top:1px; padding:0 2px; cursor:pointer;
               white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:66px; }
   .perm-lbl:hover { background:#ddd6fe; }
@@ -293,7 +294,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver98";
+const APP_VER = "ver99";
 const APP_DATA = "05nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -567,6 +568,23 @@ function permOreMese(rec){
 }
 function eroOn(rec,d){ return !(rec && rec.ero && rec.ero[d] === false); }   // predefinito: erosiva
 function isAbsCell(v){ const c=String(v==null?"":v).trim(); return !!(CODE_SET[c] && c!=="--" && c!=="AN"); }
+/* ver99 (05/11/2026, Christian: «potrebbe essere di un giorno durante le vacanze natalizie in
+   luogo del giorno di ferie, quindi e' erosivo o non erosivo anche esso»): ore di permesso
+   RETRIBUITO delle sole giornate EROSIVE. Il contrassegno e' quello del GIORNO (`rec.ero[d]`),
+   lo stesso delle assenze: dice se quel giorno il servizio era aperto, e vale per tutto cio'
+   che sta su quel giorno. ⚠️ `permOreMese` NON e' stata toccata: il Risultato del mese continua
+   a contare TUTTI i permessi retribuiti, come lo straordinario conta tutte le assenze. */
+function permOreEroseMese(rec){
+  const P = (rec && rec.permessi) ? rec.permessi : {};
+  let pag = 0;
+  Object.keys(P).forEach(function(d){
+    if (!eroOn(rec,d)) return;
+    const v = P[d]; const o = Number(v && v.ore) || 0;
+    if (!(o > 0)) return;
+    if (PERM_CODES.indexOf(String((v && v.tipo) || "").trim().toUpperCase()) !== -1) pag += o;
+  });
+  return R2(pag,3);
+}
 function oreEroseMese(rec,dp,y,m){                                         // ore bruciate dalle assenze del mese
   if(!rec||!rec.giorni) return 0;
   const q=quotaGiorno(dp,y,m); const nd=daysInMonth(y,m); let days=0;
@@ -608,7 +626,7 @@ function prodottoMese(rec,dp,y,m){                                         // or
      erosiva. I permessi con il tipo scritto a mano NON contano: non si sa se sono retribuiti,
      stessa regola del Risultato del mese (ver93).
      ⚠️ coverAbsHours e bancaMeseA (lo straordinario) restano INVARIATI. */
-  return totOfRec(rec,y,m) + oreEroseMese(rec,dp,y,m) + permOreMese(rec).pagate;
+  return totOfRec(rec,y,m) + oreEroseMese(rec,dp,y,m) + permOreEroseMese(rec);
 }
 function tettoWindow(periodo,y,m){                                         // finestra YM (incluso) del periodo che contiene (y,m)
   if(periodo==="civile") return { fromYM:y*100+1, toYM:y*100+12 };
@@ -1411,7 +1429,7 @@ function EmployeeCard(props){
      (prodottoMese): le due cose vanno tenute uguali. I permessi con il tipo
      scritto a mano NON contano, come nel Risultato del mese (ver93). */
   const oreErose = useMemo(function(){ return oreEroseMese(rec, dp, y, m); }, [rec, dp, y, m]);
-  const permPag  = useMemo(function(){ return permOreMese(rec).pagate; }, [rec]);
+  const permPag  = useMemo(function(){ return permOreEroseMese(rec); }, [rec]);   /* ver99: solo le giornate erosive */
   const totTeor = R2(tot + oreErose + permPag, 3);                  /* ver98: dentro anche i permessi retribuiti */
   const TEOR_TITLE = "Totale teorico = ore effettive + ore delle giornate di assenza EROSIVE (ferie, malattia e simili non barrate col clic) + ore di permesso retribuito (i cinque tipi della tendina). E' lo stesso numero che consuma il Tetto annuo. I permessi con il tipo scritto a mano non sono compresi.";
 
@@ -1516,8 +1534,8 @@ function EmployeeCard(props){
                       title={perm ? ("Permesso orario " + fmt2(perm.ore) + " h (" + perm.tipo + ") — clic per modificare") : "Aggiungi permesso orario"}
                       onClick={function(){ props.onOpenPerm(dp.id, d); }}></button> : null}
                   </div>
-                  {perm ? <div className="perm-lbl" role="button" tabIndex={0}
-                      title={"Permesso orario " + fmt2(perm.ore) + " h (" + perm.tipo + ") — clic per modificare"}
+                  {perm ? <div className={"perm-lbl" + (eroOn(rec,d) ? "" : " no-ero")} role="button" tabIndex={0}
+                      title={"Permesso orario " + fmt2(perm.ore) + " h (" + perm.tipo + ") — clic per modificare" + (eroOn(rec,d) ? "" : " — giornata NON erosiva: il servizio era chiuso, non consuma il massimale")}
                       onClick={function(){ if(!nonScriv) props.onOpenPerm(dp.id, d); }}
                       onKeyDown={function(e){ if(!nonScriv && (e.key==="Enter"||e.key===" ")){ e.preventDefault(); props.onOpenPerm(dp.id, d); } }}
                       >+{fmt2(perm.ore)} h {perm.tipo}</div> : null}
@@ -3608,13 +3626,17 @@ function PermModal(props){
   const [altro, setAltro] = useState(cur.tipo !== undefined && cur.tipo !== "" && !knownTipo);
   const [tipo, setTipo] = useState(knownTipo ? cur.tipo : "");
   const [altroTxt, setAltroTxt] = useState((cur.tipo !== undefined && !knownTipo) ? cur.tipo : "");
+  /* ver99: il contrassegno EROSIVA/NON EROSIVA del giorno, lo stesso delle assenze. Spuntato =
+     servizio chiuso = non consuma il massimale. E' un dato del GIORNO: se quel giorno c'e'
+     anche un'assenza, il barrato cambia anche a lei. */
+  const [chiuso, setChiuso] = useState(props.ero === false);
   const esiste = props.perm && props.perm.ore !== undefined;
   const save = function(){
     const oreNum = parseFloat(String(ore).replace(",", "."));
     if (isNaN(oreNum) || oreNum <= 0){ window.alert("Indica un numero di ore valido (> 0)."); return; }
     const t = altro ? altroTxt.trim().toUpperCase() : tipo;
     if (t === ""){ window.alert("Indica il tipo di permesso."); return; }
-    props.onSave({ ore: Math.round(oreNum * 100) / 100, tipo: t });
+    props.onSave({ ore: Math.round(oreNum * 100) / 100, tipo: t }, !chiuso);   /* ver99: secondo argomento = giornata erosiva si/no */
   };
   return (
     <div className="overlay" onClick={props.onClose}>
@@ -3636,6 +3658,13 @@ function PermModal(props){
         </div>
         {altro ? <div className="field"><label>Tipo (testo libero)</label>
           <input value={altroTxt} onChange={function(e){ setAltroTxt(e.target.value.toUpperCase()); }} placeholder="es. VISITA MEDICA" /></div> : null}
+        <div style={{ marginTop:"8px", padding:"7px 9px", background:"#f8fafc", border:"1px solid #cbd5e1", borderRadius:"8px" }}>
+          <label style={{ display:"flex", alignItems:"center", gap:"8px", fontSize:"12.5px", fontWeight:700, color:"#334155", cursor:"pointer" }}>
+            <input type="checkbox" checked={chiuso} onChange={function(e){ setChiuso(e.target.checked); }} style={{ width:"18px", height:"18px", cursor:"pointer" }} />
+            Quel giorno il servizio era chiuso
+          </label>
+          <div style={{ fontSize:"11.5px", color:"#64748b", marginTop:"3px", lineHeight:"1.35" }}>Se spunti, questo permesso <b>non consuma il Tetto annuo</b> (es. un permesso preso durante le vacanze al posto di un giorno di ferie). Vale per tutto il giorno: se lo stesso giorno c'è anche un'assenza, cambia anche per lei.</div>
+        </div>
         <div className="modal-actions">
           <span>{esiste ? <button className="btn btn-red" onClick={function(){ if (window.confirm("Rimuovere il permesso orario del giorno " + props.day + "?")) props.onDelete(); }}>Rimuovi</button> : null}</span>
           <span>
@@ -4319,6 +4348,18 @@ function App(){
   const ensureRec = function(next, dipId){ const mk = monthKey(anno, mese); if (!next.dati[mk]) next.dati[mk] = {}; if (!next.dati[mk][dipId]) next.dati[mk][dipId] = { giorni:{}, nota:"", voci:[] }; if (!Array.isArray(next.dati[mk][dipId].voci)) next.dati[mk][dipId].voci = []; return next.dati[mk][dipId]; };
   const onOpenPerm = function(dipId, day){ setPermModal({ dipId:dipId, day:day }); };
   const onPermSave = function(dipId, day, obj){ const next = JSON.parse(JSON.stringify(state)); const rec = ensureRec(next, dipId); if (!rec.permessi) rec.permessi = {}; rec.permessi[day] = obj; touch(next); setPermModal(null); showToast("Permesso orario salvato"); };
+  /* ver99: salva il permesso E il contrassegno erosiva/non erosiva in UNA SOLA copia dello
+     stato. ⚠️ Chiamare onPermSave e onEro una dopo l'altra NON funzionerebbe: ciascuna parte
+     dalla stessa copia di `state` e la seconda cancellerebbe il lavoro della prima. */
+  const onPermSaveEro = function(dipId, day, obj, erosiva){
+    const next = JSON.parse(JSON.stringify(state));
+    const rec = ensureRec(next, dipId);
+    if (!rec.permessi) rec.permessi = {};
+    rec.permessi[day] = obj;
+    if (erosiva){ if (rec.ero){ delete rec.ero[day]; if (!Object.keys(rec.ero).length) delete rec.ero; } }
+    else { if (!rec.ero) rec.ero = {}; rec.ero[day] = false; }
+    touch(next); setPermModal(null); showToast("Permesso orario salvato");
+  };
   const onPermDelete = function(dipId, day){ const next = JSON.parse(JSON.stringify(state)); const rec = ensureRec(next, dipId); if (rec.permessi) delete rec.permessi[day]; touch(next); setPermModal(null); showToast("Permesso orario rimosso"); };
   const onDich = function(dipId, value){ const next = JSON.parse(JSON.stringify(state)); ensureRec(next, dipId).dich = value; touch(next); };
   const onAzzeraSaldo = function(dipId){
@@ -4647,8 +4688,8 @@ function App(){
       {permModal ? (function(){
         const rc = getRecFrom(state, anno, mese, permModal.dipId);
         const cur = (rc.permessi && rc.permessi[permModal.day]) ? rc.permessi[permModal.day] : null;
-        return <PermModal perm={cur} day={permModal.day} mese={mese} anno={anno}
-          onSave={function(obj){ onPermSave(permModal.dipId, permModal.day, obj); }}
+        return <PermModal perm={cur} day={permModal.day} mese={mese} anno={anno} ero={eroOn(rc, permModal.day)}
+          onSave={function(obj, erosiva){ onPermSaveEro(permModal.dipId, permModal.day, obj, erosiva); }}
           onDelete={function(){ onPermDelete(permModal.dipId, permModal.day); }}
           onClose={function(){ setPermModal(null); }} />;
       })() : null}

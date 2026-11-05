@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver98 · 05nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver99 · 05nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -375,6 +375,32 @@ Banca ore, tetto annuo, contratti e export.
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
 
+- 🎄 **ANCHE IL PERMESSO PUÒ ESSERE NON EROSIVO** (ver99, 05/11/2026, Christian: «potrebbe essere
+  di un giorno durante le vacanze natalizie in luogo del giorno di ferie, quindi è erosivo o non
+  erosivo anche esso»).
+  - **Il contrassegno è del GIORNO, non della scrittura**: si usa lo stesso `rec.ero[d]` delle
+    assenze. Dice «quel giorno il servizio era aperto/chiuso» e vale per **tutto** ciò che sta su
+    quel giorno. Se lo stesso giorno ha un'assenza **e** un permesso, il barrato vale per
+    entrambi — ed è giusto così, perché il servizio o era aperto o non lo era.
+  - **Dove si spegne**: nella finestra del permesso, spunta **«Quel giorno il servizio era
+    chiuso»** (dicitura nuova, di Claude: non è una dicitura storica di Christian). La targhetta
+    viola nel Tabellone diventa **barrata e grigia** (`.perm-lbl.no-ero`), come il numerino delle
+    assenze.
+  - **Funzione nuova `permOreEroseMese(rec)`** (sotto `isAbsCell`): ore di permesso retribuito
+    delle **sole** giornate erosive. La usano `prodottoMese` (Tetto annuo) e il totale teorico
+    del Tabellone. ⚠️ **`permOreMese` NON è stata toccata**: il Risultato del mese continua a
+    contare **tutti** i permessi retribuiti, come lo straordinario conta tutte le assenze.
+  - ⚠️ **Trappola evitata**: il permesso e il contrassegno si salvano con **una sola copia dello
+    stato** (`onPermSaveEro`). Chiamare `onPermSave` e poi `onEro` **non funziona**: partono
+    tutte e due dalla stessa copia di `state` e la seconda cancella il lavoro della prima.
+  - **Provato in esecuzione** (stesso caso della ver98, 2 h di EXF il giorno 10):
+    | | prima | spunta messa | spunta tolta |
+    |---|--:|--:|--:|
+    | TOT teorico | 114,020 | **112,020** | 114,020 |
+    | Tetto annuo «Già usate» | 474,020 | **472,020** | 474,020 |
+    | Risultato del mese | −11,233 | **−11,233** | −11,233 |
+    Riaprendo la finestra il permesso è ancora lì (2 h, EXF) con la spunta accesa; la targhetta
+    risulta barrata. Zero errori di pagina.
 - ⏲️ **IL PERMESSO RETRIBUITO CONSUMA IL TETTO ANNUO** (ver98, 05/11/2026, decisione di
   Christian: «il permesso potrebbe essere anche per tutto il giorno, funzionando quindi come il
   giorno di ferie; e a mio avviso consuma certamente anche se è di un'ora»).
@@ -384,8 +410,9 @@ Banca ore, tetto annuo, contratti e export.
   - ⚠️ **Contano solo i cinque tipi della tendina** (EXF, LUTTO, ELEZ, ESAMI, SIND). Quelli con
     il **tipo scritto a mano** no: non si sa se sono retribuiti — stessa regola del Risultato del
     mese (ver93). Provato: 1,5 h di «VISITA MEDICA» **non** entrano.
-  - ⚠️ **Il permesso non ha il barrato erosiva/non erosiva**, e non serve: sta su un giorno in
-    cui l'operatore **era al lavoro**, quindi il servizio era aperto.
+  - ⚠️ In ver98 il permesso **non** aveva il barrato erosiva/non erosiva; **dalla ver99 ce l'ha**
+    (vedi sotto): Christian ha fatto notare che un permesso può essere preso **durante le
+    vacanze** al posto di un giorno di ferie.
   - ⚠️ **`coverAbsHours` e `bancaMeseA` (lo straordinario) NON sono stati toccati**, e il
     **Risultato del mese non cambia**: provato, −11,233 h prima e dopo.
   - ⚠️ **I residui già pubblicati sono ora vecchi**: chi ha permessi registrati consuma di più.
