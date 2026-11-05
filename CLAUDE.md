@@ -999,6 +999,26 @@ Banca ore, tetto annuo, contratti e export.
 
 ## Registro dei controlli sulle formule (da ripetere a ogni versione)
 
+**Controllo chiesto da Christian il 05/11/2026 («se nel costo orario chiedo costo da x a y
+verifica che si aggiorni la casella che indica il totale mesi considerati»). ESEGUITO E
+SUPERATO sulla ver106**, cambiando davvero le tendine del periodo nel browser (script
+`periodoUI.cjs` e `periodoUI2.cjs`). Persona assunta il **16/01/2026**, 15 h/sett.:
+
+| Periodo scelto | Casella «Mesi di contratto» | Riga del contratto | Retribuzione |
+|---|--:|---|--:|
+| Gennaio → Dicembre 2026 | **11,52** | 11,52 mesi · ratei su 12 · 12 cedolini | 7.444,05 € |
+| **Marzo → Giugno 2026** | **4** | 4,00 mesi · ratei su 4 · 4 cedolini | 2.585,64 € |
+| **Gennaio → Febbraio 2026** | **1,52** | 1,52 mesi · ratei su 2 · 2 cedolini | 979,96 € |
+
+Si aggiornano **tutti e tre i conteggi**, l'aiutino sotto la casella e tutti gli importi.
+⚠️ **Un solo caso in cui la casella NON segue il periodo, ed è voluto**: se il numero dei mesi
+è stato **scritto a mano**, quello prevale (provato: scritto 6, cambiato periodo in marzo→giugno,
+la casella resta 6 e la retribuzione resta 3.878,46 €). La riga «in forza per…» però **cambia lo
+stesso**, quindi la differenza si vede. **Svuotando la casella** il valore automatico torna
+subito (4,00 → 2.585,64 €). Se servisse un avviso quando il numero scritto a mano non coincide
+con quello calcolato, **va chiesto**: oggi non c'è.
+
+
 Controllo fatto il **05/11/2026 sulla ver100** e **rieseguito identico sulle ver101 → ver106**, su richiesta di Christian («controlla ottimamente
 ogni formula»). Gli attesi sono **ricalcolati da zero** in uno script separato e confrontati con
 quello che l'app mostra **davvero a video** (Playwright). Gli script stanno nella cartella di

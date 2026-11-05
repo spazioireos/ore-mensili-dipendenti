@@ -2539,7 +2539,7 @@ function costoComune(state){
 }
 function costoPar(dp){ return (dp && dp.costo) ? dp.costo : {}; }
 
-// mesi del periodo in cui il contratto e' in piedi; mese INTERO (prudenziale)
+// mesi del periodo in cui il contratto e' in piedi (vedi i tre conteggi qui sotto)
 /* ver103 (05/11/2026, Christian: «se uno cessa prima della fine del mese o inizia durante un
    mese, la retribuzione non è quella completa mensile»). Fino alla ver102 bastava **un giorno**
    di contratto perché il mese valesse 1 intero: chi veniva assunto il 25 si portava dietro un
