@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver99 · 05nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver100 · 05nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -375,6 +375,40 @@ Banca ore, tetto annuo, contratti e export.
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
 
+- 🧱 **IL MASSIMALE SI PUÒ SCRIVERE SERVIZIO PER SERVIZIO** (ver100, 05/11/2026, richiesta di
+  Christian: «sarebbe bello che esso derivasse dalla somma di servizi da me inseriti
+  singolarmente … più celle, una per servizio, con il loro massimale proprio, che danno poi un
+  massimale complessivo». **Nu\* dato.**)
+  - **Dati**: una voce di `tettiAnnui` può portare con sé `voci: [{nome, ore}]`. Il campo `ore`
+    del massimale **resta quello di sempre, già sommato**, quindi `tettiList` e `tettoForPeriod`
+    **non cambiano** e **nessun calcolo è stato toccato**. `patchTetti` ricalcola `ore` dalla
+    somma delle voci ogni volta che salva.
+  - **Funzioni nuove** (sopra `tettoStartYear`): `tettoVoci(t)`, `tettoVociSomma(voci)`,
+    `tettoEntryForPeriod(dp,y,m)` (gemella di `tettoForPeriod`, ma torna la voce intera).
+  - **A video**: nel modulo «+ Aggiungi massimale» c'è il riquadro «Oppure scrivilo servizio per
+    servizio» con «+ Aggiungi servizio»; appena c'è una riga, la casella *Ore massime nell'anno*
+    diventa **di sola lettura** e mostra la somma. Nell'elenco, sotto il massimale, si legge
+    «CAG 200,00 h · CASA DI QUARTIERE 208,50 h»; lo stesso dettaglio compare nel riquadro
+    **🎯 Tetto annuo** della vista del mese, sotto la barra («Come è diviso: …»).
+  - ⚠️ **Il dettaglio vale solo per l'ASSEGNAZIONE.** Quante ore ha consumato ciascun servizio
+    l'app **non lo sa**: nel Tabellone il giorno è **un numero solo** e non porta il servizio.
+    Christian lo sa (gli è stato scritto prima di costruire) e il riquadro lo dice a video.
+    Per il consumo per servizio servirebbe cambiare il modello dei dati (una riga per servizio
+    per ogni giorno): **non fatto, da decidere**.
+  - **Validazione**: una riga vale solo se ha **nome e ore > 0**; le righe del tutto vuote si
+    buttano in silenzio, quelle a metà **fermano** il salvataggio con il messaggio «In ogni riga
+    per servizio servono sia il nome sia le ore (maggiori di zero)».
+  - **La strada vecchia resta**: senza righe, si scrive il totale e basta — provato.
+  - **Provato in esecuzione**: 200 + 208,5 → totale **408,50** mostrato mentre si scrive e
+    salvato; elenco con il dettaglio; nel mese «Massimo dell'anno: 408,500 h» e «Come è diviso:
+    CAG 200,00 h · CASA DI QUARTIERE 208,50 h»; un massimale **vecchio** (solo numero, 300 h) si
+    comporta **esattamente come prima**; la ✕ cancella il massimale giusto e **le voci degli
+    altri restano**. Zero errori di pagina.
+- 🧭 **COME SI DIVIDONO I MASSIMALI FRA LE DUE APP** (decisione di Christian, 05/11/2026):
+  **Fogli ore** → massimali **solo per i collaboratori esterni** (per servizio, con *METTI UN
+  TETTO*), perché loro non hanno ferie né altro di retribuito ed erosivo. **Dipendenti** →
+  **massimale complessivo** per persona, scritto anche servizio per servizio (ver100). Quando si
+  preme 📤 Pubblica i residui, **il dipendente vede solo il residuo complessivo**: va bene così.
 - 🎄 **ANCHE IL PERMESSO PUÒ ESSERE NON EROSIVO** (ver99, 05/11/2026, Christian: «potrebbe essere
   di un giorno durante le vacanze natalizie in luogo del giorno di ferie, quindi è erosivo o non
   erosivo anche esso»).

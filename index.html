@@ -294,7 +294,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver99";
+const APP_VER = "ver100";
 const APP_DATA = "05nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -678,6 +678,27 @@ function ferieMaturato(dp, year){ return R2(FERIE_GG_MESE*mesiInForzaAnno(dp,yea
 function ferieResiduo(state, dp, year){ return R2((ferieMaturato(dp,year)-ferieGodute(state,dp,year)),3); }
 function annoHasData(state, year){ const ks=Object.keys(state.dati||{}); for(let i=0;i<ks.length;i++){ if(ks[i].indexOf(String(year)+"-")===0) return true; } return false; }
 function tettiList(dp){ return (Array.isArray(dp.tettiAnnui)?dp.tettiAnnui:[]).map(function(t){ return { anno:parseInt(t&&t.anno,10)||0, ore:parseFloat(String(t&&t.ore).replace(",",".")) }; }).filter(function(t){ return !isNaN(t.ore) && t.ore>0; }).sort(function(a,b){ return a.anno-b.anno; }); }
+/* ver100 (05/11/2026, richiesta di Christian: «sarebbe bello che esso derivasse dalla somma di
+   servizi da me inseriti singolarmente … più celle, una per servizio, con il loro massimale
+   proprio, che danno poi un massimale complessivo»). Un massimale può portare con sé un elenco
+   di VOCI {nome, ore}: la loro somma è il tetto dell'anno. ⚠️ Il campo `ore` del massimale
+   resta quello di sempre, scritto già sommato: `tettiList` e `tettoForPeriod` NON cambiano, e
+   nessun calcolo è stato toccato. ⚠️ Le voci dicono solo COME È STATO ASSEGNATO il tetto:
+   quante ore ha CONSUMATO ciascun servizio l'app non lo sa, perché nel Tabellone il giorno è un
+   numero solo e non porta il servizio. */
+function tettoVoci(t){
+  return (t && Array.isArray(t.voci) ? t.voci : []).map(function(v){
+    return { nome:String((v&&v.nome)||"").trim(), ore:parseFloat(String(v&&v.ore).replace(",",".")) };
+  }).filter(function(v){ return v.nome!=="" && !isNaN(v.ore) && v.ore>0; });
+}
+function tettoVociSomma(voci){ let s=0; (voci||[]).forEach(function(v){ s += Number(v.ore)||0; }); return R2(s,3); }
+function tettoEntryForPeriod(dp,y,m){                                      // il massimale vigente, con le sue voci
+  const sy=tettoStartYear(dp,y,m);
+  const raw=(Array.isArray(dp.tettiAnnui)?dp.tettiAnnui:[]).slice().sort(function(a,b){ return (parseInt(a&&a.anno,10)||0)-(parseInt(b&&b.anno,10)||0); });
+  let cur=null;
+  raw.forEach(function(t){ const n=parseFloat(String(t&&t.ore).replace(",",".")); if(!isNaN(n)&&n>0&&(parseInt(t.anno,10)||0)<=sy) cur=t; });
+  return cur;
+}
 function tettoStartYear(dp,y,m){ return (dp.tettoPeriodo==="civile") ? y : (m>=9 ? y : y-1); } // anno iniziale del periodo che contiene (y,m)
 function tettoForPeriod(dp,y,m){ const sy=tettoStartYear(dp,y,m); const list=tettiList(dp); let val=0; list.forEach(function(t){ if(t.anno<=sy) val=t.ore; }); return val; } // tetto vigente (l'ultimo <= anno), 0 se nessuno
 function valoriNow(dp){ return valoriAt(dp, 9999, 12); }
@@ -1689,6 +1710,14 @@ function EmployeeCard(props){
               <span className="cong-status">{over ? "⚠️ superato" : (quasi ? "quasi finito" : "ancora disponibili")}</span>
             </div>
             <div className="cong-bar"><div className="cong-bar-fill" style={{ width: pct + "%" }}></div></div>
+            {(function(){
+              const vv = tettoVoci(tettoEntryForPeriod(dp, y, m));
+              if (!vv.length) return null;
+              return <div style={{ fontSize:"12.5px", color:"#334155", marginTop:"4px", lineHeight:1.45 }}>
+                <b>Come è diviso:</b> {vv.map(function(v,k){ return <span key={"tv"+k}>{k ? " · " : ""}{v.nome} <b>{fmt2(v.ore)} h</b></span>; })}
+                <span style={{ color:"#64748b" }}> — è l'assegnazione; le ore consumate sono complessive.</span>
+              </div>;
+            })()}
             <div className="cong-res">Si consuma con le <b>ore fatte</b> (dal foglio), con <b>ferie e malattia</b> e con i <b>permessi retribuiti</b>. Periodo: {per}. Le giornate di assenza <b>spente col clic</b> (servizio chiuso) non consumano. <span style={{ fontSize:"11px", color:"#9a3412" }}>Numeri a 3 decimali.</span></div>
           </div>;
         })()}
@@ -2049,6 +2078,7 @@ function SchedaContratto(props){
   const [otOre, setOtOre] = useState("");
   const [ntTettoAnno, setNtTettoAnno] = useState("");
   const [ntTettoOre, setNtTettoOre] = useState("");
+  const [ntVoci, setNtVoci] = useState([]);            /* ver100: righe servizio+ore del massimale */
   // i quattro "+ Aggiungi ..." ora APRONO le caselle, che prima stavano sempre a vista
   const [apPro, setApPro] = useState(false);
   const [apTra, setApTra] = useState(false);
@@ -2133,20 +2163,44 @@ function SchedaContratto(props){
     return (Number.isInteger(n)?String(n):fmt2(n)) + " ore — " + lab;
   };
   const patchTetti = function(lista){
-    const out = lista.map(function(t){ return { anno: parseInt(t.anno,10)||0, ore: String(t.ore).trim() }; })
+    /* ver100: se il massimale ha delle VOCI (servizio + ore), il campo `ore` viene riscritto
+       con la loro somma. Così tutto il resto dell'app continua a leggere un numero solo. */
+    const out = lista.map(function(t){
+        const vv = tettoVoci(t);
+        const ore = vv.length ? String(tettoVociSomma(vv)) : String(t.ore).trim();
+        const o = { anno: parseInt(t.anno,10)||0, ore: ore };
+        if (vv.length) o.voci = vv.map(function(v){ return { nome:v.nome, ore:String(v.ore) }; });
+        return o;
+      })
       .filter(function(t){ const nn=parseFloat(String(t.ore).replace(",",".")); return !isNaN(nn) && nn>0; })
       .sort(function(a,b){ return a.anno-b.anno; });
     let legacy = "";
     if(out.length){ const base=out.filter(function(t){ return t.anno===0; }); legacy = base.length ? base[0].ore : out[0].ore; }
     patch({ tettiAnnui: out, tettoAnnuo: legacy });
   };
+  /* ver100: le righe servizio+ore. Una riga vale solo se ha IL NOME e ORE > 0; quelle lasciate
+     del tutto vuote si buttano senza dire niente, quelle a metà fermano il salvataggio. */
+  const vociValide = ntVoci.filter(function(v){ const n=parseFloat(String(v.ore).replace(",",".")); return String(v.nome).trim()!=="" && !isNaN(n) && n>0; });
+  const vociVuote  = ntVoci.filter(function(v){ return String(v.nome).trim()==="" && String(v.ore).trim()===""; });
+  const vociMezze  = ntVoci.length - vociValide.length - vociVuote.length;
+  const sommaVoci  = tettoVociSomma(vociValide.map(function(v){ return { ore: parseFloat(String(v.ore).replace(",",".")) }; }));
+  const addVoce = function(){ setNtVoci(ntVoci.concat([{ nome:"", ore:"" }])); };
+  const setVoce = function(i, campo, val){ setNtVoci(ntVoci.map(function(v,k){ if(k!==i) return v; const n=Object.assign({},v); n[campo]=val; return n; })); };
+  const delVoce = function(i){ setNtVoci(ntVoci.filter(function(_,k){ return k!==i; })); };
   const addTetto = function(){
+    const anno = String(ntTettoAnno).replace(/[^0-9]/g,"").slice(0,4);
+    if (ntVoci.length > 0){
+      if (vociMezze > 0){ setErrTet("In ogni riga per servizio servono sia il nome sia le ore (maggiori di zero)."); return false; }
+      if (vociValide.length === 0){ setErrTet("Scrivi almeno un servizio con le sue ore, oppure togli le righe e metti il totale."); return false; }
+      patchTetti(tetti.concat([{ anno: anno, ore: String(sommaVoci), voci: vociValide.map(function(v){ return { nome:String(v.nome).trim(), ore:String(v.ore).trim() }; }) }]));
+      setNtTettoAnno(""); setNtTettoOre(""); setNtVoci([]); setErrTet(""); return true;
+    }
     const oreV=String(ntTettoOre).replace(",",".").trim();
     if(oreV==="" || isNaN(Number(oreV)) || Number(oreV)<=0){ setErrTet("Scrivi un numero di ore maggiore di zero (es. 500)."); return false; }
-    patchTetti(tetti.concat([{ anno: String(ntTettoAnno).replace(/[^0-9]/g,"").slice(0,4), ore: String(ntTettoOre).trim() }]));
-    setNtTettoAnno(""); setNtTettoOre(""); setErrTet(""); return true;
+    patchTetti(tetti.concat([{ anno: anno, ore: String(ntTettoOre).trim() }]));
+    setNtTettoAnno(""); setNtTettoOre(""); setNtVoci([]); setErrTet(""); return true;
   };
-  const chiudiTet = function(){ setApTet(false); setNtTettoAnno(""); setNtTettoOre(""); setErrTet(""); };
+  const chiudiTet = function(){ setApTet(false); setNtTettoAnno(""); setNtTettoOre(""); setNtVoci([]); setErrTet(""); };
   const delTetto = function(i){ patchTetti(tetti.filter(function(_,k){ return k!==i; })); };
 
   const box = function(colore, bordo){ return { background:colore, border:"1px solid "+bordo, borderRadius:"10px", padding:"12px", marginBottom:"12px" }; };
@@ -2281,21 +2335,45 @@ function SchedaContratto(props){
         {tetti.length===0 ? <div style={{ fontSize:"12px", color:"#64748b", margin:"4px 0" }}>Nessun massimale impostato.</div> :
           <div style={{ margin:"6px 0" }}>
             {tetti.map(function(tt,i){ return (
-              <div key={"m"+i} style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"4px", fontSize:"13px" }}>
-                <span style={{ fontWeight:700 }}>🎯 {tettoRowLabel(tt)}</span>
-                <button className="voce-del" title="Rimuovi questo massimale" onClick={function(){ delTetto(i); }}>✕</button>
+              <div key={"m"+i} style={{ marginBottom:"4px" }}>
+                <div style={{ display:"flex", alignItems:"center", gap:"8px", fontSize:"13px" }}>
+                  <span style={{ fontWeight:700 }}>🎯 {tettoRowLabel(tt)}</span>
+                  <button className="voce-del" title="Rimuovi questo massimale" onClick={function(){ delTetto(i); }}>✕</button>
+                </div>
+                {tettoVoci(tt).length ? <div style={{ fontSize:"12.5px", color:"#475569", margin:"1px 0 0 18px", lineHeight:1.4 }}>
+                  {tettoVoci(tt).map(function(v,k){ return <span key={"v"+k}>{k ? " · " : ""}<b>{v.nome}</b> {fmt2(v.ore)} h</span>; })}
+                </div> : null}
               </div>
             ); })}
           </div>}
         {!apTet ?
           <div style={{ marginTop:"6px" }}><button className="btn btn-blue" onClick={function(){ setApTet(true); setErrTet(""); }}>+ Aggiungi massimale</button></div> :
-          <div style={{ display:"flex", gap:"8px", alignItems:"end", flexWrap:"wrap", marginTop:"6px" }}>
-            <div><div style={etich}>Dall'anno (vuoto = da sempre)</div>
-              <input value={ntTettoAnno} inputMode="numeric" placeholder="es. 2026" style={Object.assign({width:"130px"}, giallo)} onChange={function(e){ setNtTettoAnno(e.target.value.replace(/[^0-9]/g,"").slice(0,4)); }} /></div>
-            <div><div style={etich}>Ore massime nell'anno</div>
-              <input value={ntTettoOre} inputMode="decimal" placeholder="es. 500" autoFocus style={Object.assign({width:"130px"}, giallo)} onChange={function(e){ setNtTettoOre(e.target.value); }} /></div>
-            <button className="btn btn-blue" onClick={function(){ if(addTetto()) chiudiTet(); }}>✔ Aggiungi</button>
-            <button className="btn btn-gray" onClick={chiudiTet}>Annulla</button>
+          <div style={{ marginTop:"6px" }}>
+            <div style={{ display:"flex", gap:"8px", alignItems:"end", flexWrap:"wrap" }}>
+              <div><div style={etich}>Dall'anno (vuoto = da sempre)</div>
+                <input value={ntTettoAnno} inputMode="numeric" placeholder="es. 2026" style={Object.assign({width:"130px"}, giallo)} onChange={function(e){ setNtTettoAnno(e.target.value.replace(/[^0-9]/g,"").slice(0,4)); }} /></div>
+              <div><div style={etich}>Ore massime nell'anno</div>
+                {ntVoci.length === 0
+                  ? <input value={ntTettoOre} inputMode="decimal" placeholder="es. 500" autoFocus style={Object.assign({width:"130px"}, giallo)} onChange={function(e){ setNtTettoOre(e.target.value); }} />
+                  : <div style={{ width:"130px", padding:"6px 8px", border:"2px solid #cbd5e1", background:"#f1f5f9", borderRadius:"6px", fontSize:"13px", fontWeight:800, color:"#1f4e82" }} title="Somma delle righe per servizio qui sotto">{fmt2(sommaVoci)}</div>}</div>
+            </div>
+            <div style={{ marginTop:"7px", padding:"7px 9px", background:"#f8fafc", border:"1px solid #cbd5e1", borderRadius:"8px" }}>
+              <div style={{ fontSize:"12.5px", fontWeight:700, color:"#334155", marginBottom:"4px" }}>Oppure scrivilo servizio per servizio</div>
+              {ntVoci.map(function(v,i){ return (
+                <div key={"nv"+i} style={{ display:"flex", gap:"6px", alignItems:"center", marginBottom:"4px", flexWrap:"wrap" }}>
+                  <input value={v.nome} placeholder="nome del servizio" style={Object.assign({width:"210px"}, giallo)} onChange={function(e){ setVoce(i,"nome",e.target.value); }} />
+                  <input value={v.ore} inputMode="decimal" placeholder="ore" style={Object.assign({width:"90px"}, giallo)} onChange={function(e){ setVoce(i,"ore",e.target.value); }} />
+                  <button className="voce-del" title="Togli questa riga" onClick={function(){ delVoce(i); }}>✕</button>
+                </div>
+              ); })}
+              <button className="btn btn-gray" onClick={addVoce}>+ Aggiungi servizio</button>
+              {ntVoci.length ? <div style={{ fontSize:"12.5px", color:"#475569", marginTop:"4px" }}>Totale delle righe: <b>{fmt2(sommaVoci)} h</b> — è questo il massimale dell'anno.</div> : null}
+              <div style={{ fontSize:"11.5px", color:"#64748b", marginTop:"3px", lineHeight:1.35 }}>Serve a te per sapere <b>come hai assegnato</b> il tetto. ⚠️ Le ore <b>consumate</b> restano complessive: nel Tabellone il giorno è un numero solo e non dice a quale servizio appartiene.</div>
+            </div>
+            <div style={{ display:"flex", gap:"8px", marginTop:"7px" }}>
+              <button className="btn btn-blue" onClick={function(){ if(addTetto()) chiudiTet(); }}>✔ Aggiungi</button>
+              <button className="btn btn-gray" onClick={chiudiTet}>Annulla</button>
+            </div>
           </div>}
         {errTet ? <div style={{ color:"#b91c1c", fontSize:"12.5px", fontWeight:700, marginTop:"4px" }}>{errTet}</div> : null}
       </div>
