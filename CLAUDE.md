@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver106 · 05nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver107 · 05nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -375,6 +375,49 @@ Banca ore, tetto annuo, contratti e export.
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
 
+- 🐞 **«↺ RIMETTI I VALORI CALCOLATI» NON RIMETTEVA NIENTE** (ver107, 05/11/2026, difetto
+  **preesistente dalla ver73**, trovato con la verifica meticolosa chiesta da Christian).
+  - **Il difetto**: il pulsante faceva `setPar("settPeriodo","")` e poi `setPar("settLav","")`.
+    Ogni chiamata parte dalla **stessa copia di `state`**, quindi la seconda **cancellava il
+    lavoro della prima**: restava svuotato solo `settLav`, e la simulazione delle settimane non
+    si spegneva più. È **la stessa trappola** già incontrata in ver99 con il permesso.
+  - **La correzione**: **`onCostoPatchMulti(dipId, campi)`** scrive più campi in **una sola
+    copia** dello stato; dentro `CostoOrario` c'è `setParMulti`. `onCostoPatch` e `setPar`
+    **restano invariati** e li usano ancora tutte le altre caselle.
+  - **Provato in esecuzione**: scrivendo 20 nelle «Settimane del periodo» il costo passa da
+    **39,40 a 50,76 €/h**; premendo ↺ **prima** restava 50,76 con la casella ancora a 20, **ora**
+    torna **39,40** e le due caselle si svuotano.
+  - ⚠️ **Regola da ricordare**: in questa app **due scritture di fila nello stato non funzionano**.
+    Se una cosa cambia due campi, serve un gestore che li scriva insieme.
+
+- 🔎 **VERIFICA METICOLOSA DI TUTTA L'APP (Vm\*) — ver107, 05/11/2026.** Chiesta da Christian
+  («Vm\* che tutto si aggiorni e funzioni»). **55 controlli in esecuzione** con Playwright,
+  divisi in quattro script (`vm-A.cjs`, `vm-B.cjs`, `vm-C.cjs`, `vm-D.cjs`), **tutti superati**,
+  **zero errori di pagina**:
+  - **A (21)** — le cinque viste si aprono; scrivere ore aggiorna TOT, TOT teorico e Risultato
+    del mese; il numerino erosivo si spegne e si riaccende; il permesso apre la finestra, la
+    spunta «servizio chiuso» abbassa il TOT teorico e toglierla lo rialza; il Tetto annuo mostra
+    i numeri; Note del mese (categoria + testo); Compila veloce riempie il mese; Blocca/Sblocca
+    mese disabilita e riabilita 90 celle.
+  - **B (14)** — Costo orario: si apre coi numeri; cambiare periodo cambia mesi/costo/€/h e
+    **tornando indietro i numeri tornano identici**; cambio persona; le tre fonti delle ore
+    (Riepiloghi · a mano → «non calcolabile» · teoriche); il riquadro «Come si divide il
+    periodo»; le aliquote comuni (43 caselle); la simulazione delle settimane e il ↺; export
+    Excel.
+  - **C (13)** — Anagrafica: 52 campi; massimale **servizio per servizio** che somma mentre
+    scrivi e si salva; proroga aggiunta; colore; 💾 segnala e salva davvero; Backup JSON;
+    Riepiloghi (5 tabelle con numeri); Query personale senza «undefined».
+  - **D (7)** — Report PDF A4 con il **finto jsPDF**: la finestra si apre e il codice gira
+    **senza errori**; backup → import: i dati tornano come prima (57,00 → 48,00); cambio mese e
+    ritorno.
+  - **Registro delle formule rieseguito**: 9 formule, `R2` su 9 casi, somma delle voci su 7 casi,
+    finestra del periodo 120,000 — **stessi numeri**.
+  - ℹ️ **Due difetti PREESISTENTI misurati e NON corretti** (identici nella ver102 pubblicata, non
+    causati da queste versioni): a **390px** la vista **Anagrafica** scorre di lato (**724px**,
+    colpa della riga dei pulsanti «Genera documento: 📄 Contratto…») e il **Costo orario** arriva
+    a **429px** (già noto dalla ver85). **Da decidere con Christian** se sistemarli.
+  - ⚠️ **Non verificabile da qui**: il disegno vero del Report PDF e il collegamento a Firebase
+    (le prove girano in modalità locale con PIN).
 - 🧾 **IL CEDOLINO ESCE COMUNQUE** (ver106, 05/11/2026, Christian: «paghe è fisso, se fai 3
   giorni o 30 il cedolino esce lo stesso e il costo c'è. La formazione segue l'indicazione già
   data: va fatta comunque»).

@@ -301,7 +301,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver106";
+const APP_VER = "ver107";
 const APP_DATA = "05nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -2903,6 +2903,8 @@ function CostoOrario(props){
   const suppAttiva = dips.some(function(x){ return costoPar(x).fonteOre === "teoriche"; });
   const setComune = function(campo, val){ if (props.onCostoComune) props.onCostoComune(campo, val); };
   const setPar = function(campo, val){ if (dp && props.onCostoPatch) props.onCostoPatch(dp.id, campo, val); };
+  /* ver107: due campi insieme, in una sola copia dello stato (vedi onCostoPatchMulti). */
+  const setParMulti = function(campi){ if (dp && props.onCostoPatchMulti) props.onCostoPatchMulti(dp.id, campi); };
 
   const campoNum = function(lbl, valore, onCh, segno, titoloAiuto, spento){
     return <label style={cella} title={titoloAiuto||""}><span style={spento ? Object.assign({}, etich, { color:"#64748b" }) : etich}>{lbl}</span>
@@ -3121,7 +3123,7 @@ function CostoOrario(props){
                   </tbody></table>
                   {(d.raw.settPeriodo || d.raw.settLav) ?
                     <button className="btn btn-gray" style={{ marginTop:"6px" }}
-                      onClick={function(){ setPar("settPeriodo",""); setPar("settLav",""); }}>↺ Rimetti i valori calcolati</button> : null}
+                      onClick={function(){ setParMulti({ settPeriodo:"", settLav:"" }); }}>↺ Rimetti i valori calcolati</button> : null}
                 </div>
               </div>
             </div>
@@ -4471,6 +4473,17 @@ function App(){
     dp.costo[campo] = val;
     touch(next);
   };
+  /* ver107 (05/11/2026, difetto trovato con la verifica meticolosa chiesta da Christian):
+     scrivere due campi con due chiamate di seguito NON funziona, perche' ognuna parte dalla
+     stessa copia di `state` e la seconda cancella il lavoro della prima — la stessa trappola
+     gia' incontrata in ver99 con il permesso. Qui si scrivono insieme. */
+  const onCostoPatchMulti = function(dipId, campi){
+    const next = JSON.parse(JSON.stringify(state));
+    const dp = next.dipendenti.find(function(d){ return d.id===dipId; }); if (!dp) return;
+    if (!dp.costo || typeof dp.costo !== "object") dp.costo = {};
+    Object.keys(campi||{}).forEach(function(k){ dp.costo[k] = campi[k]; });
+    touch(next);
+  };
   const onCostoComune = function(campo, val){                                     // ver71: valori uguali per tutti
     const next = JSON.parse(JSON.stringify(state));
     if (!next.costoComune || typeof next.costoComune !== "object") next.costoComune = {};
@@ -4847,7 +4860,7 @@ function App(){
       <div className="content" style={{ zoom: zoom / 100 }}>
         {vista === "rep" ? <Riepiloghi state={state} anno={anno} /> :
          vista === "ana" ? <Anagrafica key={"ana-"+(anaSel||"")} selInit={anaSel} onDipPatch={onDipPatch} onMensTutti={onMensTutti} state={state} onAnaField={onAnaField} onAnaSet={onAnaSet} onCessCleanup={onCessCleanup} onTemplateChanged={onTemplateChanged} onImportAna={onImportAna} onExportAna={onExportAna} onAddDip={addDipDiretto} onEditDip={apriScheda} onSave={doSave} dirty={dirty} /> :
-         vista === "costo" ? <CostoOrario state={state} anno={anno} onCostoPatch={onCostoPatch} onCostoComune={onCostoComune} onSave={doSave} dirty={dirty} /> :
+         vista === "costo" ? <CostoOrario state={state} anno={anno} onCostoPatch={onCostoPatch} onCostoPatchMulti={onCostoPatchMulti} onCostoComune={onCostoComune} onSave={doSave} dirty={dirty} /> :
          vista === "query" ? <QueryPanel state={state} /> :
           <div>
             <div className="toolbar">
