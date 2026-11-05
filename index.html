@@ -301,7 +301,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver105";
+const APP_VER = "ver106";
 const APP_DATA = "05nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -2576,6 +2576,14 @@ function mesiRateiPeriodo(dp, pairs){       // solo i mesi con almeno 15 giorni
   pairs.forEach(function(pr){ n += meseConta(dp, pr.y, pr.m); });
   return n;
 }
+/* ver106 (05/11/2026, Christian: «paghe è fisso, se fai 3 giorni o 30 il cedolino esce lo
+   stesso e il costo c'è»). Terzo conteggio: i mesi in cui esce ALMENO UN CEDOLINO, cioè
+   quelli con almeno un giorno di contratto. Lo usa solo «Paghe e dichiarazioni» (J31). */
+function mesiCedolinoPeriodo(dp, pairs){
+  let n=0;
+  pairs.forEach(function(pr){ if (giorniInForzaMese(dp, pr.y, pr.m) > 0) n++; });
+  return n;
+}
 // ore davvero lavorate nel periodo: stesso conto dei Riepiloghi (le assenze valgono 0)
 function oreRendPeriodo(state, dp, pairs){
   let t=0;
@@ -2661,6 +2669,8 @@ function calcCosto(o){
   /* ver104: H2 = mesi PROPORZIONATI ai giorni veri (retribuzione e tutto il resto);
      H3 = mesi che MATURANO I RATEI, cioè quelli con almeno 15 giorni (ferie, 13ª e 14ª). */
   const H3 = (o.mesiRatei!=null) ? o.mesiRatei : Math.round(H2);
+  /* ver106: H4 = mesi in cui esce un cedolino (almeno un giorno di contratto). */
+  const H4 = (o.mesiCedolini!=null) ? o.mesiCedolini : Math.ceil(H2);
   const tot=K+L+M+N;
   const J2 = tot/165;                                   // importo orario globale
   const P2 = O2*165/38;                                 // ore mese teoriche
@@ -2704,9 +2714,13 @@ function calcCosto(o){
      NON proporzionata ai giorni veri, ma sui mesi che maturano i ratei (almeno 15 giorni),
      esattamente come ferie, permessi, tredicesima e quattordicesima. */
   const J30 = o.indeterminato ? (c.sanitaria/12)*H3 : 0;
-  const J31 = c.paghe*H2;                               /* ver104: proporzionate ai giorni veri */
+  /* ver106 (Christian): il cedolino esce comunque, 3 giorni o 30 che siano. Quindi le paghe
+     si contano sui mesi con ALMENO UN GIORNO di contratto, non in proporzione. */
+  const J31 = c.paghe*H4;
   /* ver79: formazione "secca" 250 per ogni anno iniziato (scelta B di Christian). */
-  const J32 = c.formazione*Math.max(1, Math.ceil(H2/12));   /* ver104: anni iniziati sui mesi veri */
+  /* La formazione "va fatta comunque" (Christian, 02/11 e 05/11/2026): 250 per ogni anno
+     iniziato, e **almeno uno** anche se il contratto dura pochi giorni. Invariata. */
+  const J32 = c.formazione*Math.max(1, Math.ceil(H2/12));
   /* ver80: il rimborso puo' essere "al mese" (× i mesi) oppure "secco" (una volta sola).
      ⚠️ Non entra in nessun imponibile: e' esente da imposte e contributi (confermato da
      Christian il 04/11/2026). Finisce solo nel totale J35. */
@@ -2729,6 +2743,7 @@ function datiCosto(state, dp, pairs){
   const indet = indetAFine(dp, pairs);
   const mesiAuto = mesiInPeriodo(dp, pairs);
   const mesiRateiAuto = mesiRateiPeriodo(dp, pairs);   /* ver104: ferie, 13ª e 14ª */
+  const mesiCedoAuto  = mesiCedolinoPeriodo(dp, pairs);   /* ver106: paghe e dichiarazioni */
   const oreSettAuto = oreSettPeriodo(dp, pairs);
   const tab = p.tabella || c.tabella;
   const livAuto = (function(){ const l=String(livelloPeriodo(dp, pairs)||"").toUpperCase().trim(); return MINIMI_CCNL[tab] && MINIMI_CCNL[tab][l] ? l : ""; })();
@@ -2740,11 +2755,14 @@ function datiCosto(state, dp, pairs){
   const ff = contaFestivita(pairs);
   const o = {
     com:c, indeterminato:indet, tab:tab, liv:liv,
-    mesiAuto:mesiAuto, mesiRateiAuto:mesiRateiAuto, oreSettAuto:oreSettAuto, minimoAuto:minimoAuto, addizAuto:addizAuto, nProroghe:nProroghe, oreDaRiep:oreDaRiep,
+    mesiAuto:mesiAuto, mesiRateiAuto:mesiRateiAuto, mesiCedoAuto:mesiCedoAuto, oreSettAuto:oreSettAuto, minimoAuto:minimoAuto, addizAuto:addizAuto, nProroghe:nProroghe, oreDaRiep:oreDaRiep,
     mesi: cNum(p.mesi, mesiAuto),
     /* ver104: se i mesi sono scritti a mano, anche i ratei seguono quel numero (arrotondato),
        altrimenti varrebbe il conteggio automatico e i due numeri si contraddirebbero. */
     mesiRatei: (p.mesi!=null && p.mesi!=="") ? Math.round(cNum(p.mesi, mesiAuto)) : mesiRateiAuto,
+    /* ver106: i cedolini. Se i mesi sono scritti a mano si arrotonda PER ECCESSO: un mese
+       iniziato è comunque un cedolino. */
+    mesiCedolini: (p.mesi!=null && p.mesi!=="") ? Math.ceil(cNum(p.mesi, mesiAuto)) : mesiCedoAuto,
     mesiMater: cNum(p.mesiMater, 0),
     minimo: cNum(p.minimo, minimoAuto),
     scatti: cNum(p.scatti, 0),
@@ -2803,6 +2821,7 @@ function datiCosto(state, dp, pairs){
         const ob = Object.assign({}, o, {
           mesi: R2(b.pairs.reduce(function(acc,pr){ return acc + meseFrazione(dp, pr.y, pr.m); }, 0), 3),
           mesiRatei: b.pairs.reduce(function(acc,pr){ return acc + meseConta(dp, pr.y, pr.m); }, 0),   /* ver104 */
+          mesiCedolini: b.pairs.reduce(function(acc,pr){ return acc + (giorniInForzaMese(dp, pr.y, pr.m) > 0 ? 1 : 0); }, 0),   /* ver106 */
           mesiMater: 0,
           oreSett: vv.oreSett,
           minimo: (livB && MINIMI_CCNL[tab][livB]) ? MINIMI_CCNL[tab][livB] : o.minimo,
@@ -3018,7 +3037,7 @@ function CostoOrario(props){
                   {!d.indeterminato && scadEff(dp) ?
                     <tr><td style={tdE}>Scade il</td><td style={tdV}>{scadEff(dp)}{prorogheList(dp).length ? (" — dopo " + prorogheList(dp).length + (prorogheList(dp).length===1?" proroga":" proroghe")) : ""}</td></tr> : null}
                   {cessEffStr(dp) ? <tr><td style={tdE}>Cessazione</td><td style={tdV}>{cessEffStr(dp)}</td></tr> : null}
-                  <tr><td style={tdE}>Nel periodo</td><td style={tdV}>in forza per {fmt2(d.mesiAuto)} mesi · ratei (ferie, 13ª, 14ª) su {d.mesiRateiAuto} {d.mesiRateiAuto===1?"mese":"mesi"}</td></tr>
+                  <tr><td style={tdE}>Nel periodo</td><td style={tdV}>in forza per {fmt2(d.mesiAuto)} mesi · ratei (ferie, 13ª, 14ª) su {d.mesiRateiAuto} {d.mesiRateiAuto===1?"mese":"mesi"} · {d.mesiCedoAuto} {d.mesiCedoAuto===1?"cedolino":"cedolini"}</td></tr>
                 </tbody></table>
                 <div className="co-grid" style={grigliaCampi}>
                   {campoNum("Mesi di contratto", cMostra(d.raw.mesi, d.mesiAuto), function(v){ setPar("mesi", v); }, "proposti: " + fmt2(d.mesiAuto) + " (giorni veri) · ferie, 13ª e 14ª su " + d.mesiRateiAuto)}

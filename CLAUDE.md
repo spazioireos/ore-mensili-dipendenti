@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver105 · 05nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver106 · 05nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -375,6 +375,26 @@ Banca ore, tetto annuo, contratti e export.
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
 
+- 🧾 **IL CEDOLINO ESCE COMUNQUE** (ver106, 05/11/2026, Christian: «paghe è fisso, se fai 3
+  giorni o 30 il cedolino esce lo stesso e il costo c'è. La formazione segue l'indicazione già
+  data: va fatta comunque»).
+  - **Terzo conteggio dei mesi**: **`mesiCedolinoPeriodo`** = i mesi con **almeno un giorno** di
+    contratto. Dentro `calcCosto` è **`H4`**, e lo usa **solo** `J31` (*Paghe e dichiarazioni*).
+    Se i mesi sono scritti a mano si arrotonda **per eccesso** (un mese iniziato è un cedolino).
+  - **La formazione non è stata toccata**: resta `250 × max(1, ceil(mesi/12))`, cioè 250 € per
+    ogni anno iniziato e **almeno uno** anche per un contratto di pochi giorni. Provato: 250,00 €
+    in tutti i casi, compreso quello da 0,387 mesi.
+  - **Misurato in esecuzione** (25 €/mese di paghe):
+    | | mesi prop. | ratei | **cedolini** | paghe ver105 | **paghe ver106** |
+    |---|--:|--:|--:|--:|--:|
+    | tutto l'anno | 12,00 | 12 | 12 | 300,00 € | **300,00 €** |
+    | dal **16/01** | 11,52 | 12 | **12** | 287,90 € | **300,00 €** |
+    | dal **20/01** | 11,39 | 11 | **12** | 284,68 € | **300,00 €** |
+    Costo totale: 12.479,45 → **12.491,55 €** (dal 16/01) e 12.117,33 → **12.132,66 €**
+    (dal 20/01). Per chi c'è tutto l'anno **non cambia nulla**.
+  - **A video** la riga del contratto dice ora: «in forza per **11,52 mesi** · ratei (ferie, 13ª,
+    14ª) su **12 mesi** · **12 cedolini**».
+  - **I tre conteggi ora ci sono tutti e si vedono**: giorni veri · ratei · cedolini.
 - 🏥 **L'ASSISTENZA SANITARIA STA COI RATEI** (ver105, 05/11/2026, Christian: «assistenza
   sanitaria come ferie, permessi e ratei vari»). In ver104 era finita fra le voci
   **proporzionate ai giorni veri**; è stata rimessa sui **mesi che maturano i ratei** (almeno 15
@@ -401,8 +421,9 @@ Banca ore, tetto annuo, contratti e export.
   - **Chi usa quale**, dentro `calcCosto`:
     | | conteggio |
     |---|---|
-    | retribuzione mensilizzata, malattia presunta, settimane del periodo, premi, ore aggiuntive, TFR, contributi (INPS, FIS, INAIL, IRAP, addizionale), paghe e dichiarazioni, rimborso km «al mese», anni di formazione | **H2 = mesi proporzionati** |
+    | retribuzione mensilizzata, malattia presunta, settimane del periodo, premi, ore aggiuntive, TFR, contributi (INPS, FIS, INAIL, IRAP, addizionale), rimborso km «al mese», anni di formazione | **H2 = mesi proporzionati ai giorni veri** |
     | **ferie e permessi** (dentro `O6calc`), **tredicesima** (`J6`), **quattordicesima** (`J8`), **assistenza sanitaria** (`J30`, da ver105) | **H3 = mesi con almeno 15 giorni** |
+    | **paghe e dichiarazioni** (`J31`, da ver106) | **H4 = mesi con almeno un giorno** |
   - ⚠️ **`H3` non è più `Math.round(H2)`**: è un numero suo (`o.mesiRatei`). Se i mesi sono
     **scritti a mano**, i ratei seguono quel numero arrotondato, altrimenti i due si
     contraddirebbero.
@@ -978,7 +999,7 @@ Banca ore, tetto annuo, contratti e export.
 
 ## Registro dei controlli sulle formule (da ripetere a ogni versione)
 
-Controllo fatto il **05/11/2026 sulla ver100** e **rieseguito identico sulle ver101 → ver105**, su richiesta di Christian («controlla ottimamente
+Controllo fatto il **05/11/2026 sulla ver100** e **rieseguito identico sulle ver101 → ver106**, su richiesta di Christian («controlla ottimamente
 ogni formula»). Gli attesi sono **ricalcolati da zero** in uno script separato e confrontati con
 quello che l'app mostra **davvero a video** (Playwright). Gli script stanno nella cartella di
 lavoro della sessione: `formule100.cjs`, `arrot100.cjs`, `periodo100.cjs`.
