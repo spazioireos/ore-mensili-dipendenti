@@ -283,7 +283,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver95";
+const APP_VER = "ver96";
 const APP_DATA = "05nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -2522,6 +2522,11 @@ function datiCosto(state, dp, pairs){
   o.oreAMano = cNum(p.oreManuali, 0);
   if (o.fonte === "mano") o.oreManuali = o.oreAMano;
   else if (o.fonte === "riepiloghi") o.oreManuali = oreDaRiep;
+  /* ver96 (05/11/2026, difetto segnalato da Christian): se si sceglie "dai Riepiloghi" (o "a
+     mano") e in quel periodo NON ci sono ore, H38 = (G38>0)? G38 : F38 ricadeva in silenzio
+     sulle ore TEORICHE e mostrava un costo orario calcolato su ore che non esistono.
+     Ora la cosa si vede: il risultato diventa "non calcolabile". */
+  o.oreMancanti = (o.fonte !== "teoriche") && !(o.oreManuali > 0);
   o.raw = p;
   o.res = calcCosto(o);
 
@@ -2648,8 +2653,10 @@ function CostoOrario(props){
     dips.forEach(function(x){
       const dd = datiCosto(state, x, pairs);
       const org = dd.fonte==="mano" ? "scritte a mano" : (dd.fonte==="riepiloghi" ? "dai Riepiloghi" : "teoriche");
+      /* ver96: se non ci sono ore, nel foglio non si scrive un numero inventato. */
       righe.push([x.nome, periodoLabel, dd.indeterminato?"Indeterminato":"Determinato", dd.mesi, dd.oreSett, dd.liv||"", dd.minimo,
-                  R2(dd.res.H38), org, R2(dd.res.J35), R2(dd.res.orario)]);
+                  dd.oreMancanti ? 0 : R2(dd.res.H38), org, R2(dd.res.J35),
+                  dd.oreMancanti ? "non calcolabile" : R2(dd.res.orario)]);
     });
     const wb = XLSX.utils.book_new();
     wb.Props = { Title:"Costo orario dipendenti", Author:"Christian Canonica", Company:"Spazio Ireos Società Cooperativa Sociale", CreatedDate:new Date() };
@@ -2857,10 +2864,19 @@ function CostoOrario(props){
               <div style={{ border:"2px solid #1f4e82", borderRadius:"12px", padding:"13px 12px", background:"#fff" }}>
                 <div style={{ textAlign:"center", fontSize:"22px", fontWeight:700, color:"#0F2740", ...cifre }}>{fmt2(r.J35)} €</div>
                 <div style={{ height:"2px", background:"#1f4e82", margin:"6px 0" }}></div>
-                <div style={{ textAlign:"center", fontSize:"22px", fontWeight:700, color:"#0F2740", ...cifre }}>{fmt2(r.H38)} ore</div>
+                <div style={{ textAlign:"center", fontSize:"22px", fontWeight:700, color:"#0F2740", ...cifre }}>{d.oreMancanti ? "—" : fmt2(r.H38)} ore</div>
                 <div style={{ textAlign:"center", fontSize:"13px", color:"#475569", margin:"6px 0 2px" }}>costo del periodo diviso le ore dichiarate</div>
-                <div style={{ textAlign:"center", fontSize:"34px", fontWeight:800, color:"#1f4e82", lineHeight:1.1, ...cifre }}>{fmt2(r.orario)}</div>
-                <div style={{ textAlign:"center", fontSize:"15px", fontWeight:700, color:"#1f4e82" }}>euro all'ora</div>
+                {d.oreMancanti ? (
+                  <div>
+                    <div style={{ textAlign:"center", fontSize:"24px", fontWeight:800, color:"#b45309", lineHeight:1.15 }}>non calcolabile</div>
+                    <div style={{ textAlign:"center", fontSize:"13px", fontWeight:700, color:"#92400e", marginTop:"3px", lineHeight:1.35 }}>in questo periodo non ci sono ore {d.fonte === "mano" ? "scritte a mano" : "nei Riepiloghi"}</div>
+                  </div>
+                ) : (
+                  <div>
+                    <div style={{ textAlign:"center", fontSize:"34px", fontWeight:800, color:"#1f4e82", lineHeight:1.1, ...cifre }}>{fmt2(r.orario)}</div>
+                    <div style={{ textAlign:"center", fontSize:"15px", fontWeight:700, color:"#1f4e82" }}>euro all'ora</div>
+                  </div>
+                )}
               </div>
 
               <div style={{ marginTop:"12px" }}>

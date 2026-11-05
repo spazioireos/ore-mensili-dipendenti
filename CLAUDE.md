@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver95 · 05nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver96 · 05nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -324,6 +324,57 @@ Banca ore, tetto annuo, contratti e export.
   dicitura **scelta da Christian**. ⚠️ La finestra che si apre resta «Esporta PDF — scegli il
   periodo»: quella dicitura non è stata toccata. Il titolo stampato dentro il Report è sempre
   «Spazio Ireos — Report Ore · <mese> <anno>», invariato.
+- ⚖️ **IL COSTO ORARIO SUI PERIODI CORTI: COME STANNO LE COSE** (indagine del 05/11/2026, partita
+  da una domanda di Christian su un caso vero: «perché ha ore aggiuntive?»).
+  - **Il caso**: persona a 15 h/sett., **1 mese**, 65,00 h dichiarate dai Riepiloghi. L'app
+    mostrava **11,07 ore aggiuntive = 139,56 €** e un costo orario di **22,40 €/h**.
+  - **Da dove venivano**: `O8` (ore ordinarie attese) = settimane del mese **meno** la fetta
+    presunta di ferie (30 annui ÷ 12 = 2,5 gg) e di malattia (2 gg/mese) → 3,60 settimane × 15 =
+    **53,93 h**. Le 65 dichiarate superano le 53,93, e la differenza diventa **supplementare al
+    +27%** (`E18` → `J18` → imponibile II → costo totale).
+  - ⚠️ **Nella stessa app convivono due idee di «ore del mese»**, e non coincidono:
+    | | come si calcola | esempio |
+    |---|---|--:|
+    | Tabellone, *ORE MESE* | `monteFissoMese` = 165 × oreSett ÷ 38, uguale ogni mese | 65,13 h |
+    | Costo orario, *ore lavorabili* | settimane lavorabili × oreSett, al netto delle assenze presunte | 53,93 h |
+    Sullo stesso mese il Tabellone dice «in pari» e il Costo orario dice «11 ore di supplementare».
+  - **Misurato in esecuzione**, stessa persona e stesso contratto:
+    | Periodo | Ore rese | Costo | €/h | Ore aggiuntive |
+    |---|--:|--:|--:|--:|
+    | **Anno intero** (si prende le ferie) | 620,00 | 12.601,06 | **20,32** | **0,03** |
+    | Mese lavorato pieno | 65,00 | 1.456,32 | 22,40 | 11,07 |
+    | Mese lavorato pieno, senza le aggiuntive | 65,00 | 1.268,07 | 19,51 | 0 |
+    | **Mese con metà ferie** | 32,00 | 1.268,07 | **39,63** | 0 |
+    **Sull'anno il modello funziona da solo** (le aggiuntive vengono zero). **Sui periodi corti no.**
+  - ⚠️ **La compensazione va al CONTRARIO di come sembra**: nel mese di ferie lo stipendio si paga
+    uguale ma le ore rese crollano, quindi il costo orario **sale** (39,63 €/h), non scende.
+    L'anno intero è una **media pesata** fra mesi pieni e mesi con ferie: costo totale ÷ ore
+    totali. **Non** è la media dei costi orari mensili.
+  - 🚫 **DECISIONE DI CHRISTIAN (05/11/2026): si lascia com'è.** Gli erano state proposte due
+    correzioni — (1) contare ferie/permessi/malattia **veri** dal Tabellone invece dei numeri
+    presunti, (2) un avviso quando il periodo è più corto di 12 mesi — e ha risposto «il resto
+    lascia come è». **Non riproporle.**
+  - ⚠️ **Limite noto e accettato**: su **un mese solo** il costo orario **sovrastima di circa il
+    10%** rispetto al valore annuo. **Per il numero vero si calcola sull'anno intero o su tutto
+    il contratto.** Un periodo corto non può comprendere le ferie maturate e non ancora godute.
+- 🐞 **«NON CALCOLABILE» QUANDO NON CI SONO ORE** (ver96, 05/11/2026, unico dei tre punti che
+  Christian ha accettato). Se si sceglie **«dai Riepiloghi»** (o **«a mano»**) e in quel periodo
+  **non c'è nessuna ora**, `H38 = (G38>0)? G38 : F38` ricadeva **in silenzio sulle ore TEORICHE**
+  e mostrava un costo orario calcolato su ore che non esistono (nel caso provato: 22,81 €/h su
+  60,44 ore inventate).
+  - Nuova bandierina **`o.oreMancanti`** in `datiCosto`: vera quando la fonte **non** è
+    «teoriche» e le ore sono 0.
+  - **A video**: al posto delle ore un «—», e al posto del numero grande **«non calcolabile»** in
+    arancione con sotto il motivo («in questo periodo non ci sono ore nei Riepiloghi» / «scritte
+    a mano»). Il **Costo totale resta**, perché quello è vero.
+  - **Nell'Excel del Costo orario**: *ORE RENDICONTATE* = 0 e *COSTO ORARIO €/h* = «non
+    calcolabile». ⚠️ Prima scriveva le ore teoriche e un numero: era una bugia nel foglio.
+  - Scegliendo **«Teoriche»** il numero torna: quella è una scelta voluta, non un vuoto.
+  - **Provato in esecuzione**: persona con ore → 20,12 €/h come prima; persona senza ore →
+    «— ore» e «non calcolabile»; la stessa persona su «Teoriche» → 18,67 €/h; e il **foglio Excel
+    catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
+    restano coi loro numeri.
+
 - 📅 **IL MESE SI VEDE SU OGNI PERSONA** (ver94, 05/11/2026, richiesta di Christian: «nel
   tabellone, a destra, scrivi bene grande come il nome dipendente il mese di riferimento
   cosicché io lo veda sempre»). Nella barra colorata di ogni scheda, **a destra subito prima dei
