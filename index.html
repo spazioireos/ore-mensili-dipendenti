@@ -301,7 +301,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver108";
+const APP_VER = "ver109";
 const APP_DATA = "05nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -563,15 +563,24 @@ function bancaPrecA(state,dp,anno,mese){                                    // b
    ⚠️ Il 4 novembre NON sta in festivitaSet: quel giorno si lavora, la cella resta
    compilabile e non e' rossa. Regole decise da Christian il 03/11/2026.          */
 const FEST_NON_GOD_FISSE = [[11,4]];   // [mese, giorno] — sempre non godute, mai rosse
-function contaFestivita(pairs){
+/* ver109 (05/11/2026, Christian: «non ti sembra che vada fatta una considerazione analoga a
+   quella fatta per chi cessa prima della fine del mese o inizia durante il mese?»).
+   Le festività si contano **solo nei giorni in cui il contratto è in piedi**: una festività che
+   cade quando la persona non è assunta non è un costo. Prima si contavano su tutto il periodo
+   scelto, e chiedere un periodo più largo del contratto gonfiava il conto (misurato: contratto
+   fino al 30/06 guardato su gennaio→dicembre, «festività non godute» 99,45 € invece di 24,86).
+   ⚠️ Il secondo parametro `dp` è FACOLTATIVO: senza, la funzione conta come prima. */
+function contaFestivita(pairs, dp){
   let god=0, non=0;
   (pairs||[]).forEach(function(pr){
     const f=festivitaSet(pr.y), nd=daysInMonth(pr.y,pr.m);
+    const inForza = function(d){ return dp ? inForceAt(dp, pr.y*10000 + pr.m*100 + d) : true; };
     for(let d=1; d<=nd; d++){
       if(!isFestivo(f, pr.m, d)) continue;
+      if(!inForza(d)) continue;
       if(weekdayOf(pr.y, pr.m, d)===0) non++; else god++;
     }
-    FEST_NON_GOD_FISSE.forEach(function(x){ if(x[0]===pr.m) non++; });
+    FEST_NON_GOD_FISSE.forEach(function(x){ if(x[0]===pr.m && inForza(x[1])) non++; });
   });
   return { god:god, non:non };
 }
@@ -2752,7 +2761,7 @@ function datiCosto(state, dp, pairs){
   const addizAuto = addizTDAuto(dp, pairs);
   const nProroghe = prorogheAttiveA(dp, fineperiodoYmd(pairs));   // ver83: quelle gia' partite
   const oreDaRiep = oreRendPeriodo(state, dp, pairs);
-  const ff = contaFestivita(pairs);
+  const ff = contaFestivita(pairs, dp);          /* ver109: solo i giorni in cui il contratto è in piedi */
   const o = {
     com:c, indeterminato:indet, tab:tab, liv:liv,
     periodoLabel: pairs.length ? (mLabelY(pairs[0].y, pairs[0].m) + " → " + mLabelY(pairs[pairs.length-1].y, pairs[pairs.length-1].m)) : "",   /* ver108 */
@@ -2818,7 +2827,7 @@ function datiCosto(state, dp, pairs){
         const livB = (function(){ const l=String(vv.livello==null?"":vv.livello).toUpperCase().trim(); return (MINIMI_CCNL[tab] && MINIMI_CCNL[tab][l]) ? l : ""; })();
         const indetB = String(vv.tipo) !== "determinato";
         const fineB = (function(){ const u=b.pairs[b.pairs.length-1]; return u.y*10000+u.m*100+daysInMonth(u.y,u.m); })();
-        const ff = contaFestivita(b.pairs);
+        const ff = contaFestivita(b.pairs, dp);   /* ver109 */
         const ob = Object.assign({}, o, {
           mesi: R2(b.pairs.reduce(function(acc,pr){ return acc + meseFrazione(dp, pr.y, pr.m); }, 0), 3),
           mesiRatei: b.pairs.reduce(function(acc,pr){ return acc + meseConta(dp, pr.y, pr.m); }, 0),   /* ver104 */

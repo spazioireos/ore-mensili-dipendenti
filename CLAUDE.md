@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver108 · 05nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver109 · 05nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -375,6 +375,31 @@ Banca ore, tetto annuo, contratti e export.
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
 
+- 🎌 **LE FESTIVITÀ SI CONTANO SOLO QUANDO IL CONTRATTO È IN PIEDI** (ver109, 05/11/2026,
+  Christian: «non ti sembra che vada fatta una considerazione analoga a quella fatta per chi
+  cessa prima della fine del mese o inizia durante il mese?»).
+  - **Com'era**: `contaFestivita(pairs)` contava **tutte** le festività del periodo scelto. Una
+    festività che cade quando la persona **non è assunta** entrava lo stesso nel conto, abbassava
+    le ore ordinarie lavorabili e faceva crescere le ore aggiuntive (pagate al +27%).
+  - **Ora**: `contaFestivita(pairs, dp)` salta i giorni in cui `inForceAt` è falso. Il secondo
+    parametro è **facoltativo**: senza `dp` la funzione conta come prima. Lo passano i due punti
+    che la usano (`datiCosto` e `blocchiPeriodo`). Anche il **4 novembre** (`FEST_NON_GOD_FISSE`)
+    è soggetto alla stessa regola.
+  - **È la stessa logica dei mesi parziali** (ver104): si conta solo ciò che cade dentro il
+    rapporto di lavoro.
+  - **Misurato in esecuzione**:
+    | Caso | ver108 | **ver109** |
+    |---|--:|--:|
+    | contratto fino al **30/06**, periodo gen → dic | 8.777,08 € · 20,32 €/h | **8.471,81 € · 19,61 €/h** |
+    | lo stesso, periodo gen → giu | 8.471,81 € · 19,61 €/h | **identico** |
+    | assunta il **16/01**, periodo gen → dic | 12.491,55 € · 20,51 €/h | **12.407,42 € · 20,37 €/h** |
+    | assunta il **20/01**, periodo gen → dic | 12.132,66 € · 20,22 €/h | **12.048,53 € · 20,08 €/h** |
+    | in forza **tutto l'anno** | 13.080,54 € · 20,19 €/h | **identico** |
+    ⚠️ **Il periodo scelto non cambia più il risultato** per i mesi fuori contratto: era il
+    difetto segnalato poche ore prima.
+  - ⚠️ **Per chi è in forza tutto il periodo non cambia nulla** (verificato).
+  - **Non regressione**: rieseguiti i 21 controlli della parte A, i 14 della parte B, i 6
+    dell'avviso giallo e il registro delle formule — **tutti superati, zero errori di pagina**.
 - 🟡 **AVVISO QUANDO I MESI SONO SCRITTI A MANO** (ver108, 05/11/2026, chiesto da Christian —
   «avviso giallo ok» — dopo che la verifica aveva mostrato che un numero scritto a mano resta
   fermo mentre il periodo cambia).
@@ -1079,13 +1104,11 @@ nei mesi lavorati, livello D1):
 - Se invece il rapporto **si interrompe**, va scritto nelle **date della scheda** (cessazione, e
   riassunzione quando riparte): l'app esclude da sé i mesi non coperti, anche se il periodo
   scelto è più largo.
-- 🐞 **LIMITE TROVATO IL 05/11/2026, NON CORRETTO**: le **festività** (`contaFestivita(pairs)`)
-  si contano sul **periodo scelto**, non sui mesi in cui il contratto è in piedi. Per un
-  contratto che finisce il 30/06, scegliendo gen → dic le *Festività non godute* valgono
-  **99,45 €** invece di 24,86 € e le ore ordinarie lavorabili scendono da 308,57 a 296,07:
-  il costo orario passa da **19,61 a 20,32 €/h**. **Finché non si corregge: scegliere un periodo
-  che non vada oltre la fine del contratto.** Da decidere con Christian se contare le festività
-  solo sui mesi in forza.
+- ✅ **LIMITE TROVATO E CORRETTO LO STESSO GIORNO (ver109)**: le festività si contavano sul
+  **periodo scelto** invece che sui giorni in cui il contratto è in piedi, e un periodo più largo
+  del contratto gonfiava il costo. **Ora la terza riga della tabella dà 8.471,81 € e 19,61 €/h**,
+  cioè lo stesso numero del periodo gen → giu: **quale periodo chiedi non cambia più il
+  risultato** per i mesi fuori contratto.
 
 ## Registro dei controlli sulle formule (da ripetere a ogni versione)
 
