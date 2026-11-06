@@ -301,7 +301,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver114";
+const APP_VER = "ver115";
 const APP_DATA = "06nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -2515,7 +2515,9 @@ const TAB_CCNL = ["Ott25","Ott24"];
 const COSTO_COMUNE_DEF = {
   tabella:"Ott25", ggSett:6, quattordic:50, ferie:30, festNonGod:3, festGodute:11,
   festNonGodCoef:1, malattiaMese:2, integrMater:20, altriPermessi:0, suppPct:10,
-  tfrSupp:"SI", tfrDiv:13.5, anniTfr:2, istat:2, prevCompl:1.5, prevComplPag:0,
+  /* ver115 (06/11/2026): «Anni per rivalutazione TFR» scende da 2 a 1, scelta di Christian.
+     ⚠️ È solo il valore DI PARTENZA: se nei valori comuni c'è già un numero salvato, quello resta. */
+  tfrSupp:"SI", tfrDiv:13.5, anniTfr:1, istat:2, prevCompl:1.5, prevComplPag:0,
   inps:26.90, inpsPag:100, fis:0.53333, fisPag:100, inail:0.4, inailPag:100,
   irap:3.9, irapPag:0, sanitaria:132, paghe:25, formazione:250, kmMese:0
 };
@@ -2986,6 +2988,18 @@ function CostoOrario(props){
   const sc = (state && state.costoComune) || {};
   // ver75: la % di supplementari agisce SOLO sulle ore "Teoriche"; con le ore vere (Riepiloghi/a mano) non entra nei conti
   const suppAttiva = dips.some(function(x){ return costoPar(x).fonteOre === "teoriche"; });
+  /* ver115 (06/11/2026, Christian: «forse ANNI PER RIVALUTAZIONE TFR … va disabilitata?»).
+     Dalla ver114 quella casella serve SOLO a chi non ha scritto il «TFR accantonato al 31/12»:
+     per gli altri la rivalutazione si calcola sul fondo vero e il numero degli anni non entra
+     in nessun conto. Qui si conta quanti sono, con lo stesso meccanismo di `suppAttiva`.
+     ⚠️ La casella NON viene bloccata: resta scrivibile e giallina, come la % di supplementari.
+     Spegnerla davvero metterebbe a ZERO, in silenzio, la rivalutazione di chi il fondo non ce
+     l'ha. Cambia solo quello che dice. */
+  const senzaFondo = dips.filter(function(x){ return !(cNum(costoPar(x).tfrFondo, 0) > 0); }).length;
+  const anniTfrAttivo = senzaFondo > 0;
+  const anniTfrNota = anniTfrAttivo
+    ? ("serve solo a chi non ha il fondo TFR scritto: " + senzaFondo + (senzaFondo===1 ? " persona" : " persone") + " su " + dips.length)
+    : "non in uso: tutti hanno il fondo TFR scritto nella scheda";
   const setComune = function(campo, val){ if (props.onCostoComune) props.onCostoComune(campo, val); };
   const setPar = function(campo, val){ if (dp && props.onCostoPatch) props.onCostoPatch(dp.id, campo, val); };
   /* ver107: due campi insieme, in una sola copia dello stato (vedi onCostoPatchMulti). */
@@ -3143,7 +3157,7 @@ function CostoOrario(props){
               <select value={c.tfrSupp} style={{ padding:"8px", width:"100%" }} onChange={function(e){ setComune("tfrSupp", e.target.value); }}>
                 <option value="SI">SI</option><option value="NO">NO</option></select></label>
             {campoNum("Divisore TFR", cMostra(sc.tfrDiv, COSTO_COMUNE_DEF.tfrDiv), function(v){ setComune("tfrDiv", v); }, "13,5")}
-            {campoNum("Anni per rivalutazione TFR", cMostra(sc.anniTfr, COSTO_COMUNE_DEF.anniTfr), function(v){ setComune("anniTfr", v); })}
+            {campoNum("Anni per rivalutazione TFR", cMostra(sc.anniTfr, COSTO_COMUNE_DEF.anniTfr), function(v){ setComune("anniTfr", v); }, anniTfrAttivo ? anniTfrNota : "", "", anniTfrAttivo ? false : anniTfrNota)}
             {campoNum("ISTAT anno prec. %", cMostra(sc.istat, COSTO_COMUNE_DEF.istat), function(v){ setComune("istat", v); })}
             {campoNum("Previdenza compl. %", cMostra(sc.prevCompl, COSTO_COMUNE_DEF.prevCompl), function(v){ setComune("prevCompl", v); })}
             {campoNum("Previdenza compl. — quota pagata %", cMostra(sc.prevComplPag, COSTO_COMUNE_DEF.prevComplPag), function(v){ setComune("prevComplPag", v); })}

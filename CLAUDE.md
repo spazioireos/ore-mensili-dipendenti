@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver114 · 06nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver115 · 06nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -375,6 +375,42 @@ Banca ore, tetto annuo, contratti e export.
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
 
+- 🎚️ **«ANNI PER RIVALUTAZIONE TFR»: PARTE DA 1 E DICE A CHI SERVE** (ver115, 06/11/2026,
+  Christian: «forse ANNI PER RIVALUTAZIONE TFR non va tra i valori comuni e forse va
+  disabilitata?» → poi «va bene, procedi pure. Il valore comune però non sia 2, ma 1»).
+  - **Il punto sollevato è giusto**: non è un'aliquota, è l'**anzianità**, cioè un dato della
+    singola persona, e sta fra i valori comuni solo perché nasceva come manopola unica. Dalla
+    ver114 serve **soltanto** a chi non ha scritto il «TFR accantonato al 31/12».
+  - 🚫 **NON è stata spostata nella scheda della persona**: il valore salvato resterebbe orfano e
+    si sposterebbe la *strada vecchia* proprio mentre quella nuova la rende inutile. Scartata,
+    dopo averlo scritto a Christian.
+  - 🚫 **NON è stata bloccata**: spegnerla davvero metterebbe a **zero, in silenzio**, la
+    rivalutazione di chi il fondo non ce l'ha. Resta **scrivibile e giallina**, come la «% di ore
+    supplementari» dalla ver75: cambia solo quello che **dice**.
+  - **Cosa dice ora** (stesso meccanismo di `suppAttiva`): `senzaFondo` conta i dipendenti senza
+    `costo.tfrFondo > 0`.
+    - almeno uno → nota piccola grigia sotto la casella: «serve solo a chi non ha il fondo TFR
+      scritto: **1 persona su 3**»;
+    - nessuno → **etichetta grigia** (`#64748b`) e nota «**non in uso**: tutti hanno il fondo TFR
+      scritto nella scheda».
+  - 🔢 **`COSTO_COMUNE_DEF.anniTfr` da 2 a 1**, scelta di Christian. ⚠️ È solo il valore **di
+    partenza**: se nei valori comuni c'è già un numero salvato, **quello resta** — va cambiato a
+    mano nella casella e salvato con 💾.
+  - **Misurato in esecuzione** (persona senza fondo, 15 h/sett., gen→dic 2026):
+    | | casella «Anni» | rivalutazione | costo totale | €/h |
+    |---|--:|--:|--:|--:|
+    | ver114 | 2 | 45,99 € | 16.714,85 € | 19,35 |
+    | **ver115** | **1** | **23,00 €** | **16.691,85 €** | **19,32** |
+    ⚠️ Per **chi ha il fondo scritto non cambia niente** (verificato: 240,00 € · 16.908,86 € ·
+    19,57 €/h, identici alla ver114).
+  - **Provato in esecuzione** (`anni115.cjs`), **10 controlli su 10**: la casella parte da 1; la
+    rivalutazione stimata si dimezza; la nota conta giusto (1 su 1 · 1 su 3); con **tutti** i
+    fondi scritti l'etichetta diventa grigia e la nota dice «non in uso»; la casella resta
+    scrivibile; col fondo la rivalutazione resta 240,00 €; ver114 e ver115 **identiche** su chi ha
+    il fondo. **Zero errori di pagina.**
+  - ⚠️ **L'ISTAT resta aperto**: Christian ha riferito «istat dicembre 2025 risulta 1,011», ma non
+    ha ancora detto se è una **percentuale** (1,011%) o un **rapporto** fra gli indici (= +1,1%).
+    Il valore comune è ancora **2,00%** e **non è stato toccato**. Da chiarire.
 - 💰 **LA RIVALUTAZIONE DEL TFR SI CALCOLA SUL FONDO VERO** (ver114, 06/11/2026). Christian ha
   chiesto «come si calcola la rivalutazione TFR? Noi l'abbiamo messa giusta?», poi «il più
   veritiero?» fra tre strade proposte, e ha dato **Nu\*** alla **numero 2**.
