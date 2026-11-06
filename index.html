@@ -313,7 +313,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver124";
+const APP_VER = "ver126";
 const APP_DATA = "06nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -2850,6 +2850,21 @@ function fineRapportoYmd(dp, pairs){
   const fineCon = effEndInt(dp);
   return (fineCon && fineCon < finePer) ? fineCon : finePer;
 }
+/* ver125 (06/11/2026, Christian: «in caso di licenziamento si liquidano ferie e quant'altro
+   non goduto … fallo. Scatta solo se nel periodo c'e' una data di cessazione»).
+   Torna la data di fine rapporto SOLO se cade dentro il periodo guardato, altrimenti null.
+   Usa `effEndInt`, quindi vale sia per la cessazione scritta a mano sia per la scadenza
+   naturale di un tempo determinato (anche in quel caso le ferie non godute si liquidano).
+   Fuori dalla cessazione il debito di ferie NON si liquida: puo' ancora essere goduto. */
+function cessaNelPeriodo(dp, pairs){
+  if (!pairs || !pairs.length) return null;
+  const fine = effEndInt(dp);
+  if (!fine) return null;
+  const p0 = pairs[0], pN = pairs[pairs.length-1];
+  const inizio = p0.y*10000 + p0.m*100 + 1;
+  const ultimo = pN.y*10000 + pN.m*100 + daysInMonth(pN.y, pN.m);
+  return (fine >= inizio && fine <= ultimo) ? fine : null;
+}
 function fineperiodoYmd(pairs){
   if (!pairs || !pairs.length) return 0;
   const u = pairs[pairs.length-1];
@@ -2919,9 +2934,17 @@ function calcCosto(o){
   const fGod = (o.festGodute!=null) ? o.festGodute : c.festGodute;   // ver79: contate dal calendario del periodo
   const fNon = (o.festNonGod!=null) ? o.festNonGod : c.festNonGod;
   const J12 = (H5/26)*fNon*c.festNonGodCoef;            // festivita' non godute
+  /* ver125: FERIE NON GODUTE LIQUIDATE alla cessazione. Voce GEMELLA di J12: stesso conto
+     (mensile fisso in 26esimi x giornate) e stesso trattamento (dentro l'imponibile I, quindi
+     contributi si; FUORI dalla base TFR, vedi H19). Le giornate arrivano da `datiCosto`
+     (debito del periodo + residuo degli anni precedenti scritto a mano) e valgono SOLO se
+     nel periodo c'e' una cessazione: altrimenti `o.ferieLiqGG` e' 0 e questa voce e' 0,
+     cioe' il calcolo e' identico a prima. */
+  const ggLiq = Number(o.ferieLiqGG) || 0;
+  const J13 = (H5/26)*ggLiq;                            // ferie non godute liquidate
   const E13 = (H2-I2)*c.malattiaMese;                   // giorni di malattia presunti
   const J14 = H5*I2*c.integrMater/100;                  // integrazione maternita'
-  const L15 = J5+J6+J8+J12+J14;                         // imponibile I
+  const L15 = J5+J6+J8+J12+J13+J14;                     // imponibile I
   const O5calc = (H2-I2)*4.3452;                        // settimane del periodo, come le calcola il foglio
   const O5 = (o.settPeriodoOv>0) ? o.settPeriodoOv : O5calc;
   const O6calc = O5-((c.ferie+c.altriPermessi)*H3/12 + fGod + E13)/Q2;
@@ -2939,7 +2962,17 @@ function calcCosto(o){
   const J18 = H18*H2;                                   // ore aggiuntive
   const J17 = (o.premiMese||0)*(H2-(o.premiMesiTolti||0));
   const L18 = L15+J17+J18;                              // imponibile II
-  /* ver79: le festivita' NON GODUTE (J12) non entrano nell'imponibile TFR. */
+  /* ver79: le festivita' NON GODUTE (J12) non entrano nell'imponibile TFR.
+     ver126 (06/11/2026): le FERIE NON GODUTE LIQUIDATE (J13) invece **SI'**. In ver125 erano
+     fuori, per coerenza con la gemella; Christian ha mandato tre cedolini veri e il confronto
+     fra due mesi di fila della STESSA persona lo dimostra:
+       maggio 2025  competenze 960,93 €  -> quota TFR del mese 64,15 €
+       giugno 2025  competenze 1.310,86 € (di cui 315,00 € di ferie e permessi non goduti)
+                    -> quota TFR del mese 85,36 €
+     La quota e' salita di 21,21 €. Se le 315,00 fossero FUORI dalla base sarebbe salita di
+     ~2,4 €; se sono DENTRO, di ~24,2 €. Quindi sono DENTRO.
+     ⚠️ J12 resta fuori: e' una cosa diversa (le domeniche e il 4 novembre), e nei cedolini
+     non compare come voce a se'. */
   const H19 = (L15-J12) + ((O2>=38)? J18 : ((c.tfrSupp==="SI")? E18*J2*H2 : 0)) + H5*I2*(100-c.integrMater)/100;
   /* ver79: dal TFR si toglie lo 0,50%, che e' una quota dei contributi dovuti all'INPS
      e si calcola sulla stessa base dei contributi (imponibile II). */
@@ -2981,10 +3014,10 @@ function calcCosto(o){
      Christian il 04/11/2026). Finisce solo nel totale J35. */
   const kmVal = (o.kmMese!=null?o.kmMese:c.kmMese);
   const J34 = (o.kmTipo==="secco") ? kmVal : kmVal*(H2-(o.kmMesiTolti||0));
-  const J35 = J5+J6+J8+J12+J14+J17+J18+J19+J21+J23+J25+J26+J27+J28+J29+J30+J31+J32+J34;
+  const J35 = J5+J6+J8+J12+J13+J14+J17+J18+J19+J21+J23+J25+J26+J27+J28+J29+J30+J31+J32+J34;
   const F38 = O8 + P2*(c.suppPct/100)*H2 - O11*H2;      // ore teoriche rendicontabili
   const H38 = (G38>0)? G38 : F38;                       // ore usate nel calcolo
-  return { J2:J2,P2:P2,H5:H5,J5:J5,J6:J6,J8:J8,J12:J12,E13:E13,J14:J14,L15:L15,
+  return { J2:J2,P2:P2,H5:H5,J5:J5,J6:J6,J8:J8,J12:J12,J13:J13,ggLiq:ggLiq,E13:E13,J14:J14,L15:L15,
            O5:O5,O6:O6,O8:O8,O5calc:O5calc,O6calc:O6calc,E18:E18,J17:J17,J18:J18,L18:L18,H19:H19,J19:J19,J21:J21,
            J20:J20,J23:J23,J25:J25,J26:J26,J27:J27,J28:J28,J29:J29,J30:J30,J31:J31,J32:J32,J34:J34,
            fGod:fGod, fNon:fNon,
@@ -3047,6 +3080,7 @@ function datiCosto(state, dp, pairs){
     mesiRapporto: (p.mesi!=null && p.mesi!=="") ? cNum(p.mesi, mesiAuto) : mesiRapportoAuto,
     mesiRapportoAuto: mesiRapportoAuto,
     tfrFondo: cNum(p.tfrFondo, 0),                  /* ver114: 0 o vuoto = si usa la stima di prima */
+    ferieResidue: cNum(p.ferieResidue, 0),          /* ver125: giornate di ferie residue da anni precedenti */
     tfrFondoAnno: (p.tfrFondoAnno==null||String(p.tfrFondoAnno).trim()==="") ? "" : String(p.tfrFondoAnno).trim(),
     annoIniz: pairs.length ? pairs[0].y : null,
     mesiMater: cNum(p.mesiMater, 0),
@@ -3092,6 +3126,30 @@ function datiCosto(state, dp, pairs){
     o.suppMensileOre = sm.ore; o.suppRighe = sm.righe;
     o.ferie = ferieBilancio(state, dp, pairs, c, senzaRapp, o.mesiRatei);   /* ver120 */
   }
+  /* ===== ver125: FERIE NON GODUTE LIQUIDATE ALLA CESSAZIONE =====
+     Scatta SOLO se nel periodo guardato cade la fine del rapporto (scelta di Christian del
+     06/11/2026: «altrimenti il debito puo' ancora essere goduto dopo»).
+     Le giornate sono: il debito MATURATO-GODUTO del periodo (`ferieBilancio`, la stessa
+     funzione che alimenta l'avviso della ver120) PIU' il residuo degli anni precedenti, che
+     l'app non puo' sapere e che si scrive a mano nella scheda.
+     ⚠️ Qui `ferieBilancio` si chiama a parte, NON riusando `o.ferie`: quello esiste solo con
+     le ore «dai Riepiloghi» e senza valori scritti a mano, mentre la liquidazione e' dovuta
+     comunque. `o.ferie` NON e' stato toccato. */
+  o.ferieLiq = null; o.ferieLiqGG = 0;
+  const cessYmd = cessaNelPeriodo(dp, pairs);
+  if (cessYmd){
+    const fb = ferieBilancio(state, dp, pairs, c, senzaRapp, o.mesiRatei);
+    const ggPrec = cNum(p.ferieResidue, 0);
+    const ggTot = R2(Math.max(0, fb.debitoGG) + Math.max(0, ggPrec), 2);
+    if (ggTot > 0){
+      o.ferieLiqGG = ggTot;
+      o.ferieLiq = { gg:ggTot, ggPeriodo:R2(Math.max(0, fb.debitoGG),2), ggPrec:R2(Math.max(0, ggPrec),2),
+                     matGG:fb.matGG, godGG:fb.godGG, cess:intToIt(cessYmd) };
+    } else {
+      o.ferieLiq = { gg:0, ggPeriodo:R2(Math.max(0, fb.debitoGG),2), ggPrec:R2(Math.max(0, ggPrec),2),
+                     matGG:fb.matGG, godGG:fb.godGG, cess:intToIt(cessYmd) };
+    }
+  }
   o.raw = p;
   o.res = calcCosto(o);
   /* ver120: di quanto il costo orario risulta piu' basso del vero, se restano ferie non godute.
@@ -3118,7 +3176,7 @@ function datiCosto(state, dp, pairs){
     const bl = blocchiPeriodo(dp, pairs);
     if (bl.length > 1){
       /* primo giro: ogni blocco senza ore, per sapere quante ore ordinarie teoriche vale */
-      const prep = bl.map(function(b){
+      const prep = bl.map(function(b, bi){
         const pr0 = b.pairs[0];
         const vv = valoriAt(dp, pr0.y, pr0.m);
         const livB = (function(){ const l=String(vv.livello==null?"":vv.livello).toUpperCase().trim(); return (MINIMI_CCNL[tab] && MINIMI_CCNL[tab][l]) ? l : ""; })();
@@ -3139,6 +3197,11 @@ function datiCosto(state, dp, pairs){
           /* ver117: le ore in piu' del blocco, contate sui SUOI mesi. Senza questo ogni blocco
              userebbe il totale del periodo e la somma sarebbe moltiplicata. */
           suppMensileOre: o.suppMensileAttivo ? oreSuppPeriodo(state, dp, b.pairs, c, senzaRapp, o.sottoSoglia).ore : null,
+          /* ver125: la liquidazione delle ferie non godute avviene UNA VOLTA SOLA, alla fine:
+             sta tutta nell'ULTIMO pezzo, che e' quello che contiene la cessazione. Cosi' porta
+             con se' i contributi del suo pezzo e la somma dei pezzi torna al periodo intero
+             senza casi speciali (diversamente dalla formazione, che va rimessa a parte). */
+          ferieLiqGG: (bi === bl.length-1) ? (o.ferieLiqGG||0) : 0,
           oreManuali: 0
         });
         return { b:b, ob:ob, liv:livB, indet:indetB, res0: calcCosto(ob) };
@@ -3153,7 +3216,7 @@ function datiCosto(state, dp, pairs){
       });
       /* somma dei blocchi. La FORMAZIONE e' una spesa dell'anno, non del blocco:
          si toglie da ogni blocco e si rimette una volta sola sul periodo intero. */
-      const campi = ["J5","J6","J8","J12","J14","J17","J18","J19","J20","J21","J23","J25","J26","J27","J28","J29","J30","J31","J34",
+      const campi = ["J5","J6","J8","J12","J13","J14","J17","J18","J19","J20","J21","J23","J25","J26","J27","J28","J29","J30","J31","J34",
                      "L15","L18","H19","O5","O6","O8","O5calc","O6calc","fGod","fNon","H38"];
       const res = {};
       campi.forEach(function(k){ res[k] = prep.reduce(function(a,x){ return a + (Number(x.res[k])||0); }, 0); });
@@ -3276,8 +3339,17 @@ function CostoOrario(props){
     J6:  "mensile fisso × " + nTxt(d.mesiRatei) + "/12 mesi di ratei",
     J8:  "mensile fisso × " + nTxt(d.mesiRatei) + "/12 × " + pctTxt(c.quattordic),
     J12: nTxt(r.fNon) + (Number(r.fNon)===1 ? " giorno" : " giorni") + " × " + fmt2(c.festNonGodCoef) + " (in 26esimi del mensile fisso)",
+    /* ver125: la nota dice da dove vengono le giornate, perche' sono due pezzi diversi. */
+    J13: (d.ferieLiq && d.ferieLiq.gg > 0)
+      ? (nTxt(d.ferieLiq.gg) + (Number(d.ferieLiq.gg)===1 ? " giornata" : " giornate")
+         + (aPezzi ? (" × il mensile fisso ÷ 26 dell'ULTIMO pezzo (quello della cessazione): qui a lato il medio è " + dec4(r.H5/26) + " €")
+                   : (" × " + dec4(r.H5/26) + " € (mensile fisso ÷ 26)"))
+         + " — cessazione del " + d.ferieLiq.cess
+         + ": " + nTxt(d.ferieLiq.ggPeriodo) + " dal periodo (maturate " + nTxt(d.ferieLiq.matGG) + " − godute " + nTxt(d.ferieLiq.godGG) + ")"
+         + (d.ferieLiq.ggPrec > 0 ? (" + " + nTxt(d.ferieLiq.ggPrec) + " da anni precedenti") : " + 0 da anni precedenti"))
+      : (d.ferieLiq ? "nessuna giornata da liquidare" : "non dovuta: nel periodo non cade nessuna cessazione"),
     J14: mesiTxt(d.mesiMater) + " di maternità × " + pctTxt(c.integrMater),
-    L15: "retribuzione + 13ª + 14ª + festività non godute + maternità",
+    L15: "retribuzione + 13ª + 14ª + festività non godute + ferie non godute liquidate + maternità",
     J17: fmt2(d.premiMese) + " €/mese × " + mesiTxt(R2(d.mesi - d.premiMesiTolti, 3)),
     J18: fmt2(oreAggTot) + " h sul periodo × " + dec4(euroOraAgg) + " €/h (maggiorazione " + (d.oreSett>=38 ? "15% sul minimo" : "27%") + ")",
     L18: "imponibile I + premi + ore aggiuntive",
@@ -3483,6 +3555,12 @@ function CostoOrario(props){
                   {campoNum("Ore/mese sotto soglia perse", cMostra(d.raw.sottoSoglia, ""), function(v){ setPar("sottoSoglia", v); })}
                   {campoNum("TFR accantonato al 31/12 €", cMostra(d.raw.tfrFondo, ""), function(v){ setPar("tfrFondo", v); }, "vuoto = rivalutazione stimata con gli «Anni per rivalutazione TFR»")}
                   {campoNum("TFR accantonato — anno", cMostra(d.raw.tfrFondoAnno, ""), function(v){ setPar("tfrFondoAnno", v); }, "l'anno a cui si riferisce il fondo, es. 2025")}
+                  {/* ver125: il residuo degli anni precedenti l'app non lo sa (non tiene un
+                      monte ferie per persona), quindi si scrive qui. Serve solo nel periodo in
+                      cui cade la cessazione. */}
+                  {campoNum("Giornate di ferie residue da anni precedenti", cMostra(d.raw.ferieResidue, ""),
+                    function(v){ setPar("ferieResidue", v); },
+                    (d.ferieLiq ? "si sommano alle giornate non godute del periodo e si liquidano alla cessazione" : "serve solo nel periodo in cui cade la cessazione: qui non ce n'è nessuna"))}
                   {(function(){
                     /* ver114: il fondo è un numero che invecchia. Se l'anno scritto non è quello
                        prima del periodo guardato, l'app lo dice invece di usarlo in silenzio.
@@ -3590,7 +3668,11 @@ function CostoOrario(props){
               </div>
 
               {/* ver120 (Christian ha scelto la strada 1: solo un avviso, nessun numero toccato) */}
-              {(d.ferie && d.ferie.debitoH > (d.ferie.quota/2) && d.ferie.pct > 0) ? (
+              {/* ver125: se le ferie non godute vengono LIQUIDATE (c'e' una cessazione nel
+                   periodo), il costo orario non e' piu' piu' basso del vero: la voce
+                   «Ferie non godute liquidate» lo ha gia' rimesso dentro. Quindi l'avviso
+                   della ver120 sparisce, perche' direbbe una cosa falsa. */}
+              {(d.ferie && d.ferie.debitoH > (d.ferie.quota/2) && d.ferie.pct > 0 && !(d.ferieLiq && d.ferieLiq.gg > 0)) ? (
                 <div style={{ background:"#FFF8E1", border:"1px solid #EAC87A", borderRadius:"8px", padding:"7px 10px", marginTop:"8px", fontSize:"13px", lineHeight:1.35, color:"#7c4a03" }}>
                   ⚠️ <b>Ferie non godute.</b> In questo periodo ne sono maturate <b style={cifre}>{fmt2(d.ferie.matGG)}</b> giornate e ne risultano godute <b style={cifre}>{fmt2(d.ferie.godGG)}</b>: le <b style={cifre}>{fmt2(d.ferie.debitoGG)}</b> che restano (<b style={cifre}>{fmt2(d.ferie.debitoH)}</b> h) sono un <b>debito</b> — o verranno godute dopo, o andranno pagate. Finché restano lì, la persona rende più ore a parità di stipendio, quindi il <b>costo orario qui sopra è più basso del vero di circa {fmt2(d.ferie.pct)}%</b>.
                 </div>
@@ -3605,6 +3687,11 @@ function CostoOrario(props){
                   {voce("Tredicesima", r.J6, false, par.J6)}
                   {voce("Quattordicesima", r.J8, false, par.J8)}
                   {voce("Festività non godute", r.J12, false, par.J12)}
+                  {/* ver125 (06/11/2026, Christian: «fallo»). Compare SOLO quando c'e' qualcosa
+                      da liquidare, cioe' quando nel periodo cade una cessazione e restano
+                      giornate non godute: fuori da quel caso la voce sarebbe sempre 0,00 € e
+                      allungherebbe il dettaglio per niente. */}
+                  {(d.ferieLiq && d.ferieLiq.gg > 0) ? voce("Ferie non godute liquidate", r.J13, false, par.J13) : null}
                   {voce("Integrazione maternità", r.J14, false, par.J14)}
                   {voce("Imponibile I", r.L15, true, par.L15)}
                   {voce("Premi", r.J17, false, par.J17)}

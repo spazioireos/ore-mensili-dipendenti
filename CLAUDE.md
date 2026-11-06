@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver124 · 06nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver126 · 06nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -384,6 +384,123 @@ Banca ore, tetto annuo, contratti e export.
     «— ore» e «non calcolabile»; la stessa persona su «Teoriche» → 18,67 €/h; e il **foglio Excel
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
+
+- 🧮 **LE FERIE NON GODUTE LIQUIDATE STANNO NELLA BASE TFR** (ver126, 06/11/2026). Christian
+  aveva mandato i cedolini **proprio per questo**: «ti ho fatto vedere il cedolino perché non
+  capivo se ferie e permessi non goduti fossero imponibili per il TFR».
+  - **In ver125 erano FUORI**, messe lì per coerenza con la gemella *Festività non godute*
+    (`J12`). ⚠️ **Era una scelta, non una prova**: dai primi due cedolini la quota TFR non si
+    ricostruiva sotto nessuna ipotesi, ed era stato detto.
+  - 🔑 **Il terzo cedolino l'ha chiusa**: un mese **normale** della **stessa persona**, subito
+    prima della cessazione. Il confronto fra due mesi di fila toglie di mezzo tutto quello che
+    non si vede (fondo pensione, trattamento della 14ª, arrotondamenti):
+    | | maggio 2025 | giugno 2025 | Δ |
+    |---|--:|--:|--:|
+    | competenze imponibili | 960,93 € | 1.310,86 € | **+349,93 €** |
+    | di cui **ferie e permessi NON goduti** | 0 | **315,00 €** | +315,00 |
+    | **quota TFR del mese** | **64,15 €** | **85,36 €** | **+21,21 €** |
+    - se le 315,00 fossero **FUORI** dalla base, la quota sarebbe salita di **~2,4 €**;
+    - se sono **DENTRO**, di **~24,2 €**;
+    - è salita di **21,21 €**. ✅ **Sono dentro**, senza ragionevole dubbio.
+    - Controprova coi rapporti: quota ÷ competenze vale **6,68%** a maggio e **6,51%** a giugno,
+      praticamente uguale. Se le 315,00 fossero escluse, a giugno sarebbe stato **5,09%**.
+  - **La modifica è UNA RIGA**: `H19 = (L15 − J12 − J13) + …` torna `H19 = (L15 − J12) + …`.
+    ⚠️ **`J12` resta fuori** (decisione ver79): le festività **non godute** sono le domeniche e
+    il 4 novembre, un'altra cosa, e nei cedolini non compaiono come voce a sé.
+  - ⚠️ **Conseguenza**: nel periodo di cessazione il **TFR maturato**, e quindi il **costo
+    totale**, salgono di circa `importo liquidato ÷ 13,5`. Sui cedolini veri sarebbero
+    **+23,33 €** e **+9,21 €**. **I costi orari della ver125 sui periodi con cessazione erano
+    sottostimati.**
+  - ⚠️ **Perché i primi due cedolini non bastavano**: su quello di ottobre sembrava che fossero
+    fuori (quota TFR del mese 6,33 € contro i 7,35 € che darebbero le sole ferie). **Lettura
+    sbagliata**: in quel cedolino c'è anche una **trattenuta per fondo pensione** che divide il
+    TFR, e il conto non si chiude. **Il metodo buono è il confronto fra due mesi della stessa
+    persona**, uno con e uno senza liquidazione.
+  - **Provato in esecuzione** (`liq126.cjs`): senza cessazione i numeri restano **identici alla
+    ver125**; con la cessazione il **TFR maturato cresce** di circa `importo ÷ 13,5`.
+
+- 🧾 **LE FERIE NON GODUTE SI LIQUIDANO ALLA CESSAZIONE** (ver125, 06/11/2026, segnalazione e
+  richiesta di Christian: «in caso di licenziamento si liquidano ferie e quant'altro non goduto.
+  Come lo calcoli nel costo orario del mese?» → poi **«fallo»**).
+  - **Il buco**: fino alla ver124 **non esisteva nessuna voce**. Alla cessazione si liquidano le
+    ferie non godute, ma il Costo orario non le contava: il costo dell'ultimo periodo era
+    **sottostimato**. C'era solo l'avviso giallo della ver120, che Christian aveva scelto
+    («1, solo un avviso») quando il problema era un altro.
+  - **La voce nuova `J13`** fa lo stesso conto della gemella `J12` (festività non godute):
+    `mensile fisso ÷ 26 × giornate`, dentro l'**imponibile I**, quindi i contributi la seguono.
+    ⚠️ **In ver125 era FUORI dalla base TFR; dalla ver126 è DENTRO** — vedi la scheda 🧮 qui
+    sopra, dimostrato sui cedolini veri. `J12` invece resta fuori (è un'altra cosa).
+  - 🚦 **Scatta SOLO se nel periodo cade la fine del rapporto** (scelta di Christian: «altrimenti
+    il debito può ancora essere goduto dopo»). Funzione nuova **`cessaNelPeriodo(dp, pairs)`**,
+    che usa `effEndInt`, quindi vale anche per la **scadenza naturale di un tempo determinato**.
+    Fuori da quel caso `o.ferieLiqGG` è **0** e il calcolo è **identico alla ver124**.
+  - 🔢 **Le giornate** sono due pezzi sommati: il **debito del periodo** (maturate − godute, da
+    `ferieBilancio`, la stessa funzione dell'avviso ver120) **più** il **residuo degli anni
+    precedenti**, che l'app non può sapere e che si scrive nella casella nuova
+    **«Giornate di ferie residue da anni precedenti»** (`dp.costo.ferieResidue`), nel blocco
+    *La retribuzione*. ⚠️ Scritta **senza** una cessazione nel periodo **non produce nulla**, e
+    l'aiutino sotto la casella lo dice.
+    ⚠️ `ferieBilancio` qui si chiama **a parte**, non riusando `o.ferie`: quello esiste solo con
+    le ore «dai Riepiloghi» e senza valori scritti a mano, mentre la liquidazione è dovuta
+    comunque. **`o.ferie` non è stato toccato.**
+  - 🧩 **Con i blocchi** (ver84) la liquidazione sta tutta nell'**ULTIMO pezzo**, quello che
+    contiene la cessazione (`ferieLiqGG: (bi === bl.length-1) ? … : 0`): così porta i contributi
+    del suo pezzo e la somma dei pezzi torna al periodo intero **senza casi speciali** — al
+    contrario della formazione, che va rimessa a parte. Conseguenza voluta e **giusta anche per
+    legge**: si usa il **mensile fisso finale**, quindi dopo una promozione la liquidazione è più
+    alta.
+  - 🟨 **L'avviso giallo della ver120 SPARISCE quando la liquidazione è contata**: diceva «il
+    costo orario qui è più basso del vero», e con la voce dentro **non è più vero**. Resta
+    identico in tutti gli altri casi.
+  - **Misurato in esecuzione** (X a 30 h/sett. D1, **cessazione 30/11/2026**, periodo gen→nov,
+    1.674 h rese, mai in ferie: 27,50 giornate maturate e 0 godute):
+    | | ver124 | **ver125** |
+    |---|--:|--:|
+    | *Ferie non godute liquidate* | — | **1.367,40 €** (27,50 gg × 49,72 €) |
+    | imponibile I | 16.147,80 € | **17.515,20 €** (+1.367,40, esatto) |
+    | contributi INPS | 5.279,92 € | **5.647,75 €** |
+    | TFR maturato | 1.388,07 € | **1.388,07 €** (ver125; dalla **ver126** cresce: la voce è nella base) |
+    | costo totale | 27.056,89 € | **28.797,96 €** |
+    | **€/h** | **16,16** | **17,20** |
+    🔑 **La stessa persona che si fosse goduta le ferie costa 17,31 €/h**: con la liquidazione
+    dentro i due casi tornano a dire **la stessa cosa** (17,20 contro 17,31), ed è la prova che
+    era questo il pezzo mancante. ⚠️ Scrivendo **10** giornate pregresse la voce passa a
+    **1.864,64 €** (37,50 gg).
+  - ⚠️ **La liquidazione finisce in UN mese solo** (l'ultimo cedolino): chiedendo il costo orario
+    **di quel mese** il €/h schizza. **Christian lo sa e va bene così** («ovvio e va bene»): per
+    il numero vero si guarda tutto il contratto.
+  - ✅ **I ROL NON sono un caso a parte** (Christian, 06/11/2026): «i rol sono i permessi ex
+    festività, che seguono le ferie. Noi abbiamo considerato tutto insieme a 30 gg annui,
+    corrispondenti a 2,5 giorni mese». Quindi la voce unica è **giusta**: nel cedolino vero sono
+    due righe (*Ferie non godute* e *Permessi Ex-Fs non goduti*) ma con la **stessa quota
+    giornaliera**, perciò il totale coincide. **Non separarle.**
+  - ⚠️ **NON è gestita** (non richiesta): l'**indennità di mancato preavviso**. Il **TFR** invece
+    è già contato mese per mese, quindi erogarlo alla fine **non è un costo in più**.
+  - 🧾 **VERIFICATA SU DUE CEDOLINI VERI DI LIQUIDAZIONE** (Christian, 06/11/2026). Due soci
+    dipendenti, livello D1, part-time 47,36%, cessati nel 2025. ⚠️ **I dati restano in chat: mai
+    nel repository** (regola 10.1). Tutto torna:
+    | | cedolino | l'app |
+    |---|---|---|
+    | **quota giornaliera** | 31,32261 € e 30,00053 € | `mensile fisso ÷ 26` → **identica alla quinta cifra** |
+    | **giornate × quota** | 99,19 + 25,12 = 124,31 € · 275,00 + 40,00 = 315,00 € | stessa formula |
+    | **imponibile contributivo** | 202,00 € e 1.311,00 € = **comprende** le ferie non godute | ✅ la voce sta in **imponibile I** |
+    | **ratei maturati** | 22,50 gg su 9 mesi · 15,00 gg su 6 mesi | `30/12 × mesi` → **esatti** |
+    | **mese di cessazione con 3 giorni** | **nessun rateo** | ✅ regola dei 15 giorni (ver104) |
+    | **minimo tabellare** | 9,92467 €/h × 165 = **1.637,57** · 9,73327 × 165 = **1.605,99** | `MINIMI_CCNL` **Ott25** e **Ott24**, identici |
+    - ⚠️ **Nei cedolini c'è un elemento in più che l'app non conosce**: la colonna **«etar»**
+      accanto al minimo, che vale **82,00 €** e **41,00 €** al mese a tempo pieno. Va scritto nel
+      **superminimo** della scheda, altrimenti il mensile fisso — e quindi la liquidazione — è
+      più basso del vero.
+    - ⚠️ **Nel prospetto RATEI del cedolino la colonna «Goduto» comprende anche le giornate
+      liquidate** (maturato = goduto, residuo zero): **non** si può leggere da lì quante ferie
+      sono state davvero prese.
+    - ✅ **Base TFR: CHIUSA nella ver126** — vedi la scheda 🧮 più sopra. **Ci stanno dentro**,
+      dimostrato col cedolino del mese prima.
+  - **Provato in esecuzione** (`liq125.cjs`): nessuna cessazione → numeri **identici alla
+    ver124** e nessuna voce; con la cessazione l'importo, la nota, l'imponibile I, i contributi,
+    il TFR invariato, il €/h che sale e l'avviso che sparisce; la casella pregressa; nessuna voce
+    quando non c'è debito; nessuna voce senza cessazione; con i blocchi una volta sola e col
+    mensile finale. **Zero errori di pagina.**
 
 - 🐣 **LA DOMENICA DI PASQUA NON È UNA FESTIVITÀ: TOLTA DALL'ELENCO** (ver124, 06/11/2026,
   difetto **trovato da Christian** guardando un caso vero: «per Boccalari intendo dire che nel
