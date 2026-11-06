@@ -313,7 +313,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver122";
+const APP_VER = "ver123";
 const APP_DATA = "06nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -2756,10 +2756,26 @@ function oreSuppPeriodo(state, dp, pairs, c, escludi, sottoSoglia){
     const rec  = getRecFrom(state, pr.y, pr.m, dp.id);
     const lav  = R2(oreLavorabiliMese(state, dp, c, pr.y, pr.m, escludi), 3);
     const rese = R2(totOfRec(rec, pr.y, pr.m), 3);
-    const ass  = R2(coverAbsHours(rec, dp, pr.y, pr.m) + permOreMese(rec).pagate, 3);   /* ver118: a video */
+    const perm = R2(permOreMese(rec).pagate, 3);
+    const ass  = R2(coverAbsHours(rec, dp, pr.y, pr.m) + perm, 3);   /* ver118: a video */
+    const fg   = festGoduteMese(state, dp, pr.y, pr.m, escludi);     /* ver124: a video, a parte */
     const supp = R2(Math.max(0, rese + (Number(sottoSoglia)||0) - lav), 3);
     tot += supp;
-    righe.push({ y:pr.y, m:pr.m, lav:lav, rese:rese, ass:ass, supp:supp });
+    /* ver124 (06/11/2026, Christian: «spacchettami bene le assenze indicandone le voci che le
+       compongono»): quante giornate per ciascun codice, piu' le ore di permesso retribuito.
+       ⚠️ Solo per farlo vedere: i numeri del conto restano quelli di `coverAbsHours`. */
+    const det = []; const cont = {};
+    if (rec && rec.giorni){
+      const q = quotaGiorno(dp, pr.y, pr.m), nd = daysInMonth(pr.y, pr.m);
+      for (let d=1; d<=nd; d++){
+        const cv = String(rec.giorni[d]==null ? "" : rec.giorni[d]).trim();
+        if (CODE_SET[cv] && cv!=="--" && cv!=="AN") cont[cv] = (cont[cv]||0) + 1;
+      }
+      Object.keys(cont).forEach(function(k){ det.push({ cod:k, gg:cont[k], ore:R2(cont[k]*q,3) }); });
+      det.sort(function(a,b){ return b.ore - a.ore; });
+    }
+    righe.push({ y:pr.y, m:pr.m, lav:lav, rese:rese, ass:ass, perm:perm,
+                 fest:fg.ore, festGG:fg.gg, det:det, supp:supp });
   });
   return { ore: R2(tot,3), righe: righe };
 }
@@ -3480,6 +3496,17 @@ function CostoOrario(props){
                     return null;
                   })()}
                 </div>
+                {/* ver123 (06/11/2026, Christian: «nel box della retribuzione mettimi anche
+                    l'importo orario derivante dalle varie componenti inserite»). Solo lettura:
+                    sono `J2` e `H5` di calcCosto, gli stessi numeri che il conto usa davvero. */}
+                <table style={{ width:"100%", borderCollapse:"collapse", marginTop:"7px", borderTop:"1px solid #d7dde5", paddingTop:"4px" }}><tbody>
+                  <tr><td style={tdE}>Totale delle componenti</td><td style={Object.assign({}, tdV, cifre)}>{fmt2(d.minimo + d.scatti + d.premiTP + d.superminimo)} € al mese</td></tr>
+                  <tr><td style={tdE}>Importo orario</td><td style={Object.assign({}, tdV, cifre, { fontSize:"16px", color:"#1f4e82" })}>{dec4(r.J2)} €/h</td></tr>
+                  <tr><td style={tdE}>Mensile fisso di questa persona</td><td style={Object.assign({}, tdV, cifre)}>{fmt2(r.H5)} € al mese</td></tr>
+                </tbody></table>
+                <div style={{ fontSize:"12.5px", color:"#475569", lineHeight:1.3, marginTop:"3px" }}>
+                  <b>Minimo tabellare + scatti + premi (tempo pieno) + superminimo</b>, diviso <b>165</b> ore. ⚠️ Le componenti sono a <b>tempo pieno</b>: l'importo orario <b>non cambia</b> con il part-time, cambia il mensile fisso (totale ÷ 38 × <b style={cifre}>{fmt2(d.oreSett)}</b> h/settimana). Le <b>ore aggiuntive</b> si pagano su questo importo maggiorato del <b>{d.oreSett >= 38 ? "15% sul minimo" : "27%"}</b>, cioè <b style={cifre}>{dec4(euroOraAgg)}</b> €/h.
+                </div>
               </div>
 
             </div>
@@ -3616,6 +3643,7 @@ function CostoOrario(props){
                         <tr style={{ fontWeight:800, color:"#1f4e82" }}>
                           <td style={{ padding:"1px 6px 1px 0" }}>Mese</td>
                           <td style={{ padding:"1px 6px", textAlign:"right" }}>Assenze</td>
+                          <td style={{ padding:"1px 6px", textAlign:"right" }}>Festività</td>
                           <td style={{ padding:"1px 6px", textAlign:"right" }}>Lavorabili</td>
                           <td style={{ padding:"1px 6px", textAlign:"right" }}>Rese</td>
                           <td style={{ padding:"1px 0", textAlign:"right" }}>In più</td>
@@ -3624,16 +3652,28 @@ function CostoOrario(props){
                           return (
                             <tr key={"sm" + rr.y + "-" + rr.m} style={{ borderTop:"1px dotted #e2e8f0" }}>
                               <td style={{ padding:"1px 6px 1px 0" }}>{mLabelY(rr.y, rr.m)}</td>
-                              <td style={Object.assign({ padding:"1px 6px", textAlign:"right", color:"#64748b" }, cifre)}>{fmt2(rr.ass || 0)}</td>
-                              <td style={Object.assign({ padding:"1px 6px", textAlign:"right" }, cifre)}>{fmt2(rr.lav)}</td>
-                              <td style={Object.assign({ padding:"1px 6px", textAlign:"right" }, cifre)}>{fmt2(rr.rese)}</td>
-                              <td style={Object.assign({ padding:"1px 0", textAlign:"right", fontWeight: rr.supp > 0 ? 800 : 400, color: rr.supp > 0 ? "#b45309" : "#64748b" }, cifre)}>{fmt2(rr.supp)}</td>
+                              <td style={{ padding:"1px 6px", textAlign:"right", color:"#64748b" }}>
+                                <span style={cifre}>{fmt2(rr.ass || 0)}</span>
+                                {((rr.det && rr.det.length) || rr.perm > 0.0005) ?
+                                  <div style={{ fontSize:"12.5px", color:"#475569", fontWeight:400, lineHeight:1.25, whiteSpace:"normal" }}>
+                                    {(rr.det || []).map(function(x){ return x.cod + " " + x.gg + (x.gg === 1 ? " gg" : " gg"); }).join(" · ")}
+                                    {(rr.perm > 0.0005) ? ((rr.det && rr.det.length ? " · " : "") + "permessi " + fmt2(rr.perm) + " h") : ""}
+                                  </div> : null}
+                              </td>
+                              <td style={{ padding:"1px 6px", textAlign:"right", color:"#64748b" }}>
+                                <span style={cifre}>{fmt2(rr.fest || 0)}</span>
+                                {(rr.festGG > 0) ? <div style={{ fontSize:"12.5px", color:"#475569", fontWeight:400, lineHeight:1.25 }}>{rr.festGG} gg</div> : null}
+                              </td>
+                              <td style={Object.assign({ padding:"1px 6px", textAlign:"right", verticalAlign:"top" }, cifre)}>{fmt2(rr.lav)}</td>
+                              <td style={Object.assign({ padding:"1px 6px", textAlign:"right", verticalAlign:"top" }, cifre)}>{fmt2(rr.rese)}</td>
+                              <td style={Object.assign({ padding:"1px 0", textAlign:"right", verticalAlign:"top", fontWeight: rr.supp > 0 ? 800 : 400, color: rr.supp > 0 ? "#b45309" : "#64748b" }, cifre)}>{fmt2(rr.supp)}</td>
                             </tr>
                           );
                         })}
                         <tr style={{ borderTop:"1px solid #cbd5e1", fontWeight:800 }}>
                           <td style={{ padding:"2px 6px 2px 0" }}>Totale</td>
                           <td style={Object.assign({ padding:"2px 6px", textAlign:"right", color:"#64748b" }, cifre)}>{fmt2(d.suppRighe.reduce(function(a,x){ return a + (x.ass||0); }, 0))}</td>
+                          <td style={Object.assign({ padding:"2px 6px", textAlign:"right", color:"#64748b" }, cifre)}>{fmt2(d.suppRighe.reduce(function(a,x){ return a + (x.fest||0); }, 0))}</td>
                           <td style={Object.assign({ padding:"2px 6px", textAlign:"right" }, cifre)}>{fmt2(d.suppRighe.reduce(function(a,x){ return a + x.lav; }, 0))}</td>
                           <td style={Object.assign({ padding:"2px 6px", textAlign:"right" }, cifre)}>{fmt2(d.suppRighe.reduce(function(a,x){ return a + x.rese; }, 0))}</td>
                           <td style={Object.assign({ padding:"2px 0", textAlign:"right" }, cifre)}>{fmt2(d.suppMensileOre)}</td>
@@ -3641,7 +3681,7 @@ function CostoOrario(props){
                       </tbody></table>
                       </div>
                       {(!d.blocchi && d.suppVecchio != null) ? <div style={{ fontSize:"12.5px", color:"#475569", lineHeight:1.3, marginTop:"4px" }}>Con il conto vecchio (totale del periodo contro totale) sarebbero <b style={cifre}>{fmt2(d.suppVecchio)}</b> h: la differenza è la <b>compensazione fra i mesi</b>, che ora non c'è più.</div> : null}
-                      <div style={{ fontSize:"12.5px", color:"#475569", lineHeight:1.3, marginTop:"4px" }}>La colonna <b>Assenze</b> sono le ore di ferie, malattia e permessi retribuiti <b>davvero segnate nel Tabellone</b> in quel mese: non sono più i numeri presunti dei valori comuni.</div>
+                      <div style={{ fontSize:"12.5px", color:"#475569", lineHeight:1.3, marginTop:"4px" }}>La colonna <b>Assenze</b> sono le ore di ferie, malattia e permessi retribuiti <b>davvero segnate nel Tabellone</b> in quel mese, con sotto le <b>voci che le compongono</b> (giornate per ciascun codice e ore di permesso); non sono più i numeri presunti dei valori comuni. La colonna <b>Festività</b> sono le festività <b>godute</b> contate dal calendario, cioè quelle che nel Tabellone <b>non</b> hanno un codice scritto: dove invece il codice c'è (per esempio <b>FEST</b>) la giornata compare fra le Assenze, per non contarla due volte. <b>Lavorabili = monte del mese − Assenze − Festività.</b></div>
                     </div>
                   ) : null}
                 </div> : null}

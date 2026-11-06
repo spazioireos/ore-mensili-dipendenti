@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver122 · 06nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver123 · 06nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -381,6 +381,38 @@ Banca ore, tetto annuo, contratti e export.
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
 
+- 💶 **L'IMPORTO ORARIO E LE ASSENZE SPACCHETTATE** (ver123, 06/11/2026, due richieste di
+  Christian nello stesso momento). **Nessun calcolo è stato toccato: si fanno vedere numeri che
+  l'app calcolava già.**
+  - **«Nel box della retribuzione mettimi anche l'importo orario derivante dalle varie
+    componenti inserite»** → in fondo al blocco *La retribuzione*, tre righe di sola lettura:
+    **Totale delle componenti** (minimo + scatti + premi a tempo pieno + superminimo),
+    **Importo orario** = quel totale ÷ **165** (a **4 decimali**, `J2`) e **Mensile fisso di
+    questa persona** (`H5` = totale ÷ 38 × ore settimanali). Sotto, una riga spiega la formula e
+    dice a quanto si pagano le **ore aggiuntive** (importo orario maggiorato del 27%, o del 15%
+    sul minimo a 38 h/sett.).
+    ⚠️ **Le componenti sono a tempo pieno**: l'importo orario **non cambia** col part-time,
+    cambia il mensile fisso. Provato in esecuzione su dati veri: 1.637,57 € ÷ 165 =
+    **9,9247 €/h**, mensile fisso 1.637,57 € (38 h/sett.) e 818,45 € (18 h/sett.).
+  - **«In "le ore in più mese per mese" spacchettami bene le assenze indicandone le voci che le
+    compongono»** → sotto il numero della colonna **Assenze** compare ora l'elenco delle voci
+    («**FERIE 15 gg · FEST 1 gg**», «**MAL 2 gg**», «**permessi 2,00 h**»), e c'è una **colonna
+    nuova «Festività»** con le festività godute contate dal calendario (ore e giornate).
+    Così si legge a colpo d'occhio: **Lavorabili = monte del mese − Assenze − Festività**.
+  - 🔑 **Perché servivano DUE colonne** (ed è la stessa ragione della ver122): una festività può
+    stare in **due posti diversi**. Se nel Tabellone quel giorno porta un codice (`FEST`,
+    `FERIE`…) finisce fra le **Assenze**; se la cella è vuota la conta il **calendario** e
+    finisce fra le **Festività**. Metterle in una colonna sola avrebbe nascosto proprio la cosa
+    che la ver122 è servita a correggere.
+  - **Dati nuovi** nelle righe di `oreSuppPeriodo`: `perm`, `fest`, `festGG`, `det`
+    (`[{cod, gg, ore}]`, ordinato per ore). `coverAbsHours` **non è stata toccata**: il dettaglio
+    riconta le celle **solo per scriverlo**, con lo stesso criterio (fuori `--` e `AN`).
+  - **Provato in esecuzione**: `retr123.cjs` **7 controlli su 7** (le tre righe ci sono, i 4
+    decimali, totale ÷ 165 = importo orario, mensile fisso = totale ÷ 38 × ore settimanali, e la
+    ver122 non le mostra); il riquadro mese per mese letto su un caso con ferie, malattia e
+    festività **scritte in cella**: gennaio `165 − 6,35 (FEST 1 gg) − 6,33 (1 gg dal calendario)
+    = 152,32`, dicembre `165 − 12,69 (FEST 2 gg) − 12,67 (2 gg) = 139,64`. **Zero errori di
+    pagina.**
 - 🛡️ **UNA FESTIVITÀ GIÀ SCRITTA IN CELLA NON SI CONTA DUE VOLTE** (ver122, 06/11/2026).
   Difetto **introdotto dalla ver121** e trovato controllando perché il Tabellone non le contasse.
   - **Il caso**: fino alla ver77 i giorni rossi **si potevano compilare**, e nell'elenco dei
@@ -395,7 +427,11 @@ Banca ore, tetto annuo, contratti e export.
     pastiglia) e il Costo orario (`oreLavorabiliMese`), così non possono più scostarsi.
   - ⚠️ `oreLavorabiliMese` e `oreSuppPeriodo` hanno perso il parametro `ggSett`: la quota la
     calcola `festGoduteMese` con `ggSettDi`, che legge gli stessi campi.
-  - ⚠️ **Dalla ver77 il caso non si può più creare**: riguarda solo lo storico.
+  - 🔴 **NON è un caso di scuola: succede sui dati VERI di Christian.** Guardando una persona
+    reale (gennaio → ottobre 2026) il **1 e il 6 gennaio, il 6 e il 25 aprile, il 1 maggio, il
+    2 giugno e il 15 agosto** portano tutti il codice **`FEST`** scritto in cella. Senza la
+    ver122 quelle sette giornate sarebbero state contate **due volte**. ⚠️ Dalla ver77 non si
+    possono più scrivere, ma quelle già nei dati restano.
 - 🎌 **ANCHE IL TABELLONE CONTA LE FESTIVITÀ GODUTE** (ver121, 06/11/2026). Christian: «Perché
   il tabellone non conteggia le festività godute?? Sono **assenze retribuite a tutti gli
   effetti**, come ferie, malattia eccetera. Solo le **non godute** sono un'eccezione che non
