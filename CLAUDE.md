@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver120 · 06nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver121 · 06nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -31,12 +31,18 @@ Banca ore, tetto annuo, contratti e export.
   testata, in vista Anagrafica, compariva "📅 undefined 2026" (perché `mese` è `null` fuori dalle
   viste mensili); ora mostra "📇 Anagrafica".
 - **Straordinario / "Ore in più / in meno"** — **regola definitiva, confermata con un numero da
-  Christian il 31/10/2026**: `delta del mese = ore rese + ore di assenza retribuita − monte del
-  mese`. Le assenze retribuite **contano come ore lavorate** e concorrono a raggiungere il monte
+  Christian il 31/10/2026 e ampliata il 06/11/2026**: `delta del mese = ore rese + ore di assenza
+  retribuita + ore di PERMESSO retribuito (ver93) + ore delle FESTIVITÀ GODUTE (ver121) − monte
+  del mese`. Le assenze retribuite **contano come ore lavorate** e concorrono a raggiungere il monte
   ore contrattuale; lo straordinario si paga su quanto eccede il contrattualizzato e le ore non
   dovute si trattengono, **tutto dentro lo stesso mese**: Spazio Ireos **non usa la Banca ore**.
   Esempio deciso da Christian: contratto 165 h, lavora 165 h e ha 2 giorni di ferie (12,69 h) →
-  **+12,69 di straordinario**.
+  **+12,69 di straordinario**. Secondo esempio, del 06/11/2026: contratto 165 h, **172 rese** e
+  **2 festività godute** → le ore da fare erano **152,333** e lo straordinario è **19,6666**.
+  ⚠️ Le due quote giornaliere sono diverse di proposito: le **assenze** valgono `monte/26`
+  (6,3462 a 38 h/sett., è il 12,69 del primo esempio), le **festività** `oreSett/ggSett`
+  (6,3333, è il 152,333 del secondo). ⚠️ Le festività **non godute** (domeniche e 4 novembre)
+  **non entrano**: «sono un'eccezione che non rientra nel calcolo».
   ⚠️ **Storia da non ripetere**: in ver64 questo conto era stato cambiato (le assenze coprivano
   solo le ore mancanti senza fare straordinario) ed è stato **rimesso com'era in ver65**, perché
   la regola era stata fraintesa. Non ricambiarlo senza che Christian lo chieda **con un numero
@@ -375,6 +381,35 @@ Banca ore, tetto annuo, contratti e export.
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
 
+- 🎌 **ANCHE IL TABELLONE CONTA LE FESTIVITÀ GODUTE** (ver121, 06/11/2026). Christian: «Perché
+  il tabellone non conteggia le festività godute?? Sono **assenze retribuite a tutti gli
+  effetti**, come ferie, malattia eccetera. Solo le **non godute** sono un'eccezione che non
+  rientra nel calcolo».
+  - **Perché mancavano**: dalla ver77 i giorni rossi **non si compilano**, quindi non hanno
+    nessun codice e `coverAbsHours` non li vedeva. Ora si contano **dal calendario**, come fa
+    già il Costo orario, e solo nei giorni in cui il contratto è in piedi.
+  - **Funzioni nuove** (sopra `bancaMeseA`): **`ggSettDi(state,dp)`** e
+    **`festOreMese(state,dp,y,m)`** = festività **godute** × `oreSettAt / ggSett`.
+  - **Dove cambia**: `bancaMeseA` (quindi anche `bancaPrecA` e lo **Straordinario** della Query
+    personale) e il riquadro **«Ore in più / in meno — base mensile»** del Tabellone, che ora ha
+    la pastiglia nuova **«Festività godute: 2 gg = 12,667 h»**. La frase dice ora «Ferie,
+    malattia, permessi **e festività godute** contano come fatte».
+  - 🔗 **Tabellone e Costo orario ora danno lo STESSO numero.** Provato in esecuzione su
+    dicembre 2026 (4 festività godute, 172 h rese): **+32,333 h** da una parte e **32,33 h**
+    dall'altra; prima erano +7,000 e 32,33.
+  - ✅ **Il numero di Christian torna nel Tabellone**: gennaio 2027 (1 e 6 gennaio godute),
+    38 h/sett., 172 h rese → **Risultato del mese +19,667 h**, cioè i suoi «19,6666 ore
+    straordinarie». La ver120 diceva +7,000. **3 controlli su 3** (`caso121.cjs`).
+  - ⚠️ **`coverAbsHours` NON è stata toccata**, di proposito: se le festività finissero lì
+    dentro il **Costo orario le conterebbe due volte**, perché le somma già per conto suo.
+  - ⚠️ **Le festività NON godute restano fuori** (domeniche e il 4 novembre): «sono un'eccezione
+    che non rientra nel calcolo». Restano una voce di costo a parte nel Costo orario (`J12`).
+  - ⚠️ **Il Tetto annuo NON è stato toccato**: `prodottoMese` continua a contare ore rese +
+    assenze erosive + permessi erosi. Una festività è un giorno in cui il servizio è chiuso, e
+    Christian non ha chiesto niente in proposito.
+  - ⚠️ **Conseguenza da sapere**: lo straordinario cresce in **6 mesi su 12** del 2026 (gennaio,
+    aprile, maggio, giugno, agosto, dicembre). Dalla ver121 in poi i numeri dei mesi con
+    festività **non sono confrontabili** con quelli visti prima.
 - 🟨 **AVVISO: LE FERIE NON GODUTE SONO UN DEBITO** (ver120, 06/11/2026). Fra le tre strade
   proposte per il limite che aveva visto lui stesso (vedi la scheda ⚠️🔴 della ver118) Christian
   ha scelto la **1: solo un avviso, nessun numero toccato**.
@@ -412,19 +447,16 @@ Banca ore, tetto annuo, contratti e export.
     giorni ha la sua quota giusta.
   - ✅ **Chiusa la prima domanda aperta della ver118**: «Le festività non possono che essere
     dedotte in base al mese, non vedo alternative». **Si deducono, e si contano mese per mese.**
-  - ⚠️🔴 **RESTA APERTA LA CONSEGUENZA SUL TABELLONE**: nella frase di Christian quelle 19,6666 h
-    sono **«ore straordinarie»**, cioè il linguaggio del **Risultato del mese**. Ma il Tabellone
-    **non toglie le festività**: `bancaMeseA` fa `rese + assenze − monte`. **Misurato in
-    esecuzione** su dicembre 2026 (4 festività godute, 172 h rese, nessuna assenza):
+  - ✅ **CHIUSA nella ver121**: nella frase di Christian quelle 19,6666 h sono **«ore
+    straordinarie»**, cioè il linguaggio del **Risultato del mese**, e fino alla ver120 il
+    Tabellone **non toglieva le festività** (`bancaMeseA` faceva `rese + assenze − monte`).
+    Gliel'ho chiesto e ha risposto che sono assenze retribuite a tutti gli effetti. **Misurato
+    prima della correzione**, dicembre 2026 (4 festività godute, 172 h rese, nessuna assenza):
     | | dice |
     |---|--:|
     | **Tabellone**, Risultato del mese | **+7,000 h** (172 − 165) |
     | **Costo orario** (ver119) | **+32,33 h** (172 − 139,667) |
-    Per allineare il Tabellone basterebbe aggiungere le festività godute alle ore coperte, e i
-    due numeri tornerebbero uguali. ⚠️ **NON fatto**: `bancaMeseA`, `coverAbsHours` e
-    `monteFissoMese` sono nell'elenco «non toccare senza richiesta esplicita», e quel numero
-    Christian lo guarda ogni mese per ogni persona. **Cambierebbe in 6 mesi su 12** (gennaio,
-    aprile, maggio, giugno, agosto, dicembre 2026). **Da chiedergli.**
+    ✅ **Fatto nella ver121**: ora tutti e due dicono **+32,333 h**.
 - 🧾 **LE ASSENZE SONO QUELLE VERE DEL TABELLONE, NON PIÙ QUELLE PRESUNTE** (ver118, 06/11/2026).
   Christian, alla domanda se lasciare il Costo orario sulle assenze presunte: **«a meno che non
   ti risulti più comodo usare la realtà»**. Risulta più comodo, e questo è il motivo:

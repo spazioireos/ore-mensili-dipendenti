@@ -313,7 +313,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver120";
+const APP_VER = "ver121";
 const APP_DATA = "06nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -550,11 +550,35 @@ function coverAbsHours(rec,dp,y,m){                                        // or
   for(let d=1; d<=nd; d++){ const cv=String(rec.giorni[d]==null?"":rec.giorni[d]).trim(); if(CODE_SET[cv] && cv!=="--" && cv!=="AN") days++; }
   return days*q;
 }
+/* ===== ver121: ANCHE LE FESTIVITA' GODUTE SONO ASSENZE RETRIBUITE =============
+   Christian (06/11/2026): «Perché il tabellone non conteggia le festività godute?? Sono
+   assenze retribuite a tutti gli effetti, come ferie, malattia eccetera. Solo le non godute
+   sono un'eccezione che non rientra nel calcolo.»
+   Fino alla ver120 il Tabellone faceva `rese + assenze − monte` e le festività non c'erano:
+   i giorni rossi non si compilano (ver77), quindi non hanno nessun codice e `coverAbsHours`
+   non li vedeva. Ora si contano dal calendario, come gia' fa il Costo orario.
+   ⚠️ La quota di UNA festivita' e' `oreSett / ggSett` (38/6 = 6,3333 a tempo pieno), non
+   `monte/26`: e' il numero dato da Christian il 06/11 («165 − 2 festivita' = 152,333»).
+   Le ASSENZE continuano a valere `monte/26` (6,3462), numero che lui aveva confermato il
+   31/10 («2 giorni di ferie = 12,69 h»). Sono due quote diverse di 1,3 centesimi di ora.
+   ⚠️ Le festivita' NON GODUTE (domeniche e il 4 novembre) restano fuori: «sono un'eccezione
+   che non rientra nel calcolo». Sono una voce di costo a parte nel Costo orario (J12).
+   ⚠️ `coverAbsHours` NON e' stata toccata: se le festivita' finissero li' dentro verrebbero
+   contate due volte nel Costo orario, che le somma gia' per conto suo. */
+function ggSettDi(state, dp){
+  const v = cNum(costoPar(dp).ggSett, cNum(costoComune(state).ggSett, 6));
+  return (v > 0) ? v : 6;
+}
+function festOreMese(state, dp, y, m){
+  const g = contaFestivita([{ y:y, m:m }], dp).god;        // solo le GODUTE, e solo in forza
+  if (!g) return 0;
+  return R2(g * (oreSettAt(dp, y, m) / ggSettDi(state, dp)), 3);
+}
 function bancaMeseA(state,dp,y,m){                                          // banca del singolo mese (Metodo A). null se il mese non è compilato
   const rec=getRecFrom(state,y,m,dp.id);
   if(!recHasData(rec)) return null;                                         // mese non compilato -> non conteggiato
   const rese=totOfRec(rec,y,m);                                            // ore effettivamente rese = somma delle celle
-  const eff=rese + coverAbsHours(rec,dp,y,m);                               // prodotto = rese + assenze coperte
+  const eff=rese + coverAbsHours(rec,dp,y,m) + festOreMese(state,dp,y,m);   // ver121: + festivita' godute
   return R2((eff - monteFissoMese(dp,y,m)),3);
 }
 function bancaPrecA(state,dp,anno,mese){                                    // banca cumulata dei mesi PRECEDENTI (dopo l'ultimo azzeramento, dalla decorrenza mensilizzazione)
@@ -1714,19 +1738,24 @@ function EmployeeCard(props){
              Esempio confermato: 120 h rese + 2 h di permesso su una base di 130,263
              -> Risultato del mese -8,263 (prima era -10,263). */
           const perm = permOreMese(rec);
-          const delta = R2((rese + assOre + perm.pagate - base),3);   // delta del mese (no accumulo)
+          /* ver121 (Christian): le festivita' GODUTE sono assenze retribuite a tutti gli
+             effetti. Il numero arriva gia' fatto da fuori (serve il valore comune ggSett). */
+          const festOre = Number(props.festOre) || 0;
+          const festGG = Number(props.festGG) || 0;
+          const delta = R2((rese + assOre + perm.pagate + festOre - base),3);   // delta del mese (no accumulo)
           const bcls = delta > 0.0005 ? "warn" : (delta < -0.0005 ? "over" : "ok");
           const segno = delta>0.0005 ? "+" : "";
           const esito = delta>0.0005 ? "ore in più (straordinario)" : (delta<-0.0005 ? "ore in meno" : "in pari");
           return <div className={"cong " + bcls}>
             <div className="cong-head">➕➖ Ore in più / in meno — base mensile</div>
             <div className="cong-plain">
-              Questo mese ha fatto <b>{fmt3(rese)} ore</b>; ne doveva fare <b>{fmt3(base)}</b> (base mensile). Ferie, malattia e permessi contano come fatte. <b>Risultato del mese: {segno}{fmt3(delta)} ore</b> ({esito}).
+              Questo mese ha fatto <b>{fmt3(rese)} ore</b>; ne doveva fare <b>{fmt3(base)}</b> (base mensile). Ferie, malattia, permessi e festività godute contano come fatte. <b>Risultato del mese: {segno}{fmt3(delta)} ore</b> ({esito}).
             </div>
             <div className="cong-row">
               <span className="cong-chip">Base del mese: <b>{fmt3(base)} h</b></span>
               <span className="cong-chip">Ore fatte (dal foglio): <b>{fmt3(rese)}</b></span>
               <span className="cong-chip">Ferie/malattia/permessi: <b>{assDays} gg = {fmt3(assOre)} h</b></span>
+              {(festGG > 0) ? <span className="cong-chip">Festività godute: <b>{festGG} gg = {fmt3(festOre)} h</b></span> : null}
               {(perm.pagate > 0.0005 || perm.altre > 0.0005) ?
                 <span className="cong-chip">Permessi orari: <b>{fmt3(perm.pagate)} h</b>{perm.altre > 0.0005 ? <span style={{ fontWeight:600 }}> (+ {fmt3(perm.altre)} h di tipo scritto a mano, non contate)</span> : null}</span>
                 : null}
@@ -5312,6 +5341,7 @@ function App(){
                   onVoceSet={onVoceSet} onVoceAdd={onVoceAdd} onVoceDel={onVoceDel} ferieApr={ferieApr} fogliOre={foDiff}
                   onDich={onDich} onSvuotaMese={onSvuotaMese} saldoPrec={saldoP} bancaPrec={bancaP} tettoConsumo={tettoC} onAzzeraSaldo={onAzzeraSaldo} onAnnullaAzzera={onAnnullaAzzera}
                   onSostAdd={onSostAdd} onSostChange={onSostChange} onSostDel={onSostDel} onOpenPerm={onOpenPerm}
+                  festOre={festOreMese(state, dp, anno, mese)} festGG={contaFestivita([{ y:anno, m:mese }], dp).god}
                   onEditDip={apriScheda} onDelDip={askDelDip} onAvviso={showToast} />;
               })
             }
