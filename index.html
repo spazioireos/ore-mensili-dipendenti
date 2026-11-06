@@ -313,7 +313,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver126";
+const APP_VER = "ver127";
 const APP_DATA = "06nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -2865,6 +2865,38 @@ function cessaNelPeriodo(dp, pairs){
   const ultimo = pN.y*10000 + pN.m*100 + daysInMonth(pN.y, pN.m);
   return (fine >= inizio && fine <= ultimo) ? fine : null;
 }
+/* ver127 (06/11/2026, Christian: «quindi perche' farmi inserire per tutti le ferie residue?
+   lo sai da te»). Aveva ragione: il saldo ferie NON e' una cosa del periodo, e' un conto che
+   corre dall'assunzione. Queste due funzioni servono alla sola LIQUIDAZIONE. */
+
+/* Il primo mese che l'app conosce, cioe' il piu' vecchio presente in `state.dati`.
+   Prima di quello non puo' sapere niente: e' li' che serve il numero scritto a mano. */
+function primoMeseDati(state){
+  const k = Object.keys((state && state.dati) || {}).sort();
+  if (!k.length) return null;
+  const m = String(k[0]).match(/^(\d{4})-(\d{1,2})$/);
+  return m ? { y: parseInt(m[1],10), m: parseInt(m[2],10) } : null;
+}
+/* I mesi su cui contare il saldo ferie: dall'ASSUNZIONE (o dal primo mese che l'app ha, se
+   l'assunzione e' precedente) fino al mese della cessazione. ⚠️ NON dipende dal periodo
+   scelto per il costo: quello decide tutto il resto, non il saldo ferie.
+   Torna anche `dalPrimoDato`: vero quando si e' dovuto partire dal primo mese dei dati invece
+   che dall'assunzione — ed e' l'unico caso in cui serve il residuo degli anni precedenti. */
+function pairsSaldoFerie(state, dp, cessYmd){
+  const pd = primoMeseDati(state);
+  if (!pd || !cessYmd) return null;
+  const ass = ymdIt(dp && dp.dataAssunzione);
+  const assY = ass ? Math.floor(ass/10000) : 0;
+  const assM = ass ? Math.floor((ass%10000)/100) : 0;
+  const pdN = pd.y*100 + pd.m;
+  const assN = ass ? (assY*100 + assM) : 0;
+  const dalPrimoDato = !ass || (assN < pdN);
+  const da = dalPrimoDato ? pd : { y: assY, m: assM };
+  const cY = Math.floor(cessYmd/10000), cM = Math.floor((cessYmd%10000)/100);
+  if (da.y*100 + da.m > cY*100 + cM) return null;
+  return { pairs: monthsBetween(da.y, da.m, cY, cM), dalPrimoDato: dalPrimoDato,
+           senzaAssunzione: !ass, primoDato: pd, da: da };
+}
 function fineperiodoYmd(pairs){
   if (!pairs || !pairs.length) return 0;
   const u = pairs[pairs.length-1];
@@ -3138,17 +3170,35 @@ function datiCosto(state, dp, pairs){
   o.ferieLiq = null; o.ferieLiqGG = 0;
   const cessYmd = cessaNelPeriodo(dp, pairs);
   if (cessYmd){
-    const fb = ferieBilancio(state, dp, pairs, c, senzaRapp, o.mesiRatei);
-    const ggPrec = cNum(p.ferieResidue, 0);
+    /* ver127: il saldo si conta DALL'ASSUNZIONE alla cessazione, non sul periodo scelto.
+       Cosi' l'app se lo ricava da sola per chiunque sia stato assunto dopo l'inizio dei dati,
+       e il numero a mano serve SOLO a chi e' entrato prima (li' l'app non puo' sapere niente). */
+    const sp = pairsSaldoFerie(state, dp, cessYmd);
+    const prs  = sp ? sp.pairs : pairs;
+    const sr   = mesiSenzaRapporto(state, dp, prs);
+    const mrat = mesiRateiPeriodo(dp, prs, sr);
+    const fb = ferieBilancio(state, dp, prs, c, sr, mrat);
+    const serveMano = !sp || sp.dalPrimoDato;          /* assunto prima dei dati, o senza data */
+    const ggPrec = serveMano ? cNum(p.ferieResidue, 0) : 0;
     const ggTot = R2(Math.max(0, fb.debitoGG) + Math.max(0, ggPrec), 2);
-    if (ggTot > 0){
-      o.ferieLiqGG = ggTot;
-      o.ferieLiq = { gg:ggTot, ggPeriodo:R2(Math.max(0, fb.debitoGG),2), ggPrec:R2(Math.max(0, ggPrec),2),
-                     matGG:fb.matGG, godGG:fb.godGG, cess:intToIt(cessYmd) };
-    } else {
-      o.ferieLiq = { gg:0, ggPeriodo:R2(Math.max(0, fb.debitoGG),2), ggPrec:R2(Math.max(0, ggPrec),2),
-                     matGG:fb.matGG, godGG:fb.godGG, cess:intToIt(cessYmd) };
-    }
+    const p0 = prs[0], pN = prs[prs.length-1];
+    o.ferieLiqGG = (ggTot > 0) ? ggTot : 0;
+    o.ferieLiq = {
+      gg: Math.max(0, ggTot), ggPeriodo: R2(Math.max(0, fb.debitoGG),2), ggPrec: R2(Math.max(0, ggPrec),2),
+      matGG: fb.matGG, godGG: fb.godGG, cess: intToIt(cessYmd),
+      /* da dove a dove e' stato contato il saldo, per scriverlo a video */
+      daLbl: p0 ? mLabelY(p0.y, p0.m) : "", aLbl: pN ? mLabelY(pN.y, pN.m) : "",
+      serveMano: serveMano,
+      senzaAssunzione: !!(sp && sp.senzaAssunzione) || !ymdIt(dp && dp.dataAssunzione),
+      /* la data a cui il residuo scritto a mano si riferisce: il giorno prima del primo mese
+         che l'app conosce. Non dipende piu' dal periodo scelto, quindi l'app la sa dire. */
+      residuoAl: (function(){
+        const pd = sp ? sp.primoDato : primoMeseDati(state);
+        if (!pd) return "";
+        const y = (pd.m === 1) ? (pd.y - 1) : pd.y, m = (pd.m === 1) ? 12 : (pd.m - 1);
+        return pad2(daysInMonth(y, m)) + "/" + pad2(m) + "/" + y;
+      })()
+    };
   }
   o.raw = p;
   o.res = calcCosto(o);
@@ -3345,8 +3395,11 @@ function CostoOrario(props){
          + (aPezzi ? (" × il mensile fisso ÷ 26 dell'ULTIMO pezzo (quello della cessazione): qui a lato il medio è " + dec4(r.H5/26) + " €")
                    : (" × " + dec4(r.H5/26) + " € (mensile fisso ÷ 26)"))
          + " — cessazione del " + d.ferieLiq.cess
-         + ": " + nTxt(d.ferieLiq.ggPeriodo) + " dal periodo (maturate " + nTxt(d.ferieLiq.matGG) + " − godute " + nTxt(d.ferieLiq.godGG) + ")"
-         + (d.ferieLiq.ggPrec > 0 ? (" + " + nTxt(d.ferieLiq.ggPrec) + " da anni precedenti") : " + 0 da anni precedenti"))
+         + ": " + nTxt(d.ferieLiq.ggPeriodo) + " dal saldo " + d.ferieLiq.daLbl + " → " + d.ferieLiq.aLbl
+         + " (maturate " + nTxt(d.ferieLiq.matGG) + " − godute " + nTxt(d.ferieLiq.godGG) + ")"
+         + (d.ferieLiq.serveMano
+             ? (" + " + nTxt(d.ferieLiq.ggPrec) + " scritte a mano per gli anni prima dei dati")
+             : " — niente da aggiungere: l'app ha tutta la storia dall'assunzione"))
       : (d.ferieLiq ? "nessuna giornata da liquidare" : "non dovuta: nel periodo non cade nessuna cessazione"),
     J14: mesiTxt(d.mesiMater) + " di maternità × " + pctTxt(c.integrMater),
     L15: "retribuzione + 13ª + 14ª + festività non godute + ferie non godute liquidate + maternità",
@@ -3555,12 +3608,23 @@ function CostoOrario(props){
                   {campoNum("Ore/mese sotto soglia perse", cMostra(d.raw.sottoSoglia, ""), function(v){ setPar("sottoSoglia", v); })}
                   {campoNum("TFR accantonato al 31/12 €", cMostra(d.raw.tfrFondo, ""), function(v){ setPar("tfrFondo", v); }, "vuoto = rivalutazione stimata con gli «Anni per rivalutazione TFR»")}
                   {campoNum("TFR accantonato — anno", cMostra(d.raw.tfrFondoAnno, ""), function(v){ setPar("tfrFondoAnno", v); }, "l'anno a cui si riferisce il fondo, es. 2025")}
-                  {/* ver125: il residuo degli anni precedenti l'app non lo sa (non tiene un
-                      monte ferie per persona), quindi si scrive qui. Serve solo nel periodo in
-                      cui cade la cessazione. */}
-                  {campoNum("Giornate di ferie residue da anni precedenti", cMostra(d.raw.ferieResidue, ""),
-                    function(v){ setPar("ferieResidue", v); },
-                    (d.ferieLiq ? "si sommano alle giornate non godute del periodo e si liquidano alla cessazione" : "serve solo nel periodo in cui cade la cessazione: qui non ce n'è nessuna"))}
+                  {/* ver127 (06/11/2026, Christian: «perché farmi inserire per tutti le ferie
+                      residue? lo sai da te»). Giusto: il saldo si conta dall'assunzione, quindi
+                      l'app se lo ricava da sola per chi è stato assunto DOPO l'inizio dei dati.
+                      La casella compare SOLO per chi è entrato prima — lì l'app non può sapere
+                      niente — e l'aiutino dice da sé a quale data si riferisce il numero. */}
+                  {(d.ferieLiq && d.ferieLiq.serveMano)
+                    ? campoNum("Giornate di ferie residue da anni precedenti", cMostra(d.raw.ferieResidue, ""),
+                        function(v){ setPar("ferieResidue", v); },
+                        (d.ferieLiq.residuoAl
+                           ? ("il residuo al " + d.ferieLiq.residuoAl + ": prima di lì l'app non ha dati. Lo trovi nel riquadro RATEI di un cedolino SENZA liquidazione")
+                           : "il residuo prima del primo mese che l'app conosce. Lo trovi nel riquadro RATEI di un cedolino SENZA liquidazione"))
+                    : null}
+                  {(d.ferieLiq && d.ferieLiq.senzaAssunzione) ? (
+                    <div style={{ gridColumn:"1 / -1", background:"#FFEDD5", border:"1px solid #F59E0B", borderRadius:"8px", padding:"7px 10px", marginTop:"2px", fontSize:"13px", lineHeight:1.35, color:"#7c2d12" }}>
+                      ⚠️ <b>Manca la data di assunzione</b> in anagrafica: il saldo delle ferie è stato contato dal primo mese che l'app conosce (<b>{d.ferieLiq.daLbl}</b>), quindi se la persona era già in forza prima <b>le giornate liquidate risultano meno del vero</b>. Scrivi la data in ANAGRAFICA, oppure metti qui sopra il residuo degli anni prima{d.ferieLiq.residuoAl ? (" al " + d.ferieLiq.residuoAl) : ""}.
+                    </div>
+                  ) : null}
                   {(function(){
                     /* ver114: il fondo è un numero che invecchia. Se l'anno scritto non è quello
                        prima del periodo guardato, l'app lo dice invece di usarlo in silenzio.

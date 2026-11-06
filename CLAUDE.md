@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver126 · 06nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver127 · 06nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -384,6 +384,60 @@ Banca ore, tetto annuo, contratti e export.
     «— ore» e «non calcolabile»; la stessa persona su «Teoriche» → 18,67 €/h; e il **foglio Excel
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
+
+- 📒 **IL SALDO FERIE SI CONTA DALL'ASSUNZIONE, NON DAL PERIODO SCELTO** (ver127, 06/11/2026).
+  Christian, guardando la casella della ver125: «quindi perché farmi inserire per tutti le ferie
+  residue? **lo sai da te**». Aveva ragione.
+  - **Il difetto**: `ferieBilancio` contava maturate e godute **solo dentro il periodo
+    selezionato**. Chiedendo il costo su gen→nov 2026, tutto il saldo del 2025 spariva, e per
+    rimetterlo dentro bisognava scriverlo a mano — anche per le persone di cui l'app ha la
+    storia completa. **Il saldo ferie non è una cosa del periodo: è un conto che corre
+    dall'assunzione.**
+  - **Funzioni nuove** (accanto a `cessaNelPeriodo`): **`primoMeseDati(state)`** (il mese più
+    vecchio presente in `state.dati`) e **`pairsSaldoFerie(state, dp, cessYmd)`**, che torna i
+    mesi **dall'assunzione — o dal primo mese che l'app ha, se l'assunzione è precedente — fino
+    alla cessazione**, più la bandierina `dalPrimoDato`.
+  - **La casella compare SOLO dove serve**: se l'assunzione è precedente al primo mese dei dati
+    (o manca). Per tutti gli altri **non si vede proprio**, e la nota a lato della voce lo dice:
+    «niente da aggiungere: l'app ha tutta la storia dall'assunzione».
+  - **L'aiutino dice da sé la data**: «il residuo al **31/12/2024**: prima di lì l'app non ha
+    dati. Lo trovi nel riquadro RATEI di un cedolino SENZA liquidazione». ⚠️ Con il saldo
+    ancorato all'assunzione quella data è **fissa**, quindi **non serve una casella dell'anno**
+    come per il fondo TFR: la domanda si è sciolta da sé.
+  - 🟠 **Se manca la data di assunzione**, riquadro **arancione**: dice da quale mese ha contato
+    e che le giornate liquidate possono risultare **meno del vero**. ⚠️ Sui dati veri di
+    Christian sono **4 persone su 16**, e **tutte e quattro hanno una cessazione scritta**.
+  - **Misurato sui dati veri** (backup del 04/11, `dati` da **2025-01**): dei 16 dipendenti,
+    **9** sono assunti dopo l'inizio dei dati (casella non necessaria), **3** prima (serve il
+    residuo al 31/12/2024), **4** senza data di assunzione.
+  - 🔴 **Quanto sbagliava la ver126** — stessa persona, assunta 01/03/2025, cessata 30/11/2026,
+    chiedendo il costo su **gen→nov 2026**:
+    | | giornate liquidate | voce | €/h |
+    |---|--:|--:|--:|
+    | ver126 (solo il periodo) | 27,50 | 1.367,40 € | 17,26 |
+    | **ver127** (dall'assunzione) | **52,50** | **2.610,50 €** | **18,27** |
+    Mancava **la metà** del saldo. ⚠️ La ver126 **non è mai stata pubblicata con questo difetto
+    visibile**: è stata su `main` poche ore.
+  - ✅ **Il periodo non cambia più il saldo**: provato, gen26→nov26 e gen25→nov26 danno le
+    **stesse** giornate (2.610,50 € in entrambi).
+  - ⚠️ **Dove finisce la liquidazione, e perché NON va usata su un mese solo** (domanda di
+    Christian: «se ti chiedo il costo di un mese specifico mi tiri dentro tutte le ferie non
+    godute prima?»). La voce scatta **solo se la cessazione cade nel periodo scelto**. Misurato,
+    stessa persona:
+    | periodo chiesto | costo | €/h | liquidazione |
+    |---|--:|--:|---|
+    | **solo novembre 2026** (mese della cessazione) | 6.227,82 € | **41,52** | 2.610,50 € |
+    | **solo marzo 2026** (mese qualsiasi) | 2.680,41 € | **17,18** | **nessuna** |
+    | gennaio → novembre 2026 | 30.578,48 € | 18,27 | 2.610,50 € |
+    | **tutto il rapporto** (mar 2025 → nov 2026) | 55.393,65 € | **17,35** | 2.610,50 € |
+    Sono **gli stessi 2.610,50 €**: spalmati su tutto il rapporto pesano **17 centesimi
+    all'ora**, schiacciati su un mese ne pesano **24,34**. **Il €/h del mese di cessazione non
+    si usa per rendicontare**: il numero vero è su tutto il rapporto.
+  - **Provato in esecuzione** (`liq127.cjs`), **14 controlli su 14**, zero errori di pagina:
+    casella assente per chi è assunto dopo l'inizio dei dati e saldo che parte dal mese di
+    assunzione; casella presente con la data giusta per chi è entrato prima; avviso arancione
+    senza data di assunzione; stesse giornate con due periodi diversi; nessuna voce e nessuna
+    casella senza cessazione.
 
 - 🧮 **LE FERIE NON GODUTE LIQUIDATE STANNO NELLA BASE TFR** (ver126, 06/11/2026). Christian
   aveva mandato i cedolini **proprio per questo**: «ti ho fatto vedere il cedolino perché non
