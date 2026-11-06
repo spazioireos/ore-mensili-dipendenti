@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver121 · 06nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver122 · 06nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -381,6 +381,21 @@ Banca ore, tetto annuo, contratti e export.
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
 
+- 🛡️ **UNA FESTIVITÀ GIÀ SCRITTA IN CELLA NON SI CONTA DUE VOLTE** (ver122, 06/11/2026).
+  Difetto **introdotto dalla ver121** e trovato controllando perché il Tabellone non le contasse.
+  - **Il caso**: fino alla ver77 i giorni rossi **si potevano compilare**, e nell'elenco dei
+    codici c'è anche **`FEST` («Festività goduta»)**. Se nei dati vecchi un 1° gennaio porta
+    `FEST` (o `FERIE`), `coverAbsHours` lo conta già come assenza: la ver121 ci aggiungeva anche
+    la festività del calendario, e **quel giorno valeva due volte**.
+  - **Misurato in esecuzione**: gennaio 2027, 172 h rese, 2 festività godute, con `FEST` scritto
+    sul 1° gennaio → **ver121: +26,013 h**, **ver122: +19,679 h** (giusto). Senza niente scritto
+    tutte e due danno **+19,667 h**.
+  - **Funzione nuova `festGoduteMese(state,dp,y,m,escludi)`** → `{gg, ore}`: salta i giorni che
+    portano già un codice di assenza. **La usano tutti e due**: il Tabellone (`festOreMese`, la
+    pastiglia) e il Costo orario (`oreLavorabiliMese`), così non possono più scostarsi.
+  - ⚠️ `oreLavorabiliMese` e `oreSuppPeriodo` hanno perso il parametro `ggSett`: la quota la
+    calcola `festGoduteMese` con `ggSettDi`, che legge gli stessi campi.
+  - ⚠️ **Dalla ver77 il caso non si può più creare**: riguarda solo lo storico.
 - 🎌 **ANCHE IL TABELLONE CONTA LE FESTIVITÀ GODUTE** (ver121, 06/11/2026). Christian: «Perché
   il tabellone non conteggia le festività godute?? Sono **assenze retribuite a tutti gli
   effetti**, come ferie, malattia eccetera. Solo le **non godute** sono un'eccezione che non
@@ -429,9 +444,17 @@ Banca ore, tetto annuo, contratti e export.
     190,38 h · circa **9,90%**» — cioè esattamente lo scarto misurato fra le due persone; chi ne
     fa 15 vede «15,00 su 30,00 · 95,19 h · 5,20%»; il riquadro è giallo con bordo ambra
     (`rgb(255,248,225)` / `rgb(234,200,122)`); la ver119 non lo mostra. **Zero errori di pagina.**
-  - ⚠️ **Le giornate maturate sono una stima**: vengono dal valore comune «ferie e permessi
-    annui» (30 gg = 26 ferie + 4 ex festività), **non** da un monte ferie per persona, che l'app
-    non ha. Chi ha un residuo ferie degli anni prima non è compreso.
+  - ⚠️ **Le giornate maturate vengono dal valore comune** «ferie e permessi annui» (30 gg =
+    26 ferie + 4 ex festività), diviso 12 e moltiplicato per i mesi del periodo.
+  - ✅ **Il residuo ferie degli anni prima NON serve**, e l'avvertenza che avevo scritto era
+    sbagliata: **corretta da Christian il 06/11/2026** («cosa ti cambia sapere quante ferie ha in
+    tasca pregresse indipendente se tu calcoli il costo basandoti su ogni singolo mese?»). Il
+    conto è **per periodo**: si confronta quanto è maturato **in quel periodo** con quanto se n'è
+    goduto **in quel periodo**, e un saldo degli anni prima non cambia né l'uno né l'altro.
+    **Non riproporre un monte ferie per persona.**
+  - ⚠️ **Il caso opposto non viene segnalato**: chi gode **più** giorni di quanti ne maturi nel
+    periodo (perché smaltisce un arretrato) rende meno ore a parità di stipendio, quindi il costo
+    orario risulta **più alto** del vero. L'avviso non scatta (il debito è zero). Non richiesto.
 - 📅 **LA QUOTA DI UNA FESTIVITÀ È `ore settimanali ÷ giorni a settimana`** (ver119, 06/11/2026,
   **numero dato da Christian**): «Ore mensili contrattuali 165, rese effettivamente 172 e due
   festività godute nel mese: le ore da lavorare dovevano essere **152,333**, quindi lui ha fatto
