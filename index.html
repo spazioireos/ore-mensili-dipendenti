@@ -313,7 +313,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver117";
+const APP_VER = "ver118";
 const APP_DATA = "06nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -2664,14 +2664,30 @@ function oreRendPeriodo(state, dp, pairs){
    Excel: sono giorni pagati e non lavorati. Christian non le ha nominate, ma togliere la
    loro deduzione sarebbe una modifica non richiesta che cambia il denaro (11 giorni l'anno).
    ⚠️ `monteFissoMese` e `quotaGiorno` NON sono stati toccati: si leggono e basta. */
-function oreLavorabiliMese(dp, c, y, m, escludi){
+/* ver118 (06/11/2026, Christian: «a meno che non ti risulti piu' comodo usare la realta'»).
+   Le assenze NON sono piu' i numeri presunti dei valori comuni (2,5 gg di ferie e permessi +
+   2 gg di malattia al mese): si leggono dal **Tabellone**, giorno per giorno, quelle vere.
+   Perche' conviene: con il conto mese per mese della ver117 non c'e' piu' compensazione fra i
+   mesi, quindi l'errore dei numeri presunti non si annulla piu' sull'anno — si somma. Un mese
+   senza assenze si vedeva togliere 4,5 giorni che non aveva preso (ore in piu' sottostimate);
+   un mese con due settimane di ferie se ne vedeva togliere solo 4,5 (ore in piu' inventate).
+   ⚠️ Ora «ore in piu' del mese» = `rese + assenze + permessi retribuiti − monte`, cioe' la
+   STESSA formula del **Risultato del mese** del Tabellone (regola dello straordinario del
+   31/10/2026, confermata con un numero), piu' la deduzione delle **festivita' godute**, che il
+   Tabellone non fa e che qui resta (deciso il 06/11: «il mio era un esempio per farti capire»).
+   ⚠️ `coverAbsHours`, `permOreMese`, `monteFissoMese` e `quotaGiorno` NON sono stati toccati:
+   si leggono e basta. ⚠️ `c.ferie`, `c.altriPermessi` e `c.malattiaMese` restano in uso dove
+   erano: `O6calc`/`E13`, cioe' la tabellina delle settimane e le ore «Teoriche». */
+function oreLavorabiliMese(state, dp, c, y, m, escludi){
   if (meseEscluso(escludi, y, m)) return 0;                  /* mese tutto AN = non pagato */
   const fr = meseFrazione(dp, y, m);                         /* mese parziale: ver104 */
   if (!(fr > 0)) return 0;
   const q = quotaGiorno(dp, y, m);
-  const ggPres = ((Number(c.ferie)||0) + (Number(c.altriPermessi)||0))/12 + (Number(c.malattiaMese)||0);
+  const rec = getRecFrom(state, y, m, dp.id);
+  const ass = coverAbsHours(rec, dp, y, m);                  /* ore delle assenze VERE del mese */
+  const perm = permOreMese(rec).pagate;                      /* permessi retribuiti, come nel Tabellone */
   const fGod = contaFestivita([{ y:y, m:m }], dp, escludi).god;   /* solo i giorni in forza */
-  return Math.max(0, monteFissoMese(dp,y,m)*fr - (ggPres*fr + fGod)*q);
+  return Math.max(0, monteFissoMese(dp,y,m)*fr - ass - perm - fGod*q);
 }
 /* somma, mese per mese, di max(0, ore rese - ore lavorabili): nessuna compensazione */
 function oreSuppPeriodo(state, dp, pairs, c, escludi, sottoSoglia){
@@ -2679,11 +2695,13 @@ function oreSuppPeriodo(state, dp, pairs, c, escludi, sottoSoglia){
   (pairs||[]).forEach(function(pr){
     if (meseEscluso(escludi, pr.y, pr.m)) return;
     if (!(meseFrazione(dp, pr.y, pr.m) > 0)) return;
-    const lav  = R2(oreLavorabiliMese(dp, c, pr.y, pr.m, escludi), 3);
-    const rese = R2(totOfRec(getRecFrom(state, pr.y, pr.m, dp.id), pr.y, pr.m), 3);
+    const rec  = getRecFrom(state, pr.y, pr.m, dp.id);
+    const lav  = R2(oreLavorabiliMese(state, dp, c, pr.y, pr.m, escludi), 3);
+    const rese = R2(totOfRec(rec, pr.y, pr.m), 3);
+    const ass  = R2(coverAbsHours(rec, dp, pr.y, pr.m) + permOreMese(rec).pagate, 3);   /* ver118: a video */
     const supp = R2(Math.max(0, rese + (Number(sottoSoglia)||0) - lav), 3);
     tot += supp;
-    righe.push({ y:pr.y, m:pr.m, lav:lav, rese:rese, supp:supp });
+    righe.push({ y:pr.y, m:pr.m, lav:lav, rese:rese, ass:ass, supp:supp });
   });
   return { ore: R2(tot,3), righe: righe };
 }
@@ -3409,7 +3427,7 @@ function CostoOrario(props){
                     <tr><td style={tdE}>Ore lavorabili sul periodo</td><td style={Object.assign({}, tdV, cifre)}>{fmt2(r.O8)} h</td>
                         <td style={{ padding:"1px 0 1px 8px", fontSize:"13px", color:"#475569" }}>settimane × ore settimanali</td></tr>
                   </tbody></table>
-                  {d.suppMensileAttivo ? <div style={{ fontSize:"12.5px", color:"#475569", lineHeight:1.3, marginTop:"4px" }}>⚠️ Con le ore <b>dai Riepiloghi</b> le <b>ore in più</b> non si contano da qui: si contano <b>mese per mese</b> sul monte contrattuale (riquadro «Le ore in più, mese per mese»). Questa tabellina serve alle ore <b>Teoriche</b> e alla simulazione.</div> : null}
+                  {d.suppMensileAttivo ? <div style={{ fontSize:"12.5px", color:"#475569", lineHeight:1.3, marginTop:"4px" }}>⚠️ Con le ore <b>dai Riepiloghi</b> le <b>ore in più</b> non si contano da qui: si contano <b>mese per mese</b> sul monte contrattuale (riquadro «Le ore in più, mese per mese»). Questa tabellina serve alle ore <b>Teoriche</b> e alla simulazione: è lì che valgono ancora i giorni <b>presunti</b> di ferie e malattia dei valori comuni.</div> : null}
                   {(d.raw.settPeriodo || d.raw.settLav) ?
                     <button className="btn btn-gray" style={{ marginTop:"6px" }}
                       onClick={function(){ setParMulti({ settPeriodo:"", settLav:"" }); }}>↺ Rimetti i valori calcolati</button> : null}
@@ -3479,16 +3497,18 @@ function CostoOrario(props){
                     {d.fonte === "teoriche"
                       ? <span>Le ore aggiuntive sono <b>stimate</b>: ore del mese teoriche (<b style={cifre}>{fmt2(r.P2)}</b> h) × <b style={cifre}>{fmt2(c.suppPct)}%</b>.</span>
                       : (d.suppMensileAttivo
-                        ? <span>Le ore aggiuntive vengono <b>dal dato vero, mese per mese</b>: in ogni mese le ore rese meno le ore lavorabili <b>di quel mese</b>, mai sotto zero, e poi sommate — così <b>un mese sotto non compensa un mese sopra</b>. Le ore lavorabili del mese sono quelle <b>contrattuali</b> (165 h a 38 h/settimana, in proporzione per gli altri) meno le assenze presunte: <b style={cifre}>{fmt2((c.ferie + c.altriPermessi)/12)}</b> gg fra ferie e permessi ex festività, <b style={cifre}>{fmt2(c.malattiaMese)}</b> gg di malattia e le <b>festività godute</b> del mese{(d.sottoSoglia > 0) ? <span>, più le ore perse sotto soglia (<b style={cifre}>{fmt2(d.sottoSoglia)}</b> h al mese)</span> : null}. Il conto mese per mese è nel riquadro qui sotto.</span>
+                        ? <span>Le ore aggiuntive vengono <b>dal dato vero, mese per mese</b>: in ogni mese le ore rese meno le ore lavorabili <b>di quel mese</b>, mai sotto zero, e poi sommate — così <b>un mese sotto non compensa un mese sopra</b>. Le ore lavorabili del mese sono quelle <b>contrattuali</b> (165 h a 38 h/settimana, in proporzione per gli altri) meno le <b>assenze vere segnate nel Tabellone</b> (ferie, malattia e permessi retribuiti di quel mese) e meno le <b>festività godute</b>{(d.sottoSoglia > 0) ? <span>, più le ore perse sotto soglia (<b style={cifre}>{fmt2(d.sottoSoglia)}</b> h al mese)</span> : null}. È la stessa formula del <b>Risultato del mese</b> del Tabellone, con in più la deduzione delle festività. Il conto mese per mese è nel riquadro qui sotto.</span>
                         : <span>Le ore aggiuntive vengono <b>dal dato vero</b>: ore dichiarate (<b style={cifre}>{fmt2(r.H38)}</b> h) meno le ore ordinarie lavorabili (<b style={cifre}>{fmt2(r.O8)}</b> h){(d.sottoSoglia > 0) ? <span>, più le ore perse sotto soglia (<b style={cifre}>{fmt2(d.sottoSoglia * d.mesi)}</b> h)</span> : null}; mai sotto zero.</span>)}
                     {" "}Si pagano con la maggiorazione del <b>{d.oreSett >= 38 ? "15% sul minimo" : "27%"}</b>.
                   </div>
                   {(d.suppMensileAttivo && d.suppRighe && d.suppRighe.length) ? (
                     <div style={{ marginTop:"8px", border:"1px solid #d7dde5", borderRadius:"8px", padding:"6px 8px" }}>
                       <div style={{ fontSize:"14.5px", fontWeight:800, color:"#1f4e82", marginBottom:"3px" }}>Le ore in più, mese per mese</div>
+                      <div className="co-scroll" style={{ overflowX:"auto", maxWidth:"100%" }}>
                       <table style={{ width:"100%", borderCollapse:"collapse", fontSize:"13.5px" }}><tbody>
                         <tr style={{ fontWeight:800, color:"#1f4e82" }}>
                           <td style={{ padding:"1px 6px 1px 0" }}>Mese</td>
+                          <td style={{ padding:"1px 6px", textAlign:"right" }}>Assenze</td>
                           <td style={{ padding:"1px 6px", textAlign:"right" }}>Lavorabili</td>
                           <td style={{ padding:"1px 6px", textAlign:"right" }}>Rese</td>
                           <td style={{ padding:"1px 0", textAlign:"right" }}>In più</td>
@@ -3497,6 +3517,7 @@ function CostoOrario(props){
                           return (
                             <tr key={"sm" + rr.y + "-" + rr.m} style={{ borderTop:"1px dotted #e2e8f0" }}>
                               <td style={{ padding:"1px 6px 1px 0" }}>{mLabelY(rr.y, rr.m)}</td>
+                              <td style={Object.assign({ padding:"1px 6px", textAlign:"right", color:"#64748b" }, cifre)}>{fmt2(rr.ass || 0)}</td>
                               <td style={Object.assign({ padding:"1px 6px", textAlign:"right" }, cifre)}>{fmt2(rr.lav)}</td>
                               <td style={Object.assign({ padding:"1px 6px", textAlign:"right" }, cifre)}>{fmt2(rr.rese)}</td>
                               <td style={Object.assign({ padding:"1px 0", textAlign:"right", fontWeight: rr.supp > 0 ? 800 : 400, color: rr.supp > 0 ? "#b45309" : "#64748b" }, cifre)}>{fmt2(rr.supp)}</td>
@@ -3505,12 +3526,15 @@ function CostoOrario(props){
                         })}
                         <tr style={{ borderTop:"1px solid #cbd5e1", fontWeight:800 }}>
                           <td style={{ padding:"2px 6px 2px 0" }}>Totale</td>
+                          <td style={Object.assign({ padding:"2px 6px", textAlign:"right", color:"#64748b" }, cifre)}>{fmt2(d.suppRighe.reduce(function(a,x){ return a + (x.ass||0); }, 0))}</td>
                           <td style={Object.assign({ padding:"2px 6px", textAlign:"right" }, cifre)}>{fmt2(d.suppRighe.reduce(function(a,x){ return a + x.lav; }, 0))}</td>
                           <td style={Object.assign({ padding:"2px 6px", textAlign:"right" }, cifre)}>{fmt2(d.suppRighe.reduce(function(a,x){ return a + x.rese; }, 0))}</td>
                           <td style={Object.assign({ padding:"2px 0", textAlign:"right" }, cifre)}>{fmt2(d.suppMensileOre)}</td>
                         </tr>
                       </tbody></table>
+                      </div>
                       {(!d.blocchi && d.suppVecchio != null) ? <div style={{ fontSize:"12.5px", color:"#475569", lineHeight:1.3, marginTop:"4px" }}>Con il conto vecchio (totale del periodo contro totale) sarebbero <b style={cifre}>{fmt2(d.suppVecchio)}</b> h: la differenza è la <b>compensazione fra i mesi</b>, che ora non c'è più.</div> : null}
+                      <div style={{ fontSize:"12.5px", color:"#475569", lineHeight:1.3, marginTop:"4px" }}>La colonna <b>Assenze</b> sono le ore di ferie, malattia e permessi retribuiti <b>davvero segnate nel Tabellone</b> in quel mese: non sono più i numeri presunti dei valori comuni.</div>
                     </div>
                   ) : null}
                 </div> : null}

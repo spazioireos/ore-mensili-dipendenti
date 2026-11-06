@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver117 · 06nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver118 · 06nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -375,6 +375,53 @@ Banca ore, tetto annuo, contratti e export.
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
 
+- 🧾 **LE ASSENZE SONO QUELLE VERE DEL TABELLONE, NON PIÙ QUELLE PRESUNTE** (ver118, 06/11/2026).
+  Christian, alla domanda se lasciare il Costo orario sulle assenze presunte: **«a meno che non
+  ti risulti più comodo usare la realtà»**. Risulta più comodo, e questo è il motivo:
+  - **Dalla ver117 non c'è più compensazione fra i mesi**, quindi l'errore dei numeri presunti
+    non si annulla più sull'anno: **si somma**. Un mese in cui la persona non si è assentata si
+    vedeva togliere **4,5 giorni che non aveva preso** (ore in più sottostimate); un mese con due
+    settimane di ferie se ne vedeva togliere **solo 4,5** (ore in più inventate).
+  - **Ora**: `oreLavorabiliMese` legge il Tabellone — `coverAbsHours` (ferie, malattia e gli altri
+    codici, a quota giornaliera) più `permOreMese().pagate` (i cinque permessi retribuiti). Le
+    **festività godute** restano tolte (decisione del 06/11, vedi sopra).
+  - 🔗 **«Ore in più del mese» è ora la STESSA formula del Risultato del mese del Tabellone**
+    (`rese + assenze + permessi − monte`, la regola dello straordinario del 31/10/2026 confermata
+    con un numero), **più** la deduzione delle festività godute. **Verificato in esecuzione**:
+    novembre 2026 (nessuna festività goduta) → Tabellone **+14,767 h**, Costo orario **14,77 h**:
+    lo stesso numero.
+  - ⚠️🔴 **DOMANDA APERTA PER CHRISTIAN, con i numeri**: nei mesi **con festività** i due restano
+    diversi, **esattamente delle festività**. Dicembre 2026, stessa persona (30 h/sett., 95 h
+    rese, 5 giorni di ferie, 4 festività godute: 7, 8, 25, 26):
+    | | dice |
+    |---|--:|
+    | **Tabellone**, Risultato del mese | **−10,213 h** (ore in meno) |
+    | **Costo orario**, ore in più | **+9,830 h** |
+    | differenza | **20,043 h** = 4 festività × 5,0101 h |
+    Dipende da una cosa sola: **le festività contano come ore già coperte** (come un'assenza
+    retribuita) oppure no? Se sì ha ragione il Costo orario e il Tabellone andrebbe allineato;
+    se no ha ragione il Tabellone e qui la deduzione delle festività va tolta — **è una riga**.
+    **Non deciso: va chiesto a Christian.** Finché non decide, resta com'è.
+  - ⚠️ **`c.ferie`, `c.altriPermessi` e `c.malattiaMese` NON sono stati tolti né cambiati**:
+    restano in uso in `O6calc`/`E13`, cioè nella **tabellina delle settimane** e nelle ore
+    **«Teoriche»**. L'avviso sotto quella tabellina lo dice.
+  - ⚠️ **`coverAbsHours`, `permOreMese`, `monteFissoMese`, `quotaGiorno` NON sono stati toccati**:
+    si leggono e basta. `oreLavorabiliMese` prende ora `state` come primo parametro.
+  - **A video**: nel riquadro «Le ore in più, mese per mese» c'è una **colonna «Assenze»** con le
+    ore vere di quel mese, e sotto la riga «sono le ore … davvero segnate nel Tabellone: non sono
+    più i numeri presunti». Il riquadro scorre di lato dentro il suo spazio (5 colonne).
+  - **Misurato in esecuzione** (ver117 → **ver118**):
+    | Caso | ore in più | costo totale | €/h |
+    |---|--:|--:|--:|
+    | 38 h/sett., 140 h al mese, **nessuna assenza segnata** | 112,50 → **0,39 h** | 32.557,70 → **30.831,47 €** | 19,38 → **18,35** |
+    | lo stesso, ma **15 gg di ferie a luglio e 10 ad agosto** | 99,04 → **0,39 h** | 32.350,43 → **30.831,47 €** | 21,28 → **20,28** |
+    | 30 h/sett., ore altalenanti, 3 gg MAL + 5 gg ferie | 156,05 → **39,10 h** | 27.101,18 → **25.136,41 €** | 20,07 → **18,62** |
+    ⚠️ **Il costo scende**, e parecchio: le ore in più che sparivano erano **inventate dai numeri
+    presunti**. Chi lavora 140 h al mese su un contratto da 165 non fa straordinario, e adesso
+    l'app lo dice. ⚠️ **Nel secondo caso i due numeri sono identici al primo**: è il segno che il
+    conto ora guarda davvero il mese, non una media.
+  - **Provato in esecuzione** (`supp118.cjs`): 3 casi + **2 controlli su 2** del confronto col
+    Tabellone. **Zero errori di pagina.**
 - 🧮 **LE ORE IN PIÙ SI CONTANO MESE PER MESE, E SUL MONTE CONTRATTUALE** (ver117, 06/11/2026).
   Chiude insieme i due punti rimasti del 05/11 sera, confermati da Christian il 06/11 («1 e 2
   confermo») con **la sua definizione delle ore lavorabili**: «le ore lavorabili sono quelle
@@ -425,11 +472,10 @@ Banca ore, tetto annuo, contratti e export.
     **mese per mese**.
   - ⚠️ **Con i blocchi** ogni blocco conta le ore in più dei **suoi** mesi (`suppMensileOre` nel
     pacchetto `ob`): verificato che la somma delle righe torna al totale del periodo.
-  - ⚠️ **Resta una differenza voluta fra Tabellone e Costo orario**: il **Risultato del mese** del
-    Tabellone usa le assenze **vere** (regola dello straordinario del 31/10/2026, confermata con
-    un numero), il Costo orario usa le assenze **presunte**, come ha chiesto Christian
-    («presuntivamente 2gg di malattia»). Lo stesso mese può quindi risultare «in pari» nel
-    Tabellone e con ore in più nel Costo orario. **Non è un difetto**: misurano cose diverse.
+  - ⚠️ **SUPERATO dalla ver118**: in ver117 il Costo orario usava ancora le assenze **presunte**
+    mentre il Tabellone usa quelle **vere**, e i due numeri non coincidevano. Dalla ver118 il
+    Costo orario legge le assenze vere e le due schermate danno lo **stesso** numero, salvo le
+    festività (vedi la scheda 🧾 sopra).
   - **Provato in esecuzione**: `supp117.cjs` (8 controlli su 8, tre casi) e `supp117b.cjs`
     (**24 su 24**, non regressione su 8 fonti/scritture a mano). **Zero errori di pagina.**
   - **Non regressione**: vm-A (21), vm-B (14), vm-C (15), vm-D (7), i **60 controlli delle
