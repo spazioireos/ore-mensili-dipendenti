@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver119 · 06nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver120 · 06nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -375,6 +375,28 @@ Banca ore, tetto annuo, contratti e export.
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
 
+- 🟨 **AVVISO: LE FERIE NON GODUTE SONO UN DEBITO** (ver120, 06/11/2026). Fra le tre strade
+  proposte per il limite che aveva visto lui stesso (vedi la scheda ⚠️🔴 della ver118) Christian
+  ha scelto la **1: solo un avviso, nessun numero toccato**.
+  - **Funzione nuova `ferieBilancio(state, dp, pairs, c, escludi, mesiRatei)`** (sotto
+    `oreSuppPeriodo`): conta le giornate **maturate** nel periodo — il valore comune «ferie e
+    permessi annui» (30) diviso 12, sui **mesi che maturano i ratei** — e quelle **godute
+    davvero** nel Tabellone: codici **`FERIE`** e **`EXF`**, più le ore di **permesso orario di
+    tipo EXF**. La differenza è il debito, in giornate e in ore.
+  - **Dove si vede**: riquadro giallo **subito sotto il numero €/h**, solo quando il debito
+    supera la mezza giornata e ci sono ore. Dice le giornate godute, quelle maturate, il debito
+    in giornate e in ore, e **di quanto il costo orario è più basso del vero**
+    (`debito ÷ ore rendicontate`).
+  - ⚠️ **Non cambia NESSUN numero**: verificato in esecuzione, il €/h della ver119 e quello della
+    ver120 sono **identici** (16,28 su chi non fa ferie). È solo una scritta.
+  - **Provato in esecuzione** (`ferie120.cjs`), **8 controlli su 8**: chi si prende tutte le 30
+    giornate **non vede l'avviso**; chi non ne fa nessuna lo vede con «0,00 su 30,00 maturate ·
+    190,38 h · circa **9,90%**» — cioè esattamente lo scarto misurato fra le due persone; chi ne
+    fa 15 vede «15,00 su 30,00 · 95,19 h · 5,20%»; il riquadro è giallo con bordo ambra
+    (`rgb(255,248,225)` / `rgb(234,200,122)`); la ver119 non lo mostra. **Zero errori di pagina.**
+  - ⚠️ **Le giornate maturate sono una stima**: vengono dal valore comune «ferie e permessi
+    annui» (30 gg = 26 ferie + 4 ex festività), **non** da un monte ferie per persona, che l'app
+    non ha. Chi ha un residuo ferie degli anni prima non è compreso.
 - 📅 **LA QUOTA DI UNA FESTIVITÀ È `ore settimanali ÷ giorni a settimana`** (ver119, 06/11/2026,
   **numero dato da Christian**): «Ore mensili contrattuali 165, rese effettivamente 172 e due
   festività godute nel mese: le ore da lavorare dovevano essere **152,333**, quindi lui ha fatto
@@ -474,14 +496,15 @@ Banca ore, tetto annuo, contratti e export.
     - 🧮 **Verifica del perché** (conto a mano, **non ancora nell'app**): dividendo il costo di
       chi non fa ferie per le ore **al netto delle 190,4 non godute** si ottiene **18,09 €/h**,
       cioè lo stesso numero dell'altro. È la conferma che la causa sono le ferie non godute.
-    - **Tre strade, da decidere con Christian** (nessuna fatta):
-      1. **solo un avviso**, quando le ferie godute nel periodo sono molto meno di quelle
+    - **Tre strade proposte. ✅ Christian ha scelto la 1** (fatta nella ver120):
+      1. ✅ **solo un avviso**, quando le ferie godute nel periodo sono molto meno di quelle
          maturate: «ne risultano godute X su Y maturate; il costo orario qui è più basso del vero
          di circa N%». Non tocca nessun numero;
-      2. **togliere dalle ore** le ferie maturate e non godute del periodo: il €/h torna uguale
-         per tutti. ⚠️ cambia il numero che si usa in rendicontazione;
-      3. **tornare alle assenze presunte**: misurato, nasconde il problema solo a metà (−2,1%) e
+      2. 🚫 **togliere dalle ore** le ferie maturate e non godute del periodo: il €/h torna uguale
+         per tutti, ma cambia il numero che si usa in rendicontazione. **Scartata.**
+      3. 🚫 **tornare alle assenze presunte**: misurato, nasconde il problema solo a metà (−2,1%) e
          in cambio inventa ore in più a chi le ferie se le prende (fino a 112 h in un anno).
+         **Scartata.**
     - ⚠️ **Nulla è pubblicato**: `main` porta ancora la **ver116**. Le ver117 e ver118 stanno solo
       sul ramo di lavoro.
 - 🧮 **LE ORE IN PIÙ SI CONTANO MESE PER MESE, E SUL MONTE CONTRATTUALE** (ver117, 06/11/2026).

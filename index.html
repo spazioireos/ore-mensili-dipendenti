@@ -313,7 +313,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver119";
+const APP_VER = "ver120";
 const APP_DATA = "06nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -2715,6 +2715,41 @@ function oreSuppPeriodo(state, dp, pairs, c, escludi, sottoSoglia, ggSett){
   });
   return { ore: R2(tot,3), righe: righe };
 }
+/* ===== ver120: LE FERIE NON GODUTE SONO UN DEBITO ===========================
+   Christian (06/11/2026): «ho timore a utilizzare le vere ore del tabellone: se uno non fa mai
+   ferie in un anno magari mi tradisce il costo orario». Misurato: ha ragione, ed e' il ~10%.
+   Il costo e' lo stesso, ma chi non va in ferie RENDE piu' ore e il costo si divide per quelle;
+   quelle ore pero' sono un debito (o le godra' dopo, o vanno pagate).
+   Fra le tre strade proposte ha scelto la **1: solo un avviso**, senza toccare nessun numero.
+   Qui si contano le giornate di ferie MATURATE nel periodo (il valore comune «ferie e permessi
+   annui» diviso 12, sui mesi che maturano i ratei) e quelle GODUTE davvero nel Tabellone
+   (codici FERIE e EXF, piu' le ore di permesso orario di tipo EXF). */
+function ferieBilancio(state, dp, pairs, c, escludi, mesiRatei){
+  let godH = 0, godGG = 0;
+  (pairs||[]).forEach(function(pr){
+    if (meseEscluso(escludi, pr.y, pr.m)) return;
+    const rec = getRecFrom(state, pr.y, pr.m, dp.id);
+    if (!rec || !rec.giorni) return;
+    const q = quotaGiorno(dp, pr.y, pr.m), nd = daysInMonth(pr.y, pr.m);
+    let gg = 0;
+    for (let d=1; d<=nd; d++){
+      const v = String(rec.giorni[d]==null ? "" : rec.giorni[d]).trim();
+      if (v === "FERIE" || v === "EXF") gg++;
+    }
+    godGG += gg; godH += gg*q;
+    const P = (rec.permessi) ? rec.permessi : {};     /* permessi ORARI di tipo ex festivita' */
+    Object.keys(P).forEach(function(d){
+      const v = P[d]; const ore = Number(v && v.ore) || 0;
+      if (ore > 0 && String((v && v.tipo)||"").trim().toUpperCase() === "EXF"){ godH += ore; godGG += (q>0? ore/q : 0); }
+    });
+  });
+  const mesi = (mesiRatei!=null) ? mesiRatei : 0;
+  const matGG = ((Number(c.ferie)||0) + (Number(c.altriPermessi)||0))/12 * mesi;
+  const qRif = (pairs && pairs.length) ? quotaGiorno(dp, pairs[pairs.length-1].y, pairs[pairs.length-1].m) : 0;
+  const matH = matGG * qRif;
+  return { matGG:R2(matGG,2), godGG:R2(godGG,2), matH:R2(matH,2), godH:R2(godH,2),
+           debitoGG:R2(Math.max(0, matGG-godGG),2), debitoH:R2(Math.max(0, matH-godH),2), quota:qRif };
+}
 function indetAFine(dp, pairs){
   if(!pairs.length) return tipoNow(dp)!=="determinato";
   const u=pairs[pairs.length-1];
@@ -2981,12 +3016,19 @@ function datiCosto(state, dp, pairs){
      esattamente come prima. */
   o.suppMensileAttivo = (o.fonte === "riepiloghi") && !scrittoAMano && !!(pairs && pairs.length);
   o.suppMensileOre = null; o.suppRighe = null; o.suppVecchio = null;
+  o.ferie = null;
   if (o.suppMensileAttivo){
     const sm = oreSuppPeriodo(state, dp, pairs, c, senzaRapp, o.sottoSoglia, o.ggSett);
     o.suppMensileOre = sm.ore; o.suppRighe = sm.righe;
+    o.ferie = ferieBilancio(state, dp, pairs, c, senzaRapp, o.mesiRatei);   /* ver120 */
   }
   o.raw = p;
   o.res = calcCosto(o);
+  /* ver120: di quanto il costo orario risulta piu' basso del vero, se restano ferie non godute.
+     mostrato = costo/ore · vero = costo/(ore - debito) → lo scarto relativo e' debito/ore. */
+  if (o.ferie && o.res && o.res.H38 > 0 && o.ferie.debitoH > 0){
+    o.ferie.pct = R2(o.ferie.debitoH / o.res.H38 * 100, 1);
+  }
   /* quanto darebbe il conto VECCHIO (totale del periodo contro totale), per farlo vedere */
   if (o.suppMensileAttivo){
     const rv = calcCosto(Object.assign({}, o, { suppMensileOre:null }));
@@ -3465,6 +3507,13 @@ function CostoOrario(props){
                   </div>
                 )}
               </div>
+
+              {/* ver120 (Christian ha scelto la strada 1: solo un avviso, nessun numero toccato) */}
+              {(d.ferie && d.ferie.debitoH > (d.ferie.quota/2) && d.ferie.pct > 0) ? (
+                <div style={{ background:"#FFF8E1", border:"1px solid #EAC87A", borderRadius:"8px", padding:"7px 10px", marginTop:"8px", fontSize:"13px", lineHeight:1.35, color:"#7c4a03" }}>
+                  ⚠️ <b>Ferie non godute.</b> In questo periodo ne risultano godute <b style={cifre}>{fmt2(d.ferie.godGG)}</b> giornate su <b style={cifre}>{fmt2(d.ferie.matGG)}</b> maturate: le <b style={cifre}>{fmt2(d.ferie.debitoGG)}</b> non godute (<b style={cifre}>{fmt2(d.ferie.debitoH)}</b> h) sono un <b>debito</b> — o verranno godute dopo, o andranno pagate. Finché restano lì, la persona rende più ore a parità di stipendio, quindi il <b>costo orario qui sopra è più basso del vero di circa {fmt2(d.ferie.pct)}%</b>.
+                </div>
+              ) : null}
 
               <div style={{ marginTop:"12px" }}>
                 <button className="btn btn-gray" onClick={function(){ setApriDett(!apriDett); }}>{apriDett ? "▲ Nascondi il dettaglio" : "▼ Mostra il dettaglio del calcolo"}</button>
