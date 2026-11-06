@@ -313,7 +313,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver123";
+const APP_VER = "ver124";
 const APP_DATA = "06nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -496,7 +496,13 @@ function festivitaSet(anno){
   const s = {};
   /* ver79: aggiunto il 7 dicembre (Sant'Ambrogio), richiesta di Christian del 03/11/2026. */
   [[1,1],[1,6],[4,25],[5,1],[6,2],[8,15],[10,4],[11,1],[12,7],[12,8],[12,25],[12,26]].forEach(function(f){ s[f[0]+"-"+f[1]] = true; });
-  const pa = pasqua(anno); s[pa.m+"-"+pa.d] = true;
+  /* ver124 (06/11/2026, Christian: «togli pasqua»): la DOMENICA DI PASQUA non e' una festivita'
+     infrasettimanale — e' una domenica per definizione. La festivita' e' il LUNEDI' DELL'ANGELO,
+     che resta qui sotto. Prima la domenica di Pasqua era nell'elenco e, cadendo di domenica,
+     risultava sempre "festivita' NON goduta": il Costo orario pagava un 1/26 non dovuto, ogni
+     anno, a ogni persona. Il Tabellone non cambia: quel giorno e' domenica, quindi era ed e'
+     rosso e non compilabile. */
+  const pa = pasqua(anno);
   const pd = new Date(anno, pa.m-1, pa.d); pd.setDate(pd.getDate()+1);
   s[(pd.getMonth()+1)+"-"+pd.getDate()] = true;
   return s;

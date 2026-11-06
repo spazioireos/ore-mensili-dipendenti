@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver123 · 06nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver124 · 06nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -223,6 +223,8 @@ Banca ore, tetto annuo, contratti e export.
      anche una **stringa**, che diventa il testo della nota.
      ⚠️ **Il 4 novembre NON sta in `festivitaSet`**: quel giorno si lavora, la cella resta
      compilabile e non è rossa.
+     ⚠️ **Dalla ver124 la domenica di Pasqua NON sta più in `festivitaSet`** (vedi la scheda 🐣):
+     ci sta solo il **Lunedì dell'Angelo**. Non rimetterla.
   7. **Sant'Ambrogio (7 dicembre) aggiunto a `festivitaSet`**. ⚠️ Da ver77 i giorni rossi **non
      si compilano**: dal 7/12 in poi quella casella è bloccata e le ore già scritte sui 7
      dicembre passati non sono più correggibili. Con Sant'Ambrogio dentro, il 2026 conta
@@ -234,6 +236,8 @@ Banca ore, tetto annuo, contratti e export.
     | nov 2026 (1 mese) | 0 / 2 | 27,81 €/h | **23,49 €/h** |
     | anno 2026 (12 mesi) | 11 / 4 | 19,65 €/h | **19,68 €/h** |
     | a.s. 2026/27 | 9 / 6 | — | 19,66 €/h |
+    ⚠️ **Le «non godute» di questa tabella sono quelle della ver79**: dalla **ver124** la domenica
+    di Pasqua non è più nell'elenco, quindi il 2026 ne conta **3** e non 4 (vedi la scheda 🐣).
     Sull'**anno intero il risultato non si muove** (3 centesimi): le correzioni si vedono sui
     periodi corti, che prima erano sbagliati.
   - ⚠️ **I costi orari calcolati finora su periodi più corti dell'anno erano sovrastimati.**
@@ -380,6 +384,42 @@ Banca ore, tetto annuo, contratti e export.
     «— ore» e «non calcolabile»; la stessa persona su «Teoriche» → 18,67 €/h; e il **foglio Excel
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
+
+- 🐣 **LA DOMENICA DI PASQUA NON È UNA FESTIVITÀ: TOLTA DALL'ELENCO** (ver124, 06/11/2026,
+  difetto **trovato da Christian** guardando un caso vero: «per Boccalari intendo dire che nel
+  periodo gen26-ott26 mi hai messo due festivi non goduti» → poi «1, togli pasqua - 2, e' festivo
+  e va tenuto»).
+  - **Il difetto**: `festivitaSet` metteva nell'elenco **sia la domenica di Pasqua sia il Lunedì
+    dell'Angelo** (`const pa = pasqua(anno); s[pa.m+"-"+pa.d] = true;`). Ma la Pasqua **è una
+    domenica per definizione**: non è una festività infrasettimanale, e la festività da pagare è
+    il **Lunedì dell'Angelo**, che era già nell'elenco e già contato come **goduta**. Cadendo di
+    domenica, la Pasqua risultava **ogni anno** fra le «festività NON godute» (`J12`) e faceva
+    pagare **un 1/26 del mensile fisso non dovuto**, a ogni persona.
+  - **La correzione**: una riga sola. `pasqua(anno)` si calcola ancora, ma **serve solo** a
+    ricavare il Lunedì dell'Angelo. ⚠️ **Il 4 ottobre (San Francesco) RESTA**, decisione di
+    Christian del 06/11/2026: «e' festivo e va tenuto». Nel 2026 cade di domenica, quindi resta
+    fra le non godute, ed è giusto così.
+  - ⚠️ **Il TABELLONE non cambia di un millesimo**: il 5 aprile 2026 è domenica, quindi era ed è
+    **rosso e non compilabile** (regola della ver77) e non entra in nessun conteggio di giornate
+    godute. Cambia **solo** la voce di costo *Festività non godute* del Costo orario.
+  - **Misurato in esecuzione** (persona 38 h/sett., 150 h al mese, anno 2026):
+    | | giorni non goduti | voce | €/h |
+    |---|--:|--:|--:|
+    | ver123 | **4** | 251,93 € | 17,21 |
+    | **ver124** | **3** | **188,95 €** | **17,17** |
+    Le festività **godute restano 11**, identiche. Sul periodo gen→ott i non goduti passano da
+    **2 a 1**.
+  - 🔴 **Sui dati VERI di Christian** (BOCCALARI, gen→ott 2026, dal backup del 04/11):
+    *Festività non godute* **62,96 € → 31,48 €**, costo totale **14.467,76 € → 14.427,24 €**,
+    **20,47 → 20,41 €/h**. ⚠️ Il costo scende di **40,52 €**, più dei 31,48 della voce: le
+    festività non godute entrano nell'**imponibile I** (`L15`), quindi si portano dietro anche i
+    contributi.
+  - ⚠️ **I costi orari calcolati finora erano sovrastimati di un 1/26 all'anno per persona.**
+  - **Provato in esecuzione** (`pasqua124.cjs`), **8 controlli su 8**: ver123 conta 4 giorni e
+    ver124 ne conta 3; l'importo scende; gen→ott passa da «2 giorni» a «1 giorno»; le **godute
+    non cambiano** (11,00 in entrambe); nel **Tabellone di aprile** il TOT calcolato è
+    **identico** e il 5 e il 6 aprile sono **rossi e non compilabili** in tutte e due le versioni.
+    **Zero errori di pagina.**
 
 - 💶 **L'IMPORTO ORARIO E LE ASSENZE SPACCHETTATE** (ver123, 06/11/2026, due richieste di
   Christian nello stesso momento). **Nessun calcolo è stato toccato: si fanno vedere numeri che
