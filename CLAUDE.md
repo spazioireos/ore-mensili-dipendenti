@@ -419,9 +419,21 @@ Banca ore, tetto annuo, contratti e export.
     dentro il **Costo orario le conterebbe due volte**, perché le somma già per conto suo.
   - ⚠️ **Le festività NON godute restano fuori** (domeniche e il 4 novembre): «sono un'eccezione
     che non rientra nel calcolo». Restano una voce di costo a parte nel Costo orario (`J12`).
-  - ⚠️ **Il Tetto annuo NON è stato toccato**: `prodottoMese` continua a contare ore rese +
-    assenze erosive + permessi erosi. Una festività è un giorno in cui il servizio è chiuso, e
-    Christian non ha chiesto niente in proposito.
+  - 🚫 **IL TETTO ANNUO RESTA COM'È — deciso da Christian il 06/11/2026 («Lascia com'è»),
+    dopo che gli era stato chiesto con i numeri. NON RIPROPORLO.** `prodottoMese` continua a
+    contare ore rese + assenze **erosive** + permessi erosi: le **festività godute non erodono
+    il massimale**. È la sua stessa regola del 03/11/2026 («se stai a casa durante l'anno
+    scolastico io ti pago e le ore incidono; **se stai in ferie a Natale no**»): in una
+    festività il servizio è chiuso e al progetto non arriva nessuna ora.
+    **Sono due domande diverse**, ed è giusto che rispondano in modo diverso:
+    | | che domanda fa | festività godute |
+    |---|---|---|
+    | **Risultato del mese** (straordinario) | «mi ha dato le ore che mi doveva?» | **contano** (ver121) |
+    | **🎯 Tetto annuo** | «quante ore ho scaricato su questo progetto?» | **non contano** |
+    Se si fossero fatte erodere: **11 festività × 6,3333 = 69,67 h all'anno** di massimale
+    consumate senza che nessuno abbia lavorato (il **17%** di un tetto da 408 h), e lo stesso
+    numero sarebbe sceso nel residuo che gli operatori vedono in **Fogli ore** dopo
+    *📤 Pubblica i residui*.
   - ⚠️ **Conseguenza da sapere**: lo straordinario cresce in **6 mesi su 12** del 2026 (gennaio,
     aprile, maggio, giugno, agosto, dicembre). Dalla ver121 in poi i numeri dei mesi con
     festività **non sono confrontabili** con quelli visti prima.
