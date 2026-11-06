@@ -301,8 +301,8 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver112";
-const APP_DATA = "05nov26";
+const APP_VER = "ver113";
+const APP_DATA = "06nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
 const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
@@ -2981,6 +2981,63 @@ function CostoOrario(props){
   const d = datiCosto(state, dp, pairs);
   const r = d.res;
 
+  /* ver113 (06/11/2026, richiesta di Christian: «nel riepilogo costo orario indica aliquote e
+     parametri di riferimento che consentono il calcolo a lato di ogni voce: es inps 26,90 -
+     fis 0,55, tredicesima 4 mesi, ore aggiuntive 56 ore etc»).
+     Qui si costruiscono SOLO le scritte: nessun calcolo è stato toccato, i numeri sono quelli
+     che `calcCosto` usa davvero (`c` = aliquote comuni, `d` = dati della persona, `r` = risultato).
+     ⚠️ Le percentuali si mostrano con 2 decimali, ma se l'aliquota ne ha di più (il FIS vale
+     0,53333%) si mostrano tutti: scrivere «0,53%» sarebbe un'aliquota diversa da quella usata. */
+  const pctTxt = function(v){
+    const n = Number(v)||0;
+    const r5 = Math.round(n*100000)/100000, r2 = Math.round(n*100)/100;
+    return ((r5===r2) ? fmt2(r2) : String(r5).replace(".", ",")) + "%";
+  };
+  const nTxt = function(v){ const n=Number(v)||0; return Number.isInteger(n) ? String(n) : fmt2(n); };
+  /* ⚠️ La paga oraria delle ore aggiuntive si mostra con QUATTRO decimali di proposito: con due
+     (12,60 invece di 12,6045) il prodotto «ore × €/h» tornava 1,10 € più basso della voce, e
+     chi rifà il conto con la calcolatrice troverebbe un numero diverso. */
+  const dec4 = function(v){ return R2(Number(v)||0, 4).toFixed(4).replace(".", ","); };
+  const mesiTxt = function(v){ const n=Number(v)||0; return nTxt(n) + (n===1 ? " mese" : " mesi"); };
+  /* ⚠️ Quando il periodo si taglia in BLOCCHI (ver84), livello, ore settimanali e addizionale
+     cambiano da pezzo a pezzo: le aliquote comuni valgono per tutti, l'addizionale no. */
+  const aPezzi = !!d.blocchi;
+  const oreAggTot = R2((Number(r.E18)||0)*d.mesi, 2);
+  const euroOraAgg = (oreAggTot>0) ? (r.J18/oreAggTot)
+    : (r.J2 + ((d.oreSett>=38) ? (d.minimo/165*0.15) : (r.J2*0.27)));
+  const kmVal = (d.kmMese!=null ? d.kmMese : c.kmMese);
+  const par = {
+    /* ⚠️ A pezzi `r.H5` è la MEDIA dei pezzi pesata sui mesi: lo dice, così non sembra il
+       mensile di un cedolino vero. */
+    J5:  (aPezzi ? "mensile fisso medio dei pezzi " : "mensile fisso ") + fmt2(r.H5) + " € × " + mesiTxt(R2(d.mesi - d.mesiMater, 3)) + " pagati",
+    J6:  "mensile fisso × " + nTxt(d.mesiRatei) + "/12 mesi di ratei",
+    J8:  "mensile fisso × " + nTxt(d.mesiRatei) + "/12 × " + pctTxt(c.quattordic),
+    J12: nTxt(r.fNon) + (Number(r.fNon)===1 ? " giorno" : " giorni") + " × " + fmt2(c.festNonGodCoef) + " (in 26esimi del mensile fisso)",
+    J14: mesiTxt(d.mesiMater) + " di maternità × " + pctTxt(c.integrMater),
+    L15: "retribuzione + 13ª + 14ª + festività non godute + maternità",
+    J17: fmt2(d.premiMese) + " €/mese × " + mesiTxt(R2(d.mesi - d.premiMesiTolti, 3)),
+    J18: fmt2(oreAggTot) + " h sul periodo × " + dec4(euroOraAgg) + " €/h (maggiorazione " + (d.oreSett>=38 ? "15% sul minimo" : "27%") + ")",
+    L18: "imponibile I + premi + ore aggiuntive",
+    J19: "base TFR " + fmt2(r.H19) + " € ÷ " + nTxt(c.tfrDiv),
+    J20: "0,50% su imponibile II",
+    J21: nTxt(c.anniTfr) + (Number(c.anniTfr)===1 ? " anno" : " anni") + " × 1,50% + 75% dell'ISTAT (" + pctTxt(c.istat) + ")",
+    J23: pctTxt(c.prevCompl) + " su base TFR × quota a carico " + pctTxt(c.prevComplPag),
+    J25: pctTxt(c.inps) + " × " + pctTxt(c.inpsPag) + " su imponibile II",
+    J26: aPezzi ? "diversa in ogni pezzo: vedi «Come si divide il periodo»"
+       : (d.indeterminato ? "non dovuta: contratto a tempo indeterminato" : pctTxt(d.addizTD) + " su imponibile II"),
+    J27: pctTxt(c.fis) + " × " + pctTxt(c.fisPag) + " su imponibile II",
+    J28: pctTxt(c.inail) + " × " + pctTxt(c.inailPag) + " su imponibile II, più l'1% di addizionale",
+    J29: pctTxt(c.irap) + " × quota a carico " + pctTxt(c.irapPag) + " su imponibile II",
+    J30: d.indeterminato ? (fmt2(c.sanitaria) + " €/anno ÷ 12 × " + nTxt(d.mesiRatei) + " mesi di ratei")
+       : "non dovuta: contratto a tempo determinato",
+    J31: fmt2(c.paghe) + " € × " + nTxt(d.mesiCedolini) + (Number(d.mesiCedolini)===1 ? " cedolino" : " cedolini"),
+    J32: (function(){ const n = Math.max(1, Math.ceil(d.mesi/12));
+          return fmt2(c.formazione) + " € × " + n + (n===1 ? " anno iniziato" : " anni iniziati"); })(),
+    J34: (d.kmTipo==="secco") ? (fmt2(kmVal) + " € una volta sola")
+       : (fmt2(kmVal) + " € × " + mesiTxt(R2(d.mesi - d.kmMesiTolti, 3))),
+    J35: "somma di tutte le voci qui sopra"
+  };
+
   const esporta = function(){
     const righe = [["COGNOME NOME","PERIODO","TIPO CONTRATTO","MESI","ORE SETT.","LIVELLO","MINIMO €","ORE RENDICONTATE","ORIGINE ORE","COSTO TOTALE €","COSTO ORARIO €/h"]];
     dips.forEach(function(x){
@@ -3002,11 +3059,16 @@ function CostoOrario(props){
     XLSX.writeFile(wb, "Spazio Ireos Costo orario - " + p2(ora.getDate()) + MESE_ABBR_FILE[ora.getMonth()] + String(ora.getFullYear()).slice(2) + " - " + APP_VER + " - " + p2(ora.getHours()) + "." + p2(ora.getMinutes()) + ".xlsx");
   };
 
-  const voce = function(lbl, val, forte){
-    return <div style={{ display:"flex", justifyContent:"space-between", gap:"12px", padding:"1px 0",
+  /* ver113: quarto parametro facoltativo `nota` = l'aliquota o il parametro di riferimento,
+     su una riga piccola sotto il nome della voce (12,5px, il minimo consentito dal blocco
+     leggibilità). Senza `nota` la voce si disegna esattamente come prima. */
+  const voce = function(lbl, val, forte, nota){
+    return <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline", gap:"12px", padding:"1px 0",
       borderTop: forte ? "1px solid #1f4e82" : "none", borderBottom: forte ? "none" : "1px dotted #e2e8f0",
       fontSize:"14.5px", fontWeight:forte?800:400, color: forte? "#1f4e82" : "#334155" }}>
-      <span>{lbl}</span><span style={{ fontVariantNumeric:"tabular-nums", whiteSpace:"nowrap" }}>{fmt2(val)} €</span></div>;
+      <span style={{ minWidth:0 }}>{lbl}
+        {nota ? <span className="co-par" style={{ display:"block", fontSize:"12.5px", fontWeight:400, color:"#475569", lineHeight:1.25 }}>{nota}</span> : null}</span>
+      <span style={{ fontVariantNumeric:"tabular-nums", whiteSpace:"nowrap" }}>{fmt2(val)} €</span></div>;
   };
 
   return (
@@ -3233,29 +3295,31 @@ function CostoOrario(props){
               </div>
               {apriDett ?
                 <div style={{ marginTop:"10px" }}>
-                  {voce("Retribuzione mensilizzata", r.J5)}
-                  {voce("Tredicesima", r.J6)}
-                  {voce("Quattordicesima", r.J8)}
-                  {voce("Festività non godute", r.J12)}
-                  {voce("Integrazione maternità", r.J14)}
-                  {voce("Imponibile I", r.L15, true)}
-                  {voce("Premi", r.J17)}
-                  {voce("Ore aggiuntive", r.J18)}
-                  {voce("Imponibile II", r.L18, true)}
-                  {voce("TFR maturato", r.J19 + r.J20)}
-                  {voce("0,50% già nei contributi, tolto dal TFR", -r.J20)}
-                  {voce("Rivalutazione TFR", r.J21)}
-                  {voce("Previdenza complementare", r.J23)}
-                  {voce("Contributi INPS", r.J25)}
-                  {voce("Addizionale tempo determinato", r.J26)}
-                  {voce("Contributi FIS", r.J27)}
-                  {voce("INAIL, addizionale compresa", r.J28)}
-                  {voce("IRAP", r.J29)}
-                  {voce("Assistenza sanitaria", r.J30)}
-                  {voce("Paghe e dichiarazioni", r.J31)}
-                  {voce("Formazione", r.J32)}
-                  {voce("Rimborso km", r.J34)}
-                  {voce("Costo totale", r.J35, true)}
+                  {voce("Retribuzione mensilizzata", r.J5, false, par.J5)}
+                  {voce("Tredicesima", r.J6, false, par.J6)}
+                  {voce("Quattordicesima", r.J8, false, par.J8)}
+                  {voce("Festività non godute", r.J12, false, par.J12)}
+                  {voce("Integrazione maternità", r.J14, false, par.J14)}
+                  {voce("Imponibile I", r.L15, true, par.L15)}
+                  {voce("Premi", r.J17, false, par.J17)}
+                  {voce("Ore aggiuntive", r.J18, false, par.J18)}
+                  {voce("Imponibile II", r.L18, true, par.L18)}
+                  {voce("TFR maturato", r.J19 + r.J20, false, par.J19)}
+                  {voce("0,50% già nei contributi, tolto dal TFR", -r.J20, false, par.J20)}
+                  {voce("Rivalutazione TFR", r.J21, false, par.J21)}
+                  {voce("Previdenza complementare", r.J23, false, par.J23)}
+                  {voce("Contributi INPS", r.J25, false, par.J25)}
+                  {voce("Addizionale tempo determinato", r.J26, false, par.J26)}
+                  {voce("Contributi FIS", r.J27, false, par.J27)}
+                  {voce("INAIL, addizionale compresa", r.J28, false, par.J28)}
+                  {voce("IRAP", r.J29, false, par.J29)}
+                  {voce("Assistenza sanitaria", r.J30, false, par.J30)}
+                  {voce("Paghe e dichiarazioni", r.J31, false, par.J31)}
+                  {voce("Formazione", r.J32, false, par.J32)}
+                  {voce("Rimborso km", r.J34, false, par.J34)}
+                  {voce("Costo totale", r.J35, true, par.J35)}
+                  {aPezzi ? <div style={{ fontSize:"12.5px", color:"#7c4a03", background:"#fff8e1", border:"1px solid #eac87a", borderRadius:"8px", padding:"5px 7px", marginTop:"6px", lineHeight:1.3 }}>Il periodo è stato calcolato <b>a pezzi</b>: le aliquote comuni (INPS, FIS, INAIL, IRAP, TFR) valgono per tutti i pezzi, mentre <b>livello, minimo, ore settimanali e addizionale</b> cambiano da pezzo a pezzo — li trovi nella tabella «Come si divide il periodo». Le voci che partono dal mensile fisso (retribuzione, 13ª, 14ª, festività) sono la <b>somma dei pezzi</b>, quindi rifacendole col mensile medio può restare qualche centesimo di differenza.</div> : null}
+                  <div style={{ fontSize:"12.5px", color:"#475569", lineHeight:1.3, marginTop:"5px" }}>I parametri a lato sono scritti arrotondati: rifacendo i conti a mano può restare qualche <b>centesimo</b> di differenza, mentre gli importi sono quelli giusti.</div>
                   <table style={{ width:"100%", borderCollapse:"collapse", marginTop:"10px" }}><tbody>
                     <tr><td style={tdE}>Ore ordinarie lavorabili</td><td style={Object.assign({}, tdV, cifre)}>{fmt2(r.O8)} h</td></tr>
                     <tr><td style={tdE}>Settimane lavorabili</td><td style={Object.assign({}, tdV, cifre)}>{fmt2(r.O6)}</td></tr>

@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver112 · 05nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver113 · 06nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -375,6 +375,62 @@ Banca ore, tetto annuo, contratti e export.
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
 
+- 🧾 **OGNI VOCE DEL COSTO ORARIO DICE LA SUA ALIQUOTA** (ver113, 06/11/2026, richiesta di
+  Christian: «nel riepilogo costo orario indica aliquote e parametri di riferimento che
+  consentono il calcolo a lato di ogni voce: es inps 26,90 - fis 0,55, tredicesima 4 mesi, ore
+  aggiuntive 56 ore etc»).
+  - **Come si vede**: sotto il nome di ogni voce del dettaglio c'è una riga piccola grigia
+    (**12,5px `#475569`**, il minimo consentito dal blocco leggibilità) con il parametro usato:
+    «26,90% × 100,00% su imponibile II», «mensile fisso × 12/12 mesi di ratei», «244,36 h sul
+    periodo × 12,6045 €/h (maggiorazione 27%)», «25,00 € × 12 cedolini»…
+  - **Come è fatto**: oggetto **`par`** costruito in `CostoOrario` subito dopo `const r = d.res`,
+    più `voce(lbl, val, forte, nota)` con un **quarto parametro facoltativo**. Senza `nota` la
+    voce si disegna **esattamente come prima**. Helper nuovi: `pctTxt`, `nTxt`, `mesiTxt`, `dec4`.
+  - ⚠️ **Nessun calcolo è stato toccato**: le scritte leggono `c` (aliquote comuni), `d` (dati
+    della persona) e `r` (risultato), gli stessi numeri che `calcCosto` usa davvero. Verificato:
+    gli importi della ver112 sono identici al centesimo (24.678,26 € · 38,08 €/h · 14.930,65 € ·
+    23,04 €/h).
+  - 🔢 **La paga oraria delle ore aggiuntive si scrive con QUATTRO decimali**, di proposito: con
+    due (12,60 invece di 12,6045) il prodotto «ore × €/h» tornava **1,10 € più basso** della
+    voce, e chi rifà il conto con la calcolatrice troverebbe un numero diverso. ⚠️ Anche le
+    **percentuali** si scrivono per intero quando ne hanno più di due decimali: il FIS vale
+    **0,53333%**, scrivere «0,53%» sarebbe un'aliquota diversa da quella usata.
+  - ⚠️ **Resta qualche centesimo**, ed è scritto a video in fondo al dettaglio: i parametri sono
+    arrotondati (il mensile fisso vero è 646,40916 €, scritto 646,41), quindi «646,41 × 12» dà
+    7.756,92 contro i 7.756,91 della voce. **Gli importi sono quelli giusti**, è la scritta a
+    essere arrotondata.
+  - ⚠️ **Quando il periodo si taglia a PEZZI** (ver84) compare un **riquadro giallo** in fondo al
+    dettaglio: le aliquote comuni valgono per tutti i pezzi, ma **livello, minimo, ore
+    settimanali e addizionale** cambiano da pezzo a pezzo. Perciò: l'**addizionale** non mostra
+    una percentuale ma «diversa in ogni pezzo: vedi «Come si divide il periodo»»; il mensile
+    fisso si presenta come «**mensile fisso medio dei pezzi**»; e le voci che ne derivano possono
+    scostarsi di poco (misurato: retribuzione **0,03 €**, festività non godute **0,92 €**).
+  - **Due voci spiegano perché sono a zero**: previdenza complementare «1,50% su base TFR ×
+    **quota a carico 0,00%**» e IRAP «3,90% × **quota a carico 0,00%**» — sono i valori comuni
+    scelti da Christian il 06/11/2026 («non ho nessuno, cambieremo se necessario»). Allo stesso
+    modo l'addizionale dice «non dovuta: contratto a tempo indeterminato» e l'assistenza
+    sanitaria «non dovuta: contratto a tempo determinato».
+  - 🚫 **L'export Excel del Costo orario NON è stato toccato** (Christian: «lascia pure»). Le
+    aliquote si vedono solo a video.
+  - 🚫 **DECISIONE DI CHRISTIAN (06/11/2026): la maggiorazione resta com'è.** Aveva fatto notare
+    che «fino al 30 settembre 26 le ore aggiuntive erano pagate tra le ordinarie»; gli era stato
+    proposto di togliere la maggiorazione per i mesi fino al 30/09/2026 tagliando il periodo in
+    due. Ha risposto che prima **esisteva il criterio orario** (si pagavano in misura uguale le
+    ore rese, più ferie e festività a parte) e di **«lasciar correre»**. Quindi l'app continua ad
+    applicare **sempre** +27% (o 15% sul minimo a 38 h/sett.). **Non riproporlo.**
+  - **Provato in esecuzione** (`par113.cjs`), **60 controlli su 60**, su tre casi
+    (indeterminato · determinato con rimborso «secco» · determinato con promozione che si taglia
+    in pezzi): per **ogni** voce l'importo è stato **ricalcolato dai numeri scritti nella nota**
+    e confrontato con quello a video — retribuzione, 13ª, 14ª, festività, imponibile I, ore
+    aggiuntive, imponibile II, TFR, 0,50%, rivalutazione, previdenza, INPS, FIS, INAIL, IRAP,
+    assistenza, paghe, formazione, rimborso e la somma finale. **Zero errori di pagina.**
+  - **Misurato**: larghezza di pagina **identica** alla ver112 a 390, 1280 e 1680px; il riquadro
+    del dettaglio cresce in altezza (da 924 a 1.321px a 1280), perché sono 23 righe in più;
+    **nessuna scritta sotto i 12,5px**.
+  - **Non regressione**: rieseguiti i 21 controlli della parte A, i 14 della B, i 13 della C, i 7
+    della D, i 6 dell'avviso giallo e tutto il registro delle formule — **tutti superati**.
+    ⚠️ `vm-B.cjs` è stato **corretto**: leggeva l'importo come «la riga subito dopo il nome della
+    voce», che ora è la riga del parametro; adesso cerca la prima riga che è un importo in euro.
 - 🧊 **IL MESE TUTTO «AN» NON SI PAGA, MA IL RAPPORTO VA AVANTI** (ver112, 05/11/2026 —
   **regola definitiva, supera ver110 e ver111 dello stesso giorno**). La storia, da non rifare a
   rovescio:
