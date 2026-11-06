@@ -390,10 +390,12 @@ Banca ore, tetto annuo, contratti e export.
     **giorni × `quotaGiorno`** (= monte ÷ 26), e sono esattamente quelle dei valori comuni:
     `(ferie 30 + altri permessi) / 12` = **2,50 gg** (cioè i suoi 2,166 + 0,333) più
     `malattiaMese` = **2 gg**.
-  - ⚠️ **Le FESTIVITÀ GODUTE del mese restano tolte**, contate dal calendario come dalla ver79.
-    Christian **non le ha nominate**, ma `O6calc` le toglieva già e toglierle dalla deduzione
-    sarebbe stata una modifica non richiesta che cambia il denaro (11 giorni l'anno ≈ 70 h).
-    👉 **Da chiedergli**: se le festività non vanno tolte, è una riga sola.
+  - ✅ **Le FESTIVITÀ GODUTE del mese restano tolte**, contate dal calendario come dalla ver79.
+    Christian non le aveva nominate; gli è stato chiesto, e il **06/11/2026** ha risposto:
+    **«il mio era un esempio per farti capire»** — cioè l'elenco «2,166 + 0,333 + 2» era il
+    **principio**, non la lista completa. Vale quindi la stessa regola del 06/11 sulle aliquote
+    («tu applica il giusto»): si toglie **tutto ciò che è pagato e non lavorato**, festività
+    comprese (11 giorni l'anno ≈ 70 h). **Deciso: non si cambia.**
   - **Funzioni nuove** (sopra `blocchiPeriodo`): **`oreLavorabiliMese(dp,c,y,m,escludi)`** e
     **`oreSuppPeriodo(state,dp,pairs,c,escludi,sottoSoglia)`** (torna `{ore, righe}`).
     In `calcCosto` `E18` legge **`o.suppMensileOre`** quando c'è, altrimenti fa **esattamente**
