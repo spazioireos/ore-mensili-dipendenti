@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver113 · 06nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver114 · 06nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -375,6 +375,65 @@ Banca ore, tetto annuo, contratti e export.
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
 
+- 💰 **LA RIVALUTAZIONE DEL TFR SI CALCOLA SUL FONDO VERO** (ver114, 06/11/2026). Christian ha
+  chiesto «come si calcola la rivalutazione TFR? Noi l'abbiamo messa giusta?», poi «il più
+  veritiero?» fra tre strade proposte, e ha dato **Nu\*** alla **numero 2**.
+  - **La legge** (art. 2120 c.c.): si rivaluta il **FONDO TFR già accantonato al 31 dicembre
+    dell'anno prima** — non la quota che matura adesso — al tasso **1,50% fisso + 75%
+    dell'aumento ISTAT FOI** (dicembre su dicembre). Nell'anno in cui il rapporto finisce l'1,50%
+    si conta a dodicesimi. L'**imposta sostitutiva del 17%** si toglie dal fondo del lavoratore,
+    quindi **non** è un costo in più per l'azienda: giustamente l'app non la conta.
+  - **Com'era (e resta, per chi non scrive il fondo)**: `J21 = quota TFR del periodo × «Anni per
+    rivalutazione TFR» × (1,50% + 75% ISTAT)`. La **percentuale era giusta**, la **base no**: su
+    una persona con 8.000 € di fondo la rivalutazione vera è ~240 €/anno, l'app ne metteva ~46.
+    La casella «Anni» era in pratica una **manopola** da azzeccare a occhio.
+  - **Ora**: nella scheda della persona, blocco *La retribuzione*, due caselle nuove —
+    **«TFR accantonato al 31/12 €»** (`dp.costo.tfrFondo`) e **«TFR accantonato — anno»**
+    (`dp.costo.tfrFondoAnno`). Se il fondo è scritto:
+    `J21 = fondo × (1,50% + 75% × ISTAT) × mesi di rapporto ÷ 12`.
+    ⚠️ **Se la casella è vuota non cambia assolutamente nulla**: resta la stima di prima
+    (verificato su tre casi, numeri identici al centesimo).
+  - 🧮 **`H6` = mesi in cui il RAPPORTO è in piedi**, non i mesi pagati (`o.mesiRapporto`, da
+    `mesiInPeriodo(dp, pairs)` **senza** `senzaRapp`): il fondo si rivaluta **anche nei mesi
+    tutti «AN»** del part-time verticale ciclico, perché il debito verso il lavoratore resta.
+    Verificato: con luglio e agosto non pagati la rivalutazione resta su **12/12**, non 10/12.
+    Se i mesi sono **scritti a mano**, anche questo conteggio segue quel numero.
+  - 🚨 **Il fondo è un numero che invecchia, e l'app lo dice**: se manca l'anno, o se l'anno
+    scritto non è quello **prima** del periodo guardato, compare un **avviso giallo** sotto le
+    due caselle che nomina l'anno che servirebbe e dice se la rivalutazione risulta più bassa o
+    più alta del vero. ⚠️ È **solo un avviso**: il conto si fa lo stesso col numero scritto.
+  - **A lato della voce** la nota cambia di conseguenza: col fondo «fondo TFR al 31/12/2025
+    8.000,00 € × (1,50% + 75% dell'ISTAT 2,00% = 3,00%) × 12,00/12 mesi di rapporto»; senza,
+    «stima: quota TFR del periodo × 2 anni × (1,50% + 75% dell'ISTAT 2,00%)».
+  - **Misurato in esecuzione** (15 h/sett., assunta 2018, gen→dic 2026, fondo 8.000 €):
+    | | rivalutazione | costo totale | €/h |
+    |---|--:|--:|--:|
+    | casella vuota (come ver113) | 45,99 € | 16.714,85 € | 19,35 |
+    | **fondo 8.000 €** | **240,00 €** | **16.908,86 €** | **19,57** |
+    | lo stesso, periodo gen→giu | **120,00 €** (si dimezza) | — | — |
+    ⚠️ **Per chi ha anzianità il costo orario sale**: non è un peggioramento, è che prima quel
+    costo era **sottostimato**.
+  - ⚠️ **Resta approssimato, ed è dichiarato**: per legge la quota che matura **quest'anno** si
+    rivaluta solo dall'anno prossimo, e la rivalutazione si **capitalizza** anno su anno; qui si
+    applica il tasso dell'anno in modo lineare. Sul singolo anno sono centesimi.
+  - ⚠️ **L'ISTAT resta un numero che scrive Christian** («ISTAT anno prec. %», oggi 2,00%):
+    l'app non lo legge da nessuna parte e non si aggiorna da sé. **Da controllare ogni anno.**
+    Gli è stato chiesto due volte quale mettere e non ha ancora risposto.
+  - 🚫 **Strade scartate**: la **1** (lasciare la manopola «Anni») e la **3** (dedurre
+    l'anzianità dalla data di assunzione e stimare il fondo) — quest'ultima sembra automatica ma
+    è una stima di una stima, e sbaglierebbe su passaggi di livello, part-time cambiati e
+    anticipazioni già erogate. **Non riproporle.**
+  - **Provato in esecuzione** (`tfr114.cjs`), **12 controlli su 12**: casella vuota → numeri
+    identici alla ver113 su tre casi (normale · a pezzi · con mesi AN); fondo 8.000 € → 240,00 €
+    con la nota giusta; avviso quando manca l'anno; avviso quando l'anno è sbagliato; nessun
+    avviso con l'anno giusto; il costo orario sale; il **TFR maturato non cambia**; periodo
+    dimezzato → rivalutazione dimezzata; mesi AN → 12/12; a pezzi la somma torna a 240,00 €.
+    **Zero errori di pagina.**
+  - **Non regressione**: rieseguiti vm-A (21), vm-B (14), vm-C (13), vm-D (7), i **60 controlli
+    delle aliquote** della ver113, l'avviso giallo dei mesi (6), il registro delle formule e
+    `R2` — **tutti superati**. Larghezza di pagina identica a 390, 1280 e 1680px.
+    ⚠️ `par113.cjs` → `par114.cjs`: il controllo della rivalutazione ora riconosce **due**
+    formule (col fondo e senza).
 - 🧾 **OGNI VOCE DEL COSTO ORARIO DICE LA SUA ALIQUOTA** (ver113, 06/11/2026, richiesta di
   Christian: «nel riepilogo costo orario indica aliquote e parametri di riferimento che
   consentono il calcolo a lato di ogni voce: es inps 26,90 - fis 0,55, tredicesima 4 mesi, ore

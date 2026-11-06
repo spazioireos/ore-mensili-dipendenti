@@ -301,7 +301,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver113";
+const APP_VER = "ver114";
 const APP_DATA = "06nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -2748,7 +2748,19 @@ function calcCosto(o){
      e si calcola sulla stessa base dei contributi (imponibile II). */
   const J20 = L18*0.005;                                // 0,50% a carico dei contributi
   const J19 = H19/c.tfrDiv - J20;                       // TFR al netto dello 0,50%
-  const J21 = J19*c.anniTfr*1.5/100 + J19*c.anniTfr*c.istat/100*75/100;
+  /* ver114 (06/11/2026, Christian: «il più veritiero?» → scelta la strada 2).
+     La legge (art. 2120 c.c.) rivaluta il **FONDO TFR già accantonato al 31 dicembre dell'anno
+     prima**, non la quota che matura adesso: tasso = 1,50% fisso + 75% dell'aumento ISTAT.
+     Se nella scheda della persona c'è scritto il fondo (`o.tfrFondo > 0`) si fa il conto vero,
+     in proporzione ai mesi del periodo. Se la casella è vuota resta **esattamente** la stima di
+     prima (quota del periodo × «Anni per rivalutazione TFR» × tasso): nessuno perde niente.
+     ⚠️ `H6` = mesi in cui il RAPPORTO è in piedi, **non** i mesi pagati: il fondo si rivaluta
+     anche nei mesi tutti «AN» (part-time verticale ciclico), perché il debito resta. */
+  const H6 = (o.mesiRapporto!=null) ? o.mesiRapporto : H2;
+  const tassoRiv = 1.5/100 + c.istat/100*75/100;
+  const J21 = (o.tfrFondo>0)
+    ? o.tfrFondo*tassoRiv*(H6/12)
+    : (J19*c.anniTfr*1.5/100 + J19*c.anniTfr*c.istat/100*75/100);
   const J23 = H19*(c.prevCompl/100*c.prevComplPag)/100;
   const J25 = L18*(c.inps/100*c.inpsPag)/100;
   const J26 = L18*o.addizTD/100;                        // addizionale tempo determinato
@@ -2804,6 +2816,9 @@ function datiCosto(state, dp, pairs){
   const mesiAuto = mesiInPeriodo(dp, pairs, senzaRapp);
   const mesiRateiAuto = mesiRateiPeriodo(dp, pairs, senzaRapp);   /* ver104: ferie, 13ª e 14ª */
   const mesiCedoAuto  = mesiCedolinoPeriodo(dp, pairs, senzaRapp);   /* ver106: paghe e dichiarazioni */
+  /* ver114: mesi in cui il RAPPORTO è in piedi, SENZA togliere i mesi non pagati: li usa solo
+     la rivalutazione del TFR, perché il fondo si rivaluta anche quando non si lavora. */
+  const mesiRapportoAuto = mesiInPeriodo(dp, pairs);
   const mesiANlabel = Object.keys(senzaRapp).map(function(k){ const p=k.split("-"); return mLabelY(parseInt(p[0],10), parseInt(p[1],10)); }).join(", ");
   const oreSettAuto = oreSettPeriodo(dp, pairs);
   const tab = p.tabella || c.tabella;
@@ -2826,6 +2841,12 @@ function datiCosto(state, dp, pairs){
     /* ver106: i cedolini. Se i mesi sono scritti a mano si arrotonda PER ECCESSO: un mese
        iniziato è comunque un cedolino. */
     mesiCedolini: (p.mesi!=null && p.mesi!=="") ? Math.ceil(cNum(p.mesi, mesiAuto)) : mesiCedoAuto,
+    /* ver114: se i mesi sono scritti a mano, anche la rivalutazione segue quel numero. */
+    mesiRapporto: (p.mesi!=null && p.mesi!=="") ? cNum(p.mesi, mesiAuto) : mesiRapportoAuto,
+    mesiRapportoAuto: mesiRapportoAuto,
+    tfrFondo: cNum(p.tfrFondo, 0),                  /* ver114: 0 o vuoto = si usa la stima di prima */
+    tfrFondoAnno: (p.tfrFondoAnno==null||String(p.tfrFondoAnno).trim()==="") ? "" : String(p.tfrFondoAnno).trim(),
+    annoIniz: pairs.length ? pairs[0].y : null,
     mesiMater: cNum(p.mesiMater, 0),
     minimo: cNum(p.minimo, minimoAuto),
     scatti: cNum(p.scatti, 0),
@@ -2885,6 +2906,7 @@ function datiCosto(state, dp, pairs){
           mesi: mesiInPeriodo(dp, b.pairs, senzaRapp),
           mesiRatei: mesiRateiPeriodo(dp, b.pairs, senzaRapp),   /* ver104 */
           mesiCedolini: mesiCedolinoPeriodo(dp, b.pairs, senzaRapp),   /* ver106 */
+          mesiRapporto: mesiInPeriodo(dp, b.pairs),   /* ver114: il fondo TFR si rivaluta anche nei mesi non pagati */
           mesiMater: 0,
           oreSett: vv.oreSett,
           minimo: (livB && MINIMI_CCNL[tab][livB]) ? MINIMI_CCNL[tab][livB] : o.minimo,
@@ -3020,7 +3042,11 @@ function CostoOrario(props){
     L18: "imponibile I + premi + ore aggiuntive",
     J19: "base TFR " + fmt2(r.H19) + " € ÷ " + nTxt(c.tfrDiv),
     J20: "0,50% su imponibile II",
-    J21: nTxt(c.anniTfr) + (Number(c.anniTfr)===1 ? " anno" : " anni") + " × 1,50% + 75% dell'ISTAT (" + pctTxt(c.istat) + ")",
+    /* ver114: due note diverse, perché sono due conti diversi. Col fondo scritto si vede il
+       conto di legge; senza, resta la stima di prima. */
+    J21: (d.tfrFondo>0)
+      ? ("fondo TFR" + (d.tfrFondoAnno ? (" al 31/12/" + d.tfrFondoAnno) : "") + " " + fmt2(d.tfrFondo) + " € × (1,50% + 75% dell'ISTAT " + pctTxt(c.istat) + " = " + pctTxt(R2(1.5 + c.istat*0.75, 5)) + ") × " + fmt2(d.mesiRapporto) + "/12 mesi di rapporto")
+      : ("stima: quota TFR del periodo × " + nTxt(c.anniTfr) + (Number(c.anniTfr)===1 ? " anno" : " anni") + " × (1,50% + 75% dell'ISTAT " + pctTxt(c.istat) + ")"),
     J23: pctTxt(c.prevCompl) + " su base TFR × quota a carico " + pctTxt(c.prevComplPag),
     J25: pctTxt(c.inps) + " × " + pctTxt(c.inpsPag) + " su imponibile II",
     J26: aPezzi ? "diversa in ogni pezzo: vedi «Come si divide il periodo»"
@@ -3214,6 +3240,26 @@ function CostoOrario(props){
                       <option value="secco">secco (una volta sola)</option>
                     </select></label>
                   {campoNum("Ore/mese sotto soglia perse", cMostra(d.raw.sottoSoglia, ""), function(v){ setPar("sottoSoglia", v); })}
+                  {campoNum("TFR accantonato al 31/12 €", cMostra(d.raw.tfrFondo, ""), function(v){ setPar("tfrFondo", v); }, "vuoto = rivalutazione stimata con gli «Anni per rivalutazione TFR»")}
+                  {campoNum("TFR accantonato — anno", cMostra(d.raw.tfrFondoAnno, ""), function(v){ setPar("tfrFondoAnno", v); }, "l'anno a cui si riferisce il fondo, es. 2025")}
+                  {(function(){
+                    /* ver114: il fondo è un numero che invecchia. Se l'anno scritto non è quello
+                       prima del periodo guardato, l'app lo dice invece di usarlo in silenzio.
+                       ⚠️ È solo un avviso: il conto si fa comunque con il numero scritto. */
+                    if (!(d.tfrFondo > 0)) return null;
+                    const attesoAnno = d.annoIniz ? (d.annoIniz - 1) : null;
+                    if (!d.tfrFondoAnno) {
+                      return <div style={{ gridColumn:"1 / -1", background:"#FFF8E1", border:"1px solid #EAC87A", borderRadius:"8px", padding:"7px 10px", marginTop:"2px", fontSize:"13px", lineHeight:1.35, color:"#7c4a03" }}>
+                        ⚠️ <b>Manca l'anno del fondo TFR</b>: scrivilo, altrimenti fra un anno nessuno saprà se quel numero è ancora buono.{attesoAnno ? <span> Per il periodo che stai guardando serve il fondo al <b>31/12/{attesoAnno}</b>.</span> : null}
+                      </div>;
+                    }
+                    if (attesoAnno && String(d.tfrFondoAnno) !== String(attesoAnno)) {
+                      return <div style={{ gridColumn:"1 / -1", background:"#FFF8E1", border:"1px solid #EAC87A", borderRadius:"8px", padding:"7px 10px", marginTop:"2px", fontSize:"13px", lineHeight:1.35, color:"#7c4a03" }}>
+                        ⚠️ <b>Il fondo TFR è di un altro anno</b>: hai scritto il fondo al <b>31/12/{d.tfrFondoAnno}</b>, ma per il periodo che stai guardando servirebbe quello al <b>31/12/{attesoAnno}</b>. Il conto si fa lo stesso con il numero scritto, ma la rivalutazione risulta {String(d.tfrFondoAnno) < String(attesoAnno) ? "più bassa" : "più alta"} del vero.
+                      </div>;
+                    }
+                    return null;
+                  })()}
                 </div>
               </div>
 
