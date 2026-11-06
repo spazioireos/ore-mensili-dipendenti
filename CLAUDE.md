@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver116 · 06nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver117 · 06nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -375,6 +375,80 @@ Banca ore, tetto annuo, contratti e export.
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
 
+- 🧮 **LE ORE IN PIÙ SI CONTANO MESE PER MESE, E SUL MONTE CONTRATTUALE** (ver117, 06/11/2026).
+  Chiude insieme i due punti rimasti del 05/11 sera, confermati da Christian il 06/11 («1 e 2
+  confermo») con **la sua definizione delle ore lavorabili**: «le ore lavorabili sono quelle
+  **contrattuali** (chi ha 38 ore settimanali deve fare 165 ore mensili; nel mese pago 165 ore
+  considerando però che ci stanno **2,166 gg di ferie**, **0,333 di permesso ex festività** e
+  presuntivamente **2 gg di malattia**)».
+  - **Niente più compensazione fra i mesi.** Prima `E18` confrontava il **totale** delle ore rese
+    del periodo con il **totale** delle ore lavorabili: un mese sotto copriva un mese sopra. Ora,
+    per ogni mese, `max(0, ore rese − ore lavorabili del mese)`, e poi si somma.
+  - **Le due app ora si parlano.** La base non è più «settimane × ore settimanali» (`O5`/`O6`/`O8`
+    del foglio Excel) ma **`monteFissoMese`, lo stesso numero che il Tabellone mostra come ORE
+    MESE** (165 h a 38 h/sett., in proporzione per gli altri). Le assenze presunte si tolgono in
+    **giorni × `quotaGiorno`** (= monte ÷ 26), e sono esattamente quelle dei valori comuni:
+    `(ferie 30 + altri permessi) / 12` = **2,50 gg** (cioè i suoi 2,166 + 0,333) più
+    `malattiaMese` = **2 gg**.
+  - ⚠️ **Le FESTIVITÀ GODUTE del mese restano tolte**, contate dal calendario come dalla ver79.
+    Christian **non le ha nominate**, ma `O6calc` le toglieva già e toglierle dalla deduzione
+    sarebbe stata una modifica non richiesta che cambia il denaro (11 giorni l'anno ≈ 70 h).
+    👉 **Da chiedergli**: se le festività non vanno tolte, è una riga sola.
+  - **Funzioni nuove** (sopra `blocchiPeriodo`): **`oreLavorabiliMese(dp,c,y,m,escludi)`** e
+    **`oreSuppPeriodo(state,dp,pairs,c,escludi,sottoSoglia)`** (torna `{ore, righe}`).
+    In `calcCosto` `E18` legge **`o.suppMensileOre`** quando c'è, altrimenti fa **esattamente**
+    quello di prima. `scrittoAMano` è stato **spostato più in su** in `datiCosto` (stessa
+    espressione) perché ora serve prima di `calcCosto`.
+  - 🚫 **Quando NON si applica**, e lì i numeri sono **identici alla ver116**: ore scritte **a
+    mano** (c'è un numero unico, non si sa com'era distribuito), ore **Teoriche** (la stima resta
+    la percentuale) e ogni volta che l'utente ha scritto a mano **mesi, ore settimanali, livello,
+    minimo, addizionale o le settimane della simulazione**. Verificato su **8 casi**: 24 controlli
+    su 24.
+  - **A video**: riquadro nuovo **«Le ore in più, mese per mese»** (mese · lavorabili · rese · in
+    più, con il totale), la frase sotto la tabellina del dettaglio riscritta, e un avviso sotto la
+    tabellina delle settimane che dice che **quelle settimane non entrano più in questo conto**
+    (servono alle ore «Teoriche» e alla simulazione). ⚠️ Diciture nuove, scritte da Claude.
+  - **Misurato in esecuzione, tre casi** (ver116 → **ver117**):
+    | Caso | ore in più | costo totale | €/h |
+    |---|--:|--:|--:|
+    | 38 h/sett., 12 mesi altalenanti (180·120·175·130…) | 230,26 → **280,48 h** | 34.370,72 → **35.144,04 €** | 19,09 → **19,52** |
+    | 15 h/sett., 72 h in 10 mesi, luglio e agosto tutti AN | 205,72 → **206,46 h** | 14.002,91 → **14.015,34 €** | 19,45 → **19,47** |
+    | 30 h/sett. promossa D2 dal 01/06 (periodo a **blocchi**) | 260,73 → **262,50 h** | 29.752,35 → **29.783,07 €** | 19,83 → **19,86** |
+    ⚠️ **Il costo sale solo dove i mesi sono disuguali**: è lì che la compensazione nascondeva le
+    ore in più. Dove ogni mese è sopra allo stesso modo (secondo caso) non cambia quasi nulla.
+  - **Conti rifatti a mano** sul primo caso: gennaio 2026 ha 2 festività godute (1 e 6 gennaio),
+    quindi `165 − (4,5 + 2) × 6,34615 = 123,75` h; febbraio, senza festività, `165 − 4,5 ×
+    6,34615 = 136,44`; dicembre, con 4 festività godute, `111,06`. Totale dell'anno **1.567,50 h**
+    contro le **1.569,60** del conto vecchio: sull'anno intero la base è **la stessa**, cambia il
+    **mese per mese**.
+  - ⚠️ **Con i blocchi** ogni blocco conta le ore in più dei **suoi** mesi (`suppMensileOre` nel
+    pacchetto `ob`): verificato che la somma delle righe torna al totale del periodo.
+  - ⚠️ **Resta una differenza voluta fra Tabellone e Costo orario**: il **Risultato del mese** del
+    Tabellone usa le assenze **vere** (regola dello straordinario del 31/10/2026, confermata con
+    un numero), il Costo orario usa le assenze **presunte**, come ha chiesto Christian
+    («presuntivamente 2gg di malattia»). Lo stesso mese può quindi risultare «in pari» nel
+    Tabellone e con ore in più nel Costo orario. **Non è un difetto**: misurano cose diverse.
+  - **Provato in esecuzione**: `supp117.cjs` (8 controlli su 8, tre casi) e `supp117b.cjs`
+    (**24 su 24**, non regressione su 8 fonti/scritture a mano). **Zero errori di pagina.**
+  - **Non regressione**: vm-A (21), vm-B (14), vm-C (15), vm-D (7), i **60 controlli delle
+    aliquote**, i 12 del fondo TFR, i 10 della casella «Anni», i 7 dell'ISTAT, i 6 dell'avviso
+    giallo, il registro delle formule (9) e `R2` (9) — **tutti superati**. ⚠️ Negli script del
+    TFR/ISTAT i confronti **fra versioni** sul **costo totale** sono stati corretti: adesso il
+    costo cambia di proposito, quindi si confronta solo la **rivalutazione** (identica).
+- 📱 **I DUE SBORDAMENTI A 390px SONO CHIUSI** (ver117, 06/11/2026, Christian: «3, sistema»).
+  Erano difetti **preesistenti**, misurati il 05/11 con la verifica meticolosa e **non** causati
+  dalle versioni di quei giorni.
+  - **Anagrafica, da 724 a 390px.** L'elenco delle persone e la scheda stavano su una riga flex
+    che non andava a capo, e la scheda (`flex:1`, `min-width:auto`) non si restringeva sotto la
+    larghezza minima del suo contenuto: la riga **«Genera documento: 📄 Contratto 📄 Proroga 📄
+    Trasformazione»**. Sotto i 900px ora l'elenco va a capo e i tre pulsanti si impilano
+    (`.ana-wrap`, `.ana-sheet`, `.ana-gen` nella media query che c'era già). Aggiunti **tre soli
+    attributi `class`** nel JavaScript: nessuna logica, nessun campo, nessuna dicitura toccati.
+  - **Costo orario, da 429 a 390px.** Colpa della tabella **«Come si divide il periodo»**, che ha
+    **sette colonne**. Ora scorre lei dentro il suo riquadro (`.co-scroll`, `overflow-x:auto`),
+    come fa da sempre la griglia del mese.
+  - **Misurato**: a 390px tutte e cinque le viste stanno in **390px**; a **1280 e 1680px la
+    larghezza è identica** alla ver116.
 - 📉 **ISTAT: IL VALORE DI PARTENZA PASSA DA 2 A 1,011** (ver116, 06/11/2026). Christian: «istat
   dicembre 2025 risulta 1,011» → alla domanda se fosse una percentuale o il rapporto fra gli
   indici: «**è una percentuale**» → **Nu\*** per portarlo anche nel codice.
@@ -1367,9 +1441,10 @@ nei mesi lavorati, livello D1):
   cioè lo stesso numero del periodo gen → giu: **quale periodo chiedi non cambia più il
   risultato** per i mesi fuori contratto.
 
-## 🔜 DA FARE, deciso da Christian il 05/11/2026 (sera) — NON ANCORA FATTO
+## ✅ FATTO nella ver117 (06/11/2026) — era il «DA FARE» del 05/11 sera
 
-Due richieste precise, da affrontare **insieme** perché toccano lo stesso punto.
+Due richieste precise, affrontate **insieme** perché toccano lo stesso punto. **Chiuse entrambe**
+nella ver117: vedi la scheda 🧮 più sopra.
 ✅ **Già chiuso nella stessa serata**: la terza questione di quel messaggio — i mesi tutti «AN» —
 è stata risolta con la **ver112** (non sono pagati, ma il rapporto va avanti). Le due qui sotto
 restano.
@@ -1379,13 +1454,13 @@ avanzamenti del ramo `claude/integrated-app-feasibility-8d1wg0`. ⚠️ Le ver10
 sono **passaggi superati lo stesso giorno** (rispettivamente da ver104, ver111 e ver112): stanno
 nella storia dei commit, ma **non sono mai state la versione pubblicata**.
 
-1. **Le ore supplementari si contano MESE PER MESE, senza compensazione.** Parole di Christian:
+1. ✅ **Le ore supplementari si contano MESE PER MESE, senza compensazione.** Parole di Christian:
    «gennaio 95 ore fatte in luogo di 90 e febbraio 85 ore in luogo di 90 **non dà
    compensazione**». Oggi `E18` confronta il **totale** delle ore rese con il **totale** delle
    ore lavorabili del periodo (`(G38 − O8 + O11·H2)/H2`), quindi un mese sotto **compensa** un
    mese sopra. Va cambiato in: per ogni mese `max(0, ore del mese − ore lavorabili del mese)`,
    poi somma.
-2. **«Tabellone e costo orario si parlino».** Nella stessa app convivono due idee di «ore del
+2. ✅ **«Tabellone e costo orario si parlino».** Nella stessa app convivevano due idee di «ore del
    mese» che non coincidono (vedi la scheda ⚖️ più sopra): `monteFissoMese` nel Tabellone e le
    «settimane lavorabili meno assenze presunte» nel Costo orario. Le ore lavorabili del mese
    vanno prese **dal Tabellone** (ferie, permessi e malattia **veri**) invece che dai numeri
@@ -1393,9 +1468,12 @@ nella storia dei commit, ma **non sono mai state la versione pubblicata**.
    ⚠️ Attenzione: il 05/11/2026 **mattina** Christian aveva detto «il resto lascia come è» su
    questa stessa cosa; la **sera** ha cambiato idea. Vale l'ultima.
 
-⚠️ **Conseguenza da misurare prima di consegnare**: con il conto mese per mese le supplementari
-**crescono** (niente più compensazione) e quindi il costo totale sale. Va mostrato il confronto
-prima/dopo su almeno tre casi veri.
+⚠️ **Conseguenza misurata prima di consegnare**, come la regola chiedeva: con il conto mese per
+mese le supplementari **crescono** e il costo totale sale, ma **solo dove i mesi sono disuguali**.
+Confronto su tre casi veri nella scheda 🧮 (da +0,7 h a +50,2 h di ore in più).
+⚠️ **La definizione delle ore lavorabili l'ha data Christian il 06/11** e **non** è quella che
+avevo proposto io: non sono «ferie, permessi e malattia **veri** presi dal Tabellone», ma il
+**monte contrattuale meno le assenze PRESUNTE**. Vale la sua.
 
 ## Registro dei controlli sulle formule (da ripetere a ogni versione)
 

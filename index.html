@@ -234,6 +234,18 @@ input:focus,select:focus,textarea:focus{outline:3px solid #1d4ed8;outline-offset
     .co-grid { grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)) !important; }
     /* su telefono la tabellina delle settimane usciva di lato: le etichette vanno a capo */
     .co-sub table td { white-space:normal !important; }
+    /* ===== ver117 (06/11/2026, Christian: «3, sistema») — ANAGRAFICA su telefono ======
+       Difetto PREESISTENTE misurato il 05/11/2026 con la verifica meticolosa: a 390px la
+       vista Anagrafica scorreva di lato (724px). Causa: l'elenco delle persone e la scheda
+       stanno su una riga flex che non va a capo, e la scheda (flex:1) ha min-width:auto,
+       quindi non si restringe sotto la larghezza minima del suo contenuto — che e' la riga
+       «Genera documento: 📄 Contratto 📄 Proroga 📄 Trasformazione».
+       Qui l'elenco va a capo e i tre pulsanti si impilano. Solo aspetto: nessuna dicitura,
+       nessun campo, nessuna logica toccata; sopra i 900px non cambia niente. */
+    .ana-wrap { flex-wrap:wrap !important; }
+    .ana-wrap > div { min-width:0 !important; }
+    .ana-sheet { flex:1 1 100% !important; }
+    .ana-gen { flex-wrap:wrap !important; }
   }
   @media (min-width:1500px){
     .co-wrap { flex-grow:2; }
@@ -301,7 +313,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver116";
+const APP_VER = "ver117";
 const APP_DATA = "06nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -2635,6 +2647,46 @@ function oreRendPeriodo(state, dp, pairs){
   pairs.forEach(function(pr){ t += totOfRec(getRecFrom(state, pr.y, pr.m, dp.id), pr.y, pr.m); });
   return R2(t);
 }
+/* ===== ver117: LE ORE IN PIU' SI CONTANO MESE PER MESE, SENZA COMPENSAZIONE ===
+   Richiesta di Christian del 05/11/2026 (sera), confermata il 06/11 («1 e 2 confermo»):
+   «gennaio 95 ore fatte in luogo di 90 e febbraio 85 ore in luogo di 90 NON da'
+   compensazione». Prima `E18` confrontava il TOTALE delle ore rese del periodo con il
+   TOTALE delle ore lavorabili, quindi un mese sotto copriva un mese sopra.
+   E le ore lavorabili del mese sono, parole sue: «quelle contrattuali (chi ha 38 ore
+   settimanali deve fare 165 ore mensili; nel mese pago 165 ore considerando pero' che ci
+   stanno 2,166 gg di ferie, 0,333 di permesso ex festivita' e presuntivamente 2 gg di
+   malattia)». Quindi la base NON e' piu' «settimane x ore settimanali» (O5/O6/O8 del foglio
+   Excel) ma il MONTE CONTRATTUALE del Tabellone, `monteFissoMese` — ed e' il punto 2 della
+   stessa richiesta: «Tabellone e costo orario si parlino».
+   2,166 + 0,333 = 2,5 gg al mese = (ferie 30 + altri permessi 0) / 12 dei valori comuni;
+   la malattia presunta e' `malattiaMese` (2 gg).
+   ⚠️ Le FESTIVITA' GODUTE del mese restano tolte, come faceva `O6calc` e come fa il foglio
+   Excel: sono giorni pagati e non lavorati. Christian non le ha nominate, ma togliere la
+   loro deduzione sarebbe una modifica non richiesta che cambia il denaro (11 giorni l'anno).
+   ⚠️ `monteFissoMese` e `quotaGiorno` NON sono stati toccati: si leggono e basta. */
+function oreLavorabiliMese(dp, c, y, m, escludi){
+  if (meseEscluso(escludi, y, m)) return 0;                  /* mese tutto AN = non pagato */
+  const fr = meseFrazione(dp, y, m);                         /* mese parziale: ver104 */
+  if (!(fr > 0)) return 0;
+  const q = quotaGiorno(dp, y, m);
+  const ggPres = ((Number(c.ferie)||0) + (Number(c.altriPermessi)||0))/12 + (Number(c.malattiaMese)||0);
+  const fGod = contaFestivita([{ y:y, m:m }], dp, escludi).god;   /* solo i giorni in forza */
+  return Math.max(0, monteFissoMese(dp,y,m)*fr - (ggPres*fr + fGod)*q);
+}
+/* somma, mese per mese, di max(0, ore rese - ore lavorabili): nessuna compensazione */
+function oreSuppPeriodo(state, dp, pairs, c, escludi, sottoSoglia){
+  const righe=[]; let tot=0;
+  (pairs||[]).forEach(function(pr){
+    if (meseEscluso(escludi, pr.y, pr.m)) return;
+    if (!(meseFrazione(dp, pr.y, pr.m) > 0)) return;
+    const lav  = R2(oreLavorabiliMese(dp, c, pr.y, pr.m, escludi), 3);
+    const rese = R2(totOfRec(getRecFrom(state, pr.y, pr.m, dp.id), pr.y, pr.m), 3);
+    const supp = R2(Math.max(0, rese + (Number(sottoSoglia)||0) - lav), 3);
+    tot += supp;
+    righe.push({ y:pr.y, m:pr.m, lav:lav, rese:rese, supp:supp });
+  });
+  return { ore: R2(tot,3), righe: righe };
+}
 function indetAFine(dp, pairs){
   if(!pairs.length) return tipoNow(dp)!=="determinato";
   const u=pairs[pairs.length-1];
@@ -2744,7 +2796,12 @@ function calcCosto(o){
   const O8 = O6*O2;                                     // ore ordinarie lavorate
   const O11 = o.sottoSoglia||0;
   const G38 = (o.oreManuali>0)? o.oreManuali : 0;
-  const E18 = (G38>0)? ((H2>0)? Math.max(0,(G38-O8+O11*H2))/H2 : 0) : P2*(c.suppPct/100);   /* ver103: con 0 mesi non si divide */
+  /* ver117: con le ore «dai Riepiloghi» le ore in piu' arrivano GIA' sommate mese per mese
+     (`o.suppMensileOre`), senza compensazione. Qui si riportano "al mese" perche' tutto il
+     resto del foglio (H18, J18, H19) lavora su un valore mensile da moltiplicare per H2. */
+  const E18 = (o.suppMensileOre!=null)
+    ? ((H2>0)? o.suppMensileOre/H2 : 0)
+    : ((G38>0)? ((H2>0)? Math.max(0,(G38-O8+O11*H2))/H2 : 0) : P2*(c.suppPct/100));   /* ver103: con 0 mesi non si divide */
   const H18 = E18*(J2 + ((O2>=38)? (K/165*15/100) : (J2*27/100)));
   const J18 = H18*H2;                                   // ore aggiuntive
   const J17 = (o.premiMese||0)*(H2-(o.premiMesiTolti||0));
@@ -2805,6 +2862,11 @@ function calcCosto(o){
 function datiCosto(state, dp, pairs){
   const c = costoComune(state);
   const p = costoPar(dp);
+  /* ver117: serve PRIMA di calcCosto, perche' decide anche se le ore in piu' si contano
+     mese per mese. Stessa espressione di sempre, solo spostata piu' in su. */
+  const scrittoAMano = (p.mesi!=null && p.mesi!=="") || (p.oreSett!=null && p.oreSett!=="") ||
+    (p.livello!=null && p.livello!=="") || (p.minimo!=null && p.minimo!=="") ||
+    (p.addizTD!=null && p.addizTD!=="") || cNum(p.settPeriodo,0)>0 || cNum(p.settLav,0)>0;
   const indet = indetAFine(dp, pairs);
   /* ver112 (05/11/2026). Storia in tre passi, da non rifare a rovescio:
      · ver110 — «se è tutto AN non c'è rapporto»: i mesi tutti AN venivano esclusi da tutto;
@@ -2883,17 +2945,31 @@ function datiCosto(state, dp, pairs){
      sulle ore TEORICHE e mostrava un costo orario calcolato su ore che non esistono.
      Ora la cosa si vede: il risultato diventa "non calcolabile". */
   o.oreMancanti = (o.fonte !== "teoriche") && !(o.oreManuali > 0);
+  /* ver117: le ore in piu', mese per mese. Serve il dettaglio mensile VERO, quindi vale solo
+     con le ore «dai Riepiloghi»: con le ore «a mano» c'e' un numero unico e non si puo' sapere
+     come era distribuito, con le «Teoriche» la stima resta la percentuale. Non vale nemmeno se
+     l'utente ha scritto a mano un valore strutturale (mesi, ore settimanali, livello, minimo,
+     addizionale, settimane della simulazione): in quel caso comanda quello che ha scritto lui,
+     esattamente come prima. */
+  o.suppMensileAttivo = (o.fonte === "riepiloghi") && !scrittoAMano && !!(pairs && pairs.length);
+  o.suppMensileOre = null; o.suppRighe = null; o.suppVecchio = null;
+  if (o.suppMensileAttivo){
+    const sm = oreSuppPeriodo(state, dp, pairs, c, senzaRapp, o.sottoSoglia);
+    o.suppMensileOre = sm.ore; o.suppRighe = sm.righe;
+  }
   o.raw = p;
   o.res = calcCosto(o);
+  /* quanto darebbe il conto VECCHIO (totale del periodo contro totale), per farlo vedere */
+  if (o.suppMensileAttivo){
+    const rv = calcCosto(Object.assign({}, o, { suppMensileOre:null }));
+    o.suppVecchio = R2((Number(rv.E18)||0)*o.mesi, 2);
+  }
 
   /* ===== ver84: se dentro il periodo cambia qualcosa, si calcola a BLOCCHI =====
      Non si taglia quando l'utente ha scritto a mano un valore "strutturale" (mesi, ore
      settimanali, livello, minimo, addizionale, settimane della simulazione) o quando ci sono
      conteggi in mesi che non saprei ripartire (maternità, mesi tolti dal rimborso o dal premio):
      in quei casi vale quello che ha scritto lui, su tutto il periodo, come prima. */
-  const scrittoAMano = (p.mesi!=null && p.mesi!=="") || (p.oreSett!=null && p.oreSett!=="") ||
-    (p.livello!=null && p.livello!=="") || (p.minimo!=null && p.minimo!=="") ||
-    (p.addizTD!=null && p.addizTD!=="") || cNum(p.settPeriodo,0)>0 || cNum(p.settLav,0)>0;
   const contiInMesi = (o.mesiMater>0) || (o.kmMesiTolti>0) || (o.premiMesiTolti>0);
   o.noTaglio = scrittoAMano ? "valori scritti a mano" : (contiInMesi ? "maternità o mesi tolti" : "");
   o.blocchi = null;
@@ -2920,6 +2996,9 @@ function datiCosto(state, dp, pairs){
           indeterminato: indetB,
           addizTD: indetB ? 0 : R2(1.40 + 0.5*prorogheAttiveA(dp, fineB)),
           festGodute: ff.god, festNonGod: ff.non,
+          /* ver117: le ore in piu' del blocco, contate sui SUOI mesi. Senza questo ogni blocco
+             userebbe il totale del periodo e la somma sarebbe moltiplicata. */
+          suppMensileOre: o.suppMensileAttivo ? oreSuppPeriodo(state, dp, b.pairs, c, senzaRapp, o.sottoSoglia).ore : null,
           oreManuali: 0
         });
         return { b:b, ob:ob, liv:livB, indet:indetB, res0: calcCosto(ob) };
@@ -3330,6 +3409,7 @@ function CostoOrario(props){
                     <tr><td style={tdE}>Ore lavorabili sul periodo</td><td style={Object.assign({}, tdV, cifre)}>{fmt2(r.O8)} h</td>
                         <td style={{ padding:"1px 0 1px 8px", fontSize:"13px", color:"#475569" }}>settimane × ore settimanali</td></tr>
                   </tbody></table>
+                  {d.suppMensileAttivo ? <div style={{ fontSize:"12.5px", color:"#475569", lineHeight:1.3, marginTop:"4px" }}>⚠️ Con le ore <b>dai Riepiloghi</b> le <b>ore in più</b> non si contano da qui: si contano <b>mese per mese</b> sul monte contrattuale (riquadro «Le ore in più, mese per mese»). Questa tabellina serve alle ore <b>Teoriche</b> e alla simulazione.</div> : null}
                   {(d.raw.settPeriodo || d.raw.settLav) ?
                     <button className="btn btn-gray" style={{ marginTop:"6px" }}
                       onClick={function(){ setParMulti({ settPeriodo:"", settLav:"" }); }}>↺ Rimetti i valori calcolati</button> : null}
@@ -3398,15 +3478,52 @@ function CostoOrario(props){
                   <div style={{ fontSize:"13px", color:"#475569", lineHeight:1.35, marginTop:"5px" }}>
                     {d.fonte === "teoriche"
                       ? <span>Le ore aggiuntive sono <b>stimate</b>: ore del mese teoriche (<b style={cifre}>{fmt2(r.P2)}</b> h) × <b style={cifre}>{fmt2(c.suppPct)}%</b>.</span>
-                      : <span>Le ore aggiuntive vengono <b>dal dato vero</b>: ore dichiarate (<b style={cifre}>{fmt2(r.H38)}</b> h) meno le ore ordinarie lavorabili (<b style={cifre}>{fmt2(r.O8)}</b> h){(d.sottoSoglia > 0) ? <span>, più le ore perse sotto soglia (<b style={cifre}>{fmt2(d.sottoSoglia * d.mesi)}</b> h)</span> : null}; mai sotto zero.</span>}
+                      : (d.suppMensileAttivo
+                        ? <span>Le ore aggiuntive vengono <b>dal dato vero, mese per mese</b>: in ogni mese le ore rese meno le ore lavorabili <b>di quel mese</b>, mai sotto zero, e poi sommate — così <b>un mese sotto non compensa un mese sopra</b>. Le ore lavorabili del mese sono quelle <b>contrattuali</b> (165 h a 38 h/settimana, in proporzione per gli altri) meno le assenze presunte: <b style={cifre}>{fmt2((c.ferie + c.altriPermessi)/12)}</b> gg fra ferie e permessi ex festività, <b style={cifre}>{fmt2(c.malattiaMese)}</b> gg di malattia e le <b>festività godute</b> del mese{(d.sottoSoglia > 0) ? <span>, più le ore perse sotto soglia (<b style={cifre}>{fmt2(d.sottoSoglia)}</b> h al mese)</span> : null}. Il conto mese per mese è nel riquadro qui sotto.</span>
+                        : <span>Le ore aggiuntive vengono <b>dal dato vero</b>: ore dichiarate (<b style={cifre}>{fmt2(r.H38)}</b> h) meno le ore ordinarie lavorabili (<b style={cifre}>{fmt2(r.O8)}</b> h){(d.sottoSoglia > 0) ? <span>, più le ore perse sotto soglia (<b style={cifre}>{fmt2(d.sottoSoglia * d.mesi)}</b> h)</span> : null}; mai sotto zero.</span>)}
                     {" "}Si pagano con la maggiorazione del <b>{d.oreSett >= 38 ? "15% sul minimo" : "27%"}</b>.
                   </div>
+                  {(d.suppMensileAttivo && d.suppRighe && d.suppRighe.length) ? (
+                    <div style={{ marginTop:"8px", border:"1px solid #d7dde5", borderRadius:"8px", padding:"6px 8px" }}>
+                      <div style={{ fontSize:"14.5px", fontWeight:800, color:"#1f4e82", marginBottom:"3px" }}>Le ore in più, mese per mese</div>
+                      <table style={{ width:"100%", borderCollapse:"collapse", fontSize:"13.5px" }}><tbody>
+                        <tr style={{ fontWeight:800, color:"#1f4e82" }}>
+                          <td style={{ padding:"1px 6px 1px 0" }}>Mese</td>
+                          <td style={{ padding:"1px 6px", textAlign:"right" }}>Lavorabili</td>
+                          <td style={{ padding:"1px 6px", textAlign:"right" }}>Rese</td>
+                          <td style={{ padding:"1px 0", textAlign:"right" }}>In più</td>
+                        </tr>
+                        {d.suppRighe.map(function(rr){
+                          return (
+                            <tr key={"sm" + rr.y + "-" + rr.m} style={{ borderTop:"1px dotted #e2e8f0" }}>
+                              <td style={{ padding:"1px 6px 1px 0" }}>{mLabelY(rr.y, rr.m)}</td>
+                              <td style={Object.assign({ padding:"1px 6px", textAlign:"right" }, cifre)}>{fmt2(rr.lav)}</td>
+                              <td style={Object.assign({ padding:"1px 6px", textAlign:"right" }, cifre)}>{fmt2(rr.rese)}</td>
+                              <td style={Object.assign({ padding:"1px 0", textAlign:"right", fontWeight: rr.supp > 0 ? 800 : 400, color: rr.supp > 0 ? "#b45309" : "#64748b" }, cifre)}>{fmt2(rr.supp)}</td>
+                            </tr>
+                          );
+                        })}
+                        <tr style={{ borderTop:"1px solid #cbd5e1", fontWeight:800 }}>
+                          <td style={{ padding:"2px 6px 2px 0" }}>Totale</td>
+                          <td style={Object.assign({ padding:"2px 6px", textAlign:"right" }, cifre)}>{fmt2(d.suppRighe.reduce(function(a,x){ return a + x.lav; }, 0))}</td>
+                          <td style={Object.assign({ padding:"2px 6px", textAlign:"right" }, cifre)}>{fmt2(d.suppRighe.reduce(function(a,x){ return a + x.rese; }, 0))}</td>
+                          <td style={Object.assign({ padding:"2px 0", textAlign:"right" }, cifre)}>{fmt2(d.suppMensileOre)}</td>
+                        </tr>
+                      </tbody></table>
+                      {(!d.blocchi && d.suppVecchio != null) ? <div style={{ fontSize:"12.5px", color:"#475569", lineHeight:1.3, marginTop:"4px" }}>Con il conto vecchio (totale del periodo contro totale) sarebbero <b style={cifre}>{fmt2(d.suppVecchio)}</b> h: la differenza è la <b>compensazione fra i mesi</b>, che ora non c'è più.</div> : null}
+                    </div>
+                  ) : null}
                 </div> : null}
 
               {d.blocchi ? (
                 <div style={blocco}>
                   <div style={capo}>Come si divide il periodo</div>
                   <div style={{ fontSize:"13px", color:"#475569", lineHeight:1.35, marginBottom:"6px" }}>Dentro il periodo che hai scelto è cambiato qualcosa (livello, ore settimanali, tipo di contratto o una proroga): il conto è stato fatto <b>a pezzi</b> e poi sommato. La <b>formazione</b> ({fmt2(d.formazTot)} €) è contata <b>una volta sola</b>{d.fonte === "mano" ? ", e le ore scritte a mano sono state divise in proporzione alle ore di ciascun pezzo" : ""}.</div>
+                  {/* ver117 (06/11/2026, Christian: «3, sistema»): difetto PREESISTENTE. Questa
+                      tabella ha SETTE colonne e a 390px non ci sta: spingeva la pagina a 429px e
+                      il Costo orario scorreva di lato. Ora scorre lei dentro il suo riquadro,
+                      come fa da sempre la griglia del mese. Solo aspetto. */}
+                  <div className="co-scroll" style={{ overflowX:"auto", maxWidth:"100%" }}>
                   <table style={{ width:"100%", borderCollapse:"collapse", fontSize:"13.5px" }}><tbody>
                     <tr style={{ fontWeight:800, color:"#1f4e82" }}>
                       <td style={{ padding:"1px 6px 1px 0" }}>Periodo</td>
@@ -3431,6 +3548,7 @@ function CostoOrario(props){
                       );
                     })}
                   </tbody></table>
+                  </div>
                 </div>
               ) : ((d.noTaglio && d.tagliPossibili > 1) ? (
                 <div style={{ background:"#FFF8E1", border:"1px solid #EAC87A", borderRadius:"8px", padding:"7px 10px", marginBottom:"6px", fontSize:"13px", lineHeight:1.35 }}>⚠️ In questo periodo qualcosa cambia (si dividerebbe in <b>{d.tagliPossibili}</b> pezzi), ma il conto è su <b>un pezzo solo</b> perché ci sono <b>{d.noTaglio}</b>. Per il conto preciso svuota quelle caselle, oppure calcola i periodi separatamente.</div>
@@ -3568,7 +3686,7 @@ function Anagrafica(props){
       <div style={{ background:"#f8fafc", border:"1px dashed #94a3b8", borderRadius:"10px", padding:"10px 14px", marginBottom:"12px", fontSize:"13px", color:"#334155", lineHeight:"1.5" }}>
         <b>Come si usa:</b> 1) scegli una persona nell'elenco a sinistra · 2) compila i campi <span style={{ background:"#fffde7", border:"1px solid #f59e0b", borderRadius:"4px", padding:"0 5px", fontWeight:700 }}>giallini</span> (sono quelli modificabili) · 3) premi <b>💾 Salva</b> · 4) crea i documenti con i pulsanti <b>📄 Contratto / Proroga / Trasformazione</b> in alto a destra. Le <b>proroghe</b> e le <b>trasformazioni</b> si aggiungono in fondo a questa scheda, nel riquadro viola <b>Trasformaz./proroghe</b>.
       </div>
-      <div style={{ display:"flex", gap:"14px", alignItems:"flex-start" }}>
+      <div className="ana-wrap" style={{ display:"flex", gap:"14px", alignItems:"flex-start" }}>
         <div style={{ minWidth:"210px", display:"flex", flexDirection:"column", gap:"4px" }}>
           {dips.map(function(x){ return (
             <button key={x.id} onClick={function(){ setSelId(x.id); setMsg(""); }}
@@ -3577,11 +3695,11 @@ function Anagrafica(props){
             </button>
           ); })}
         </div>
-        <div style={{ flex:1, background:"#fff", border:"2px solid #94a3b8", borderRadius:"12px", padding:"14px" }}>
+        <div className="ana-sheet" style={{ flex:1, background:"#fff", border:"2px solid #94a3b8", borderRadius:"12px", padding:"14px" }}>
           <div style={{ display:"flex", alignItems:"center", gap:"10px", marginBottom:"12px", flexWrap:"wrap" }}>
             <div style={{ fontSize:"18px", fontWeight:800, color:"#1f4e82" }}><span style={{ display:"inline-block", width:"14px", height:"14px", borderRadius:"4px", background:(dp.colore||"#94a3b8"), border:"1px solid rgba(0,0,0,.25)", marginRight:"7px", verticalAlign:"-1px" }}></span>{dp.nome}</div>
             <div className="spacer"></div>
-            <div style={{ display:"flex", alignItems:"center", gap:"8px", background:"#eef5fc", border:"1px solid #b9d5f1", borderRadius:"10px", padding:"6px 10px" }}>
+            <div className="ana-gen" style={{ display:"flex", alignItems:"center", gap:"8px", background:"#eef5fc", border:"1px solid #b9d5f1", borderRadius:"10px", padding:"6px 10px" }}>
               <span style={{ fontSize:"12px", fontWeight:800, color:"#1e3a8a", whiteSpace:"nowrap" }}>Genera documento:</span>
               <button className="btn btn-blue" onClick={genera} title="Genera il contratto .docx identico al modello, con i dati di questa scheda">📄 Contratto</button>
               <button className="btn btn-blue" onClick={generaPro} title="Genera la lettera di proroga .docx (richiede almeno una proroga nella scheda)">📄 Proroga</button>
