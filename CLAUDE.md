@@ -422,6 +422,40 @@ Banca ore, tetto annuo, contratti e export.
     conto ora guarda davvero il mese, non una media.
   - **Provato in esecuzione** (`supp118.cjs`): 3 casi + **2 controlli su 2** del confronto col
     Tabellone. **Zero errori di pagina.**
+  - **Non regressione**: `supp118b` (24/24: con le ore a mano, le Teoriche e i valori scritti a
+    mano i numeri sono **identici alla ver117**), vm-A (21), vm-B (14), vm-C (15), vm-D (7), i
+    **60 controlli delle aliquote**, il fondo TFR (12), la casella «Anni» (10), l'ISTAT (7),
+    l'avviso giallo (6), il registro delle formule (9) e la finestra del periodo — **tutti
+    superati, zero errori di pagina**. ⚠️ Negli script di TFR/ISTAT/«Anni» gli attesi della
+    **rivalutazione stimata** sono stati aggiornati (17,32 → **15,27 €**): la stima si calcola
+    sulla base TFR, che comprende le ore in più, e quelle ora sono di meno. Non è una
+    regressione, è la conseguenza voluta.
+  - ⚠️🔴 **IL LIMITE CHE HA VISTO CHRISTIAN SUBITO, MISURATO** («ho timore a utilizzare le vere ore
+    del tabellone: se uno non fa mai ferie in un anno magari mi tradisce il costo orario»).
+    **Ha ragione, ed è il 10%.** Due persone **identiche** (38 h/sett., stesso stipendio, stesso
+    ritmo), una si prende le 30 giornate di ferie e l'altra nessuna, anno 2026:
+    | | chi FA le ferie | chi NON le fa | scarto |
+    |---|--:|--:|--:|
+    | **ver117** (assenze presunte) | 19,30 €/h | 18,89 €/h | **−2,1%** |
+    | **ver118** (assenze vere) | **18,08 €/h** | **16,29 €/h** | **−9,9%** |
+    - **Perché**: il costo è lo stesso (lo stipendio non cambia), ma chi non va in ferie
+      **rende 190,4 ore in più** (30 gg × 6,346 h) e il costo si divide per quelle. Quelle ore
+      però sono un **debito**: o le godrà dopo (e allora in quel periodo renderà di meno), o
+      andranno pagate. Nella ver117 il difetto c'era lo stesso, ma era **in parte nascosto**
+      dalle ore in più inventate dai numeri presunti: due errori che si compensavano a metà.
+    - 🧮 **Verifica del perché** (conto a mano, **non ancora nell'app**): dividendo il costo di
+      chi non fa ferie per le ore **al netto delle 190,4 non godute** si ottiene **18,09 €/h**,
+      cioè lo stesso numero dell'altro. È la conferma che la causa sono le ferie non godute.
+    - **Tre strade, da decidere con Christian** (nessuna fatta):
+      1. **solo un avviso**, quando le ferie godute nel periodo sono molto meno di quelle
+         maturate: «ne risultano godute X su Y maturate; il costo orario qui è più basso del vero
+         di circa N%». Non tocca nessun numero;
+      2. **togliere dalle ore** le ferie maturate e non godute del periodo: il €/h torna uguale
+         per tutti. ⚠️ cambia il numero che si usa in rendicontazione;
+      3. **tornare alle assenze presunte**: misurato, nasconde il problema solo a metà (−2,1%) e
+         in cambio inventa ore in più a chi le ferie se le prende (fino a 112 h in un anno).
+    - ⚠️ **Nulla è pubblicato**: `main` porta ancora la **ver116**. Le ver117 e ver118 stanno solo
+      sul ramo di lavoro.
 - 🧮 **LE ORE IN PIÙ SI CONTANO MESE PER MESE, E SUL MONTE CONTRATTUALE** (ver117, 06/11/2026).
   Chiude insieme i due punti rimasti del 05/11 sera, confermati da Christian il 06/11 («1 e 2
   confermo») con **la sua definizione delle ore lavorabili**: «le ore lavorabili sono quelle
