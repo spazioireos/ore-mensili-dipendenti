@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver127 · 06nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver128 · 06nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -112,8 +112,8 @@ Banca ore, tetto annuo, contratti e export.
   Funzioni: `calcCosto(o)` (il motore, specchio delle celle J5…J35/F38/H38 del foglio),
   `datiCosto(state,dp,pairs)` (mette insieme scheda + valori comuni + scostamenti),
   `mesiInPeriodo`, `oreRendPeriodo`, `addizTDAuto`, `oreSettPeriodo`, `indetAFine`,
-  componente **`CostoOrario`**. Tabelle `MINIMI_CCNL` (Ott25/Ott24, livelli B1→E2) e
-  `COSTO_COMUNE_DEF`.
+  componente **`CostoOrario`**. Tabelle `MINIMI_CCNL` (dalla **ver128**: Feb24/Ott24/Ott25, **13
+  livelli** A1→F2, scelte **per data**), `SCATTI_CCNL` e `COSTO_COMUNE_DEF`.
   - **Dati**: `state.costoComune` (valori uguali per tutti) e `dp.costo` (scostamenti della
     singola persona). **Nessun calcolo preesistente è stato toccato**: il costo orario legge e
     basta (ore dei mesi con lo stesso `totOfRec` dei Riepiloghi, contratto dalla scheda).
@@ -259,7 +259,7 @@ Banca ore, tetto annuo, contratti e export.
     tendina sta su *secco*. ⚠️ Il cambio è stato **chiesto da Christian** («cambia pure la parola
     Rimborso»), non fatto di iniziativa: le diciture restano sue.
 - 🎓 **IL LIVELLO SEGUE LE TRASFORMAZIONI** (ver82, 04/11/2026, difetto segnalato da Christian:
-  «Boccalari fu assunta a livello D1, poi cambiò, ma nel costo orario lascia D1 come
+  «una dipendente fu assunta a livello D1, poi cambiò, ma nel costo orario lascia D1 come
   riferimento»). `datiCosto` ricavava il livello da **`dp.livello`**, cioè quello di
   **assunzione**: chi veniva promosso restava al livello vecchio, con il **minimo tabellare
   sbagliato**. Ora c'è **`livelloPeriodo(dp, pairs)`**, gemella di `oreSettPeriodo`: prende il
@@ -384,6 +384,80 @@ Banca ore, tetto annuo, contratti e export.
     «— ore» e «non calcolabile»; la stessa persona su «Teoriche» → 18,67 €/h; e il **foglio Excel
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
+
+- 📊 **IL CCNL HA TRE TRANCHE E GLI SCATTI SI CONTANO DA SOLI** (ver128, 06/11/2026).
+  Christian: «su periodi lunghi potrebbe essere cambiato l'importo da corrispondere, per esempio
+  per ccnl rinnovato» → poi ha mandato la tabella ufficiale **AUMENTI RETRIBUTIVI** e quella
+  degli **scatti**, con «produci lavoro con tabellari e scatti», «**scatti sono fissi**» e
+  «nessun arretrato / una tantum per i mesi fra la decorrenza e la firma».
+  - **`MINIMI_CCNL` ha ora TRE tabelle** — **Feb24 · Ott24 · Ott25** — e **tutti i 13 livelli**
+    (A1, A2, B1, C1, C2, C3, D1, D2, D3, E1, E2, F1, F2). Prima erano **due** tabelle e **sei**
+    livelli. ⚠️ **Due valori erano sbagliati di un centesimo** e sono stati corretti sulla
+    tabella ufficiale: **B1 Ott25** 1.436,78 → **1.436,79** · **E1 Ott25** 1.839,16 →
+    **1.839,15**. Gli altri dieci coincidevano.
+    ⚠️ **C3 e D1 hanno lo stesso tabellare**, e così **D3 ed E1**: è scritto così nel CCNL.
+  - **`MINIMI_DAL`** (feb 2024 · ott 2024 · ott 2025) e **`tabellaAl(y, m)`**: il minimo si prende
+    **mese per mese**. ⚠️ Prima del 02/2024 l'app non ha la tabella vecchia e usa la Feb24: oggi
+    non capita, i dati partono dal 2025.
+  - **`SCATTI_CCNL`** (valori mensili a **tempo pieno**, per livello), **`SCATTI_MAX` = 5** e
+    **`SCATTI_MESI` = 24**. **`scattiAl(state, dp, y, m, prec)`** conta i **mesi utili
+    dall'assunzione** fino al mese precedente: un **mese tutto «AN» non è utile** e fa slittare la
+    maturazione (regola di Christian), riconosciuto con **`meseTuttoAN`**, la funzione della
+    ver112. `n = min(5, floor(utili / 24))`.
+  - 🧩 **`firmaMese` guarda anche la tabella e il numero di scatti**, quindi il periodo **si
+    taglia da solo** al rinnovo e a ogni scatto, col meccanismo della ver84. `firmaMese` e
+    `blocchiPeriodo` prendono ora **`state`** come primo parametro e un oggetto **`fisso`**
+    (`{tab, scatti, prec}`): le dimensioni **scritte a mano non fanno più tagliare**, perché lì il
+    valore è uguale dappertutto. Nel riquadro «Come si divide il periodo» ci sono due colonne
+    nuove, **Tab.** e **Scatti**.
+  - **Le tendine hanno «automatica (per data)» in cima**, ed è il **predefinito**
+    (`COSTO_COMUNE_DEF.tabella` da `"Ott25"` a **`"auto"`**). Forzandone una, vale su tutto il
+    periodo e l'aiutino lo dice. ⚠️ **Se nei valori comuni c'è già un `tabella` salvato prevale
+    quello**: va rimesso su «automatica» a mano — stesso meccanismo dell'ISTAT in ver116.
+  - **La casella «Scatti di anzianità €» si compila da sola** e l'aiutino dice il conto per
+    esteso: «5 scatti × 20,66 € = 103,30 € (uno ogni 24 mesi utili, massimo 5)». Scrivendo un
+    importo a mano vince quello, come prima.
+  - **Casella nuova «Scatti già maturati al 31/12/2024»** (`dp.costo.scattiPrec`), chiesta da
+    Christian: «metti una casella come hai fatto per le ferie». Compare **solo** per chi è stato
+    assunto **prima** dell'inizio dei dati, e la data la scrive l'app. Da lì in poi conta i mesi
+    utili veri e aggiunge uno scatto ogni 24. ⚠️ **Limite dichiarato**: a quella data non si sa a
+    che punto fosse il biennio in corso, quindi il prossimo scatto può arrivare fino a 23 mesi
+    più tardi del vero; lasciando la casella **vuota** l'app stima da sé contando tutti i mesi
+    dall'assunzione (nessun mese AN prima dei dati) e quel problema non c'è.
+  - 🔴 **VERIFICA SUI DATI VERI, ed è la cosa più forte**: Christian aveva detto quali quattro
+    persone hanno gli scatti. Contando da sola sul backup del 04/11, l'app ne trova **tre delle
+    quattro** (5 scatti su 132 mesi · 1 su 46 · 1 su 38) e **nessuno in più**. ⚠️ **La quarta non
+    torna**: assunta il 07/01/2025, a dicembre 2026 ha **23 mesi** e il primo scatto le
+    maturerebbe a **gennaio 2027**. **Da chiarire con Christian** (anzianità riconosciuta da
+    prima? data sbagliata?).
+  - **Misurato in esecuzione** (D1 30 h/sett., assunta 01/03/2025, periodo **marzo 2025 →
+    novembre 2026**, a cavallo del rinnovo):
+    | | costo totale | €/h |
+    |---|--:|--:|
+    | ver127 (tabella unica Ott25) | 51.872,07 € | 16,25 |
+    | **ver128** (Ott24 fino a settembre 2025, poi Ott25) | **51.546,57 €** | **16,15** |
+    **−325,50 €**, cioè esattamente la stima fatta prima di costruire. Il periodo si divide in
+    **Marzo→Settembre 2025 (Ott24)** e **Ottobre 2025→Novembre 2026 (Ott25)**.
+    ⚠️ **Sui periodi dentro un solo CCNL non cambia un centesimo.**
+  - ⚠️ **Gli scatti fanno SALIRE il costo di chi ha anzianità**: 5 scatti valgono **103,30 €/mese**
+    a tempo pieno su un D1, cioè **978,63 €/anno** su un part-time a 30 h/sett. Sui dati veri
+    **15 dipendenti su 16 avevano gli scatti a zero**: non era un valore giusto, era un valore
+    **mancante**.
+  - **Provato in esecuzione** (`ccnl128.cjs`), **14 controlli su 14**, zero errori di pagina: la
+    tendina dice «automatica»; il periodo si taglia al rinnovo e i due pezzi usano Ott24 e Ott25;
+    2 scatti a 69 mesi e 5 (il massimo) con molta anzianità; nessuna casella pregressa per chi è
+    assunto dopo l'inizio dei dati; 12 mesi tutti AN fanno scendere lo scatto da 1 a 0; la
+    casella pregressa cambia il conto; forzando Ott24 il mensile diventa 1.267,89 €.
+  - 🏷️ **L'etichetta delle ferie dice ora la data** (richiesta di Christian: «devi dirmi entro
+    che data, così capisco»): non più «Giornate di ferie residue da anni precedenti» ma
+    **«Giornate di ferie residue al 31/12/2024»**, con la data calcolata dall'app.
+  - 🔴 **REGOLA 10.1 APPLICATA ANCHE A QUESTO FILE** (06/11/2026): scrivendo questa scheda il
+    controllo automatico ha **bloccato** un testo che conteneva **cognomi di dipendenti**. Ha
+    fatto bene: `CLAUDE.md` sta in un **repository pubblico**, esattamente come `index.html`.
+    Erano già presenti **tre cognomi** (schede ver82, ver111 e ver124), ora sostituiti con «una
+    dipendente». ⚠️ **Da qui in avanti: nessun nome di persona reale in CLAUDE.md, in master.md
+    e in qualunque file del repository.** I casi veri si descrivono senza nome.
+    ⚠️ **Toglierli ora non li toglie dai commit vecchi**: restano leggibili nella storia.
 
 - 📒 **IL SALDO FERIE SI CONTA DALL'ASSUNZIONE, NON DAL PERIODO SCELTO** (ver127, 06/11/2026).
   Christian, guardando la casella della ver125: «quindi perché farmi inserire per tutti le ferie
@@ -557,7 +631,7 @@ Banca ore, tetto annuo, contratti e export.
     mensile finale. **Zero errori di pagina.**
 
 - 🐣 **LA DOMENICA DI PASQUA NON È UNA FESTIVITÀ: TOLTA DALL'ELENCO** (ver124, 06/11/2026,
-  difetto **trovato da Christian** guardando un caso vero: «per Boccalari intendo dire che nel
+  difetto **trovato da Christian** guardando un caso vero: «per [una dipendente] intendo dire che nel
   periodo gen26-ott26 mi hai messo due festivi non goduti» → poi «1, togli pasqua - 2, e' festivo
   e va tenuto»).
   - **Il difetto**: `festivitaSet` metteva nell'elenco **sia la domenica di Pasqua sia il Lunedì
@@ -580,7 +654,7 @@ Banca ore, tetto annuo, contratti e export.
     | **ver124** | **3** | **188,95 €** | **17,17** |
     Le festività **godute restano 11**, identiche. Sul periodo gen→ott i non goduti passano da
     **2 a 1**.
-  - 🔴 **Sui dati VERI di Christian** (BOCCALARI, gen→ott 2026, dal backup del 04/11):
+  - 🔴 **Sui dati VERI di Christian** (una dipendente, gen→ott 2026, dal backup del 04/11):
     *Festività non godute* **62,96 € → 31,48 €**, costo totale **14.467,76 € → 14.427,24 €**,
     **20,47 → 20,41 €/h**. ⚠️ Il costo scende di **40,52 €**, più dei 31,48 della voce: le
     festività non godute entrano nell'**imponibile I** (`L15`), quindi si portano dietro anche i
@@ -1083,7 +1157,7 @@ Banca ore, tetto annuo, contratti e export.
   |---|---|---|
   | **ver109** | — | il mese tutto AN contava come un mese normale |
   | **ver110** | «se è tutto AN non c'è rapporto» | escluso da tutto |
-  | **ver111** | «Frutaz ma anche altri hanno magari AN su un mese ma il rapporto va avanti, mica si ferma» | solo segnalato, contato normalmente |
+  | **ver111** | «una dipendente, ma anche altri, ha magari AN su un mese ma il rapporto va avanti, mica si ferma» | solo segnalato, contato normalmente |
   | **ver112** | «il rapporto va avanti nel senso che riprenderanno a lavorare, in quanto indeterminate» + alla domanda se in quei mesi prendono lo stipendio: **«NO, non sono pagati»** | **non pagato**, ma il rapporto resta in piedi |
   È il **part-time verticale ciclico**: la persona è assunta a tempo indeterminato e riprenderà a
   lavorare, ma nei mesi fermi non esce la busta paga.

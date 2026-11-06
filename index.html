@@ -313,7 +313,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver127";
+const APP_VER = "ver128";
 const APP_DATA = "06nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -2571,15 +2571,42 @@ function SchedaContratto(props){
      (nel foglio Excel era legata all'addizionale: qui e' legata al tipo di contratto);
    - mesi contati INTERI (prudenziale) anche se il contratto inizia o finisce a meta' mese. */
 
+/* ver128 (06/11/2026): le TRE tranche del rinnovo CCNL e tutti i 13 livelli, dalla tabella
+   ufficiale «AUMENTI RETRIBUTIVI» mandata da Christian. Prima c'erano solo 6 livelli e due
+   tabelle, e due valori erano sbagliati di un centesimo (B1 Ott25 1436,78 -> 1436,79;
+   E1 Ott25 1839,16 -> 1839,15): corretti sulla tabella, che e' la fonte.
+   ⚠️ C3 e D1 hanno lo stesso tabellare, e cosi' D3 ed E1: e' giusto, e' scritto cosi' nella
+   tabella del CCNL. */
 const MINIMI_CCNL = {
-  "Ott25": { "B1":1436.78, "C1":1545.21, "D1":1637.57, "D2":1727.83, "E1":1839.16, "E2":1985.42 },
-  "Ott24": { "B1":1408.89, "C1":1515.21, "D1":1605.99, "D2":1694.41, "E1":1803.62, "E2":1947.00 }
+  "Feb24": { "A1":1307.22,"A2":1319.37,"B1":1381.00,"C1":1485.21,"C2":1529.48,"C3":1574.41,"D1":1574.41,"D2":1660.99,"D3":1768.09,"E1":1768.09,"E2":1908.58,"F1":2107.81,"F2":2407.25 },
+  "Ott24": { "A1":1333.54,"A2":1345.95,"B1":1408.89,"C1":1515.21,"C2":1560.27,"C3":1605.99,"D1":1605.99,"D2":1694.41,"D3":1803.62,"E1":1803.62,"E2":1947.00,"F1":2150.18,"F2":2455.67 },
+  "Ott25": { "A1":1359.85,"A2":1372.53,"B1":1436.79,"C1":1545.21,"C2":1591.06,"C3":1637.57,"D1":1637.57,"D2":1727.83,"D3":1839.15,"E1":1839.15,"E2":1985.42,"F1":2192.54,"F2":2504.09 }
 };
-const LIV_CCNL = ["B1","C1","D1","D2","E1","E2"];
-const TAB_CCNL = ["Ott25","Ott24"];
+/* da quale mese vale ogni tabella: anno*100 + mese */
+const MINIMI_DAL = { "Feb24":202402, "Ott24":202410, "Ott25":202510 };
+/* La tabella in vigore in un dato mese. ⚠️ Prima del 02/2024 l'app non ha la tabella vecchia:
+   usa la Feb24 e lo dice. Oggi non succede, i dati partono dal 2025. */
+function tabellaAl(y, m){
+  const n = y*100 + m;
+  let best = "Feb24";
+  Object.keys(MINIMI_DAL).forEach(function(k){
+    if (MINIMI_DAL[k] <= n && MINIMI_DAL[k] >= MINIMI_DAL[best]) best = k;
+  });
+  return best;
+}
+/* ver128: SCATTI DI ANZIANITA'. Valori mensili a TEMPO PIENO, per livello, dati da Christian
+   il 06/11/2026. ⚠️ «scatti sono fissi»: non cambiano con le tranche del rinnovo.
+   Regola, parole sue: «ogni due anni, ma slittano se c'e' stato un mese tutto di AN (vuoto).
+   Massimo 5 scatti.» */
+const SCATTI_CCNL = { "A1":11.62,"A2":13.43,"B1":16.27,"C1":18.59,"C2":19.63,"C3":20.66,"D1":20.66,"D2":23.24,"D3":26.86,"E1":26.86,"E2":31.50,"F1":39.51,"F2":46.48 };
+const SCATTI_MAX = 5;
+const SCATTI_MESI = 24;
+const LIV_CCNL = ["A1","A2","B1","C1","C2","C3","D1","D2","D3","E1","E2","F1","F2"];
+const TAB_CCNL = ["Ott25","Ott24","Feb24"];
 
 const COSTO_COMUNE_DEF = {
-  tabella:"Ott25", ggSett:6, quattordic:50, ferie:30, festNonGod:3, festGodute:11,
+  /* ver128: «auto» = la tabella la sceglie l'app in base al mese. Forzarne una vale su tutto. */
+  tabella:"auto", ggSett:6, quattordic:50, ferie:30, festNonGod:3, festGodute:11,
   festNonGodCoef:1, malattiaMese:2, integrMater:20, altriPermessi:0, suppPct:10,
   /* ver115 (06/11/2026): «Anni per rivalutazione TFR» scende da 2 a 1, scelta di Christian.
      ⚠️ È solo il valore DI PARTENZA: se nei valori comuni c'è già un numero salvato, quello resta. */
@@ -2915,15 +2942,60 @@ function addizTDAuto(dp, pairs){
    qualcosa che pesa sul costo: livello, ore settimanali, passaggio a indeterminato, oppure
    entra in vigore una proroga (addizionale che sale). Richiesta di Christian del 04/11/2026:
    «non puoi tu automaticamente dividere i periodi con trasformazioni in più blocchi?». */
-function firmaMese(dp, y, m){
+/* ver128: quanti SCATTI sono maturati all'inizio del mese (y,m).
+   Si contano i mesi utili dall'assunzione fino al mese PRECEDENTE: un mese tutto «AN» non e'
+   utile e fa slittare la maturazione (regola di Christian). Massimo 5.
+   ⚠️ Prima del primo mese che l'app conosce non si puo' sapere se ci furono mesi tutti AN:
+   quei mesi si contano tutti come utili, e `stimati` lo segnala. */
+function scattiAl(state, dp, y, m, prec){
+  const ass = ymdIt(dp && dp.dataAssunzione);
+  const pd = primoMeseDati(state);
+  const pdN = pd ? (pd.y*100 + pd.m) : null;
+  const fino = y*100 + m;                       // esclusivo: si conta fino al mese prima
+  const aY = ass ? Math.floor(ass/10000) : 0, aM = ass ? Math.floor((ass%10000)/100) : 0;
+  const daAss = ass ? (aY*100 + aM) : null;
+  /* ci sono mesi PRIMA dei dati? (o manca la data di assunzione) */
+  const primaDeiDati = (!ass) || (pdN != null && daAss < pdN);
+  /* ver128: se l'utente ha scritto quanti scatti erano gia' maturati alla data in cui i dati
+     cominciano, si parte da quel numero e si contano solo i mesi che l'app vede davvero.
+     ⚠️ Non si sa a che punto fosse il biennio in corso a quella data: il prossimo scatto puo'
+     arrivare fino a 23 mesi piu' tardi del vero. E' scritto a video. */
+  const usaCasella = primaDeiDati && (prec != null) && (prec !== "") && !isNaN(Number(prec));
+  let cy, cm, base = 0;
+  if (usaCasella){ base = Math.max(0, Math.floor(Number(prec))); cy = pd.y; cm = pd.m; }
+  else if (ass){ cy = aY; cm = aM; }
+  else if (pd){ cy = pd.y; cm = pd.m; }
+  else return { n:0, utili:0, stimati:0, senzaAssunzione:!ass, primaDeiDati:primaDeiDati, daCasella:false };
+  if ((cy*100 + cm) >= fino)
+    return { n: Math.min(SCATTI_MAX, base), utili:0, stimati:0, senzaAssunzione:!ass, primaDeiDati:primaDeiDati, daCasella:usaCasella };
+  let utili = 0, stimati = 0, guard = 0;
+  while ((cy*100 + cm) < fino && guard < 1200){
+    const n = cy*100 + cm;
+    if (pdN != null && n < pdN){ utili++; stimati++; }      /* prima dei dati: si conta tutto */
+    else if (!meseTuttoAN(state, dp, cy, cm)) utili++;
+    cm++; if (cm > 12){ cm = 1; cy++; }
+    guard++;
+  }
+  return { n: Math.min(SCATTI_MAX, base + Math.floor(utili / SCATTI_MESI)),
+           utili:utili, stimati:stimati, senzaAssunzione:!ass,
+           primaDeiDati:primaDeiDati, daCasella:usaCasella };
+}
+function firmaMese(state, dp, y, m, fisso){
   const v = valoriAt(dp, y, m);
   const np = prorogheAttiveA(dp, y*10000 + m*100 + daysInMonth(y, m));
-  return [String(v.livello==null?"":v.livello).toUpperCase().trim(), String(v.oreSett), String(v.tipo), String(np)].join("|");
+  /* ver128: anche la TABELLA CCNL in vigore e il numero di SCATTI maturati fanno parte della
+     firma, cosi' il periodo si taglia da solo al rinnovo e a ogni scatto. */
+  /* `fisso` dice quali dimensioni l'utente ha scritto a mano: quelle NON fanno piu' tagliare
+     il periodo, perche' il suo valore vale uguale dappertutto. */
+  const f = fisso || {};
+  return [String(v.livello==null?"":v.livello).toUpperCase().trim(), String(v.oreSett), String(v.tipo), String(np),
+          f.tab ? "-" : tabellaAl(y, m),
+          f.scatti ? "-" : String(scattiAl(state, dp, y, m, (f.prec != null ? f.prec : null)).n)].join("|");
 }
-function blocchiPeriodo(dp, pairs){
+function blocchiPeriodo(state, dp, pairs, fisso){
   const out = [];
   (pairs||[]).forEach(function(pr){
-    const f = firmaMese(dp, pr.y, pr.m);
+    const f = firmaMese(state, dp, pr.y, pr.m, fisso);
     const u = out.length ? out[out.length-1] : null;
     if (u && u.firma === f) u.pairs.push(pr); else out.push({ firma:f, pairs:[pr] });
   });
@@ -3088,16 +3160,39 @@ function datiCosto(state, dp, pairs){
   const mesiRapportoAuto = mesiInPeriodo(dp, pairs);
   const mesiANlabel = Object.keys(senzaRapp).map(function(k){ const p=k.split("-"); return mLabelY(parseInt(p[0],10), parseInt(p[1],10)); }).join(", ");
   const oreSettAuto = oreSettPeriodo(dp, pairs);
-  const tab = p.tabella || c.tabella;
+  /* ver128: la tabella CCNL si sceglie DA SOLA in base al mese; «auto» (o vuoto) = automatica.
+     Se l'utente ne forza una, quella vale su tutto il periodo, come prima. */
+  const ultimoPr = (pairs && pairs.length) ? pairs[pairs.length-1] : null;
+  const tabScritta = (p.tabella && p.tabella !== "auto") ? p.tabella
+                   : ((c.tabella && c.tabella !== "auto") ? c.tabella : "");
+  const tabAuto = ultimoPr ? tabellaAl(ultimoPr.y, ultimoPr.m) : "Ott25";
+  const tab = tabScritta || tabAuto;
   const livAuto = (function(){ const l=String(livelloPeriodo(dp, pairs)||"").toUpperCase().trim(); return MINIMI_CCNL[tab] && MINIMI_CCNL[tab][l] ? l : ""; })();
   const liv = p.livello!=null && p.livello!=="" ? p.livello : livAuto;
   const minimoAuto = (MINIMI_CCNL[tab] && MINIMI_CCNL[tab][liv]) ? MINIMI_CCNL[tab][liv] : 0;
+  /* ver128: gli SCATTI si contano da soli dall'assunzione, uno ogni 24 mesi utili, massimo 5.
+     Il valore e' quello del livello, a tempo pieno (come il minimo). */
+  const scattiPrecRaw = (p.scattiPrec != null && String(p.scattiPrec).trim() !== "") ? cNum(p.scattiPrec, 0) : null;
+  const scattiInfo = ultimoPr ? scattiAl(state, dp, ultimoPr.y, ultimoPr.m, scattiPrecRaw)
+                              : { n:0, utili:0, stimati:0, senzaAssunzione:!ymdIt(dp && dp.dataAssunzione), primaDeiDati:true, daCasella:false };
+  const scattiValore = SCATTI_CCNL[liv] || 0;
+  const scattiAuto = R2(scattiValore * scattiInfo.n, 2);
+  const scattiAMano = (p.scatti != null && String(p.scatti) !== "");
   const addizAuto = addizTDAuto(dp, pairs);
   const nProroghe = prorogheAttiveA(dp, fineRapportoYmd(dp, pairs));   // ver83/ver110: quelle gia' partite, entro la fine del rapporto
   const oreDaRiep = oreRendPeriodo(state, dp, pairs);
   const ff = contaFestivita(pairs, dp, senzaRapp);   /* ver109; ver112: i mesi non pagati non portano festività */
   const o = {
     com:c, indeterminato:indet, tab:tab, liv:liv,
+    /* ver128: tabella CCNL automatica e scatti automatici */
+    tabAuto: tabAuto, tabScritta: tabScritta,
+    scattiInfo: scattiInfo, scattiValore: scattiValore, scattiAuto: scattiAuto, scattiAMano: scattiAMano,
+    /* la data a cui si riferiscono le caselle «al …»: il giorno prima del primo mese dei dati */
+    primaDeiDatiAl: (function(){
+      const pd = primoMeseDati(state); if (!pd) return "";
+      const yy = (pd.m === 1) ? (pd.y - 1) : pd.y, mm = (pd.m === 1) ? 12 : (pd.m - 1);
+      return pad2(daysInMonth(yy, mm)) + "/" + pad2(mm) + "/" + yy;
+    })(),
     periodoLabel: pairs.length ? (mLabelY(pairs[0].y, pairs[0].m) + " → " + mLabelY(pairs[pairs.length-1].y, pairs[pairs.length-1].m)) : "",   /* ver108 */
     mesiAN: mesiANlabel, nMesiAN: Object.keys(senzaRapp).length,   /* ver110 */
     mesiAuto:mesiAuto, mesiRateiAuto:mesiRateiAuto, mesiCedoAuto:mesiCedoAuto, oreSettAuto:oreSettAuto, minimoAuto:minimoAuto, addizAuto:addizAuto, nProroghe:nProroghe, oreDaRiep:oreDaRiep,
@@ -3117,7 +3212,7 @@ function datiCosto(state, dp, pairs){
     annoIniz: pairs.length ? pairs[0].y : null,
     mesiMater: cNum(p.mesiMater, 0),
     minimo: cNum(p.minimo, minimoAuto),
-    scatti: cNum(p.scatti, 0),
+    scatti: scattiAMano ? cNum(p.scatti, scattiAuto) : scattiAuto,   /* ver128 */
     premiTP: cNum(p.premiTP, 0),
     superminimo: cNum(p.superminimo, 0),
     oreSett: cNum(p.oreSett, oreSettAuto),
@@ -3221,15 +3316,21 @@ function datiCosto(state, dp, pairs){
   const contiInMesi = (o.mesiMater>0) || (o.kmMesiTolti>0) || (o.premiMesiTolti>0);
   o.noTaglio = scrittoAMano ? "valori scritti a mano" : (contiInMesi ? "maternità o mesi tolti" : "");
   o.blocchi = null;
-  o.tagliPossibili = (pairs && pairs.length) ? blocchiPeriodo(dp, pairs).length : 1;
+  const fissoSplit = { tab: !!tabScritta, scatti: scattiAMano, prec: scattiPrecRaw };
+  o.tagliPossibili = (pairs && pairs.length) ? blocchiPeriodo(state, dp, pairs, fissoSplit).length : 1;
   if (!o.noTaglio && pairs && pairs.length > 1){
-    const bl = blocchiPeriodo(dp, pairs);
+    const bl = blocchiPeriodo(state, dp, pairs, fissoSplit);
     if (bl.length > 1){
       /* primo giro: ogni blocco senza ore, per sapere quante ore ordinarie teoriche vale */
       const prep = bl.map(function(b, bi){
         const pr0 = b.pairs[0];
         const vv = valoriAt(dp, pr0.y, pr0.m);
-        const livB = (function(){ const l=String(vv.livello==null?"":vv.livello).toUpperCase().trim(); return (MINIMI_CCNL[tab] && MINIMI_CCNL[tab][l]) ? l : ""; })();
+        /* ver128: ogni pezzo usa la TABELLA CCNL in vigore nei suoi mesi (se non e' forzata a
+           mano) e i SUOI scatti, contati all'inizio del pezzo. */
+        const tabB = tabScritta || tabellaAl(pr0.y, pr0.m);
+        const livB = (function(){ const l=String(vv.livello==null?"":vv.livello).toUpperCase().trim(); return (MINIMI_CCNL[tabB] && MINIMI_CCNL[tabB][l]) ? l : ""; })();
+        const scB = scattiAl(state, dp, pr0.y, pr0.m, scattiPrecRaw);
+        const scattiB = scattiAMano ? o.scatti : R2((SCATTI_CCNL[livB || liv] || 0) * scB.n, 2);
         const indetB = String(vv.tipo) !== "determinato";
         const fineB = fineRapportoYmd(dp, b.pairs);   /* ver110: non oltre la fine del rapporto */
         const ff = contaFestivita(b.pairs, dp, senzaRapp);   /* ver109/ver112 */
@@ -3240,7 +3341,8 @@ function datiCosto(state, dp, pairs){
           mesiRapporto: mesiInPeriodo(dp, b.pairs),   /* ver114: il fondo TFR si rivaluta anche nei mesi non pagati */
           mesiMater: 0,
           oreSett: vv.oreSett,
-          minimo: (livB && MINIMI_CCNL[tab][livB]) ? MINIMI_CCNL[tab][livB] : o.minimo,
+          minimo: (livB && MINIMI_CCNL[tabB][livB]) ? MINIMI_CCNL[tabB][livB] : o.minimo,
+          scatti: scattiB,
           indeterminato: indetB,
           addizTD: indetB ? 0 : R2(1.40 + 0.5*prorogheAttiveA(dp, fineB)),
           festGodute: ff.god, festNonGod: ff.non,
@@ -3254,7 +3356,7 @@ function datiCosto(state, dp, pairs){
           ferieLiqGG: (bi === bl.length-1) ? (o.ferieLiqGG||0) : 0,
           oreManuali: 0
         });
-        return { b:b, ob:ob, liv:livB, indet:indetB, res0: calcCosto(ob) };
+        return { b:b, ob:ob, liv:livB, indet:indetB, tab:tabB, nSc:scB.n, res0: calcCosto(ob) };
       });
       /* le ore di ogni blocco, secondo la fonte scelta */
       const sommaO8 = prep.reduce(function(a,x){ return a + (x.res0.O8||0); }, 0);
@@ -3282,6 +3384,7 @@ function datiCosto(state, dp, pairs){
       o.blocchi = prep.map(function(x){
         const p0=x.b.pairs[0], p1=x.b.pairs[x.b.pairs.length-1];
         return { da: mLabelY(p0.y,p0.m), a: mLabelY(p1.y,p1.m), mesi: x.ob.mesi, liv: x.liv || "—",
+                 tab: x.tab, nSc: x.nSc, scatti: x.ob.scatti,
                  oreSett: x.ob.oreSett, addiz: x.ob.addizTD, indet: x.indet,
                  agg: R2((Number(x.res.E18)||0) * x.ob.mesi, 2),
                  ore: R2(x.res.H38,2), costo: R2(x.res.J35 - x.res.J32, 2) };
@@ -3495,8 +3598,10 @@ function CostoOrario(props){
           <div style={aiuto}>Sono i numeri che non cambiano da persona a persona: contributi, festività, assenze presunte, voci fisse. Si scrivono <b>una volta sola</b> e valgono per tutte le schede. Dove serve, nella scheda della singola persona si può scrivere un valore diverso.</div>
           <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(190px, 1fr))", gap:"8px" }}>
             <label style={cella}><span style={etich}>Tabella CCNL</span>
-              <select value={c.tabella} style={{ padding:"8px", width:"100%" }} onChange={function(e){ setComune("tabella", e.target.value); }}>
-                {TAB_CCNL.map(function(t){ return <option key={t} value={t}>{t}</option>; })}</select></label>
+              <select value={c.tabella || "auto"} style={{ padding:"8px", width:"100%" }} onChange={function(e){ setComune("tabella", e.target.value); }}>
+                <option value="auto">automatica (per data)</option>
+                {TAB_CCNL.map(function(t){ return <option key={t} value={t}>{t}</option>; })}</select>
+              <span style={{ fontSize:"12.5px", color:"#475569", lineHeight:1.35 }}>le tranche del rinnovo: Feb24 · Ott24 · Ott25. Con «automatica» ogni mese usa la sua</span></label>
             {campoNum("Giorni settimanali", cMostra(sc.ggSett, COSTO_COMUNE_DEF.ggSett), function(v){ setComune("ggSett", v); }, "divisore giornaliero")}
             {campoNum("Quattordicesima %", cMostra(sc.quattordic, COSTO_COMUNE_DEF.quattordic), function(v){ setComune("quattordic", v); }, "50 = metà mensilità")}
             {campoNum("Ferie + permessi (gg/anno)", cMostra(sc.ferie, COSTO_COMUNE_DEF.ferie), function(v){ setComune("ferie", v); }, "26 ferie + 4 permessi")}
@@ -3588,14 +3693,27 @@ function CostoOrario(props){
                 <div style={{ fontSize:"13px", color:"#475569", lineHeight:1.35 }}>Scegli il livello e il minimo si compila da sé. Le caselle <b>giallino</b> si possono scrivere; quello che non è giallino lo calcola l'app.</div>
                 <div className="co-grid" style={grigliaCampi}>
                   <label style={cella}><span style={etich}>Tabella</span>
-                    <select value={d.tab} style={{ padding:"8px", width:"100%" }} onChange={function(e){ setPar("tabella", e.target.value); }}>
-                      {TAB_CCNL.map(function(t){ return <option key={t} value={t}>{t}</option>; })}</select></label>
+                    <select value={(d.raw.tabella && d.raw.tabella !== "auto") ? d.raw.tabella : "auto"} style={{ padding:"8px", width:"100%" }} onChange={function(e){ setPar("tabella", e.target.value); }}>
+                      <option value="auto">automatica (per data)</option>
+                      {TAB_CCNL.map(function(t){ return <option key={t} value={t}>{t}</option>; })}</select>
+                    <span style={{ fontSize:"12.5px", color:"#475569", lineHeight:1.35 }}>{d.tabScritta ? ("forzata: vale " + d.tabScritta + " su tutto il periodo") : ("automatica: in questo periodo l'ultima è " + d.tabAuto)}</span></label>
                   <label style={cella}><span style={etich}>Livello</span>
                     <select value={d.liv} style={{ padding:"8px", width:"100%" }} onChange={function(e){ setPar("livello", e.target.value); setPar("minimo", ""); }}>
                       <option value="">— scegli —</option>
                       {LIV_CCNL.map(function(l){ return <option key={l} value={l}>{l}</option>; })}</select></label>
                   {campoNum("Minimo tabellare €", cMostra(d.raw.minimo, d.minimoAuto), function(v){ setPar("minimo", v); }, d.minimoAuto ? ("da tabella: " + fmt2(d.minimoAuto)) : "scrivilo a mano")}
-                  {campoNum("Scatti di anzianità €", cMostra(d.raw.scatti, ""), function(v){ setPar("scatti", v); })}
+                  {campoNum("Scatti di anzianità €", cMostra(d.raw.scatti, d.scattiAuto || ""), function(v){ setPar("scatti", v); },
+                    d.scattiInfo.senzaAssunzione
+                      ? "serve la data di assunzione in ANAGRAFICA per contarli da soli"
+                      : (nTxt(d.scattiInfo.n) + (Number(d.scattiInfo.n)===1 ? " scatto" : " scatti") + " × " + fmt2(d.scattiValore) + " € = " + fmt2(d.scattiAuto) + " € (uno ogni 24 mesi utili, massimo " + SCATTI_MAX + ")"))}
+                  {/* ver128: il pregresso serve solo a chi è stato assunto prima dell'inizio dei dati. */}
+                  {(d.scattiInfo.primaDeiDati && d.primaDeiDatiAl)
+                    ? campoNum("Scatti già maturati al " + d.primaDeiDatiAl, cMostra(d.raw.scattiPrec, ""),
+                        function(v){ setPar("scattiPrec", v); },
+                        d.scattiInfo.daCasella
+                          ? "da lì l'app conta i mesi utili veri e aggiunge uno scatto ogni 24"
+                          : "quanti scatti aveva già maturato a quella data: prima di lì l'app non ha dati")
+                    : null}
                   {campoNum("Premi (tempo pieno) €", cMostra(d.raw.premiTP, ""), function(v){ setPar("premiTP", v); })}
                   {campoNum("Superminimo €", cMostra(d.raw.superminimo, ""), function(v){ setPar("superminimo", v); })}
                   {campoNum("Premio €/mese", cMostra(d.raw.premiMese, ""), function(v){ setPar("premiMese", v); })}
@@ -3614,7 +3732,7 @@ function CostoOrario(props){
                       La casella compare SOLO per chi è entrato prima — lì l'app non può sapere
                       niente — e l'aiutino dice da sé a quale data si riferisce il numero. */}
                   {(d.ferieLiq && d.ferieLiq.serveMano)
-                    ? campoNum("Giornate di ferie residue da anni precedenti", cMostra(d.raw.ferieResidue, ""),
+                    ? campoNum("Giornate di ferie residue al " + (d.ferieLiq.residuoAl || "inizio dei dati"), cMostra(d.raw.ferieResidue, ""),
                         function(v){ setPar("ferieResidue", v); },
                         (d.ferieLiq.residuoAl
                            ? ("il residuo al " + d.ferieLiq.residuoAl + ": prima di lì l'app non ha dati. Lo trovi nel riquadro RATEI di un cedolino SENZA liquidazione")
@@ -3775,7 +3893,7 @@ function CostoOrario(props){
                   {voce("Formazione", r.J32, false, par.J32)}
                   {voce("Rimborso km", r.J34, false, par.J34)}
                   {voce("Costo totale", r.J35, true, par.J35)}
-                  {aPezzi ? <div style={{ fontSize:"12.5px", color:"#7c4a03", background:"#fff8e1", border:"1px solid #eac87a", borderRadius:"8px", padding:"5px 7px", marginTop:"6px", lineHeight:1.3 }}>Il periodo è stato calcolato <b>a pezzi</b>: le aliquote comuni (INPS, FIS, INAIL, IRAP, TFR) valgono per tutti i pezzi, mentre <b>livello, minimo, ore settimanali e addizionale</b> cambiano da pezzo a pezzo — li trovi nella tabella «Come si divide il periodo». Le voci che partono dal mensile fisso (retribuzione, 13ª, 14ª, festività) sono la <b>somma dei pezzi</b>, quindi rifacendole col mensile medio può restare qualche centesimo di differenza.</div> : null}
+                  {aPezzi ? <div style={{ fontSize:"12.5px", color:"#7c4a03", background:"#fff8e1", border:"1px solid #eac87a", borderRadius:"8px", padding:"5px 7px", marginTop:"6px", lineHeight:1.3 }}>Il periodo è stato calcolato <b>a pezzi</b>: le aliquote comuni (INPS, FIS, INAIL, IRAP, TFR) valgono per tutti i pezzi, mentre <b>livello, tabella CCNL, scatti, minimo, ore settimanali e addizionale</b> cambiano da pezzo a pezzo — li trovi nella tabella «Come si divide il periodo». Le voci che partono dal mensile fisso (retribuzione, 13ª, 14ª, festività) sono la <b>somma dei pezzi</b>, quindi rifacendole col mensile medio può restare qualche centesimo di differenza.</div> : null}
                   <div style={{ fontSize:"12.5px", color:"#475569", lineHeight:1.3, marginTop:"5px" }}>I parametri a lato sono scritti arrotondati: rifacendo i conti a mano può restare qualche <b>centesimo</b> di differenza, mentre gli importi sono quelli giusti.</div>
                   <table style={{ width:"100%", borderCollapse:"collapse", marginTop:"10px" }}><tbody>
                     <tr><td style={tdE}>Ore ordinarie lavorabili</td><td style={Object.assign({}, tdV, cifre)}>{fmt2(r.O8)} h</td></tr>
@@ -3846,7 +3964,7 @@ function CostoOrario(props){
               {d.blocchi ? (
                 <div style={blocco}>
                   <div style={capo}>Come si divide il periodo</div>
-                  <div style={{ fontSize:"13px", color:"#475569", lineHeight:1.35, marginBottom:"6px" }}>Dentro il periodo che hai scelto è cambiato qualcosa (livello, ore settimanali, tipo di contratto o una proroga): il conto è stato fatto <b>a pezzi</b> e poi sommato. La <b>formazione</b> ({fmt2(d.formazTot)} €) è contata <b>una volta sola</b>{d.fonte === "mano" ? ", e le ore scritte a mano sono state divise in proporzione alle ore di ciascun pezzo" : ""}.</div>
+                  <div style={{ fontSize:"13px", color:"#475569", lineHeight:1.35, marginBottom:"6px" }}>Dentro il periodo che hai scelto è cambiato qualcosa (livello, ore settimanali, tipo di contratto, una proroga, il <b>rinnovo del CCNL</b> o uno <b>scatto di anzianità</b>): il conto è stato fatto <b>a pezzi</b> e poi sommato. La <b>formazione</b> ({fmt2(d.formazTot)} €) è contata <b>una volta sola</b>{d.fonte === "mano" ? ", e le ore scritte a mano sono state divise in proporzione alle ore di ciascun pezzo" : ""}.</div>
                   {/* ver117 (06/11/2026, Christian: «3, sistema»): difetto PREESISTENTE. Questa
                       tabella ha SETTE colonne e a 390px non ci sta: spingeva la pagina a 429px e
                       il Costo orario scorreva di lato. Ora scorre lei dentro il suo riquadro,
@@ -3856,6 +3974,8 @@ function CostoOrario(props){
                     <tr style={{ fontWeight:800, color:"#1f4e82" }}>
                       <td style={{ padding:"1px 6px 1px 0" }}>Periodo</td>
                       <td style={{ padding:"1px 6px" }}>Liv.</td>
+                      <td style={{ padding:"1px 6px" }}>Tab.</td>
+                      <td style={{ padding:"1px 6px", textAlign:"right" }}>Scatti</td>
                       <td style={{ padding:"1px 6px" }}>h/sett</td>
                       <td style={{ padding:"1px 6px" }}>Addiz.</td>
                       <td style={{ padding:"1px 6px", textAlign:"right" }}>Aggiunt.</td>
@@ -3867,6 +3987,8 @@ function CostoOrario(props){
                         <tr key={"bl" + bi} style={{ borderTop:"1px dotted #e2e8f0" }}>
                           <td style={{ padding:"1px 6px 1px 0" }}>{bb.da === bb.a ? bb.da : (bb.da + " → " + bb.a)}</td>
                           <td style={{ padding:"1px 6px" }}>{bb.liv}</td>
+                          <td style={{ padding:"1px 6px" }}>{bb.tab}</td>
+                          <td style={Object.assign({ padding:"1px 6px", textAlign:"right" }, cifre)}>{nTxt(bb.nSc) + " = " + fmt2(bb.scatti) + " €"}</td>
                           <td style={Object.assign({ padding:"1px 6px" }, cifre)}>{fmt2(bb.oreSett)}</td>
                           <td style={Object.assign({ padding:"1px 6px" }, cifre)}>{bb.indet ? "—" : (fmt2(bb.addiz) + "%")}</td>
                           <td style={Object.assign({ padding:"1px 6px", textAlign:"right" }, cifre)}>{fmt2(bb.agg)}</td>
