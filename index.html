@@ -301,7 +301,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver115";
+const APP_VER = "ver116";
 const APP_DATA = "06nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -2517,7 +2517,12 @@ const COSTO_COMUNE_DEF = {
   festNonGodCoef:1, malattiaMese:2, integrMater:20, altriPermessi:0, suppPct:10,
   /* ver115 (06/11/2026): «Anni per rivalutazione TFR» scende da 2 a 1, scelta di Christian.
      ⚠️ È solo il valore DI PARTENZA: se nei valori comuni c'è già un numero salvato, quello resta. */
-  tfrSupp:"SI", tfrDiv:13.5, anniTfr:1, istat:2, prevCompl:1.5, prevComplPag:0,
+  /* ver116 (06/11/2026): ISTAT da 2 a 1,011 — l'aumento dell'indice FOI di dicembre 2025,
+     riferito da Christian («è una percentuale»). Tasso di rivalutazione TFR che ne esce:
+     1,50% + 75% × 1,011% = 2,25825%. ⚠️ Valore DI PARTENZA: un numero già salvato nei valori
+     comuni resta, va cambiato a mano nella casella. ⚠️ Da riscrivere ogni gennaio col dato
+     di dicembre dell'anno prima. */
+  tfrSupp:"SI", tfrDiv:13.5, anniTfr:1, istat:1.011, prevCompl:1.5, prevComplPag:0,
   inps:26.90, inpsPag:100, fis:0.53333, fisPag:100, inail:0.4, inailPag:100,
   irap:3.9, irapPag:0, sanitaria:132, paghe:25, formazione:250, kmMese:0
 };
@@ -3024,11 +3029,14 @@ function CostoOrario(props){
      che `calcCosto` usa davvero (`c` = aliquote comuni, `d` = dati della persona, `r` = risultato).
      ⚠️ Le percentuali si mostrano con 2 decimali, ma se l'aliquota ne ha di più (il FIS vale
      0,53333%) si mostrano tutti: scrivere «0,53%» sarebbe un'aliquota diversa da quella usata. */
-  const pctTxt = function(v){
+  /* ⚠️ `numTxt` scrive il numero con 2 decimali, ma se ne ha di più li mostra TUTTI: senza,
+     l'ISTAT 1,011 comparirebbe come «1,01» mentre il conto userebbe 1,011 — una bugia a video. */
+  const numTxt = function(v){
     const n = Number(v)||0;
     const r5 = Math.round(n*100000)/100000, r2 = Math.round(n*100)/100;
-    return ((r5===r2) ? fmt2(r2) : String(r5).replace(".", ",")) + "%";
+    return (r5===r2) ? fmt2(r2) : String(r5).replace(".", ",");
   };
+  const pctTxt = function(v){ return numTxt(v) + "%"; };
   const nTxt = function(v){ const n=Number(v)||0; return Number.isInteger(n) ? String(n) : fmt2(n); };
   /* ⚠️ La paga oraria delle ore aggiuntive si mostra con QUATTRO decimali di proposito: con due
      (12,60 invece di 12,6045) il prodotto «ore × €/h» tornava 1,10 € più basso della voce, e
@@ -3158,7 +3166,7 @@ function CostoOrario(props){
                 <option value="SI">SI</option><option value="NO">NO</option></select></label>
             {campoNum("Divisore TFR", cMostra(sc.tfrDiv, COSTO_COMUNE_DEF.tfrDiv), function(v){ setComune("tfrDiv", v); }, "13,5")}
             {campoNum("Anni per rivalutazione TFR", cMostra(sc.anniTfr, COSTO_COMUNE_DEF.anniTfr), function(v){ setComune("anniTfr", v); }, anniTfrAttivo ? anniTfrNota : "", "", anniTfrAttivo ? false : anniTfrNota)}
-            {campoNum("ISTAT anno prec. %", cMostra(sc.istat, COSTO_COMUNE_DEF.istat), function(v){ setComune("istat", v); })}
+            {campoNum("ISTAT anno prec. %", cMostra(sc.istat, numTxt(COSTO_COMUNE_DEF.istat)), function(v){ setComune("istat", v); })}
             {campoNum("Previdenza compl. %", cMostra(sc.prevCompl, COSTO_COMUNE_DEF.prevCompl), function(v){ setComune("prevCompl", v); })}
             {campoNum("Previdenza compl. — quota pagata %", cMostra(sc.prevComplPag, COSTO_COMUNE_DEF.prevComplPag), function(v){ setComune("prevComplPag", v); })}
             {campoNum("INPS %", cMostra(sc.inps, COSTO_COMUNE_DEF.inps), function(v){ setComune("inps", v); }, "26,40 netta")}

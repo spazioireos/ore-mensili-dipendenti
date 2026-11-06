@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver115 · 06nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver116 · 06nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -375,6 +375,37 @@ Banca ore, tetto annuo, contratti e export.
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
 
+- 📉 **ISTAT: IL VALORE DI PARTENZA PASSA DA 2 A 1,011** (ver116, 06/11/2026). Christian: «istat
+  dicembre 2025 risulta 1,011» → alla domanda se fosse una percentuale o il rapporto fra gli
+  indici: «**è una percentuale**» → **Nu\*** per portarlo anche nel codice.
+  - **`COSTO_COMUNE_DEF.istat` da 2 a 1,011.** Il tasso di rivalutazione del TFR diventa
+    **1,50% + 75% × 1,011% = 2,25825%** (era 3,000%).
+  - 🐞 **Trappola trovata e chiusa nella stessa versione**: `cMostra` formatta il valore di
+    partenza con **`fmt2`**, quindi la casella avrebbe mostrato **«1,01»** mentre il conto usava
+    **1,011** — una bugia a video, e peggio: cliccando e salvando si sarebbe scritto 1,01 nei
+    dati. Ora il valore di partenza passa a `cMostra` **già scritto** con **`numTxt`**, che tiene
+    i decimali veri quando ce ne sono più di due. `pctTxt` è diventato `numTxt(v) + "%"`: una
+    sola formattazione per i due usi, **le altre 34 caselle non sono state toccate**.
+  - **Misurato in esecuzione** (15 h/sett., gen→dic 2026, niente salvato nei valori comuni):
+    | | rivalutazione | costo totale | €/h |
+    |---|--:|--:|--:|
+    | **col fondo 8.000 €** — ver115 | 240,00 € | 16.908,86 € | 19,57 |
+    | **col fondo 8.000 €** — ver116 | **180,66 €** | **16.849,52 €** | **19,50** |
+    | **senza fondo** (stima, Anni = 1) — ver115 | 23,00 € | 16.691,85 € | 19,32 |
+    | **senza fondo** — ver116 | **17,31 €** | **16.686,17 €** | **19,31** |
+    La nota a lato della voce scrive per intero: «1,50% + 75% dell'ISTAT **1,011%** = **2,25825%**».
+  - ⚠️ **Vale solo se la casella non è mai stata salvata**: con un `costoComune.istat` già scritto
+    (es. 2) **prevale quello** — verificato in esecuzione, resta 2,00% e 240,00 €. Va cambiato a
+    mano nella casella e salvato con 💾.
+  - ⚠️ **È il dato di dicembre 2025**, cioè quello che rivaluta il fondo al 31/12/2025: serve per
+    i costi del **2026**. **Da riscrivere ogni gennaio** col dato di dicembre dell'anno prima.
+  - **Provato in esecuzione** (`istat116.cjs`), **7 controlli su 7**: la casella mostra «1,011»
+    per intero; col fondo 180,66 €; senza fondo 17,31 €; il tasso scritto è 2,25825%; con un
+    valore già salvato prevale quello; e scrivendo 1,011 a mano sulla **ver115** si ottengono gli
+    stessi numeri della ver116. **Zero errori di pagina.**
+  - **Non regressione**: vm-A (21), vm-B (14), vm-C (13), vm-D (7), i 60 controlli delle aliquote,
+    i 12 del fondo TFR, i 10 della casella «Anni» e il registro delle formule (9) — **tutti
+    superati**.
 - 🎚️ **«ANNI PER RIVALUTAZIONE TFR»: PARTE DA 1 E DICE A CHI SERVE** (ver115, 06/11/2026,
   Christian: «forse ANNI PER RIVALUTAZIONE TFR non va tra i valori comuni e forse va
   disabilitata?» → poi «va bene, procedi pure. Il valore comune però non sia 2, ma 1»).
@@ -408,9 +439,7 @@ Banca ore, tetto annuo, contratti e export.
     fondi scritti l'etichetta diventa grigia e la nota dice «non in uso»; la casella resta
     scrivibile; col fondo la rivalutazione resta 240,00 €; ver114 e ver115 **identiche** su chi ha
     il fondo. **Zero errori di pagina.**
-  - ⚠️ **L'ISTAT resta aperto**: Christian ha riferito «istat dicembre 2025 risulta 1,011», ma non
-    ha ancora detto se è una **percentuale** (1,011%) o un **rapporto** fra gli indici (= +1,1%).
-    Il valore comune è ancora **2,00%** e **non è stato toccato**. Da chiarire.
+  - ✅ **ISTAT chiuso in ver116**: Christian ha confermato che **1,011 è una percentuale**.
 - 💰 **LA RIVALUTAZIONE DEL TFR SI CALCOLA SUL FONDO VERO** (ver114, 06/11/2026). Christian ha
   chiesto «come si calcola la rivalutazione TFR? Noi l'abbiamo messa giusta?», poi «il più
   veritiero?» fra tre strade proposte, e ha dato **Nu\*** alla **numero 2**.
