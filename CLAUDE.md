@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver118 · 06nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver119 · 06nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -375,6 +375,34 @@ Banca ore, tetto annuo, contratti e export.
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
 
+- 📅 **LA QUOTA DI UNA FESTIVITÀ È `ore settimanali ÷ giorni a settimana`** (ver119, 06/11/2026,
+  **numero dato da Christian**): «Ore mensili contrattuali 165, rese effettivamente 172 e due
+  festività godute nel mese: le ore da lavorare dovevano essere **152,333**, quindi lui ha fatto
+  **19,6666 ore straordinarie**». 165 − 2 × (38/6) = 152,3333 · 172 − 152,3333 = 19,6667.
+  - **Com'era**: la ver118 usava `quotaGiorno` = **monte/26** (6,3462 a 38 h/sett.) anche per le
+    festività → 152,31 e 19,69. Ora usa **`oreSettAt / ggSett`** (6,3333). **Provato in
+    esecuzione**: gennaio 2026 (2 festività godute), 172 h rese → **lavorabili 152,33 · ore in
+    più 19,67**, cioè i numeri di Christian.
+  - ⚠️ **Restano DUE quote giornaliere, ed è voluto**: le **assenze** valgono `monte/26` (6,3462),
+    ed è il numero che Christian aveva confermato il **31/10/2026** («2 giorni di ferie =
+    12,69 h»); le **festività** valgono `oreSett/ggSett` (6,3333). Differenza: **1,3 centesimi di
+    ora al giorno**. `ggSett` è il campo della scheda (6 di difetto), quindi chi lavora su 5
+    giorni ha la sua quota giusta.
+  - ✅ **Chiusa la prima domanda aperta della ver118**: «Le festività non possono che essere
+    dedotte in base al mese, non vedo alternative». **Si deducono, e si contano mese per mese.**
+  - ⚠️🔴 **RESTA APERTA LA CONSEGUENZA SUL TABELLONE**: nella frase di Christian quelle 19,6666 h
+    sono **«ore straordinarie»**, cioè il linguaggio del **Risultato del mese**. Ma il Tabellone
+    **non toglie le festività**: `bancaMeseA` fa `rese + assenze − monte`. **Misurato in
+    esecuzione** su dicembre 2026 (4 festività godute, 172 h rese, nessuna assenza):
+    | | dice |
+    |---|--:|
+    | **Tabellone**, Risultato del mese | **+7,000 h** (172 − 165) |
+    | **Costo orario** (ver119) | **+32,33 h** (172 − 139,667) |
+    Per allineare il Tabellone basterebbe aggiungere le festività godute alle ore coperte, e i
+    due numeri tornerebbero uguali. ⚠️ **NON fatto**: `bancaMeseA`, `coverAbsHours` e
+    `monteFissoMese` sono nell'elenco «non toccare senza richiesta esplicita», e quel numero
+    Christian lo guarda ogni mese per ogni persona. **Cambierebbe in 6 mesi su 12** (gennaio,
+    aprile, maggio, giugno, agosto, dicembre 2026). **Da chiedergli.**
 - 🧾 **LE ASSENZE SONO QUELLE VERE DEL TABELLONE, NON PIÙ QUELLE PRESUNTE** (ver118, 06/11/2026).
   Christian, alla domanda se lasciare il Costo orario sulle assenze presunte: **«a meno che non
   ti risulti più comodo usare la realtà»**. Risulta più comodo, e questo è il motivo:
@@ -398,10 +426,10 @@ Banca ore, tetto annuo, contratti e export.
     | **Tabellone**, Risultato del mese | **−10,213 h** (ore in meno) |
     | **Costo orario**, ore in più | **+9,830 h** |
     | differenza | **20,043 h** = 4 festività × 5,0101 h |
-    Dipende da una cosa sola: **le festività contano come ore già coperte** (come un'assenza
-    retribuita) oppure no? Se sì ha ragione il Costo orario e il Tabellone andrebbe allineato;
-    se no ha ragione il Tabellone e qui la deduzione delle festività va tolta — **è una riga**.
-    **Non deciso: va chiesto a Christian.** Finché non decide, resta com'è.
+    Dipendeva da una cosa sola: **le festività contano come ore già coperte** (come un'assenza
+    retribuita) oppure no? ✅ **DECISO da Christian il 06/11/2026, con un numero** (vedi la
+    scheda 📅 della ver119): **sì, si deducono, mese per mese.** Quindi ha ragione il Costo
+    orario, e resta aperta solo la domanda se allineare anche il **Tabellone**.
   - ⚠️ **`c.ferie`, `c.altriPermessi` e `c.malattiaMese` NON sono stati tolti né cambiati**:
     restano in uso in `O6calc`/`E13`, cioè nella **tabellina delle settimane** e nelle ore
     **«Teoriche»**. L'avviso sotto quella tabellina lo dice.

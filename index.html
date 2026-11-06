@@ -313,7 +313,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver118";
+const APP_VER = "ver119";
 const APP_DATA = "06nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -2678,25 +2678,35 @@ function oreRendPeriodo(state, dp, pairs){
    ⚠️ `coverAbsHours`, `permOreMese`, `monteFissoMese` e `quotaGiorno` NON sono stati toccati:
    si leggono e basta. ⚠️ `c.ferie`, `c.altriPermessi` e `c.malattiaMese` restano in uso dove
    erano: `O6calc`/`E13`, cioe' la tabellina delle settimane e le ore «Teoriche». */
-function oreLavorabiliMese(state, dp, c, y, m, escludi){
+/* ver119 (06/11/2026): la quota di UNA FESTIVITA' e' `ore settimanali / giorni a settimana`,
+   non `monte / 26`. Numero dato da Christian: «Ore mensili contrattuali 165, rese effettivamente
+   172 e due festivita' godute nel mese: le ore da lavorare dovevano essere 152,333, quindi lui
+   ha fatto 19,6666 ore straordinarie» → 165 − 2 × (38/6) = 152,3333 e 172 − 152,3333 = 19,6667.
+   ⚠️ Restano DUE quote giornaliere, ed e' voluto: le ASSENZE valgono `monte/26` (6,3462 a 38
+   h/sett.), ed e' il numero che Christian aveva confermato il 31/10/2026 («2 giorni di ferie =
+   12,69 h»); le FESTIVITA' valgono `oreSett/ggSett` (6,3333). Differenza: 1,3 centesimi di ora
+   al giorno. `ggSett` e' il campo della scheda (6 di difetto), quindi chi lavora su 5 giorni ha
+   la sua quota giusta. */
+function oreLavorabiliMese(state, dp, c, y, m, escludi, ggSett){
   if (meseEscluso(escludi, y, m)) return 0;                  /* mese tutto AN = non pagato */
   const fr = meseFrazione(dp, y, m);                         /* mese parziale: ver104 */
   if (!(fr > 0)) return 0;
-  const q = quotaGiorno(dp, y, m);
   const rec = getRecFrom(state, y, m, dp.id);
   const ass = coverAbsHours(rec, dp, y, m);                  /* ore delle assenze VERE del mese */
   const perm = permOreMese(rec).pagate;                      /* permessi retribuiti, come nel Tabellone */
   const fGod = contaFestivita([{ y:y, m:m }], dp, escludi).god;   /* solo i giorni in forza */
-  return Math.max(0, monteFissoMese(dp,y,m)*fr - ass - perm - fGod*q);
+  const gg = Number(ggSett) || Number(c.ggSett) || 6;
+  const qFest = oreSettAt(dp, y, m) / gg;                    /* ver119: quota di una festivita' */
+  return Math.max(0, monteFissoMese(dp,y,m)*fr - ass - perm - fGod*qFest);
 }
 /* somma, mese per mese, di max(0, ore rese - ore lavorabili): nessuna compensazione */
-function oreSuppPeriodo(state, dp, pairs, c, escludi, sottoSoglia){
+function oreSuppPeriodo(state, dp, pairs, c, escludi, sottoSoglia, ggSett){
   const righe=[]; let tot=0;
   (pairs||[]).forEach(function(pr){
     if (meseEscluso(escludi, pr.y, pr.m)) return;
     if (!(meseFrazione(dp, pr.y, pr.m) > 0)) return;
     const rec  = getRecFrom(state, pr.y, pr.m, dp.id);
-    const lav  = R2(oreLavorabiliMese(state, dp, c, pr.y, pr.m, escludi), 3);
+    const lav  = R2(oreLavorabiliMese(state, dp, c, pr.y, pr.m, escludi, ggSett), 3);
     const rese = R2(totOfRec(rec, pr.y, pr.m), 3);
     const ass  = R2(coverAbsHours(rec, dp, pr.y, pr.m) + permOreMese(rec).pagate, 3);   /* ver118: a video */
     const supp = R2(Math.max(0, rese + (Number(sottoSoglia)||0) - lav), 3);
@@ -2972,7 +2982,7 @@ function datiCosto(state, dp, pairs){
   o.suppMensileAttivo = (o.fonte === "riepiloghi") && !scrittoAMano && !!(pairs && pairs.length);
   o.suppMensileOre = null; o.suppRighe = null; o.suppVecchio = null;
   if (o.suppMensileAttivo){
-    const sm = oreSuppPeriodo(state, dp, pairs, c, senzaRapp, o.sottoSoglia);
+    const sm = oreSuppPeriodo(state, dp, pairs, c, senzaRapp, o.sottoSoglia, o.ggSett);
     o.suppMensileOre = sm.ore; o.suppRighe = sm.righe;
   }
   o.raw = p;
@@ -3016,7 +3026,7 @@ function datiCosto(state, dp, pairs){
           festGodute: ff.god, festNonGod: ff.non,
           /* ver117: le ore in piu' del blocco, contate sui SUOI mesi. Senza questo ogni blocco
              userebbe il totale del periodo e la somma sarebbe moltiplicata. */
-          suppMensileOre: o.suppMensileAttivo ? oreSuppPeriodo(state, dp, b.pairs, c, senzaRapp, o.sottoSoglia).ore : null,
+          suppMensileOre: o.suppMensileAttivo ? oreSuppPeriodo(state, dp, b.pairs, c, senzaRapp, o.sottoSoglia, o.ggSett).ore : null,
           oreManuali: 0
         });
         return { b:b, ob:ob, liv:livB, indet:indetB, res0: calcCosto(ob) };
