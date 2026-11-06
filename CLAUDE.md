@@ -1373,11 +1373,11 @@ Due richieste precise, da affrontare **insieme** perché toccano lo stesso punto
 ✅ **Già chiuso nella stessa serata**: la terza questione di quel messaggio — i mesi tutti «AN» —
 è stata risolta con la **ver112** (non sono pagati, ma il rapporto va avanti). Le due qui sotto
 restano.
-✅ **Pubblicato su `main` il 06/11/2026** («main» di Christian): `main` porta ora la **ver114**,
-con tutte le ver103 → ver114 in un unico avanzamento del ramo
-`claude/integrated-app-feasibility-8d1wg0`. ⚠️ Le ver103, ver110 e ver111 sono **passaggi
-superati lo stesso giorno** (rispettivamente da ver104, ver111 e ver112): stanno nella storia dei
-commit, ma **non sono mai state la versione pubblicata**.
+✅ **Pubblicato su `main` il 06/11/2026** («main» di Christian, **due volte** nella stessa
+giornata): `main` porta ora la **ver116**, con tutte le ver103 → ver116 arrivate con due
+avanzamenti del ramo `claude/integrated-app-feasibility-8d1wg0`. ⚠️ Le ver103, ver110 e ver111
+sono **passaggi superati lo stesso giorno** (rispettivamente da ver104, ver111 e ver112): stanno
+nella storia dei commit, ma **non sono mai state la versione pubblicata**.
 
 1. **Le ore supplementari si contano MESE PER MESE, senza compensazione.** Parole di Christian:
    «gennaio 95 ore fatte in luogo di 90 e febbraio 85 ore in luogo di 90 **non dà
