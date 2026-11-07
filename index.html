@@ -354,7 +354,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver130";
+const APP_VER = "ver131";
 const APP_DATA = "07nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -416,7 +416,22 @@ function cellaValoreFinale(t){            // alla fine: il codice vero, il numer
   return null;                                                 // non ammesso
 }
 
-const PALETTE = ["#00B0F0","#CCFF66","#FFC000","#FFDDFF","#B7A4D6","#9AD0C2","#F49AC2","#8FB9E0","#C3B091","#9CA3AF"];
+/* ver131 (07/11/2026, Christian: «i colori scheda sono pochi, va messa palette … ok 24, no
+   verde brillante»). Erano DIECI e il colore si assegna con `PALETTE[numero % 10]`: con 16
+   dipendenti dall'undicesimo si ricominciava da capo. Misurato sul backup del 04/11: 13 colori
+   distinti su 16 persone, tre colori usati da DUE persone ciascuno.
+   ⚠️ I PRIMI DIECI RESTANO AL LORO POSTO, nello stesso ordine: cosi' nessuno cambia colore.
+   ⚠️ I SEI dopo di loro sono quelli che Christian si era gia' messo da se' e che NON stavano
+   nella palette (quindi nel riquadro «Colore della scheda» non risultavano selezionati per chi
+   li aveva): ora ci sono, e si vedono come scelti.
+   ⚠️ Gli OTTO nuovi sono tinte chiare e spente, NESSUN verde brillante (sua richiesta). Il
+   `#CCFF66` in seconda posizione e' il verde brillante che c'era gia' ed e' in uso da due
+   persone: lasciato per non cambiare il loro colore. */
+const PALETTE = [
+  "#00B0F0","#CCFF66","#FFC000","#FFDDFF","#B7A4D6","#9AD0C2","#F49AC2","#8FB9E0","#C3B091","#9CA3AF",
+  "#5deeb7","#d494ff","#88adf7","#a4cb3a","#dbd51a","#4ddbb5",
+  "#FFB38A","#FF9AA2","#D7A86E","#A3C4F3","#7FD1D1","#BFD8B8","#E6C3E8","#C9CBA3"
+];
 
 /* Anagrafica precompilata (colori-barra e contratti come nel file Excel) */
 const DIP_INIZIALI = [
@@ -566,10 +581,17 @@ function trasfDates(dp){ return trasfList(dp).map(function(t){ return t.data; })
 function trasfOrder(dp){ return trasfList(dp).slice().sort(function(a,b){ return ymdIt(a.data)-ymdIt(b.data); }); }
 function valoriAt(dp, y, m){
   let liv=(dp.livello==null?"":String(dp.livello)), ore=Number(dp.oreSett)||0, tipo=dp.tipoContratto||"indeterminato";
+  /* ver131 (07/11/2026, Christian: «le trasformazioni potrebbero riguardare anche aggiunta di
+     superminimo, quindi va considerata e calcolata anche questa cosa»). Il superminimo parte da
+     ZERO e lo cambiano le trasformazioni che lo nominano. ⚠️ Parte da zero di proposito: la
+     casella del Costo orario resta quella di prima e, se e' scritta a mano, VINCE — quindi chi
+     ha un superminimo scritto li' dentro non cambia di un centesimo. */
+  let superm=0;
   const ref=y*10000+m*100+1;
   trasfOrder(dp).forEach(function(t){ if(ymdIt(t.data)<=ref){
     if(t.livello!=null && String(t.livello).trim()!=="") liv=String(t.livello).trim();
     if(t.oreSett!=null && String(t.oreSett)!=="" && !isNaN(Number(t.oreSett))) ore=Number(t.oreSett);
+    if(t.superminimo!=null && String(t.superminimo)!=="" && !isNaN(Number(t.superminimo))) superm=Number(t.superminimo);
     if(t.toIndet) tipo="indeterminato";
   }});
   // trasformazioni orarie TEMPORANEE (finestra inizio→fine, allineata al mese): override di oreSett nei mesi coperti
@@ -582,7 +604,7 @@ function valoriAt(dp, y, m){
     const fYM=Math.floor(wf/10000)*100+Math.floor((wf%10000)/100);
     if(refYM>=iYM && refYM<=fYM && w.oreSett!=null && String(w.oreSett)!=="" && !isNaN(Number(w.oreSett))) ore=Number(w.oreSett);
   });
-  return { livello:liv, oreSett:ore, tipo:tipo };
+  return { livello:liv, oreSett:ore, tipo:tipo, superm:superm };
 }
 function orarioTempAt(dp,y,m){ const refYM=y*100+m; let r=null; (Array.isArray(dp.orariTemp)?dp.orariTemp:[]).forEach(function(w){ if(!w)return; const wi=ymdIt(w.inizio),wf=ymdIt(w.fine); if(!wi||!wf)return; const iYM=Math.floor(wi/10000)*100+Math.floor((wi%10000)/100); const fYM=Math.floor(wf/10000)*100+Math.floor((wf%10000)/100); if(refYM>=iYM&&refYM<=fYM&&w.oreSett!=null&&String(w.oreSett)!==""&&!isNaN(Number(w.oreSett))) r=Number(w.oreSett); }); return r; }
 /* ===== Banca ore — METODO A (mensilizzazione fissa) ===== */
@@ -897,6 +919,7 @@ function tettoForPeriod(dp,y,m){ const sy=tettoStartYear(dp,y,m); const list=tet
 function valoriNow(dp){ return valoriAt(dp, 9999, 12); }
 function tipoNow(dp){ return valoriNow(dp).tipo; }
 function livelloAt(dp,y,m){ return valoriAt(dp,y,m).livello; }
+function superminimoAt(dp,y,m){ return valoriAt(dp,y,m).superm; }   /* ver131 */
 function oreSettAt(dp,y,m){ return valoriAt(dp,y,m).oreSett; }
 function tipoAt(dp,y,m){ return valoriAt(dp,y,m).tipo; }
 function hoursDisp(v){ const n=Number(v)||0; return Number.isInteger(n) ? String(n) : fmt2(n); }
@@ -911,6 +934,13 @@ function autoContenuto(dp){
   if(t.toIndet) parts.push("trasformazione del rapporto di lavoro da tempo determinato a tempo indeterminato");
   if(t.livello!=null && String(t.livello).trim()!=="" && String(t.livello).trim()!==prev.livello) parts.push("passaggio dal livello "+(prev.livello||"—")+" al livello "+String(t.livello).trim());
   if(t.oreSett!=null && String(t.oreSett)!=="" && Number(t.oreSett)!==prev.oreSett) parts.push("variazione del monte ore settimanale da "+hoursDisp(prev.oreSett)+" a "+hoursDisp(Number(t.oreSett))+" ore");
+  /* ver131: Christian ha autorizzato di nominare il superminimo anche nella lettera (punto 5). */
+  if(t.superminimo!=null && String(t.superminimo)!=="" && Number(t.superminimo)!==prev.superm){
+    const nv=Number(t.superminimo);
+    if(nv>0 && (prev.superm||0)===0) parts.push("riconoscimento di un superminimo mensile di "+fmt2(nv)+" euro");
+    else if(nv===0 && (prev.superm||0)>0) parts.push("cessazione del superminimo mensile di "+fmt2(prev.superm)+" euro");
+    else parts.push("variazione del superminimo mensile da "+fmt2(prev.superm||0)+" a "+fmt2(nv)+" euro");
+  }
   if(!parts.length) return "";
   let frase=parts.join(" e ")+" con decorrenza "+dlong(t.data)+".";
   return frase.charAt(0).toUpperCase()+frase.slice(1);
@@ -2306,6 +2336,7 @@ function SchedaContratto(props){
   const [ntLiv, setNtLiv] = useState("");
   const [ntOre, setNtOre] = useState("");
   const [ntIndet, setNtIndet] = useState(false);
+  const [ntSup, setNtSup] = useState("");          /* ver131: superminimo della trasformazione */
   const [otMeseI, setOtMeseI] = useState(String(_now.getMonth()+1));
   const [otAnnoI, setOtAnnoI] = useState(String(_now.getFullYear()));
   const [otMeseF, setOtMeseF] = useState(String(_now.getMonth()+1));
@@ -2337,6 +2368,7 @@ function SchedaContratto(props){
     if(t.toIndet) parts.push("→ a tempo indeterminato");
     if(t.livello) parts.push("livello "+t.livello);
     if(t.oreSett!=null && String(t.oreSett)!=="") parts.push((Number.isInteger(Number(t.oreSett))?String(Number(t.oreSett)):fmt2(Number(t.oreSett)))+" h/sett");
+    if(t.superminimo!=null && String(t.superminimo)!=="") parts.push("superminimo "+fmt2(Number(t.superminimo))+" \u20ac");   /* ver131 */
     return (parts.join(", ")||"nessuna modifica")+" — dal "+t.data;
   };
   const addPro = function(){
@@ -2354,11 +2386,15 @@ function SchedaContratto(props){
     const oreV=String(ntOre).replace(",",".").trim();
     if(oreV!=="" && !isNaN(Number(oreV))) rec.oreSett=Number(oreV);
     if(ntIndet) rec.toIndet=true;
-    if(!rec.livello && rec.oreSett==null && !rec.toIndet){ setErrTra("Compila almeno uno tra livello, monte ore o la spunta \u00aba tempo indeterminato\u00bb."); return false; }
+    /* ver131: il superminimo. Lo ZERO e' un valore valido (serve a TOGLIERE un superminimo che
+       c'era prima), quindi si guarda se la casella e' scritta, non se il numero e' > 0. */
+    const supV=String(ntSup).replace(",",".").trim();
+    if(supV!=="" && !isNaN(Number(supV)) && Number(supV)>=0) rec.superminimo=Number(supV);
+    if(!rec.livello && rec.oreSett==null && rec.superminimo==null && !rec.toIndet){ setErrTra("Compila almeno uno tra livello, monte ore, superminimo o la spunta \u00aba tempo indeterminato\u00bb."); return false; }
     patch({ trasformazioni: trasf.concat([rec]).sort(function(a,b){ return ymdIt(a.data)-ymdIt(b.data); }) });
-    setNtLiv(""); setNtOre(""); setNtIndet(false); setErrTra(""); return true;
+    setNtLiv(""); setNtOre(""); setNtSup(""); setNtIndet(false); setErrTra(""); return true;
   };
-  const chiudiTra = function(){ setApTra(false); setNtLiv(""); setNtOre(""); setNtIndet(false);
+  const chiudiTra = function(){ setApTra(false); setNtLiv(""); setNtOre(""); setNtSup(""); setNtIndet(false);
     setNtMese(String(_now.getMonth()+1)); setNtAnno(String(_now.getFullYear())); setErrTra(""); };
   const delTrasf = function(i){ patch({ trasformazioni: trasf.filter(function(_,k){ return k!==i; }) }); };
 
@@ -2496,13 +2532,15 @@ function SchedaContratto(props){
                 <input value={ntLiv} placeholder="es. D2" autoFocus style={Object.assign({width:"100%"}, giallo)} onChange={function(e){ setNtLiv(e.target.value.toUpperCase()); }} /></div>
               <div><div style={etich}>Nuovo monte ore/sett</div>
                 <input value={ntOre} placeholder="es. 24" inputMode="decimal" style={Object.assign({width:"100%"}, giallo)} onChange={function(e){ setNtOre(e.target.value); }} /></div>
+              <div><div style={etich}>Nuovo superminimo €</div>
+                <input value={ntSup} placeholder="es. 100 (0 per togliere)" inputMode="decimal" style={Object.assign({width:"100%"}, giallo)} onChange={function(e){ setNtSup(e.target.value); }} /></div>
               <label style={{ display:"flex", alignItems:"center", gap:"6px", fontSize:"13px" }}><input type="checkbox" checked={ntIndet} onChange={function(e){ setNtIndet(e.target.checked); }} /> → a tempo indeterminato</label>
               <div style={{ display:"flex", gap:"6px", flexWrap:"wrap" }}>
                 <button className="btn btn-blue" onClick={function(){ if(addTrasf()) chiudiTra(); }}>✔ Aggiungi</button>
                 <button className="btn btn-gray" onClick={chiudiTra}>Annulla</button>
               </div>
             </div>
-            <div style={{ fontSize:"11px", color:"#64748b", marginTop:"4px" }}>Compila almeno uno tra livello, monte ore o la spunta "a tempo indeterminato".</div>
+            <div style={{ fontSize:"11px", color:"#64748b", marginTop:"4px" }}>Compila almeno uno tra livello, monte ore, superminimo o la spunta "a tempo indeterminato". Il superminimo è <b>al mese, a tempo pieno</b>, come il minimo tabellare: scrivi <b>0</b> per togliere un superminimo che c'era prima.</div>
           </div>}
         {errTra ? <div style={{ color:"#b91c1c", fontSize:"12.5px", fontWeight:700, marginTop:"4px" }}>{errTra}</div> : null}
       </div>
@@ -3063,7 +3101,10 @@ function firmaMese(state, dp, y, m, fisso){
   const f = fisso || {};
   return [String(v.livello==null?"":v.livello).toUpperCase().trim(), String(v.oreSett), String(v.tipo), String(np),
           f.tab ? "-" : tabellaAl(y, m),
-          f.scatti ? "-" : String(scattiAl(state, dp, y, m, (f.prec != null ? f.prec : null)).n)].join("|");
+          f.scatti ? "-" : String(scattiAl(state, dp, y, m, (f.prec != null ? f.prec : null)).n),
+          /* ver131: anche il SUPERMINIMO fa parte della firma, cosi' il periodo si taglia da
+             solo alla data in cui cambia. Scritto a mano vale uguale dappertutto: non taglia. */
+          f.superm ? "-" : String(v.superm)].join("|");
 }
 function blocchiPeriodo(state, dp, pairs, fisso){
   const out = [];
@@ -3079,6 +3120,17 @@ function livelloPeriodo(dp, pairs){
   (pairs||[]).forEach(function(pr){
     const primo = pr.y*10000 + pr.m*100 + 1;
     if (inForceAt(dp, primo) || inForceAt(dp, pr.y*10000+pr.m*100+daysInMonth(pr.y,pr.m))) v = livelloAt(dp, pr.y, pr.m);
+  });
+  return v;
+}
+/* ver131: il superminimo dell'ULTIMO mese in cui il contratto e' in piedi dentro il periodo,
+   esattamente come fa `livelloPeriodo` per il livello. Serve come valore AUTOMATICO quando il
+   periodo non si taglia in pezzi; quando si taglia, ogni pezzo usa il suo. */
+function superminimoPeriodo(dp, pairs){
+  let v = 0;
+  (pairs||[]).forEach(function(pr){
+    const primo = pr.y*10000 + pr.m*100 + 1;
+    if (inForceAt(dp, primo) || inForceAt(dp, pr.y*10000+pr.m*100+daysInMonth(pr.y,pr.m))) v = superminimoAt(dp, pr.y, pr.m);
   });
   return v;
 }
@@ -3251,6 +3303,10 @@ function datiCosto(state, dp, pairs){
   const scattiValore = SCATTI_CCNL[liv] || 0;
   const scattiAuto = R2(scattiValore * scattiInfo.n, 2);
   const scattiAMano = (p.scatti != null && String(p.scatti) !== "");
+  /* ver131: il SUPERMINIMO in vigore alla fine del periodo diventa il valore automatico; la
+     casella della scheda, se scritta, continua a vincere (e allora compare l'avviso). */
+  const supermAuto = superminimoPeriodo(dp, pairs);
+  const supermAMano = (p.superminimo != null && String(p.superminimo).trim() !== "");
   const addizAuto = addizTDAuto(dp, pairs);
   const nProroghe = prorogheAttiveA(dp, fineRapportoYmd(dp, pairs));   // ver83/ver110: quelle gia' partite, entro la fine del rapporto
   const oreDaRiep = oreRendPeriodo(state, dp, pairs);
@@ -3287,7 +3343,7 @@ function datiCosto(state, dp, pairs){
     minimo: cNum(p.minimo, minimoAuto),
     scatti: scattiAMano ? cNum(p.scatti, scattiAuto) : scattiAuto,   /* ver128 */
     premiTP: cNum(p.premiTP, 0),
-    superminimo: cNum(p.superminimo, 0),
+    superminimo: cNum(p.superminimo, supermAuto),   /* ver131: segue le trasformazioni */
     oreSett: cNum(p.oreSett, oreSettAuto),
     ggSett: cNum(p.ggSett, c.ggSett),
     addizTD: cNum(p.addizTD, addizAuto),
@@ -3388,8 +3444,9 @@ function datiCosto(state, dp, pairs){
      in quei casi vale quello che ha scritto lui, su tutto il periodo, come prima. */
   const contiInMesi = (o.mesiMater>0) || (o.kmMesiTolti>0) || (o.premiMesiTolti>0);
   o.noTaglio = scrittoAMano ? "valori scritti a mano" : (contiInMesi ? "maternità o mesi tolti" : "");
+  o.supermAuto = supermAuto; o.supermAMano = supermAMano;   /* ver131: per l'avviso sulla casella */
   o.blocchi = null;
-  const fissoSplit = { tab: !!tabScritta, scatti: scattiAMano, prec: scattiPrecRaw };
+  const fissoSplit = { tab: !!tabScritta, scatti: scattiAMano, prec: scattiPrecRaw, superm: supermAMano };
   o.tagliPossibili = (pairs && pairs.length) ? blocchiPeriodo(state, dp, pairs, fissoSplit).length : 1;
   if (!o.noTaglio && pairs && pairs.length > 1){
     const bl = blocchiPeriodo(state, dp, pairs, fissoSplit);
@@ -3416,6 +3473,8 @@ function datiCosto(state, dp, pairs){
           oreSett: vv.oreSett,
           minimo: (livB && MINIMI_CCNL[tabB][livB]) ? MINIMI_CCNL[tabB][livB] : o.minimo,
           scatti: scattiB,
+          /* ver131: il superminimo del pezzo. Se e' scritto a mano vale quello, su tutti i pezzi. */
+          superminimo: supermAMano ? o.superminimo : vv.superm,
           indeterminato: indetB,
           addizTD: indetB ? 0 : R2(1.40 + 0.5*prorogheAttiveA(dp, fineB)),
           festGodute: ff.god, festNonGod: ff.non,
@@ -3788,7 +3847,24 @@ function CostoOrario(props){
                           : "quanti scatti aveva già maturato a quella data: prima di lì l'app non ha dati")
                     : null}
                   {campoNum("Premi (tempo pieno) €", cMostra(d.raw.premiTP, ""), function(v){ setPar("premiTP", v); })}
-                  {campoNum("Superminimo €", cMostra(d.raw.superminimo, ""), function(v){ setPar("superminimo", v); })}
+                  {campoNum("Superminimo €", cMostra(d.raw.superminimo, d.supermAuto > 0 ? d.supermAuto : ""), function(v){ setPar("superminimo", v); },
+                    d.supermAuto > 0 ? ("dalle trasformazioni: " + fmt2(d.supermAuto) + " \u20ac") : null)}
+                  {(function(){
+                    /* ver131, punto 4 chiesto da Christian: «andrebbe messa un'indicazione sulla
+                       scheda che mi faccia sempre capire che l'indicazione mia a mano vince sul
+                       resto, allertandomi». Compare SEMPRE che la casella e' scritta, non solo
+                       quando il numero differisce da quello automatico. */
+                    if (!d.supermAMano) return null;
+                    const mano = cNum(d.raw.superminimo, 0);
+                    const diverso = Math.abs(mano - (d.supermAuto||0)) > 0.005;
+                    return <div style={{ gridColumn:"1 / -1", background:"#FFF8E1", border:"1px solid #EAC87A", borderRadius:"8px", padding:"7px 10px", marginTop:"2px", fontSize:"13px", lineHeight:1.35, color:"#7c4a03" }}>
+                      ⚠️ <b>Il superminimo è scritto a mano: vince su tutto il resto.</b> L'app sta usando <b>{fmt2(mano)} €</b> su <b>tutti</b> i mesi del periodo
+                      {diverso ? <span>, invece dei <b>{fmt2(d.supermAuto)} €</b> che risultano dalle trasformazioni registrate nella scheda ANAGRAFICA</span>
+                               : <span>, ed è lo stesso numero che risulta dalle trasformazioni</span>}.
+                      {diverso ? <span> Con il numero scritto a mano il periodo <b>non si taglia più</b> alla data in cui il superminimo cambia, quindi i mesi prima e dopo pesano uguale.</span> : null}
+                      <b> Svuota la casella</b> per tornare al calcolo automatico, che segue le date.
+                    </div>;
+                  })()}
                   {campoNum("Premio €/mese", cMostra(d.raw.premiMese, ""), function(v){ setPar("premiMese", v); })}
                   {campoNum("Rimborso km €", cMostra(d.raw.kmMese, c.kmMese || ""), function(v){ setPar("kmMese", v); }, "comune: " + fmt2(c.kmMese))}
                   <label style={cella}><span style={etich}>Rimborso: come si conta</span>

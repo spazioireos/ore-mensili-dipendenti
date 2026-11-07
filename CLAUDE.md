@@ -18,7 +18,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver130 · 07nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver131 · 07nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -390,6 +390,84 @@ Banca ore, tetto annuo, contratti e export.
     «— ore» e «non calcolabile»; la stessa persona su «Teoriche» → 18,67 €/h; e il **foglio Excel
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
+
+- 💠 **IL SUPERMINIMO SEGUE LE TRASFORMAZIONI, E I COLORI SONO 24** (ver131, 07/11/2026, due
+  richieste di Christian: «le trasformazioni potrebbero riguardare anche — per i dipendenti —
+  aggiunta di superminimo, quindi va considerata e calcolata anche questa cosa» e «i colori
+  scheda sono pochi, va messa palette … ok 24, no verde brillante»).
+  - 🔴 **Il difetto, misurato**: una trasformazione portava **livello**, **ore settimanali** e la
+    spunta «a tempo indeterminato». Il **superminimo no**: era un numero solo nella scheda del
+    Costo orario, **senza data**, applicato a **tutti** i mesi del periodo. Sui dati veri, periodo
+    gen→ott 2026: un superminimo di **100 €/mese** pesa **806,05 €** (costo 14.427,24 →
+    15.233,29 €, €/h 20,41 → 21,55). Se fosse partito il **01/06**, i mesi veri sarebbero 5 su
+    10: l'app ne addebitava **806,05 € invece di ~403 €**, cioè **403 € di troppo** — e a catena
+    su 13ª, 14ª, festività, ferie liquidate, TFR e contributi.
+  - **Come è fatto**, con lo stesso meccanismo già collaudato per il livello (ver82/ver84):
+    - `valoriAt` tiene ora anche **`superm`**: parte da **ZERO** e lo cambiano le trasformazioni
+      che lo nominano. ⚠️ Parte da zero di proposito, così **chi ha un superminimo scritto nella
+      casella del Costo orario non cambia di un centesimo** (la casella vince, come prima);
+    - **`superminimoAt(dp,y,m)`** e **`superminimoPeriodo(dp,pairs)`** (gemella di
+      `livelloPeriodo`: il valore dell'ultimo mese in cui il contratto è in piedi) → è il valore
+      **automatico** della casella;
+    - **`firmaMese`** lo guarda, quindi **il periodo si taglia da solo** alla data in cui il
+      superminimo cambia; ogni pezzo usa il suo (`superminimo: supermAMano ? o.superminimo : vv.superm`);
+    - `fissoSplit.superm` = vero quando la casella è scritta a mano: allora **non fa tagliare**,
+      perché quel valore vale uguale dappertutto.
+  - **Nel modulo «+ Aggiungi trasformazione»** c'è la casella nuova **«Nuovo superminimo €»**
+    (dicitura nuova, scritta da Claude). ⚠️ **Lo ZERO è un valore valido**: serve a **togliere**
+    un superminimo che c'era prima, quindi si guarda se la casella è *scritta*, non se il numero
+    è maggiore di zero. L'aiutino dice che è **al mese, a tempo pieno**, come il minimo tabellare.
+  - 🟨 **PUNTO 4 chiesto da Christian** («andrebbe messa un'indicazione sulla scheda che mi faccia
+    sempre capire che l'indicazione mia a mano vince sul resto, allertandomi»): sotto la casella
+    *Superminimo €* del Costo orario compare un **avviso giallo** che dice «**Il superminimo è
+    scritto a mano: vince su tutto il resto**», quale numero sta usando l'app, quale risulterebbe
+    dalle trasformazioni, che **il periodo non si taglia più** alla data del cambio, e che per
+    tornare all'automatico basta **svuotare la casella**.
+    ⚠️ A differenza dell'avviso dei mesi (ver108) **compare SEMPRE che la casella è scritta**,
+    anche quando il numero coincide con quello automatico: è il «sempre» che ha chiesto lui.
+  - 🏷️ **La LETTERA di trasformazione nomina il superminimo** — dicitura **autorizzata da
+    Christian** («1-2-3-5 ok», e il 5 era proprio questo). `autoContenuto` scrive
+    «riconoscimento di un superminimo mensile di 100,00 euro», «variazione del superminimo
+    mensile da 100,00 a 250,00 euro» oppure «cessazione del superminimo mensile di 100,00 euro»,
+    e si unisce alle frasi che c'erano già («passaggio dal livello D1 al livello D2 **e**
+    riconoscimento di un superminimo…»). ⚠️ Le frasi di livello, ore e tempo indeterminato
+    **sono rimaste identiche**.
+  - 🎨 **PALETTE da 10 a 24 colori.** Erano **dieci** e il colore si assegna con
+    `PALETTE[numero % 10]`: con 16 dipendenti **dall'undicesimo si ricominciava da capo**.
+    Misurato sul backup del 04/11: **13 colori distinti su 16 persone**, tre colori usati da
+    **due persone ciascuno**, e **sei tinte che Christian si era messo da sé** e che non stavano
+    nella palette (quindi per quelle persone **nessun quadratino risultava selezionato**).
+    - i **primi dieci restano al loro posto, nello stesso ordine**: **nessuno cambia colore**;
+    - poi i **sei suoi** (`#5deeb7 #d494ff #88adf7 #a4cb3a #dbd51a #4ddbb5`): ora si vedono come
+      scelti;
+    - poi **otto nuovi**, chiari e spenti, **nessun verde brillante** (sua richiesta):
+      `#FFB38A #FF9AA2 #D7A86E #A3C4F3 #7FD1D1 #BFD8B8 #E6C3E8 #C9CBA3`.
+    - ⚠️ Il **`#CCFF66`** in seconda posizione **è** il verde brillante, ma c'era già ed **è in
+      uso da due persone**: lasciato per non cambiare il loro colore. Se Christian lo vuole
+      togliere va deciso con lui, perché cambia il colore di quelle due.
+    - **Provato**: con **20 persone senza colore, 20 colori distinti** su 20 schede.
+  - ⚠️ **NESSUN altro calcolo è stato toccato.** Verificato sui dati veri: **ver130 e ver131
+    danno gli stessi numeri** (componenti 1.727,83 · costo 14.427,24 € · 20,41 €/h · 2 pezzi).
+  - **Provato in esecuzione** (`super131.cjs` **20/20**, `lettera131.cjs` **14/14**, zero errori
+    di pagina e di console):
+    - 24 quadratini, i primi dieci nell'ordine di prima, i sei suoi presenti, gli otto nuovi
+      quelli previsti, 20 colori distinti su 20 persone;
+    - superminimo **100 € dal 01/06/2026**, periodo gen→ott: il periodo passa da **2 a 3 pezzi**
+      (Gennaio→Maggio senza · **Giugno** con · Luglio→Ottobre con) e il costo è **14.113,92 €**,
+      cioè **in mezzo** fra i 13.699,70 € di «niente» e i 14.505,75 € di «100 su tutto», e
+      vicinissimo alla metà teorica (14.102,73 €);
+    - l'aiutino sotto la casella dice «dalle trasformazioni: 100,00 €»;
+    - scrivendo **250** a mano: vince il 250 (componenti 1.887,57), l'avviso nomina **sia il 250
+      sia il 100**, dice che il periodo non si taglia più, e i pezzi tornano quelli della sola
+      proroga;
+    - una seconda trasformazione con **0** toglie il superminimo (**4 pezzi**) e il costo scende;
+    - la lettera: sette frasi provate, comprese quelle vecchie rimaste identiche;
+    - `valoriAt` mese per mese: 0 a gennaio e febbraio, **100 da marzo a luglio**, **0 da agosto**.
+  - ⚠️ **`lettera131.cjs` non riscrive le funzioni**: le **estrae testualmente** da `index.html`
+    (`trasfOrder`, `valoriAt`, `autoContenuto`) e le esegue in node. `autoContenuto` serve solo a
+    riempire il segnaposto del .docx, quindi dalla pagina non è raggiungibile.
+  - ⚠️ **Il .docx vero della lettera NON è stato generato**: serve il modello Word di Christian.
+    La **frase** è verificata, il **documento** no.
 
 - 🔎 **COLLAUDO INTEGRALE E LEGGIBILITÀ: NIENTE SOTTO I 12,5px FUORI DALLE GRIGLIE**
   (ver130, 07/11/2026, dal collaudo completo chiesto da Christian: «AUDIT COMPLETO, VERIFICA E
