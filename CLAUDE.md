@@ -9,10 +9,16 @@ Banca ore, tetto annuo, contratti e export.
 - ⚠️ **TRAPPOLA GIÀ COSTATA UN ERRORE**: nel documento i campi (`dipendenti`, `dati`, …) stanno
   al **PRIMO LIVELLO**, NON dentro un campo `state`. Leggere `snap.data()`, non `snap.data().state`.
 - **Struttura dati**: `dipendenti[]` = `{id, nome "COGNOME NOME", …}`;
-  `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
+  `dati["YYYY-MM"][dipId].giorni` = mappa giorno → ore **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
+  ⚠️ **Le ore non sono sempre un numero** (verificato sul backup del 04/11 col collaudo del
+  07/11/2026): nei dati veri convivono **1.862 interi, 1.006 decimali e 3.152 stringhe**, e fra
+  le stringhe ci sono sia i codici (`FEST`, `AN`…) sia **numeri scritti all'italiana con la
+  virgola** (`"4,5"`). Le celle scritte dall'app finiscono come stringa (`"7,25"`). Chi legge
+  quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
+  sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver129 · 06nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver130 · 07nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -384,6 +390,78 @@ Banca ore, tetto annuo, contratti e export.
     «— ore» e «non calcolabile»; la stessa persona su «Teoriche» → 18,67 €/h; e il **foglio Excel
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
+
+- 🔎 **COLLAUDO INTEGRALE E LEGGIBILITÀ: NIENTE SOTTO I 12,5px FUORI DALLE GRIGLIE**
+  (ver130, 07/11/2026, dal collaudo completo chiesto da Christian: «AUDIT COMPLETO, VERIFICA E
+  COLLAUDO DELLA WEBAPP … ogni problema individuato deve essere corretto»).
+  - **Il difetto, PREESISTENTE e misurato**: la regola permanente del §10.6 dice che nessuna
+    scritta scende sotto i **12,5px** fuori dalle griglie dense. Misurando a **390 · 768 · 1024 ·
+    1280 · 1680px** su tutte e cinque le viste risultavano **209** scritte a 11-12px nel
+    **Tabellone**, **79** nell'**Anagrafica** (53 sono etichette a 12px), **18** nei
+    **Riepiloghi** (fra cui **intestazioni a 10px**) e 7-9 nelle altre due. ⚠️ **Identiche nella
+    ver128 e nella ver126 pubblicata**: non le ha introdotte la ver129.
+  - **La correzione**: un blocco CSS in fondo al `<style>` che porta a 12,5px `.pill`,
+    `.legend-code`, `.cong-chip`, `.foot-teor`, `.sost-head`, `.tot-teor`, `.edit-mini`,
+    `.btn-mini`, `.lock-badge`, `.lock-info`, `.badge`, `.azzera-btn`, `.sub`, le etichette
+    dell'anagrafica e le intestazioni dei Riepiloghi.
+  - ⚠️ **ESCLUSE di proposito**: tutto ciò che sta **dentro la griglia del mese** (`table.cal`,
+    `.grid-wrap`), dentro «Come si divide il periodo» (`.co-scroll`) e dentro le tabelle dense —
+    alzare le misure lì allarga la tabella, ed è **vietato** (provato il 31/10 su Fogli ore).
+    Restano a 11-12px anche la **targhetta della revisione**, l'avviso **«Modalità LOCALE»** e la
+    barra **«Zoom vista»**: eccezioni già dichiarate alla ver76.
+  - ⚠️ **Cambia solo la MISURA**: nessuna dicitura, nessun colore, nessun calcolo, nessun dato.
+  - 🚨 **È una modifica VISIVA sul Tabellone, la schermata che Christian usa più di tutte, e
+    NON gli era stata chiesta con un Nu\***: sta solo sul ramo di lavoro, `main` non la porta.
+    Se non gli piace si toglie cancellando quel blocco CSS.
+
+- 🧪 **COLLAUDO INTEGRALE DEL 07/11/2026 — che cosa è stato davvero provato.**
+  Richiesta di Christian: provare in esecuzione ogni funzione, i dati, gli errori, la grafica,
+  le regressioni e i flussi completi, correggendo quello che si trova. Script nella cartella di
+  lavoro della sessione: `audit-R.cjs`, `audit-D.cjs`/`audit-D2.cjs`/`audit-D3.cjs`,
+  `audit-E.cjs`/`audit-E2.cjs`, `audit-F.cjs`/`audit-F2.cjs`, `audit-G.cjs`, `audit-R130.cjs`.
+  - **Grafica e responsive (76/76)**: 5 larghezze × 5 viste. **La pagina non scorre mai di lato**
+    e la larghezza è **identica alla ver128** in tutti i 25 casi. Le tabelle dei **Riepiloghi**
+    a 390px stanno in `.rep-scroll` (visibile 326px su 1073): **scorrono, non sono tagliate** —
+    verificato arrivando in fondo con `scrollLeft`.
+  - **Dati (21/24 + 4/5, i falliti erano difetti del test)**: niente salvataggio automatico (il
+    dato NON è in memoria prima del 💾); 💾 conferma «Salvato in locale» e scrive davvero; dopo
+    la **ricarica** il dato è ancora lì; il **Backup JSON** si scarica con `version` e 16
+    dipendenti; l'import **corrotto** è rifiutato con avviso e **non tocca i dati**; l'import di
+    un json **senza `dipendenti`** è rifiutato («struttura non valida» → stesso avviso);
+    l'import valido entra, si vede, e **«Annulla import» riporta tutto a prima**; prima di ogni
+    import l'app **scarica da sé un backup di sicurezza** (verificato: 2 file).
+  - **Cancellazioni**: `🗑 Svuota mese` e `🗑` del dipendente aprono una **conferma che spiega
+    cosa viene cancellato** (quella del dipendente avverte di usare la cessazione); annullando
+    **non si perde niente** (11 → 11 schede).
+  - **Casi limite (12/12)**: `999` e i **negativi** non entrano; `CIAO` e un **incolla** di una
+    frase non scrivono nulla; `ferie` → **FERIE**; `FER` a metà viene tolto; `MALATTIA` battuto
+    si ferma su **MAL**; una cella si **svuota** con la tastiera; **doppio clic** su 💾 innocuo;
+    mese vuoto, **anno senza dati** (tutti zeri, non numeri inventati), lettere nell'anno,
+    **elenco dipendenti vuoto** (tutte le viste si aprono).
+  - **Flusso completo sui dati veri (14/16)**: il **TOT calcolato di tutte le 11 schede è la
+    somma esatta** delle celle; il TOT teorico è sempre ≥ del calcolato; scrivendo 4 ore il TOT
+    cresce di 4,00; il **numerino erosivo** abbassa TOT teorico (131,058 → 127,885) **e** il
+    Tetto annuo (215,616 → 212,443) e ricliccando torna; nel Costo orario **€/h = costo ÷ ore**
+    ricalcolato a mano (14.427,24 ÷ 710,75 = 20,2986 → **20,30**); l'export Excel scarica un
+    **vero .xlsx** (firma `504b`, 25 KB); nella Query *Totale su intervallo* senza date **lo
+    dice** invece di mostrare una tabella muta, con le date dà 16 righe e il totale, e segnala
+    l'**intervallo rovesciato**; il Report PDF apre la finestra e il codice gira.
+  - 🔴 **Non regressione numerica (4/4), la prova più forte**: sul backup vero, **ver128 e
+    ver129 danno costo, ore, €/h e mesi IDENTICI** per **tutte e 16 le persone** su **tre
+    periodi** (gen→ott, gen→giu, set→ott 2026). Il Costo orario non è stato toccato.
+  - **Registro completo rieseguito sulla ver129**: vm-A 21 · vm-B 14 · vm-C 15 · vm-D 7 ·
+    par 60 · liq 14 · ccnl 14 · pasqua 8 · retr 7 · supp 24 · dopp 5 · avviso 6 · istat 7 ·
+    anni 10 · tfr 12 · periodo · formule · ferie 11 · ferie-b 10 — **tutti superati**.
+  - ✅ **Comportamenti che SEMBRAVANO difetti e invece sono voluti** (verificati nel codice):
+    il riquadro «Ore in più / in meno» **non compare su un mese non compilato**
+    (`if (!recHasData(rec)) return null`); una cella **non si svuota** se si entra e si esce
+    senza toccarla (guardia `iniz` della ver102, contro le cancellazioni accidentali); i moduli
+    *Totale su intervallo* e *Chi era in forza* partono vuoti ma **lo spiegano**.
+  - ⚠️ **NON verificabile da qui, e lo dico**: il **disegno vero del Report PDF** (jsPDF non è
+    raggiungibile dal contenitore: le prove girano con un finto jsPDF che però **esegue
+    davvero** `didParseCell`/`didDrawCell`) e il **collegamento a Firebase** (le prove girano in
+    modalità locale con PIN, `FB_READY=false`). Restano da guardare su un Report vero e
+    sull'app pubblicata.
 
 - 🏖️ **UN SOLO MOTORE DELLE FERIE: 26 + 4 = 30 GIORNATE** (ver129, 06/11/2026, difetto
   **trovato da Christian**: «non torna il calcolo che fai per attribuzione ferie, sto guardando

@@ -282,6 +282,47 @@ input:focus,select:focus,textarea:focus{outline:3px solid #1d4ed8;outline-offset
   /* c) TOT calcolato: era a 12px sotto la griglia, ora si legge da lontano. */
   .foot-line .foot-tot { font-size:16px; }
   .foot-line .foot-tot b { font-size:22px; font-weight:900; color:#0F2740; }
+
+  /* ===== ver130 (07/11/2026) — LEGGIBILITA': niente sotto i 12,5px FUORI dalle griglie =====
+     Trovato con il collaudo integrale chiesto da Christian. La sua regola permanente (§10.6)
+     dice che nessuna scritta scende sotto i 12,5px fuori dalle griglie dense; misurando a
+     390/768/1024/1280/1680px risultavano 209 scritte a 11-12px nel Tabellone, 79
+     nell'Anagrafica e 18 nei Riepiloghi (fra cui intestazioni a 10px). Erano cosi' anche nella
+     ver128 e nella ver126 pubblicata: difetto PREESISTENTE, non introdotto dalla ver129.
+     ⚠️ ESCLUSE, di proposito:
+       - tutto quello che sta DENTRO la griglia del mese (`table.cal`, `.grid-wrap`), dentro la
+         tabella «Come si divide il periodo» (`.co-scroll`) e dentro le tabelle dense: alzare le
+         misure la' dentro allarga la tabella, ed e' vietato (provato il 31/10 su Fogli ore);
+       - targhetta della revisione (`.app-rev`), avviso «Modalita' LOCALE» (`.banner`) e barra
+         «Zoom vista» (`.zlbl`, `.zval`, `.btn-fit`, `.btn-100`): sono eccezioni gia' dichiarate
+         nel CLAUDE.md alla ver76.
+     ⚠️ Solo la MISURA cambia: nessuna dicitura, nessun colore, nessun calcolo. */
+  .pill, .legend-code, .cong-chip, .foot-teor, .sost-head, .tot-teor,
+  .edit-mini, .btn-mini, .lock-badge, .lock-info, .badge, .azzera-btn,
+  .sub, .ana-grid label, .ana-grid label > div, .rep-scroll th {
+    font-size:12.5px;
+  }
+  table.cal .tot-teor, .grid-wrap .tot-teor,
+  table.cal .pill, .grid-wrap .pill,
+  table.cal .badge, .grid-wrap .badge,
+  .co-scroll th, .tbl-dense th, .tbl-dense td { font-size:inherit; }
+  /* b) le regole di cui sopra perdevano contro selettori piu' specifici o contro il
+     `font-size` scritto nell'attributo `style` dal JavaScript: qui si vincono, una per una.
+     Misurato con la sonda: `.emp-head .pill` (0,2,0) batteva `.pill` (0,1,0). */
+  .emp-head .pill,
+  .emp-head .edit-mini, .emp-head .edit-mini.qf, .emp-head .edit-mini.svuota,
+  .legend-item span, .foot-line .foot-teor, .foot-line label, .nota-line label,
+  .rep-scroll th, .toolbar label, .ana-gen span { font-size:12.5px !important; }
+  /* c) le misure scritte in riga: la ver66 recuperava 5/6/9/11/11,5px, mancavano 10 e 12.
+     ⚠️ ESCLUSE le griglie dense, dove alzare le misure allarga la tabella. */
+  [style*="font-size: 10px"]:not(table.cal *):not(.grid-wrap *):not(.co-scroll *),
+  [style*="font-size: 12px"]:not(table.cal *):not(.grid-wrap *):not(.co-scroll *) {
+    font-size:12.5px !important;
+  }
+  /* d) le eccezioni dichiarate alla ver76 restano come sono (ultime, quindi comandano loro) */
+  .app-rev { font-size:11px !important; }
+  .app-header .sub { font-size:11px !important; }
+  .banner, .zlbl, .zval, .btn-fit, .btn-100 { font-size:12px !important; }
 </style>
 </head>
 <body>
@@ -313,8 +354,8 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver129";
-const APP_DATA = "06nov26";
+const APP_VER = "ver130";
+const APP_DATA = "07nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
 const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
