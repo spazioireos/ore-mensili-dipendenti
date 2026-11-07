@@ -2091,8 +2091,12 @@ Banca ore, tetto annuo, contratti e export.
   - **L'esito non mente**: alla fine dice quanti sono riusciti e **chi no, con il motivo**; se
     l'errore parla di permessi, avvisa che **le regole di sicurezza nuove non sono ancora
     pubblicate** in console.
-  - ⚠️ **Serve che Christian pubblichi** `regole-firestore/regole-residui-03nov26.rules` (sta nel
-    repo di Fogli ore). Finché non lo fa, il pulsante fallisce e lo dice.
+  - ✅ **Le regole SONO state pubblicate** (verificato il 07/11/2026: Christian ha incollato il
+    testo in vigore nella console e risulta identico a
+    `regole-firestore/regole-residui-03nov26.rules`, rieseguito l'emulatore ufficiale su quel
+    testo: **51/51**). Da qui in avanti il pulsante può scrivere davvero. ⚠️ **Va premuto**: i
+    residui pubblicati prima della ver98 sono vecchi, perché ora il tetto lo consumano anche i
+    permessi retribuiti.
 - 🔴 **I FESTIVI NON SI COMPILANO** (ver77, richiesta di Christian, opzione **A** = blocco totale).
   Sui giorni rossi (festività e domeniche) non si scrive più **niente**, né ore né codici:
   `nonScriv = blocked || rosso` disattiva la casella e il pulsante del permesso orario.
