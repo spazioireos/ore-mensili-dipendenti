@@ -313,7 +313,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver128";
+const APP_VER = "ver129";
 const APP_DATA = "06nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -775,27 +775,59 @@ function straoRange(state, dp, fromYM, toYM){   // somma per persona dei delta m
   });
   return { piu:R2(piu,3), meno:R2(meno,3) };
 }
-/* ===== Ferie da smaltire (controllo al 30 aprile sull'anno precedente) ===== */
-const FERIE_GG_ANNO = 26;                 // giorni ferie annui (pieni)
-const FERIE_GG_MESE = 26/12;              // 2,1666... GG al mese, riproporzionati sui mesi lavorati
-function ferieGodute(state, dp, year){    // giorni "FERIE" segnati nelle celle dell'anno
+/* ===== Ferie da smaltire (controllo al 30 aprile sull'anno precedente) =====
+   ver129 (06/11/2026, regola confermata da Christian: «exf e permessi ex festivita' sono la
+   stessa cosa e possono essere presi in ore o giorni: sono 4 gg annui e si sommano a 26 gg di
+   ferie annui»). Fino alla ver128 qui c'era un SECONDO motore delle ferie, diverso da quello
+   del Costo orario: 26 giornate l'anno, SOLO le celle FERIE, e 12 mesi d'ufficio a chi non ha
+   la data di assunzione. Ora il criterio e' UNO SOLO, lo stesso di `ferieBilancio`:
+     - maturate = (ferie + altri permessi dei valori comuni: 26+4=30) / 12 x mesi che maturano
+     - godute   = celle FERIE + celle EXF + permessi ORARI di tipo EXF (ore -> giornate)
+     - i mesi che maturano sono quelli CON DATI, con almeno 15 giorni di contratto, e non tutti
+       «AN» (un mese non pagato non matura ratei: la stessa regola di `mesiRateiPeriodo`)
+   ⚠️ Il numero di giornate NON e' piu' scritto nel codice: viene dai valori comuni, cosi' se
+   si cambia «ferie e permessi annui» si muove tutta l'app.
+   ⚠️ I mesi si contano su quelli CON DATI perche' qui si puo' scegliere solo l'anno (non un
+   intervallo di mesi): su un anno ancora in corso 12 mesi d'ufficio gonfiavano il debito. */
+const FERIE_GG_ANNO_DEF = 30;              // 26 ferie + 4 ex festivita', valore di riserva
+function ferieGGAnno(state){
+  const c = (state && state.costoComune) ? state.costoComune : {};
+  const f = Number(String(c.ferie==null?"":c.ferie).replace(",",".")) || 0;
+  const p = Number(String(c.altriPermessi==null?"":c.altriPermessi).replace(",",".")) || 0;
+  return (f+p) > 0 ? (f+p) : FERIE_GG_ANNO_DEF;
+}
+function ferieGodute(state, dp, year){     // giornate di ferie / ex festivita' godute nell'anno
+  let gg = 0;
+  for(let mo=1; mo<=12; mo++){
+    const rec=(state.dati[monthKey(year,mo)]||{})[dp.id];
+    if(!rec||!rec.giorni) continue;
+    const nd=daysInMonth(year,mo);
+    for(let d=1; d<=nd; d++){ const v=String(rec.giorni[d]==null?"":rec.giorni[d]).trim();
+      if(v==="FERIE"||v==="EXF") gg++; }
+    const q=quotaGiorno(dp,year,mo), P=(rec.permessi)?rec.permessi:{};
+    Object.keys(P).forEach(function(d){ const v=P[d], ore=Number(v&&v.ore)||0;
+      if(ore>0 && String((v&&v.tipo)||"").trim().toUpperCase()==="EXF" && q>0) gg += ore/q; });
+  }
+  return R2(gg,3);
+}
+function mesiFerieAnno(state, dp, year){   // mesi dell'anno che maturano le ferie
+  const senzaData = !assunzInt(dp);
   let n=0;
   for(let mo=1; mo<=12; mo++){
     const rec=(state.dati[monthKey(year,mo)]||{})[dp.id];
     if(!rec||!rec.giorni) continue;
     const nd=daysInMonth(year,mo);
-    for(let d=1; d<=nd; d++){ if(String(rec.giorni[d]==null?"":rec.giorni[d]).trim()==="FERIE") n++; }
+    let scritte=false;
+    for(let d=1; d<=nd; d++){ if(String(rec.giorni[d]==null?"":rec.giorni[d]).trim()!==""){ scritte=true; break; } }
+    if(!scritte) continue;
+    if(!senzaData && !meseConta(dp, year, mo)) continue;
+    if(meseTuttoAN(state, dp, year, mo)) continue;
+    n++;
   }
   return n;
 }
-function mesiInForzaAnno(dp, year){        // mesi dell'anno in cui l'operatore è in forza (test a metà mese)
-  if(!assunzInt(dp)) return 12;            // senza data assunzione: anno intero
-  let n=0;
-  for(let mo=1; mo<=12; mo++){ if(inForceAt(dp, year*10000+mo*100+15)) n++; }
-  return n;
-}
-function ferieMaturato(dp, year){ return R2(FERIE_GG_MESE*mesiInForzaAnno(dp,year),3); }
-function ferieResiduo(state, dp, year){ return R2((ferieMaturato(dp,year)-ferieGodute(state,dp,year)),3); }
+function ferieMaturato(state, dp, year){ return R2(ferieGGAnno(state)/12*mesiFerieAnno(state,dp,year),3); }
+function ferieResiduo(state, dp, year){ return R2((ferieMaturato(state,dp,year)-ferieGodute(state,dp,year)),3); }
 function annoHasData(state, year){ const ks=Object.keys(state.dati||{}); for(let i=0;i<ks.length;i++){ if(ks[i].indexOf(String(year)+"-")===0) return true; } return false; }
 function tettiList(dp){ return (Array.isArray(dp.tettiAnnui)?dp.tettiAnnui:[]).map(function(t){ return { anno:parseInt(t&&t.anno,10)||0, ore:parseFloat(String(t&&t.ore).replace(",",".")) }; }).filter(function(t){ return !isNaN(t.ore) && t.ore>0; }).sort(function(a,b){ return a.anno-b.anno; }); }
 /* ver100 (05/11/2026, richiesta di Christian: «sarebbe bello che esso derivasse dalla somma di
@@ -4297,12 +4329,12 @@ function QueryPanel(props){
   const sLabel = function(ym){ return MONTH_LABEL[(ym%100)-1]+" "+Math.floor(ym/100); };
   function expS(){ const aoa=[["STRAORDINARIO (base mensile) — da "+sLabel(sFromYM)+" a "+sLabel(sToYM)],["Conteggiati solo i mesi da ottobre 2026 in poi. Ore in più = straordinario pagato; ore in meno = ore tolte. Nessuna compensazione tra i due."],[],["COGNOME NOME","ORE IN PIU' (STRAORDINARIO)","ORE IN MENO"]]; rowsS.forEach(function(r){ aoa.push([r.nome, R2(r.piu,3), R2(r.meno,3)]); }); aoa.push([]); aoa.push(["TOTALE COMPLESSIVO", R2(totSPiu,3), R2(totSMeno,3)]); qExport("Query - Straordinario "+sLabel(sFromYM).replace(/ /g,"-")+"_"+sLabel(sToYM).replace(/ /g,"-")+".xlsx", aoa); }
 
-  // --- Ferie da smaltire: residuo (26 GG/anno, 2,1666 GG/mese sui mesi lavorati) per l'anno scelto ---
+  // --- Ferie da smaltire: residuo (ver129: 30 GG/anno = 2,50 al mese, godute FERIE+EXF) per l'anno scelto ---
   const fY = parseInt(fAnno,10)||0;
   const fHasData = fY>0 && annoHasData(state, fY);
-  const rowsF = fY>0 ? dips.map(function(dp){ const mat=ferieMaturato(dp,fY), god=ferieGodute(state,dp,fY), res=R2((mat-god),3); return { nome:nomeOf(dp), col:dp.colore, mat:mat, god:god, res:res }; }) : [];
+  const rowsF = fY>0 ? dips.map(function(dp){ const mat=ferieMaturato(state,dp,fY), god=ferieGodute(state,dp,fY), res=R2((mat-god),3); return { nome:nomeOf(dp), col:dp.colore, mat:mat, god:god, res:res }; }) : [];
   const daSmaltire = rowsF.filter(function(r){ return r.res>0.0005; });
-  function expF(){ const aoa=[["FERIE DA SMALTIRE — anno "+fY+" (verifica al 30 aprile "+(fY+1)+")"],["26 GG annui = 2,1666 GG/mese riproporzionati sui mesi in forza. Residuo = maturate − godute. In rosso chi ha residuo > 0."],[],["COGNOME NOME","FERIE MATURATE (GG)","FERIE GODUTE (GG)","RESIDUO DA SMALTIRE (GG)"]]; rowsF.forEach(function(r){ aoa.push([r.nome, R2(r.mat,3), r.god, R2(r.res,3)]); }); qExport("Query - Ferie da smaltire "+fY+".xlsx", aoa); }
+  function expF(){ const aoa=[["FERIE DA SMALTIRE — anno "+fY+" (verifica al 30 aprile "+(fY+1)+")"],["30 GG annui (26 ferie + 4 ex festività) = 2,50 GG/mese riproporzionati sui mesi in forza con dati. Godute = FERIE + EXF. Residuo = maturate − godute. In rosso chi ha residuo > 0."],[],["COGNOME NOME","FERIE MATURATE (GG)","FERIE GODUTE (GG)","RESIDUO DA SMALTIRE (GG)"]]; rowsF.forEach(function(r){ aoa.push([r.nome, R2(r.mat,3), R2(r.god,3), R2(r.res,3)]); }); qExport("Query - Ferie da smaltire "+fY+".xlsx", aoa); }
 
   return (
     <div style={{ padding:"14px" }}>
@@ -4430,7 +4462,7 @@ function QueryPanel(props){
       {mode==="ferie" ? (
         <div>
           <div style={{ fontSize:"12px", color:"#334155", background:"#fff7ed", border:"1px dashed #fb923c", borderRadius:"8px", padding:"8px 12px", marginBottom:"12px", lineHeight:1.5 }}>
-            Residuo ferie per l'anno scelto: <b>26 GG annui</b> = 2,1666 GG/mese riproporzionati sui mesi in forza. <b>Residuo = maturate − godute</b> (un giorno "FERIE" nel foglio = 1 GG). Al <b>30 aprile</b> si controlla l'anno <b>precedente</b>, per far godere il residuo in tempo.
+            Residuo ferie per l'anno scelto: <b>30 GG annui</b> (26 ferie + 4 ex festività) = 2,50 GG/mese riproporzionati sui mesi in forza che hanno dati. <b>Residuo = maturate − godute</b> (un giorno "FERIE" o "EXF" nel foglio = 1 GG; le ex festività prese <b>a ore</b> si convertono in giornate con la quota del mese). Al <b>30 aprile</b> si controlla l'anno <b>precedente</b>, per far godere il residuo in tempo.
           </div>
           <div style={{ display:"flex", alignItems:"flex-end", gap:"10px", flexWrap:"wrap", marginBottom:"12px" }}>
             <div><div style={{ fontSize:"12px", fontWeight:700, marginBottom:"3px" }}>Anno da controllare</div><input value={fAnno} onChange={function(e){ setFAnno(e.target.value.replace(/[^0-9]/g,"").slice(0,4)); }} inputMode="numeric" style={Object.assign({},yInput,{width:"100px"})} /></div>
@@ -4445,7 +4477,7 @@ function QueryPanel(props){
              <div style={{ overflowX:"auto", border:"1px solid #e2e8f0", borderRadius:"8px" }}>
                <table style={{ borderCollapse:"collapse", width:"100%", minWidth:"560px" }}>
                  <thead><tr><th style={th}>Cognome Nome</th><th style={Object.assign({},th,{textAlign:"right"})}>Maturate (GG)</th><th style={Object.assign({},th,{textAlign:"right"})}>Godute (GG)</th><th style={Object.assign({},th,{textAlign:"right"})}>Residuo da smaltire (GG)</th></tr></thead>
-                 <tbody>{rowsF.map(function(r,i){ const flag=r.res>0.0005; return <tr key={i} style={flag?{background:"#fee2e2"}:undefined}><td style={Object.assign({},td,{borderLeft:"7px solid "+(r.col||"#94a3b8")},flag?{fontWeight:800,color:"#991b1b"}:undefined)}>{r.nome}</td><td style={Object.assign({},td,{textAlign:"right"})}>{fmt2(r.mat)}</td><td style={Object.assign({},td,{textAlign:"right"})}>{r.god}</td><td style={Object.assign({},td,{textAlign:"right",fontWeight:800,color:flag?"#dc2626":"#94a3b8"})}>{flag?fmt2(r.res):"0,00"}</td></tr>; })}</tbody>
+                 <tbody>{rowsF.map(function(r,i){ const flag=r.res>0.0005; return <tr key={i} style={flag?{background:"#fee2e2"}:undefined}><td style={Object.assign({},td,{borderLeft:"7px solid "+(r.col||"#94a3b8")},flag?{fontWeight:800,color:"#991b1b"}:undefined)}>{r.nome}</td><td style={Object.assign({},td,{textAlign:"right"})}>{fmt2(r.mat)}</td><td style={Object.assign({},td,{textAlign:"right"})}>{fmt2(r.god)}</td><td style={Object.assign({},td,{textAlign:"right",fontWeight:800,color:flag?"#dc2626":"#94a3b8"})}>{flag?fmt2(r.res):"0,00"}</td></tr>; })}</tbody>
                </table>
              </div>
            </div>}
@@ -5672,7 +5704,7 @@ function App(){
                 const bancaP = dp.mensilizzato ? bancaPrecA(state, dp, anno, mese) : 0;
                 const tettoNum = tettoForPeriod(dp, anno, mese);
                 const tettoC = (!isNaN(tettoNum) && tettoNum>0) ? consumoTetto(state, dp, anno, mese) : 0;
-                const ferieApr = (mese===4) ? { year:anno-1, mat:ferieMaturato(dp,anno-1), god:ferieGodute(state,dp,anno-1), res:ferieResiduo(state,dp,anno-1), noData:!annoHasData(state,anno-1) } : null;
+                const ferieApr = (mese===4) ? { year:anno-1, mat:ferieMaturato(state,dp,anno-1), god:ferieGodute(state,dp,anno-1), res:ferieResiduo(state,dp,anno-1), noData:!annoHasData(state,anno-1) } : null;
                 const foDiff = (function(){ try { if (!foPerNome) return null; const agg = foPerNome[foNorm(dp.nome)]; return agg ? foConfronta(recDp, anno, mese, agg) : null; } catch (e){ console.error("confronto Fogli ore", e); return null; } })();
                 return <EmployeeCard key={dp.id} dp={dp} rec={recDp} fuoriPeriodo={fuoriPeriodo} anno={anno} mese={mese} fset={fset} mLocked={mLocked}
                   dipList={dipList} onCell={onCell} onEro={onEro} onNota={onNota} onFestConfirm={onFestConfirm} onQuickFill={onQuickFill}

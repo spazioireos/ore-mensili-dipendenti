@@ -12,7 +12,7 @@ Banca ore, tetto annuo, contratti e export.
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → NUMERO (ore) **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver128 · 06nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver129 · 06nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -384,6 +384,79 @@ Banca ore, tetto annuo, contratti e export.
     «— ore» e «non calcolabile»; la stessa persona su «Teoriche» → 18,67 €/h; e il **foglio Excel
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
+
+- 🏖️ **UN SOLO MOTORE DELLE FERIE: 26 + 4 = 30 GIORNATE** (ver129, 06/11/2026, difetto
+  **trovato da Christian**: «non torna il calcolo che fai per attribuzione ferie, sto guardando
+  il 2026»). Aveva ragione: nell'app c'erano **due motori diversi**, e sul 2026 non potevano
+  dare lo stesso numero.
+  | | **A — «Ferie da smaltire»** (fascia rossa di aprile + Query personale) | **B — Costo orario** (`ferieBilancio`, ver120/125/127) |
+  |---|---|---|
+  | maturate | **26** gg/anno = 2,1666/mese | **30** gg/anno = 2,50/mese |
+  | mesi | mesi in forza (prova al giorno 15), **12 d'ufficio senza data di assunzione**, mesi tutti «AN» **contati** | mesi di **rateo** (≥15 gg) **meno** i mesi tutti «AN» |
+  | godute | **solo celle FERIE** | **FERIE + EXF** + permessi orari EXF |
+  - 🔑 **La regola, data da Christian il 06/11/2026**: «**exf e permessi ex festività sono la
+    stessa cosa e possono essere presi in ore o giorni: sono 4 gg annui e si sommano a 26 gg di
+    ferie annui**» → **30 giornate l'anno = 2,50 al mese**, ed è la stessa cosa che già diceva
+    il 06/11 sui ROL («tutto insieme a 30 gg annui»).
+  - **Cosa è cambiato**, nel solo motore A (`ferieGodute`, `ferieMaturato`, `ferieResiduo`):
+    - **le giornate non sono più scritte nel codice**: `ferieGGAnno(state)` le prende dai
+      **valori comuni** (`ferie` + `altriPermessi` = 26 + 4), così se si cambia quel numero si
+      muove tutta l'app. `FERIE_GG_ANNO_DEF = 30` è solo il valore di riserva;
+    - **godute = celle FERIE + celle EXF + permessi ORARI di tipo EXF**, questi ultimi
+      convertiti in giornate con `quotaGiorno` del mese. ⚠️ Serve perché le ex festività **si
+      possono prendere a ore** (precisato da Christian nello stesso scambio);
+    - **`mesiFerieAnno`**: contano i mesi **che hanno dati**, con **almeno 15 giorni** di
+      contratto (`meseConta`, la stessa funzione del Costo orario) e **non tutti «AN»**
+      (`meseTuttoAN`: un mese non pagato non matura ratei).
+  - ⚠️ **I mesi si contano su quelli CON DATI** perché qui **si può scegliere solo l'anno**, non
+    un intervallo di mesi (osservazione di Christian): su un anno ancora in corso i 12 mesi
+    d'ufficio gonfiavano il debito di 2,50 giornate per ogni mese non ancora compilato.
+  - 🔴 **Quanto sbagliava**, sui dati veri (backup del 04/11, celle fino a ottobre 2026) —
+    maturate − godute = residuo:
+    | | ver128 | **ver129** |
+    |---|--:|--:|
+    | 2026, chi ha 9 mesi compilati | 26,00 − 14 = **12,00** | 22,50 − 14 = **8,50** |
+    | 2026, chi non ha **nessun** mese compilato (4 persone senza data di assunzione) | 26,00 − 0 = **26,00** di debito **inventato** | **0,00** |
+    | 2025 (anno chiuso), chi ha lavorato 12 mesi | 26,00 − 13 = 13,00 | **30,00** − 13 = **17,00** |
+    | 2026, chi ha 30 celle EXF | 26,00 − **16** = 10,00 | 22,50 − **46** = 0,00 (in credito) |
+    ⚠️ Sull'**anno chiuso il residuo SALE** per quasi tutti, perché le maturate passano da 26 a
+    30. ⚠️ Sull'**anno in corso SCENDE**, perché i mesi non compilati non maturano più.
+  - 🧾 **Un caso vero che si è chiuso da sé**: una persona aveva **30 celle EXF** nel 2026
+    (2 a maggio, 7 a luglio, **21 ad agosto**), cioè ferie estive battute col codice EXF. Con il
+    motore unico **il totale non cambia** (FERIE ed EXF si sommano): 46 giornate godute, contro
+    21,00 di residuo 2025 + 22,50 maturate nel 2026 = 43,50. **Sta smaltendo l'arretrato, è
+    quasi in pari**: il «−23,50» era solo l'effetto di guardare un anno per volta.
+  - 🏷️ **Due diciture cambiate, ENTRAMBE autorizzate da Christian** («sul 2 ti dico che è
+    giusto, divengono 30 annui (= 2,5 mese) se sommiamo le ex festività»): la riga di
+    spiegazione sopra la tabella e il sottotitolo dell'**Excel** dicevano «26 GG annui = 2,1666
+    GG/mese», che sarebbe diventato falso. Ora dicono «30 GG annui (26 ferie + 4 ex festività) =
+    2,50 GG/mese riproporzionati sui mesi in forza che hanno dati», e nominano EXF e le ore.
+    ⚠️ **Nessun altro testo è stato toccato**: la fascia rossa di aprile e le intestazioni delle
+    colonne sono quelle di prima.
+  - **Una colonna formattata**: nella tabella e nell'Excel le **godute** passano da numero intero
+    a `fmt2`/`R2(…,3)`, perché con le ex festività prese **a ore** possono avere i decimali.
+  - ⚠️ **Il Costo orario NON è stato toccato**: `ferieBilancio`, l'avviso giallo della ver120 e
+    la liquidazione della ver125/127 sono **identici**. È il motore vecchio che è stato portato
+    sul nuovo, non il contrario.
+  - ⚠️ **A e B possono ancora dare maturate diverse, ed è voluto**: A guarda **l'anno civile** e
+    conta i mesi **registrati**, B guarda **il periodo che scegli** e conta i mesi di **rateo**
+    (anche quelli non ancora compilati). Su un anno chiuso e completo coincidono. Le **godute**
+    invece sono ora **sempre le stesse** — verificato in esecuzione: 22,00 e 22,00.
+  - **Provato in esecuzione** (`ferie129.cjs` **11/11**, `ferie129b.cjs` **10/10**, zero errori
+    di pagina): la targhetta dice ver129; le 16 righe della tabella ci sono in entrambe le
+    versioni; 2025 maturate 26,00 → 30,00 e residuo 13,00 → 17,00; una cella EXF che prima non
+    contava ora conta (godute 18 → 19); chi non ha la data di assunzione passa da 26,00 maturate
+    d'ufficio a 7,50 sui 3 mesi con dati; chi non ha nessun mese compilato passa da 26,00 di
+    debito a 0,00; le maturate del 2026 scendono a 22,50 sui 9 mesi compilati; le 30 celle EXF
+    portano le godute da 16 a 46; la nota a video dice 30 e 2,50 e nomina le ore; la **fascia di
+    aprile** passa da «maturate 13,00 − godute 4,00» a «maturate 15,00 − godute 5,00»; un
+    **permesso orario EXF da 4,01 h** diventa **2,00 giornate** godute (nella ver128 era
+    ignorato) e il residuo scende esattamente della stessa quantità; e il **Costo orario dà le
+    stesse godute**.
+  - 🟠 **Due incoerenze nei DATI, segnalate a Christian e NON corrette dal codice**: una persona
+    ha ore scritte in un mese in cui, secondo le date della scheda, il contratto non è in piedi
+    (quel mese non matura e non si vede); un'altra ha dati su 10 mesi del 2025 ma risulta assunta
+    da 4. Si sistemano a mano nelle date della scheda — **lui ha detto che lo fa lui**.
 
 - 📊 **IL CCNL HA TRE TRANCHE E GLI SCATTI SI CONTANO DA SOLI** (ver128, 06/11/2026).
   Christian: «su periodi lunghi potrebbe essere cambiato l'importo da corrispondere, per esempio
