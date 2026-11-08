@@ -323,6 +323,111 @@ input:focus,select:focus,textarea:focus{outline:3px solid #1d4ed8;outline-offset
   .app-rev { font-size:11px !important; }
   .app-header .sub { font-size:11px !important; }
   .banner, .zlbl, .zval, .btn-fit, .btn-100 { font-size:12px !important; }
+
+  /* ================= COMPATTAZIONE (ver134 - 08nov26) =================
+     Richiesta di Christian dell'08/11/2026: "REVISIONE GRAFICA COMPLESSIVA
+     DEL GESTIONALE - compattazione dell'interfaccia".
+     Tre sue scelte, prese con una domanda prima di costruire:
+       1) NIENTE VERDE: la codifica a colori per provenienza del dato non e'
+          distinguibile dal solo CSS (parametro preassegnato e compilazione
+          manuale sono la stessa casella nel DOM), quindi si rimanda.
+       2) I COLORI GIA' SCELTI DA LUI VINCONO SEMPRE: qui NON si cambia
+          nessun colore, nessuno sfondo, nessun bordo. Solo spazi.
+       3) LE ALTEZZE NON SI RIDUCONO: .btn resta a min-height 40px (ver66),
+          .cell-in resta height 34px, le caselle restano quelle che sono.
+          Si stringono SOLO margini, imbottiture, distanze e interlinea dei
+          CONTENITORI, come vuole il paragrafo 10.6.
+     ESCLUSIONI: niente di tutto questo entra dentro la griglia del mese
+     (table.cal, .grid-wrap) ne' dentro "Come si divide il periodo"
+     (.co-scroll): la' le misure non si toccano (provato il 31/10 su Fogli
+     ore: la tabella si allarga e su telefono si scorre di piu').
+     Nessuna dicitura, nessun calcolo, nessun dato toccati.
+     ==================================================================== */
+
+  /* --- a) il telaio: testata, linguette, barre --- */
+  .app-header { padding:8px 14px; gap:10px; }
+  .tabs { padding:6px 12px 0; }
+  .zoombar { padding:4px 12px; }
+  .yearbar { padding:2px 5px; }
+  .monthstrip { margin:6px -14px -8px; padding:5px 14px; }
+
+  /* --- b) l'area di lavoro e le schede delle persone --- */
+  .content { padding:10px; }
+  .toolbar { margin-bottom:8px; }
+  .lock-info { padding:5px 10px; margin-bottom:8px; }
+  .emp-card { margin-bottom:10px; }
+  .emp-head { padding:7px 12px; }
+  .grid-wrap { padding:6px 8px 3px; }
+  .foot-line { padding:5px 14px 2px; }
+
+  /* --- c) i riquadri sotto la griglia (conguaglio, sostituzioni, note) --- */
+  .cong { margin-top:3px; padding:6px 9px; }
+  .cong-head { margin-bottom:4px; }
+  .cong-plain { padding:4px 8px; margin-bottom:4px; }
+  .cong-bar { margin:2px 0 4px; }
+  .sost-box { margin:3px 14px 7px; padding:6px 8px; }
+  .sost-head { margin-bottom:4px; }
+  .sost-row { margin-bottom:4px; }
+  .nota-line { padding:5px 14px 8px; }
+  .note-box { margin:7px 14px 10px; padding:7px 9px; }
+  .note-head { margin-bottom:5px; }
+  .voce-row { margin-bottom:4px; }
+
+  /* --- d) Riepiloghi e legenda --- */
+  .legend, .rep-box { padding:8px 11px; margin-bottom:9px; }
+  .legend h3, .rep-box h3 { margin:0 0 5px; }
+  table.rep th, table.rep td { padding:4px 7px; }
+
+  /* --- e) finestre --- */
+  .overlay { padding:12px; }
+  .modal { padding:15px; }
+  .field { margin-bottom:8px; }
+  .modal-actions { margin-top:11px; }
+  .login-box { padding:22px; }
+
+  /* --- f) spaziature scritte in riga dal JavaScript: servono !important.
+         Ogni regola esclude le tre griglie dense. --- */
+  /* i quattro riquadri in fondo alla scheda: proroghe, trasformazioni,
+     monte ore, massimali (sono il contenitore piu' largo dell'app) */
+  [style*="padding: 12px"][style*="margin-bottom: 12px"]:not(table.cal *):not(.grid-wrap *):not(.co-scroll *)
+    { padding:8px !important; margin-bottom:8px !important; }
+  /* riquadro "Come si usa" e riquadro "Mensilizza tutti" dell'Anagrafica */
+  [style*="padding: 10px 14px"]:not(table.cal *):not(.grid-wrap *):not(.co-scroll *)
+    { padding:7px 10px !important; }
+  [style*="padding: 12px 14px"]:not(table.cal *):not(.grid-wrap *):not(.co-scroll *)
+    { padding:8px 11px !important; }
+  /* la scheda dell'Anagrafica e il riquadro del risultato del Costo orario */
+  .ana-sheet { padding:10px !important; }
+  [style*="padding: 13px 12px"]:not(table.cal *):not(.grid-wrap *):not(.co-scroll *)
+    { padding:9px 10px !important; }
+  /* le sezioni dell'Anagrafica e le righe di spiegazione */
+  [style*="margin-bottom: 16px"]:not(table.cal *):not(.grid-wrap *):not(.co-scroll *)
+    { margin-bottom:10px !important; }
+  [style*="margin-bottom: 14px"]:not(table.cal *):not(.grid-wrap *):not(.co-scroll *)
+    { margin-bottom:9px !important; }
+
+  /* --- g) interlinea dei testi lunghi di spiegazione, fuori dalle griglie.
+         NON cambia la misura dei caratteri: solo lo spazio fra le righe. --- */
+  .legend p, .rep-box p, .co-par { line-height:1.25; }
+
+
+  /* --- h) secondo giro: Anagrafica e Costo orario erano gia' compatti
+         (ver69 e ver76), qui si recupera il resto degli spazi in riga. --- */
+  .ana-grid { gap:5px !important; }
+  [style*="margin-bottom: 10px"]:not(table.cal *):not(.grid-wrap *):not(.co-scroll *)
+    { margin-bottom:7px !important; }
+  [style*="margin-bottom: 8px"]:not(table.cal *):not(.grid-wrap *):not(.co-scroll *)
+    { margin-bottom:5px !important; }
+  [style*="margin-bottom: 6px"]:not(table.cal *):not(.grid-wrap *):not(.co-scroll *)
+    { margin-bottom:4px !important; }
+  [style*="margin-top: 6px"]:not(table.cal *):not(.grid-wrap *):not(.co-scroll *)
+    { margin-top:4px !important; }
+  /* i riquadri del Costo orario: box() e blocco, 7px 10px -> 5px 8px */
+  [style*="padding: 7px 10px"]:not(table.cal *):not(.grid-wrap *):not(.co-scroll *)
+    { padding:5px 8px !important; }
+
+  /* ============== fine aggiunta ver134 ============== */
+
 </style>
 </head>
 <body>
@@ -354,7 +459,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver133";
+const APP_VER = "ver134";
 const APP_DATA = "08nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)

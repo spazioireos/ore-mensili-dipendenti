@@ -18,7 +18,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver133 · 08nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver134 · 08nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -390,6 +390,45 @@ Banca ore, tetto annuo, contratti e export.
     «— ore» e «non calcolabile»; la stessa persona su «Teoriche» → 18,67 €/h; e il **foglio Excel
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
+
+- 📐 **COMPATTAZIONE: PIU' ROBA A SCHERMO, STESSI COLORI E STESSE ALTEZZE** (ver134, 08/11/2026,
+  richiesta di Christian: «REVISIONE GRAFICA COMPLESSIVA DEL GESTIONALE — l'interfaccia attuale
+  presenta spaziature eccessive»). Intervento **di solo CSS**: un blocco nuovo in fondo al
+  `<style>`, **nessuna riga di JavaScript, nessun attributo HTML, nessuna classe nuova**.
+  - 🔑 **TRE SCELTE DI CHRISTIAN, prese con una domanda PRIMA di costruire**, perché la sua
+    richiesta conteneva due contraddizioni interne:
+    1. **niente verde**: la codifica a colori per provenienza del dato (giallo manuale / verde
+       parametro / azzurro formula / bianco incerto) **non è ottenibile dal solo CSS**, perché
+       «parametro preassegnato» e «compilazione manuale» nel DOM sono **la stessa casella**.
+       Servirebbe un contrassegno nel JavaScript, che il suo stesso vincolo vietava. **Rimandata**
+       (sua risposta: «Parte 2 hai fatto bene a non fare»);
+    2. **i colori già scelti da lui vincono sempre**: qui **nessun colore è stato toccato**;
+    3. **le altezze NON si riducono**: la sua richiesta chiedeva di abbassare anche caselle,
+       tendine e pulsanti, ma il §10.6 dice il contrario; **vale il §10.6**, si stringono solo
+       gli SPAZI.
+  - ⚠️ **Perché il verde non si può fare senza toccare il codice**: non riproporlo come se bastasse
+    il CSS. Se un giorno si vorrà davvero, serve il suo permesso per **un solo contrassegno** sulle
+    caselle precompilate da un parametro.
+  - **Che cosa si stringe**: imbottiture e distanze dei CONTENITORI — testata, linguette, barra
+    dello zoom, `.content`, `.toolbar`, `.emp-card`, `.emp-head`, il padding esterno di
+    `.grid-wrap`, i riquadri del conguaglio/sostituzioni/note, `.legend`/`.rep-box`, le celle di
+    `table.rep`, le finestre — più le spaziature **scritte in riga da React**, agganciate con
+    `[style*="..."]` e `!important` (React serializza **con** lo spazio dopo i due punti).
+  - **Misurato in esecuzione** a 390 · 768 · 1280 · 1680px, confrontando la ver133 e la ver134
+    sullo stesso backup vero:
+    | vista | guadagno in altezza |
+    |---|--:|
+    | **Riepiloghi** | **da −13,2% a −20,4%** |
+    | **Tabellone** | **da −7% a −12,1%** |
+    | Anagrafica | da −4,3% a −6,8% |
+    | Costo orario | da −2,1% a −4,2% |
+  - ✅ **Che cosa NON è cambiato, in tutti e 20 i casi misurati**: la **larghezza della pagina**
+    (identica, nessuno scorrimento laterale nuovo); la **tabella del mese** (**2282px → 2282px**);
+    il numero di **scritte sotto i 12,5px** (identico: 334 nel Tabellone — sono dentro la griglia,
+    eccezione dichiarata — e 7 altrove); i **pulsanti ≥40px** (9 su 9); l'**altezza della cella
+    delle ore** (34px). **Zero errori di pagina.**
+  - 🚫 **Esclusioni**: ogni regola porta `:not(table.cal *):not(.grid-wrap *):not(.co-scroll *)`.
+    Dentro la griglia del mese e dentro «Come si divide il periodo» **non si tocca niente**.
 
 - ⚠️ **LE «SETTIMANE DAVVERO LAVORABILI» DICONO CHE NON SERVONO** (ver133, 08/11/2026, domanda
   di Christian: «la questione settimane davvero lavorabili in realtà ci serve? Non calcoliamo
