@@ -424,8 +424,14 @@ Banca ore, tetto annuo, contratti e export.
   - **Registro cumulativo rieseguito sulla ver133**: vm-A 21 · vm-B 14 · vm-C 15 · vm-D 7 ·
     formule 9/9 · par 21/21 · ccnl 14 · liq 14 · ferie 11 · ferie-b 10 · tfr 12 · istat 7 ·
     anni 10 · retr 7 · pasqua 8 · dopp 5 · supp-b 24 · avviso 6 · periodo · super 20 ·
-    lettera 14 · scatti 11+5 — **tutti superati**. ⚠️ L'unico «fallito» di `ferie133` era
-    un'**attesa sbagliata dello script** (si aspettava la targhetta «ver131»): corretta.
+    lettera 14 · scatti 11+5 — **25 script, nessuna regressione**.
+    ⚠️ **Due «falliti», entrambi attese sbagliate dei MIEI script, non difetti dell'app**, e
+    corrette negli script: `ferie133` si aspettava la targhetta «ver131»; `scatti133` si
+    aspettava un costo identico alla ver131 su un periodo che **contiene** il mese di
+    maturazione — lì la differenza (**14,03 €**) **è** la correzione della ver132 (b).
+  - **`scatti133c` ha riconfermato i numeri di Christian** sulla persona con 4 scatti
+    riconosciuti: **Gennaio 2026 → Gennaio 2027 con 4 = 82,64 €** e **Febbraio 2027 →
+    Dicembre 2027 con 5 = 103,30 €**.
 
 - 🎖️ **GLI SCATTI RICONOSCIUTI ALL'ASSUNZIONE, E IL MESE IN CUI MATURANO** (ver132, 08/11/2026,
   da un caso vero di Christian: «ha **4 scatti** al livello D1 **regalati all'assunzione** e il
