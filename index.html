@@ -354,8 +354,8 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver131";
-const APP_DATA = "07nov26";
+const APP_VER = "ver132";
+const APP_DATA = "08nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
 const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
@@ -3058,7 +3058,14 @@ function addizTDAuto(dp, pairs){
    utile e fa slittare la maturazione (regola di Christian). Massimo 5.
    ⚠️ Prima del primo mese che l'app conosce non si puo' sapere se ci furono mesi tutti AN:
    quei mesi si contano tutti come utili, e `stimati` lo segnala. */
-function scattiAl(state, dp, y, m, prec){
+/* ver132 (08/11/2026). Due aggiunte, chieste da Christian per un caso vero: una persona a
+   cui all'assunzione sono stati RICONOSCIUTI 4 scatti, con il quinto che matura a febbraio 2027.
+   a) `ass0` = scatti riconosciuti il giorno dell'assunzione (casella nuova): diventa il punto di
+      partenza, e da li' l'app continua ad aggiungerne uno ogni 24 mesi utili;
+   b) chi e' assunto DOPO il giorno 1 comincia a contare dal mese SUCCESSIVO: cosi' i 24 mesi si
+      chiudono all'anniversario e lo scatto parte dal mese dopo. Senza questo, per lei (assunta
+      il 07/01/2025) il quinto scatto sarebbe partito da gennaio 2027 invece che da febbraio. */
+function scattiAl(state, dp, y, m, prec, ass0){
   const ass = ymdIt(dp && dp.dataAssunzione);
   const pd = primoMeseDati(state);
   const pdN = pd ? (pd.y*100 + pd.m) : null;
@@ -3072,13 +3079,18 @@ function scattiAl(state, dp, y, m, prec){
      ⚠️ Non si sa a che punto fosse il biennio in corso a quella data: il prossimo scatto puo'
      arrivare fino a 23 mesi piu' tardi del vero. E' scritto a video. */
   const usaCasella = primaDeiDati && (prec != null) && (prec !== "") && !isNaN(Number(prec));
+  const assG = ass ? (ass % 100) : 0;                 /* ver132: giorno di assunzione */
+  const riconosciuti = (ass0 != null && ass0 !== "" && !isNaN(Number(ass0)))
+    ? Math.max(0, Math.floor(Number(ass0))) : 0;      /* ver132: scatti regalati all'assunzione */
   let cy, cm, base = 0;
   if (usaCasella){ base = Math.max(0, Math.floor(Number(prec))); cy = pd.y; cm = pd.m; }
-  else if (ass){ cy = aY; cm = aM; }
+  else if (ass){ base = riconosciuti; cy = aY; cm = aM;
+    /* ver132 b): assunto dopo il giorno 1 -> il primo mese utile e' quello dopo */
+    if (assG > 1){ cm++; if (cm > 12){ cm = 1; cy++; } } }
   else if (pd){ cy = pd.y; cm = pd.m; }
-  else return { n:0, utili:0, stimati:0, senzaAssunzione:!ass, primaDeiDati:primaDeiDati, daCasella:false };
+  else return { n:0, utili:0, stimati:0, base:0, riconosciuti:riconosciuti, senzaAssunzione:!ass, primaDeiDati:primaDeiDati, daCasella:false };
   if ((cy*100 + cm) >= fino)
-    return { n: Math.min(SCATTI_MAX, base), utili:0, stimati:0, senzaAssunzione:!ass, primaDeiDati:primaDeiDati, daCasella:usaCasella };
+    return { n: Math.min(SCATTI_MAX, base), utili:0, stimati:0, base:base, riconosciuti:riconosciuti, senzaAssunzione:!ass, primaDeiDati:primaDeiDati, daCasella:usaCasella };
   let utili = 0, stimati = 0, guard = 0;
   while ((cy*100 + cm) < fino && guard < 1200){
     const n = cy*100 + cm;
@@ -3088,8 +3100,8 @@ function scattiAl(state, dp, y, m, prec){
     guard++;
   }
   return { n: Math.min(SCATTI_MAX, base + Math.floor(utili / SCATTI_MESI)),
-           utili:utili, stimati:stimati, senzaAssunzione:!ass,
-           primaDeiDati:primaDeiDati, daCasella:usaCasella };
+           utili:utili, stimati:stimati, base:base, riconosciuti:riconosciuti,
+           senzaAssunzione:!ass, primaDeiDati:primaDeiDati, daCasella:usaCasella };
 }
 function firmaMese(state, dp, y, m, fisso){
   const v = valoriAt(dp, y, m);
@@ -3101,7 +3113,7 @@ function firmaMese(state, dp, y, m, fisso){
   const f = fisso || {};
   return [String(v.livello==null?"":v.livello).toUpperCase().trim(), String(v.oreSett), String(v.tipo), String(np),
           f.tab ? "-" : tabellaAl(y, m),
-          f.scatti ? "-" : String(scattiAl(state, dp, y, m, (f.prec != null ? f.prec : null)).n),
+          f.scatti ? "-" : String(scattiAl(state, dp, y, m, (f.prec != null ? f.prec : null), (f.ass != null ? f.ass : null)).n),
           /* ver131: anche il SUPERMINIMO fa parte della firma, cosi' il periodo si taglia da
              solo alla data in cui cambia. Scritto a mano vale uguale dappertutto: non taglia. */
           f.superm ? "-" : String(v.superm)].join("|");
@@ -3298,8 +3310,10 @@ function datiCosto(state, dp, pairs){
   /* ver128: gli SCATTI si contano da soli dall'assunzione, uno ogni 24 mesi utili, massimo 5.
      Il valore e' quello del livello, a tempo pieno (come il minimo). */
   const scattiPrecRaw = (p.scattiPrec != null && String(p.scattiPrec).trim() !== "") ? cNum(p.scattiPrec, 0) : null;
-  const scattiInfo = ultimoPr ? scattiAl(state, dp, ultimoPr.y, ultimoPr.m, scattiPrecRaw)
-                              : { n:0, utili:0, stimati:0, senzaAssunzione:!ymdIt(dp && dp.dataAssunzione), primaDeiDati:true, daCasella:false };
+  /* ver132: scatti RICONOSCIUTI all'assunzione (casella nuova nella scheda della persona). */
+  const scattiAssRaw = (p.scattiAss != null && String(p.scattiAss).trim() !== "") ? cNum(p.scattiAss, 0) : null;
+  const scattiInfo = ultimoPr ? scattiAl(state, dp, ultimoPr.y, ultimoPr.m, scattiPrecRaw, scattiAssRaw)
+                              : { n:0, utili:0, stimati:0, base:0, riconosciuti:0, senzaAssunzione:!ymdIt(dp && dp.dataAssunzione), primaDeiDati:true, daCasella:false };
   const scattiValore = SCATTI_CCNL[liv] || 0;
   const scattiAuto = R2(scattiValore * scattiInfo.n, 2);
   const scattiAMano = (p.scatti != null && String(p.scatti) !== "");
@@ -3446,7 +3460,7 @@ function datiCosto(state, dp, pairs){
   o.noTaglio = scrittoAMano ? "valori scritti a mano" : (contiInMesi ? "maternità o mesi tolti" : "");
   o.supermAuto = supermAuto; o.supermAMano = supermAMano;   /* ver131: per l'avviso sulla casella */
   o.blocchi = null;
-  const fissoSplit = { tab: !!tabScritta, scatti: scattiAMano, prec: scattiPrecRaw, superm: supermAMano };
+  const fissoSplit = { tab: !!tabScritta, scatti: scattiAMano, prec: scattiPrecRaw, ass: scattiAssRaw, superm: supermAMano };
   o.tagliPossibili = (pairs && pairs.length) ? blocchiPeriodo(state, dp, pairs, fissoSplit).length : 1;
   if (!o.noTaglio && pairs && pairs.length > 1){
     const bl = blocchiPeriodo(state, dp, pairs, fissoSplit);
@@ -3459,7 +3473,7 @@ function datiCosto(state, dp, pairs){
            mano) e i SUOI scatti, contati all'inizio del pezzo. */
         const tabB = tabScritta || tabellaAl(pr0.y, pr0.m);
         const livB = (function(){ const l=String(vv.livello==null?"":vv.livello).toUpperCase().trim(); return (MINIMI_CCNL[tabB] && MINIMI_CCNL[tabB][l]) ? l : ""; })();
-        const scB = scattiAl(state, dp, pr0.y, pr0.m, scattiPrecRaw);
+        const scB = scattiAl(state, dp, pr0.y, pr0.m, scattiPrecRaw, scattiAssRaw);
         const scattiB = scattiAMano ? o.scatti : R2((SCATTI_CCNL[livB || liv] || 0) * scB.n, 2);
         const indetB = String(vv.tipo) !== "determinato";
         const fineB = fineRapportoYmd(dp, b.pairs);   /* ver110: non oltre la fine del rapporto */
@@ -3837,7 +3851,16 @@ function CostoOrario(props){
                   {campoNum("Scatti di anzianità €", cMostra(d.raw.scatti, d.scattiAuto || ""), function(v){ setPar("scatti", v); },
                     d.scattiInfo.senzaAssunzione
                       ? "serve la data di assunzione in ANAGRAFICA per contarli da soli"
-                      : (nTxt(d.scattiInfo.n) + (Number(d.scattiInfo.n)===1 ? " scatto" : " scatti") + " × " + fmt2(d.scattiValore) + " € = " + fmt2(d.scattiAuto) + " € (uno ogni 24 mesi utili, massimo " + SCATTI_MAX + ")"))}
+                      : (nTxt(d.scattiInfo.n) + (Number(d.scattiInfo.n)===1 ? " scatto" : " scatti") + " × " + fmt2(d.scattiValore) + " € = " + fmt2(d.scattiAuto) + " € (uno ogni 24 mesi utili, massimo " + SCATTI_MAX + ")"
+                          + (d.scattiInfo.riconosciuti > 0 ? (" \u2014 di cui " + nTxt(d.scattiInfo.riconosciuti) + " riconosciuti all'assunzione") : "")))}
+                  {/* ver132: gli scatti RICONOSCIUTI all'assunzione. Compare solo a chi è stato
+                      assunto DOPO l'inizio dei dati, cioè esattamente dove non c'è la casella del
+                      pregresso qui sotto: così delle due ne si vede sempre una sola. */}
+                  {(!d.scattiInfo.primaDeiDati)
+                    ? campoNum("Scatti riconosciuti all'assunzione", cMostra(d.raw.scattiAss, ""),
+                        function(v){ setPar("scattiAss", v); },
+                        "quanti scatti gli sono stati riconosciuti il giorno dell'assunzione: da lì l'app aggiunge uno ogni 24 mesi utili")
+                    : null}
                   {/* ver128: il pregresso serve solo a chi è stato assunto prima dell'inizio dei dati. */}
                   {(d.scattiInfo.primaDeiDati && d.primaDeiDatiAl)
                     ? campoNum("Scatti già maturati al " + d.primaDeiDatiAl, cMostra(d.raw.scattiPrec, ""),

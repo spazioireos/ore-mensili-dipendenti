@@ -18,7 +18,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver131 · 07nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver132 · 08nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -391,6 +391,59 @@ Banca ore, tetto annuo, contratti e export.
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
 
+- 🎖️ **GLI SCATTI RICONOSCIUTI ALL'ASSUNZIONE, E IL MESE IN CUI MATURANO** (ver132, 08/11/2026,
+  da un caso vero di Christian: «ha **4 scatti** al livello D1 **regalati all'assunzione** e il
+  **quinto scatta a febbraio 27**», poi «**Ok 1 e 2**»). Due aggiunte, entrambe sul conteggio
+  degli scatti della ver128.
+  - **a) Casella nuova «Scatti riconosciuti all'assunzione»** (`dp.costo.scattiAss`, un numero).
+    Diventa il **punto di partenza** di `scattiAl`, che da lì continua ad aggiungerne **uno ogni
+    24 mesi utili** come già faceva (massimo 5, e un mese tutto «AN» fa slittare la maturazione).
+    Gli scatti «regalati» l'app non può indovinarli: glieli si dice una volta e poi va da sola.
+    ⚠️ **Compare SOLO a chi è assunto dopo l'inizio dei dati**, cioè esattamente dove **non**
+    compare la casella «Scatti già maturati al …» della ver128: delle due se ne vede **sempre una
+    sola**, così non si sommano per sbaglio. (Dicitura nuova, scritta da Claude.)
+  - **b) Chi è assunto DOPO il giorno 1 comincia a contare dal mese SUCCESSIVO.** Prima il mese
+    di assunzione contava intero: per lei (assunta il **07/01/2025**) i 24 mesi si chiudevano a
+    fine dicembre 2026 e il quinto scatto partiva da **gennaio** 2027. Ora i 24 mesi si chiudono
+    all'**anniversario** (07/01/2027) e lo scatto parte dal mese dopo, **febbraio 2027**: è il
+    numero che ha dato Christian.
+  - **L'aiutino sotto «Scatti di anzianità €»** aggiunge, quando ce ne sono, «— di cui **4**
+    riconosciuti all'assunzione».
+  - ⚠️ **L'importo scritto a mano continua a vincere** su tutto, come prima, e continua a
+    **spegnere il taglio del periodo** (`fissoSplit.scatti`). La **casella nuova invece NON lo
+    spegne**: è un punto di partenza, non un valore fisso, quindi il periodo si taglia ancora al
+    mese in cui lo scatto cambia. **Verificato**: con 4 riconosciuti, gennaio 2026 → dicembre
+    2027 si divide in **Gennaio 2026→Gennaio 2027 (4 = 82,64 €)** e **Febbraio 2027→Dicembre
+    2027 (5 = 103,30 €)**.
+  - 🔴 **CONSEGUENZA DA SAPERE della b)**: per chi è assunto **dopo il giorno 1** ogni scatto
+    matura **un mese più tardi** di come lo contava la ver131, quindi i costi dei periodi che
+    **contengono** quel mese scendono di un mese di scatto. **Misurato sui dati veri**: una
+    persona assunta il **16/10/2023**, periodo gen→dic 2025, passa da **13.708,83 €** a
+    **13.692,46 €** (**−16,37 €**), perché il suo primo scatto si sposta da ottobre a novembre
+    2025. ⚠️ Sui periodi che **non** contengono il mese di maturazione **non cambia un centesimo**.
+  - **Provato in esecuzione** (`scatti132.cjs` **11/12**, `scatti132b.cjs` **5/5**,
+    `scatti132c.cjs`, zero errori di pagina):
+    - **non regressione sui 16 dipendenti veri**, periodo gen→ott 2026: **costi identici** fra
+      ver131 e ver132, 16 su 16;
+    - la casella nuova compare e quella del pregresso **no**;
+    - con **4** scritti: «4 scatti × 20,66 € = **82,64 €** … — di cui 4 riconosciuti
+      all'assunzione»; a **gennaio 2027 ancora 4**; a **febbraio 2027 → 5 = 103,30 €**;
+    - con la casella **vuota** ver131 e ver132 contano lo **stesso numero** di scatti;
+    - chi è assunto il **giorno 1** (01/02/2023) e chi è già al **massimo** (5): **differenza
+      0,00 €**;
+    - ⚠️ l'unico controllo «fallito» dei 12 era una **mia attesa sbagliata** nello script (mi
+      aspettavo costo identico anche su un periodo che contiene il mese di maturazione: lì la
+      differenza **è** la correzione chiesta, −14,03 € su quel caso).
+  - 📚 **La tabella degli scatti è stata ricontrollata contro il CCNL**, su domanda di Christian
+    («torna con le tabelle degli scatti ccnl coop sociali?»): **D1 = 20,66 €/mese**, **massimo 5
+    scatti**, **uno ogni biennio**, tabella in vigore dal **01/10/2025** — confermati dall'art. 80
+    del CCNL Cooperative sociali e dalla tabella CNEL T151, che riporta anche **D1 minimo
+    1.637,57 €** (lo stesso di `MINIMI_CCNL.Ott25`). Confermati pure **A1 11,62 · A2 13,43 ·
+    B1 16,27 · D2 23,24 · F2 46,48**. ⚠️ **NON verificati uno per uno** C1, C2, C3, D3, E1, E2,
+    F1: la pagina con la tabella completa **non è raggiungibile** dalla rete di questa sessione
+    (host non fra quelli consentiti), quindi restano quelli della tabella che aveva mandato
+    Christian. ⚠️ Una fonte secondaria parla di **61,98 €** per il D1 col rinnovo 2025-2028
+    (= 3 × 20,66): **da verificare sul testo ufficiale** prima di toccare qualcosa.
 - 💠 **IL SUPERMINIMO SEGUE LE TRASFORMAZIONI, E I COLORI SONO 24** (ver131, 07/11/2026, due
   richieste di Christian: «le trasformazioni potrebbero riguardare anche — per i dipendenti —
   aggiunta di superminimo, quindi va considerata e calcolata anche questa cosa» e «i colori
