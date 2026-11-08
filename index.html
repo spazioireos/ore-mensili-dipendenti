@@ -354,7 +354,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver132";
+const APP_VER = "ver133";
 const APP_DATA = "08nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -3993,6 +3993,18 @@ function CostoOrario(props){
                         <td style={{ padding:"1px 0 1px 8px", fontSize:"13px", color:"#475569" }}>settimane × ore settimanali</td></tr>
                   </tbody></table>
                   {d.suppMensileAttivo ? <div style={{ fontSize:"12.5px", color:"#475569", lineHeight:1.3, marginTop:"4px" }}>⚠️ Con le ore <b>dai Riepiloghi</b> le <b>ore in più</b> non si contano da qui: si contano <b>mese per mese</b> sul monte contrattuale (riquadro «Le ore in più, mese per mese»). Questa tabellina serve alle ore <b>Teoriche</b> e alla simulazione: è lì che valgono ancora i giorni <b>presunti</b> di ferie e malattia dei valori comuni.</div> : null}
+                  {/* ver133 (08/11/2026, Nu* di Christian: «la questione settimane davvero
+                      lavorabili in realtà ci serve? Non calcoliamo tutto dalle ore reali da
+                      tabellone?»). Con le ore dai Riepiloghi o a mano queste due caselle NON
+                      servono per contare le ore, ma scriverle spegne il conto mese per mese
+                      (ver117) e il taglio del periodo in pezzi (ver84): l'app ora lo dice.
+                      NESSUN calcolo è cambiato: è solo un avviso. */}
+                  {((d.raw.settPeriodo || d.raw.settLav) && d.fonte !== "teoriche") ?
+                    <div style={{ marginTop:"6px", background:"#fff8e1", border:"2px solid #eac87a", borderRadius:"8px", padding:"7px 9px", fontSize:"12.5px", color:"#78350f", lineHeight:1.35 }}>
+                      ⚠️ <b>Queste settimane sono scritte a mano, ma qui non servono.</b> Con le ore {d.fonte === "mano" ? "scritte a mano" : "dai Riepiloghi"} le ore del periodo arrivano da lì, non da questa tabellina: lei serve solo alle ore <b>Teoriche</b> e alle simulazioni.
+                      <div style={{ marginTop:"3px" }}>⚠️ Scriverle però <b>spegne due cose</b>: le <b>ore in più</b> tornano a contarsi sul <b>totale del periodo</b> invece che <b>mese per mese</b>, e il periodo <b>non si divide più in pezzi</b> (niente riquadro «Come si divide il periodo»). Il costo cambia di conseguenza.</div>
+                      <div style={{ marginTop:"3px" }}>Per tornare all'automatico premi <b>↺ Rimetti i valori calcolati</b> qui sotto.</div>
+                    </div> : null}
                   {(d.raw.settPeriodo || d.raw.settLav) ?
                     <button className="btn btn-gray" style={{ marginTop:"6px" }}
                       onClick={function(){ setParMulti({ settPeriodo:"", settLav:"" }); }}>↺ Rimetti i valori calcolati</button> : null}

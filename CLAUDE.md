@@ -18,7 +18,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver132 · 08nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver133 · 08nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -391,6 +391,42 @@ Banca ore, tetto annuo, contratti e export.
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
 
+- ⚠️ **LE «SETTIMANE DAVVERO LAVORABILI» DICONO CHE NON SERVONO** (ver133, 08/11/2026, domanda
+  di Christian: «la questione settimane davvero lavorabili in realtà ci serve? Non calcoliamo
+  tutto dalle ore reali da tabellone?» → **Nu\***). **Avviso e nulla più: NESSUN calcolo è stato
+  toccato**, verificato in esecuzione (stesso costo al centesimo della ver132).
+  - **Ha ragione lui, e il difetto era che l'app non lo diceva.** Le due caselle *Settimane del
+    periodo* e *Settimane davvero lavorabili* (ver73) servono alle ore **«Teoriche»** e alle
+    simulazioni. Con le ore **dai Riepiloghi** o **a mano** le ore del periodo arrivano da lì, non
+    da quella tabellina: le settimane **non contano le ore**. Ma scriverle **spegne due cose**,
+    perché sono «valori strutturali scritti a mano»: le **ore in più** tornano a contarsi sul
+    **totale del periodo** invece che **mese per mese** (ver117) e il **periodo non si divide più
+    in pezzi** (ver84). Quindi non sono innocue, e prima **non c'era nessun avviso**.
+  - **A video**: sotto la tabellina delle settimane, **sopra** il pulsante ↺, un riquadro giallo
+    che dice che quelle settimane qui non servono, che spengono il conto mese per mese e il
+    taglio in pezzi, e che per tornare all'automatico basta premere **↺ Rimetti i valori
+    calcolati**. Compare **solo** se almeno una delle due caselle è scritta **e** la fonte delle
+    ore **non** è «Teoriche». ⚠️ **Dicitura nuova, scritta da Claude.**
+  - ⚠️ **Le caselle restano scrivibili e giallline**, come la «% di ore supplementari» dalla
+    ver75 e la «Anni per rivalutazione TFR» dalla ver115: sono **spente nei conti**, non bloccate.
+    Non bloccarle senza che Christian lo chieda.
+  - 🔴 **QUANTO PESA, misurato sui dati VERI** (backup del 04/11, una persona che ha
+    `settLav` scritto a mano, periodo gen→ott 2026): con le settimane scritte il costo è
+    **12.456,45 €** e il periodo si divide in **0 pezzi**; premendo ↺ diventa **13.108,55 €** e
+    **12 pezzi**. **652,10 € di differenza** su dieci mesi, su una persona sola, per due caselle
+    che l'utente credeva innocue. **È la cosa che l'avviso serve a far vedere.**
+  - **Provato in esecuzione** (`avv133.cjs`, **18 controlli su 18**, zero errori di pagina):
+    la ver132 non mostra l'avviso e la ver133 sì; **costo totale, ore e €/h identici** fra le due
+    versioni nello stesso stato; premendo ↺ l'avviso sparisce, il pulsante sparisce, il periodo
+    torna a 12 pezzi e **ver132 e ver133 danno lo stesso numero** (13.108,55 €); con le ore
+    «Teoriche» l'avviso **non compare** anche se le caselle sono scritte; su una persona senza
+    settimane scritte non c'è né avviso né pulsante.
+  - **Registro cumulativo rieseguito sulla ver133**: vm-A 21 · vm-B 14 · vm-C 15 · vm-D 7 ·
+    formule 9/9 · par 21/21 · ccnl 14 · liq 14 · ferie 11 · ferie-b 10 · tfr 12 · istat 7 ·
+    anni 10 · retr 7 · pasqua 8 · dopp 5 · supp-b 24 · avviso 6 · periodo · super 20 ·
+    lettera 14 · scatti 11+5 — **tutti superati**. ⚠️ L'unico «fallito» di `ferie133` era
+    un'**attesa sbagliata dello script** (si aspettava la targhetta «ver131»): corretta.
+
 - 🎖️ **GLI SCATTI RICONOSCIUTI ALL'ASSUNZIONE, E IL MESE IN CUI MATURANO** (ver132, 08/11/2026,
   da un caso vero di Christian: «ha **4 scatti** al livello D1 **regalati all'assunzione** e il
   **quinto scatta a febbraio 27**», poi «**Ok 1 e 2**»). Due aggiunte, entrambe sul conteggio
@@ -439,11 +475,18 @@ Banca ore, tetto annuo, contratti e export.
     scatti**, **uno ogni biennio**, tabella in vigore dal **01/10/2025** — confermati dall'art. 80
     del CCNL Cooperative sociali e dalla tabella CNEL T151, che riporta anche **D1 minimo
     1.637,57 €** (lo stesso di `MINIMI_CCNL.Ott25`). Confermati pure **A1 11,62 · A2 13,43 ·
-    B1 16,27 · D2 23,24 · F2 46,48**. ⚠️ **NON verificati uno per uno** C1, C2, C3, D3, E1, E2,
-    F1: la pagina con la tabella completa **non è raggiungibile** dalla rete di questa sessione
-    (host non fra quelli consentiti), quindi restano quelli della tabella che aveva mandato
-    Christian. ⚠️ Una fonte secondaria parla di **61,98 €** per il D1 col rinnovo 2025-2028
-    (= 3 × 20,66): **da verificare sul testo ufficiale** prima di toccare qualcosa.
+    B1 16,27 · D2 23,24 · F2 46,48**. Di C1, C2, C3, D3, E1, E2 e F1 la pagina con la tabella
+    completa **non era raggiungibile** dalla rete di questa sessione (host non fra quelli
+    consentiti).
+  - ✅ **TABELLA CHIUSA: Christian l'ha mandata per intero l'08/11/2026** («questi sono i valori
+    degli scatti che devi memorizzare per livello») e **tutti e 13 i valori coincidono** con
+    `SCATTI_CCNL` già nel codice, **verificato uno per uno**:
+    **A1 11,62 · A2 13,43 · B1 16,27 · C1 18,59 · C2 19,63 · C3 20,66 · D1 20,66 · D2 23,24 ·
+    D3 26,86 · E1 26,86 · E2 31,50 · F1 39,51 · F2 46,48**. Confermato anche che **C3 e D1 hanno
+    lo stesso scatto** e **D3 ed E1** pure, come già scritto per i tabellari. **Nessun valore è
+    stato cambiato**: la tabella era già giusta.
+    ⚠️ Resta da verificare sul testo ufficiale la fonte secondaria che parla di **61,98 €** per
+    il D1 col rinnovo 2025-2028 (= 3 × 20,66): **non toccare niente** prima di averlo visto.
 - 💠 **IL SUPERMINIMO SEGUE LE TRASFORMAZIONI, E I COLORI SONO 24** (ver131, 07/11/2026, due
   richieste di Christian: «le trasformazioni potrebbero riguardare anche — per i dipendenti —
   aggiunta di superminimo, quindi va considerata e calcolata anche questa cosa» e «i colori
