@@ -18,7 +18,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver142 · 09nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver143 · 09nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -394,6 +394,25 @@ Banca ore, tetto annuo, contratti e export.
     «— ore» e «non calcolabile»; la stessa persona su «Teoriche» → 18,67 €/h; e il **foglio Excel
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
+
+- ⚡ **IL TETTO DELLE 13 ORE VALE ANCHE IN «COMPILA VELOCE»** (ver143, 09/11/2026, richiesta di
+  Christian: «Estendi compila veloce»).
+  - **Perché serviva**: `QuickFillModal` **non passa da `CellInput`** (è così dalla ver102),
+    quindi il tetto della ver142 non lo toccava: di là un valore oltre le 13 ore sarebbe entrato
+    lo stesso, e per di più **su decine di giorni in un colpo solo**.
+  - **Come**: bandierina `valOltreIlTetto` (numero, non codice, oltre `ORE_MAX_GIORNO`); il
+    pulsante **«Compila N giorni» si spegne** e la nota a lato diventa rossa con la stessa frase
+    della ver142. ⚠️ **I codici non sono toccati**: FERIE, MAL, EXF… passano come prima.
+  - **Provato in esecuzione** (`qf143.cjs`, **11 controlli su 11**): 7 · 13 · 12,5 passano;
+    **14 · 20 · 99 · 13,5 spengono il pulsante** e mostrano il motivo; FERIE passa; premendo con
+    7 il mese si riempie davvero (22 celle a 7,00). **Zero errori di pagina.**
+  - 🔴 **BUCO ANCORA APERTO, TROVATO QUI E NON CHIUSO (serve il permesso di Christian)**:
+    «Compila veloce» accetta anche **testo libero**. Scrivendo **`PIPPO`** la nota dice
+    «ore: PIPPO», il pulsante resta acceso e **vengono scritte 22 celle**. L'app poi le segnala
+    (tutte e 22 diventano **rosse** per la ver101 e compare la fascia di avviso), quindi il danno
+    si vede e si può disfare, ma non dovrebbe essere possibile. **La correzione sarebbe la stessa
+    riga**: rifiutare un valore che non è né un codice né un numero. **Chiesto a Christian il
+    09/11/2026, in attesa.**
 
 - ⏱️ **IN UN GIORNO NON SI SCRIVONO PIÙ DI 13 ORE** (ver142, 09/11/2026, scelta di Christian
   «ok 13» dopo che il collaudo generale aveva misurato che si potevano scrivere **99 ore in un

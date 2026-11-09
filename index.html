@@ -459,7 +459,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver142";
+const APP_VER = "ver143";
 const APP_DATA = "09nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -5351,7 +5351,12 @@ function QuickFillModal(props){
   const vTrim = valore.trim();
   const isCode = CODE_SET[vTrim.toUpperCase()] !== undefined;
   const valNorm = isCode ? vTrim.toUpperCase() : vTrim.replace(".", ",");
-  const apply = function(){ if (vTrim === "") return; props.onApply({ dpId:dp.id, valore:valNorm, target:target, overwrite:overwrite, occupied:occupied }); };
+  /* ver143 (09/11/2026, richiesta di Christian: «Estendi compila veloce»). Il tetto delle
+     13 ore della ver142 valeva solo per la cella del Tabellone: «Compila veloce» NON passa da
+     CellInput, quindi di qua un valore oltre il tetto sarebbe entrato lo stesso, e per di piu'
+     su decine di giorni in un colpo solo. */
+  const valOltreIlTetto = (!isCode) && vTrim !== "" && isNumeric(valNorm) && !oreEntroIlMassimo(valNorm);
+  const apply = function(){ if (vTrim === "" || valOltreIlTetto) return; props.onApply({ dpId:dp.id, valore:valNorm, target:target, overwrite:overwrite, occupied:occupied }); };
   return (
     <div className="overlay" onClick={props.onClose}>
       <div className="modal" onClick={function(e){ e.stopPropagation(); }} style={{ maxWidth:"560px" }}>
@@ -5361,7 +5366,7 @@ function QuickFillModal(props){
           <label style={{ fontSize:"13px", fontWeight:"700" }}>Valore da inserire:</label>
           <input value={valore} onChange={function(e){ setValore(e.target.value); }} list="codici-list" placeholder="es. 7  oppure  FERIE"
             style={{ padding:"7px 9px", border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px", width:"160px", fontSize:"15px", fontWeight:"700" }} />
-          <span style={{ fontSize:"12px", color:"#64748b" }}>{vTrim==="" ? "" : (isCode ? "codice: " + CODE_SET[vTrim.toUpperCase()].l : "ore: " + valNorm)}</span>
+          <span style={{ fontSize:"12px", color: valOltreIlTetto ? "#b91c1c" : "#64748b", fontWeight: valOltreIlTetto ? 700 : 400 }}>{vTrim==="" ? "" : (isCode ? "codice: " + CODE_SET[vTrim.toUpperCase()].l : (valOltreIlTetto ? ("In un giorno non si possono scrivere più di " + ORE_MAX_GIORNO + " ore.") : ("ore: " + valNorm)))}</span>
         </div>
         <div style={{ marginBottom:"10px", background:"#f8fafc", border:"1px solid #e2e8f0", borderRadius:"8px", padding:"8px 10px" }}>
           <div style={{ fontSize:"13px", fontWeight:"700", marginBottom:"6px" }}>Quali giorni del mese:</div>
@@ -5418,7 +5423,7 @@ function QuickFillModal(props){
           <span></span>
           <span>
             <button className="btn btn-gray" onClick={props.onClose}>Annulla</button>
-            <button className="btn btn-blue" style={{ marginLeft:"8px" }} disabled={vTrim==="" || target.length===0} onClick={apply}>Compila {target.length} giorni</button>
+            <button className="btn btn-blue" style={{ marginLeft:"8px" }} disabled={vTrim==="" || target.length===0 || valOltreIlTetto} onClick={apply}>Compila {target.length} giorni</button>
           </span>
         </div>
       </div>
