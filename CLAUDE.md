@@ -18,7 +18,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver134 · 08nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver135 · 09nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -391,6 +391,51 @@ Banca ore, tetto annuo, contratti e export.
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
 
+- 🎖️ **GLI SCATTI ALL'ASSUNZIONE SI SCRIVONO IN ANAGRAFICA, E L'AVVISO CHE MANCAVA** (ver135,
+  09/11/2026, due richieste di Christian: «è bene che compaia anche in anagrafica e qui si
+  compili automaticamente e resti sfondo grigiolino, come per tutte le cose copiate in maniera
+  automatica perchè scritte altrove» e, sul nome, «in questo punto fai ricomparire il nome della
+  persona dipendente» → sua scelta **«a e b»** e **«sezione del contratto, ma se lo metto
+  impediscimi di scriverlo altrove»**). **Nessun calcolo è stato toccato**, verificato in
+  esecuzione: stesso costo al centesimo della ver134.
+  - **a) La casella «Scatti riconosciuti all'assunzione» è passata in ANAGRAFICA → Contratto**
+    (campo `ana.scattiAss`). Nella scheda del **Costo orario** la stessa casella è ora
+    **grigia e di sola lettura** (`#f1f5f9`, bordo `#cbd5e1`) e dice «si scrive in **ANAGRAFICA
+    → Contratto**»: è il «grigiolino» che Christian ha chiesto per tutto ciò che arriva da
+    un'altra scheda. ⚠️ **Nessun dato va perso**: `datiCosto` legge **prima** l'Anagrafica e,
+    **solo se è vuota**, continua a usare il vecchio `dp.costo.scattiAss` — e in quel caso la
+    nota sotto la casella dice «questo è il vecchio valore della scheda: riscrivilo in
+    Anagrafica». Dati nuovi: `d.scattiAssVal` e `d.scattiAssDaAna`.
+  - **b) Il nome della persona si ripete dentro la scheda.** Scorrendo il Costo orario il nome in
+    cima usciva dallo schermo e non si sapeva più di chi fossero i numeri. Ora compare in cima a
+    **ciascuno dei tre blocchi** (*Il contratto*, *La retribuzione*, *Le ore da dichiarare*), in
+    piccolo (14px), e in cima al **riquadro del risultato**, grande come l'originale (19px), con
+    il quadratino del colore della persona. Funzione `nomeQui(grande)`, dichiarata accanto a
+    `cella` e riempita nel render. ⚠️ **Il nome in cima alla scheda NON è stato toccato.**
+  - 🟨 **L'avviso che mancava sugli scatti**: un importo scritto a mano nella casella
+    *Scatti di anzianità €* **vince sul calcolo e ferma l'aggiornamento automatico** — a febbraio
+    2027 non diventerà 103,30, resterà quello scritto — e **spegne il taglio del periodo**
+    (`fissoSplit.scatti`). Prima l'aiutino mostrava il conteggio automatico **senza dire che non
+    era quello in uso**: una bugia silenziosa. Ora, quando `d.scattiAMano` è vero, compare un
+    riquadro giallo che nomina **entrambi** i numeri (quello in uso e quello automatico), dice che
+    il valore non cambierà mai da solo e che per riaccendere l'automatico basta **svuotare la
+    casella**. Stessa forma dell'avviso del superminimo (ver131). ⚠️ **Dicitura nuova, scritta da
+    Claude.** ⚠️ La casella **resta scrivibile e giallina**: è l'avviso, non un blocco.
+  - **Provato in esecuzione** (`ver135.cjs`, `ver135d.cjs`, `nome-co.cjs`): la casella in
+    Anagrafica c'è ed è scrivibile; quella del Costo orario è grigia e disabilitata; scrivendo
+    **4** in Anagrafica il Costo orario mostra 4 e l'aiutino dice «di cui 4 riconosciuti
+    all'assunzione»; con l'Anagrafica vuota il vecchio valore della scheda continua a valere e la
+    nota lo dice; il nome compare **4 volte** nella scheda; l'avviso giallo compare solo con gli
+    scatti scritti a mano e nomina i due numeri. **Zero errori di pagina.**
+  - ⚠️ **Resta aperto, e NON è stato toccato**: le altre caselle dell'Anagrafica che riguardano la
+    paga — *Importo orario base €*, ***Superminimo €***, ***Scatti di anzianità €***, *Altro
+    importo orario €*, *Importo orario totale €*, *Part / Full time*, *Giorni di lavoro nella
+    settimana*, *Ruolo / qualifica* — **non sono lette da nessun calcolo**: finiscono in
+    `dp.ana.*` e servono solo ai segnaposto della lettera .docx e all'export Excel. È la causa
+    del «su del mastro ho messo 0,500 orarie di scatti, ma non ho capito se poi si aggiorna»:
+    quel numero non alimenta niente. **Verificato contando le letture nel file: zero.**
+    Christian lo ha chiesto come correzione strutturale il 09/11/2026 (direttiva «LA SCHEDA
+    ANAGRAFICA È IL MOTORE DEL SISTEMA»): **da fare, con le sue risposte alle domande aperte.**
 - 📐 **COMPATTAZIONE: PIU' ROBA A SCHERMO, STESSI COLORI E STESSE ALTEZZE** (ver134, 08/11/2026,
   richiesta di Christian: «REVISIONE GRAFICA COMPLESSIVA DEL GESTIONALE — l'interfaccia attuale
   presenta spaziature eccessive»). Intervento **di solo CSS**: un blocco nuovo in fondo al

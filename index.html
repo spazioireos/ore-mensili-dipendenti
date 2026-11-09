@@ -459,8 +459,8 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver134";
-const APP_DATA = "08nov26";
+const APP_VER = "ver135";
+const APP_DATA = "09nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
 const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
@@ -2150,7 +2150,7 @@ const ANA_SECTIONS = [
   { t:"Dati anagrafici", f:[["cognome","Cognome"],["nome","Nome"],["luogoNascita","Luogo di nascita"],["dataNascita","Data di nascita (gg/mm/aaaa)","date"],["sesso","Sesso","sex"],["cf","Codice fiscale","cf"],["email","Email"]] },
   { t:"Residenza", f:[["indRes","Indirizzo residenza"],["capRes","CAP"],["luogoRes","Comune"]] },
   { t:"Domicilio", f:[["indDom","Indirizzo domicilio"],["capDom","CAP"],["luogoDom","Comune"]] },
-  { t:"Contratto", f:[["dataContratto","Data contratto","date"],["dataAssunzione","Data avvio / assunzione","date"],["scadenza","Data conclusione / scadenza","date"],["cessazione","Data cessazione","cess"],["tipoContratto","Tipo contratto","tipo"],["partFull","Part / Full time","list:partFull"],["orizz","Orizzontale / Verticale / Misto","list:orizz"],["qualifica","Ruolo / qualifica","qual"],["livello","Livello di inquadramento"]] },
+  { t:"Contratto", f:[["dataContratto","Data contratto","date"],["dataAssunzione","Data avvio / assunzione","date"],["scadenza","Data conclusione / scadenza","date"],["cessazione","Data cessazione","cess"],["tipoContratto","Tipo contratto","tipo"],["partFull","Part / Full time","list:partFull"],["orizz","Orizzontale / Verticale / Misto","list:orizz"],["qualifica","Ruolo / qualifica","qual"],["livello","Livello di inquadramento"],["scattiAss","Scatti riconosciuti all'assunzione"]] },
   { t:"Luogo di lavoro", f:[["luogo","Luogo di lavoro","luogo"],["specificaStruttura","Specifica struttura (nome istituto/centro…)"],["ubicazione","Ubicazione / indirizzo"]] },
   { t:"Orario", f:[["oreSett","Monte ore settimanali"],["giorniLav","Giorni di lavoro nella settimana","list:giorniLav"],["periodo","Periodo di lavoro nell'anno","list:periodo"],["giorniProva","Giorni di prova"]] },
   { t:"Orari settimanali (per la tabella del contratto)", f:[["orarioLun","Lunedì"],["orarioMar","Martedì"],["orarioMer","Mercoledì"],["orarioGio","Giovedì"],["orarioVen","Venerdì"],["orarioSab","Sabato"]] },
@@ -3416,7 +3416,14 @@ function datiCosto(state, dp, pairs){
      Il valore e' quello del livello, a tempo pieno (come il minimo). */
   const scattiPrecRaw = (p.scattiPrec != null && String(p.scattiPrec).trim() !== "") ? cNum(p.scattiPrec, 0) : null;
   /* ver132: scatti RICONOSCIUTI all'assunzione (casella nuova nella scheda della persona). */
-  const scattiAssRaw = (p.scattiAss != null && String(p.scattiAss).trim() !== "") ? cNum(p.scattiAss, 0) : null;
+  /* ver135: gli scatti riconosciuti all'assunzione si scrivono in ANAGRAFICA (sezione
+     Contratto) e qui si leggono soltanto. Il vecchio valore scritto nella scheda del Costo
+     orario continua a valere finche' l'Anagrafica e' vuota, cosi' nessun dato gia' inserito
+     va perso. */
+  const scattiAssAna = (dp.ana && dp.ana.scattiAss != null && String(dp.ana.scattiAss).trim() !== "")
+    ? cNum(dp.ana.scattiAss, 0) : null;
+  const scattiAssRaw = (scattiAssAna != null) ? scattiAssAna
+    : ((p.scattiAss != null && String(p.scattiAss).trim() !== "") ? cNum(p.scattiAss, 0) : null);
   const scattiInfo = ultimoPr ? scattiAl(state, dp, ultimoPr.y, ultimoPr.m, scattiPrecRaw, scattiAssRaw)
                               : { n:0, utili:0, stimati:0, base:0, riconosciuti:0, senzaAssunzione:!ymdIt(dp && dp.dataAssunzione), primaDeiDati:true, daCasella:false };
   const scattiValore = SCATTI_CCNL[liv] || 0;
@@ -3435,6 +3442,7 @@ function datiCosto(state, dp, pairs){
     /* ver128: tabella CCNL automatica e scatti automatici */
     tabAuto: tabAuto, tabScritta: tabScritta,
     scattiInfo: scattiInfo, scattiValore: scattiValore, scattiAuto: scattiAuto, scattiAMano: scattiAMano,
+    scattiAssVal: scattiAssRaw, scattiAssDaAna: (scattiAssAna != null),
     /* la data a cui si riferiscono le caselle «al …»: il giorno prima del primo mese dei dati */
     primaDeiDatiAl: (function(){
       const pd = primoMeseDati(state); if (!pd) return "";
@@ -3665,6 +3673,7 @@ function CostoOrario(props){
   const giallo = { border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px", padding:"7px 9px", fontFamily:"inherit", fontSize:"15px", width:"100%" };
   const etich = { fontSize:"13px", fontWeight:700, color:"#374151", marginBottom:"2px" };
   const cella = { display:"block" };
+  let nomeQui = function(){ return null; };   /* ver135: riempita nel render, vedi sotto */
   const box = function(bg,bd){ return { background:bg, border:"1px solid "+bd, borderRadius:"10px", padding:"7px 10px", marginBottom:"6px" }; };
   const titolo = { fontWeight:800, fontSize:"15px", marginBottom:"4px", display:"block" };
   const aiuto = { fontSize:"13px", color:"#475569", lineHeight:1.35, margin:"0 0 6px" };
@@ -3898,6 +3907,18 @@ function CostoOrario(props){
         <div style={{ flex:"1 1 420px", minWidth:0, background:"#fff", border:"2px solid #5a9ce2", borderRadius:"12px", padding:"9px" }}>
           <div style={{ fontSize:"19px", fontWeight:800, color:"#1f4e82", marginBottom:"4px" }}><span style={{ display:"inline-block", width:"14px", height:"14px", borderRadius:"4px", background:(dp.colore||"#94a3b8"), border:"1px solid rgba(0,0,0,.25)", marginRight:"7px", verticalAlign:"-1px" }}></span>{dp.nome}</div>
 
+          {/* ver135 (09/11/2026, richiesta di Christian: "in questo punto fai ricomparire il
+              nome della persona dipendente", scelta "a e b"). Scorrendo la scheda il nome in
+              cima usciva dallo schermo e non si sapeva piu' di chi fossero i numeri. Ora si
+              ripete in cima a ogni blocco (piccolo) e in cima al riquadro del risultato
+              (grande come l'originale). Nessun calcolo toccato: e' solo il nome. */}
+          {(function(){ nomeQui = function(grande){
+            return <div style={{ fontSize: grande ? "19px" : "14px", fontWeight:800, color:"#1f4e82",
+                                 marginBottom: grande ? "5px" : "3px", lineHeight:1.2 }}>
+              <span style={{ display:"inline-block", width: grande ? "14px" : "11px", height: grande ? "14px" : "11px",
+                             borderRadius:"4px", background:(dp.colore||"#94a3b8"), border:"1px solid rgba(0,0,0,.25)",
+                             marginRight:"6px", verticalAlign:"-1px" }}></span>{dp.nome}</div>; }; return null; })()}
+
           <div style={{ display:"flex", gap:"8px", flexWrap:"wrap", alignItems:"flex-start" }}>
 
             <div className="co-wrap" style={{ flex:"1 1 470px", minWidth:0, display:"flex", flexWrap:"wrap", gap:"8px", alignItems:"flex-start" }}>
@@ -3905,6 +3926,7 @@ function CostoOrario(props){
             <div className="co-sub" style={{ flex:"1 1 100%", minWidth:0 }}>
 
               <div style={blocco}>
+                {nomeQui(false)}
                 <div style={capo}>Il contratto</div>
                 <table style={{ width:"100%", borderCollapse:"collapse" }}><tbody>
                   <tr><td style={tdE}>Tipo</td><td style={tdV}>{d.indeterminato ? "Indeterminato" : "Determinato"}</td></tr>
@@ -3940,6 +3962,7 @@ function CostoOrario(props){
               </div>
 
               <div style={blocco}>
+                {nomeQui(false)}
                 <div style={capo}>La retribuzione</div>
                 <div style={{ fontSize:"13px", color:"#475569", lineHeight:1.35 }}>Scegli il livello e il minimo si compila da sé. Le caselle <b>giallino</b> si possono scrivere; quello che non è giallino lo calcola l'app.</div>
                 <div className="co-grid" style={grigliaCampi}>
@@ -3958,13 +3981,29 @@ function CostoOrario(props){
                       ? "serve la data di assunzione in ANAGRAFICA per contarli da soli"
                       : (nTxt(d.scattiInfo.n) + (Number(d.scattiInfo.n)===1 ? " scatto" : " scatti") + " × " + fmt2(d.scattiValore) + " € = " + fmt2(d.scattiAuto) + " € (uno ogni 24 mesi utili, massimo " + SCATTI_MAX + ")"
                           + (d.scattiInfo.riconosciuti > 0 ? (" \u2014 di cui " + nTxt(d.scattiInfo.riconosciuti) + " riconosciuti all'assunzione") : "")))}
+                  {/* ver135: l'avviso che mancava. Un importo scritto a mano nella casella qui
+                      sopra VINCE sul calcolo e ferma l'aggiornamento automatico: a febbraio 2027
+                      non diventera' 103,30, restera' quello scritto. Prima l'aiutino mostrava il
+                      conteggio automatico senza dire che non era quello in uso. Stessa forma
+                      dell'avviso del superminimo (ver131). NESSUN calcolo e' cambiato. */}
+                  {d.scattiAMano
+                    ? <div style={{ gridColumn:"1 / -1", background:"#fff8e1", border:"2px solid #eac87a", borderRadius:"8px", padding:"7px 9px", fontSize:"12.5px", color:"#78350f", lineHeight:1.35 }}>
+                        ⚠️ <b>Gli scatti sono scritti a mano: l'aggiornamento automatico è fermo.</b>
+                        L'app sta usando <b>{fmt2(d.scatti)} €</b> al mese; dal conteggio automatico risulterebbero <b>{fmt2(d.scattiAuto)} €</b>
+                        {d.scattiInfo && d.scattiInfo.n != null ? (" (" + nTxt(d.scattiInfo.n) + (Number(d.scattiInfo.n)===1 ? " scatto" : " scatti") + ")") : ""}.
+                        <div style={{ marginTop:"3px" }}>Finché la casella resta scritta il valore <b>non cambierà mai da solo</b>, nemmeno quando matura lo scatto successivo, e il periodo <b>non si divide più</b> al mese dello scatto.</div>
+                        <div style={{ marginTop:"3px" }}>Per riaccendere l'automatico <b>svuota la casella</b>.</div>
+                      </div>
+                    : null}
                   {/* ver132: gli scatti RICONOSCIUTI all'assunzione. Compare solo a chi è stato
                       assunto DOPO l'inizio dei dati, cioè esattamente dove non c'è la casella del
                       pregresso qui sotto: così delle due ne si vede sempre una sola. */}
                   {(!d.scattiInfo.primaDeiDati)
-                    ? campoNum("Scatti riconosciuti all'assunzione", cMostra(d.raw.scattiAss, ""),
-                        function(v){ setPar("scattiAss", v); },
-                        "quanti scatti gli sono stati riconosciuti il giorno dell'assunzione: da lì l'app aggiunge uno ogni 24 mesi utili")
+                    ? <label style={cella}><span style={etich}>Scatti riconosciuti all'assunzione</span>
+                        <input value={d.scattiAssVal == null ? "" : nTxt(d.scattiAssVal)} disabled
+                          style={{ width:"100%", border:"2px solid #cbd5e1", background:"#f1f5f9", color:"#475569", borderRadius:"6px", padding:"7px 9px", fontFamily:"inherit", fontSize:"15px" }} />
+                        <span style={{ display:"block", fontSize:"12.5px", color:"#475569", lineHeight:1.3 }}>si scrive in <b>ANAGRAFICA → Contratto</b>{d.scattiAssVal == null ? "" : (d.scattiAssDaAna ? ", ed è scritto lì" : " — questo è il vecchio valore della scheda: riscrivilo in Anagrafica")}</span>
+                      </label>
                     : null}
                   {/* ver128: il pregresso serve solo a chi è stato assunto prima dell'inizio dei dati. */}
                   {(d.scattiInfo.primaDeiDati && d.primaDeiDatiAl)
@@ -4057,6 +4096,7 @@ function CostoOrario(props){
             <div className="co-sub" style={{ flex:"1 1 100%", minWidth:0 }}>
 
               <div style={blocco}>
+                {nomeQui(false)}
                 <div style={capo}>Le ore da dichiarare</div>
                 <div style={{ fontSize:"13px", color:"#475569", lineHeight:1.35, marginBottom:"6px" }}>Al Comune si dichiarano <b>solo le ore davvero lavorate</b>: le assenze non si dichiarano. Scegli da dove prenderle.</div>
                 <div style={{ display:"flex", flexDirection:"column", gap:"6px", fontSize:"14.5px" }}>
@@ -4121,6 +4161,7 @@ function CostoOrario(props){
 
             <div className="co-det" style={{ flex:"1 1 340px", minWidth:0 }}>
               <div style={{ border:"2px solid #1f4e82", borderRadius:"12px", padding:"13px 12px", background:"#fff" }}>
+                {nomeQui(true)}
                 <div style={{ textAlign:"center", fontSize:"22px", fontWeight:700, color:"#0F2740", ...cifre }}>{fmt2(r.J35)} €</div>
                 <div style={{ height:"2px", background:"#1f4e82", margin:"6px 0" }}></div>
                 <div style={{ textAlign:"center", fontSize:"22px", fontWeight:700, color:"#0F2740", ...cifre }}>{d.oreMancanti ? "—" : fmt2(r.H38)} ore</div>
