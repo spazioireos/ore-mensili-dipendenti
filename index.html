@@ -459,7 +459,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver137";
+const APP_VER = "ver138";
 const APP_DATA = "09nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -2814,7 +2814,72 @@ const MINIMI_CCNL = {
 const MINIMI_DAL = { "Feb24":202402, "Ott24":202410, "Ott25":202510 };
 /* La tabella in vigore in un dato mese. ⚠️ Prima del 02/2024 l'app non ha la tabella vecchia:
    usa la Feb24 e lo dice. Oggi non succede, i dati partono dal 2025. */
-function tabellaAl(y, m){
+/* ═══ ver138 — LE TABELLE CCNL SI AGGIORNANO SENZA TOCCARE IL CODICE ═══════════════════════
+   Richiesta di Christian (punto 6 della direttiva del 09/11/2026): «voglio poter caricare le
+   nuove tabelle retributive in occasione di ogni rinnovo … conservare integralmente le tabelle
+   precedenti e le rispettive decorrenze … aggiornare una sola volta e fare in modo che tutti i
+   calcoli recepiscano automaticamente le nuove condizioni».
+   ⚠️ **Prima di costruire è stato verificato che non esistesse già** (suo punto 6): le tabelle
+   erano scritte SOLO dentro `index.html`, come costanti, e non c'era nessun modo di aggiungerne
+   una. Non si duplica niente.
+   **Come funziona.** Le tre tranche dell'app (`MINIMI_CCNL` + `MINIMI_DAL`) restano dove sono e
+   non si possono cancellare: sono il punto di partenza. Quelle che Christian carica stanno nei
+   DATI, in `state.ccnlTab`, e si AGGIUNGONO. Una tranche sua con la stessa decorrenza di una
+   dell'app prende il posto di quella (serve a correggere un importo), ma la riga originale resta
+   nel codice e ricompare se lui cancella la sua.
+   ⚠️ **Gli importi storici non si sovrascrivono MAI**: ogni tranche porta la sua decorrenza e
+   `ccnlAl` sceglie quella in vigore **nel mese**, quindi un periodo del 2025 continua a usare la
+   tabella del 2025 anche dopo un rinnovo del 2027. È il suo punto 4.
+   ⚠️ Gli **scatti** sono per Christian «fissi, nel senso che il loro importo non è mai stato
+   alzato con i rinnovi» (09/11/2026), e la tabella dell'app è una sola. Ma il suo punto 6.2
+   chiede di poterli aggiornare con la decorrenza: perciò una tranche può portare anche i suoi
+   scatti, e se non li porta si usano quelli della tranche precedente (in fondo, quelli
+   dell'app). Così la cosa funziona sia se non cambiano mai, sia se un giorno cambiano. */
+function ccnlDalN(dal){                      /* "01/10/2026" -> 202610 */
+  const v = ymdIt(dal); if (!v) return 0;
+  return Math.floor(v/10000)*100 + Math.floor((v%10000)/100);
+}
+function ccnlTranche(state){
+  const out = Object.keys(MINIMI_DAL).map(function(k){
+    return { nome:k, dalN:MINIMI_DAL[k], minimi:MINIMI_CCNL[k], scatti:null, fonte:"app" };
+  });
+  ((state && state.ccnlTab) || []).forEach(function(t){
+    if (!t) return;
+    const dalN = ccnlDalN(t.dal); if (!dalN) return;
+    const rec = { nome:(t.nome || t.dal || String(dalN)), dalN:dalN, dal:t.dal,
+                  minimi:(t.minimi && typeof t.minimi==="object") ? t.minimi : {},
+                  scatti:(t.scatti && typeof t.scatti==="object") ? t.scatti : null, fonte:"tuo" };
+    const i = out.findIndex(function(x){ return x.dalN === dalN; });
+    if (i >= 0) out[i] = rec; else out.push(rec);
+  });
+  out.sort(function(a,b){ return a.dalN - b.dalN; });
+  return out;
+}
+/* la tranche in vigore in quel mese (la più recente con decorrenza <= mese) */
+function ccnlAl(state, y, m){
+  const el = ccnlTranche(state); const n = y*100 + m;
+  let best = el[0];
+  el.forEach(function(t){ if (t.dalN <= n) best = t; });
+  return best;
+}
+/* i minimi di una tranche, per NOME: serve perché il resto del codice gira su `tab` (il nome) */
+function minimiDi(state, nome){
+  const t = ccnlTranche(state).find(function(x){ return x.nome === nome; });
+  return (t && t.minimi) ? t.minimi : (MINIMI_CCNL[nome] || {});
+}
+/* lo scatto di un livello su una tranche: se la tranche non ne porta, si eredita indietro */
+function scattoDi(state, nome, liv){
+  const el = ccnlTranche(state);
+  let i = el.findIndex(function(x){ return x.nome === nome; });
+  if (i < 0) i = el.length - 1;
+  for (let k = i; k >= 0; k--){ const s = el[k].scatti; if (s && s[liv] != null && !isNaN(Number(s[liv]))) return Number(s[liv]); }
+  return SCATTI_CCNL[liv] || 0;
+}
+/* ver138: il terzo parametro `state` è FACOLTATIVO, così le chiamate senza stato continuano a
+   comportarsi come prima (solo le tre tranche dell'app). Con lo stato si vedono anche le tranche
+   che Christian ha caricato. */
+function tabellaAl(y, m, state){
+  if (state){ const t = ccnlAl(state, y, m); if (t) return t.nome; }
   const n = y*100 + m;
   let best = "Feb24";
   Object.keys(MINIMI_DAL).forEach(function(k){
@@ -3229,7 +3294,7 @@ function firmaMese(state, dp, y, m, fisso){
      il periodo, perche' il suo valore vale uguale dappertutto. */
   const f = fisso || {};
   return [String(v.livello==null?"":v.livello).toUpperCase().trim(), String(v.oreSett), String(v.tipo), String(np),
-          f.tab ? "-" : tabellaAl(y, m),
+          f.tab ? "-" : tabellaAl(y, m, state),                 /* ver138 */
           f.scatti ? "-" : String(scattiAl(state, dp, y, m, (f.prec != null ? f.prec : null), (f.ass != null ? f.ass : null)).n),
           /* ver131: anche il SUPERMINIMO fa parte della firma, cosi' il periodo si taglia da
              solo alla data in cui cambia. Scritto a mano vale uguale dappertutto: non taglia. */
@@ -3446,11 +3511,12 @@ function datiCosto(state, dp, pairs){
      in vigore nel mese, e il periodo si taglia da sé al rinnovo. `tabScritta` resta a "" così
      `fissoSplit.tab` è sempre falso e il taglio non si spegne più. */
   const tabScritta = "";
-  const tabAuto = ultimoPr ? tabellaAl(ultimoPr.y, ultimoPr.m) : "Ott25";
+  const tabAuto = ultimoPr ? tabellaAl(ultimoPr.y, ultimoPr.m, state) : "Ott25";   /* ver138: anche le tranche caricate da Christian */
   const tab = tabAuto;
-  const livAuto = (function(){ const l=String(livelloPeriodo(dp, pairs)||"").toUpperCase().trim(); return MINIMI_CCNL[tab] && MINIMI_CCNL[tab][l] ? l : ""; })();
+  const minTab = minimiDi(state, tab);                                             /* ver138 */
+  const livAuto = (function(){ const l=String(livelloPeriodo(dp, pairs)||"").toUpperCase().trim(); return minTab && minTab[l] ? l : ""; })();
   const liv = livAuto;
-  const minimoAuto = (MINIMI_CCNL[tab] && MINIMI_CCNL[tab][liv]) ? MINIMI_CCNL[tab][liv] : 0;
+  const minimoAuto = (minTab && minTab[liv]) ? Number(minTab[liv]) : 0;             /* ver138 */
   /* ver128: gli SCATTI si contano da soli dall'assunzione, uno ogni 24 mesi utili, massimo 5.
      Il valore e' quello del livello, a tempo pieno (come il minimo). */
   const scattiPrecRaw = (p.scattiPrec != null && String(p.scattiPrec).trim() !== "") ? cNum(p.scattiPrec, 0) : null;
@@ -3465,7 +3531,7 @@ function datiCosto(state, dp, pairs){
     : ((p.scattiAss != null && String(p.scattiAss).trim() !== "") ? cNum(p.scattiAss, 0) : null);
   const scattiInfo = ultimoPr ? scattiAl(state, dp, ultimoPr.y, ultimoPr.m, scattiPrecRaw, scattiAssRaw)
                               : { n:0, utili:0, stimati:0, base:0, riconosciuti:0, senzaAssunzione:!ymdIt(dp && dp.dataAssunzione), primaDeiDati:true, daCasella:false };
-  const scattiValore = SCATTI_CCNL[liv] || 0;
+  const scattiValore = scattoDi(state, tab, liv);                                   /* ver138 */
   const scattiAuto = R2(scattiValore * scattiInfo.n, 2);
   const scattiAMano = (p.scatti != null && String(p.scatti) !== "");
   /* ver131: il SUPERMINIMO in vigore alla fine del periodo diventa il valore automatico; la
@@ -3623,10 +3689,11 @@ function datiCosto(state, dp, pairs){
         const vv = valoriAt(dp, pr0.y, pr0.m);
         /* ver128: ogni pezzo usa la TABELLA CCNL in vigore nei suoi mesi (se non e' forzata a
            mano) e i SUOI scatti, contati all'inizio del pezzo. */
-        const tabB = tabScritta || tabellaAl(pr0.y, pr0.m);
-        const livB = (function(){ const l=String(vv.livello==null?"":vv.livello).toUpperCase().trim(); return (MINIMI_CCNL[tabB] && MINIMI_CCNL[tabB][l]) ? l : ""; })();
+        const tabB = tabScritta || tabellaAl(pr0.y, pr0.m, state);                  /* ver138 */
+        const minB = minimiDi(state, tabB);                                           /* ver138 */
+        const livB = (function(){ const l=String(vv.livello==null?"":vv.livello).toUpperCase().trim(); return (minB && minB[l]) ? l : ""; })();
         const scB = scattiAl(state, dp, pr0.y, pr0.m, scattiPrecRaw, scattiAssRaw);
-        const scattiB = scattiAMano ? o.scatti : R2((SCATTI_CCNL[livB || liv] || 0) * scB.n, 2);
+        const scattiB = scattiAMano ? o.scatti : R2(scattoDi(state, tabB, livB || liv) * scB.n, 2);   /* ver138 */
         const indetB = String(vv.tipo) !== "determinato";
         const fineB = fineRapportoYmd(dp, b.pairs);   /* ver110: non oltre la fine del rapporto */
         const ff = contaFestivita(b.pairs, dp, senzaRapp);   /* ver109/ver112 */
@@ -3637,7 +3704,7 @@ function datiCosto(state, dp, pairs){
           mesiRapporto: mesiInPeriodo(dp, b.pairs),   /* ver114: il fondo TFR si rivaluta anche nei mesi non pagati */
           mesiMater: 0,
           oreSett: vv.oreSett,
-          minimo: (livB && MINIMI_CCNL[tabB][livB]) ? MINIMI_CCNL[tabB][livB] : o.minimo,
+          minimo: (livB && minB[livB]) ? Number(minB[livB]) : o.minimo,                /* ver138 */
           scatti: scattiB,
           /* ver131: il superminimo del pezzo. Se e' scritto a mano vale quello, su tutti i pezzi. */
           superminimo: supermAMano ? o.superminimo : vv.superm,
@@ -3714,6 +3781,14 @@ function CostoOrario(props){
   const [taY, setTaY] = useState(props.anno); const [taM, setTaM] = useState(12);
   const [selId, setSelId] = useState(dips.length ? dips[0].id : null);
   const [apriComuni, setApriComuni] = useState(false);
+  /* ver138: il pannello AGGIORNA TABELLE CCNL. `ccTesto` è l'incollaggio che fa Christian,
+     nel formato che gli è stato dato: una riga per livello, «D1 1.637,57». */
+  const [apriCCNL, setApriCCNL] = useState(false);
+  const [ccDal, setCcDal] = useState("");
+  const [ccNome, setCcNome] = useState("");
+  const [ccTesto, setCcTesto] = useState("");
+  const [ccScatti, setCcScatti] = useState("");
+  const [ccErr, setCcErr] = useState("");
   const [apriDett, setApriDett] = useState(true);
 
   const pairs = monthsBetween(parseInt(faY,10), parseInt(faM,10), parseInt(taY,10), parseInt(taM,10));
@@ -3751,6 +3826,60 @@ function CostoOrario(props){
     ? ("serve solo a chi non ha il fondo TFR scritto: " + senzaFondo + (senzaFondo===1 ? " persona" : " persone") + " su " + dips.length)
     : "non in uso: tutti hanno il fondo TFR scritto nella scheda";
   const setComune = function(campo, val){ if (props.onCostoComune) props.onCostoComune(campo, val); };
+  /* ver138 — legge l'incollaggio «LIVELLO IMPORTO», una riga per livello. Accetta sia
+     «D1 1.637,57» sia «D1  1637.57» sia «D1 = 1.637,57»; salta le righe vuote e quelle che non
+     cominciano con un livello noto. Torna {valori, ignorate}. */
+  const ccLeggi = function(txt){
+    const valori = {}; const ignorate = [];
+    String(txt || "").split(/[\n\r]+/).forEach(function(riga){
+      const t = String(riga).trim(); if (t === "") return;
+      const m = t.match(/^([A-Fa-f][0-9])\s*[=:\t ]\s*(.+)$/);
+      if (!m){ ignorate.push(t.slice(0,40)); return; }
+      const liv = m[1].toUpperCase();
+      if (LIV_CCNL.indexOf(liv) < 0){ ignorate.push(t.slice(0,40)); return; }
+      const v = cNum(m[2].replace(/[^0-9.,]/g, ""), null);
+      if (v == null || !(v > 0)){ ignorate.push(t.slice(0,40)); return; }
+      valori[liv] = v;
+    });
+    return { valori: valori, ignorate: ignorate };
+  };
+  const ccSalva = function(){
+    const dalN = ccnlDalN(ccDal);
+    if (!dalN){ setCcErr("Scrivi la data di decorrenza come gg/mm/aaaa, per esempio 01/10/2026."); return; }
+    const min = ccLeggi(ccTesto);
+    const nMin = Object.keys(min.valori).length;
+    if (nMin === 0){ setCcErr("Non ho letto nessun importo. Scrivi una riga per livello, per esempio «D1 1.637,57»."); return; }
+    const sca = ccLeggi(ccScatti);
+    const nSca = Object.keys(sca.valori).length;
+    const nome = String(ccNome || "").trim() || ccDal.trim();
+    const esiste = ((state && state.ccnlTab) || []).some(function(t){ return ccnlDalN(t && t.dal) === dalN; });
+    const sovrascriveApp = Object.keys(MINIMI_DAL).filter(function(k){ return MINIMI_DAL[k] === dalN; });
+    const righe = [];
+    righe.push("Aggiungo una tabella CCNL:");
+    righe.push("");
+    righe.push("  nome: " + nome);
+    righe.push("  vale dal: " + ccDal.trim());
+    righe.push("  minimi letti: " + nMin + " livelli su " + LIV_CCNL.length);
+    righe.push("  scatti letti: " + (nSca ? (nSca + " livelli") : "nessuno — restano quelli di prima"));
+    const mancanti = LIV_CCNL.filter(function(l){ return min.valori[l] == null; });
+    if (mancanti.length) righe.push("  ⚠ livelli SENZA importo: " + mancanti.join(" "));
+    if (min.ignorate.length) righe.push("  ⚠ righe non capite e saltate: " + min.ignorate.length);
+    if (sovrascriveApp.length) righe.push("  ⚠ ha la stessa decorrenza della tabella «" + sovrascriveApp.join("/") + "» dell'app: prenderà il suo posto");
+    if (esiste) righe.push("  ⚠ c'è già una tua tabella con questa decorrenza: verrà sostituita");
+    righe.push("");
+    righe.push("Le tabelle precedenti NON vengono toccate: i periodi passati continuano a usare la loro.");
+    righe.push("");
+    righe.push("Dopo questo serve 💾 per salvare.");
+    if (!window.confirm(righe.join("\n"))) return;
+    const rec = { dal: ccDal.trim(), nome: nome, minimi: min.valori };
+    if (nSca) rec.scatti = sca.valori;
+    if (props.onCCNLAdd) props.onCCNLAdd(rec);
+    setCcErr(""); setCcDal(""); setCcNome(""); setCcTesto(""); setCcScatti("");
+  };
+  const ccElimina = function(dal){
+    if (!window.confirm("Elimino la tabella CCNL che vale dal " + dal + "?\n\nI calcoli dei periodi che la usavano torneranno alla tabella precedente.\nDopo questo serve 💾 per salvare.")) return;
+    if (props.onCCNLDel) props.onCCNLDel(dal);
+  };
   const setPar = function(campo, val){ if (dp && props.onCostoPatch) props.onCostoPatch(dp.id, campo, val); };
   /* ver107: due campi insieme, in una sola copia dello stato (vedi onCostoPatchMulti). */
   const setParMulti = function(campi){ if (dp && props.onCostoPatchMulti) props.onCostoPatchMulti(dp.id, campi); };
@@ -3915,7 +4044,91 @@ function CostoOrario(props){
           <select value={taY} onChange={function(e){ setTaY(parseInt(e.target.value,10)); }} style={{ padding:"8px" }}>{anniDisp.map(function(y){ return <option key={y} value={y}>{y}</option>; })}</select></div>
         <div style={{ fontSize:"14px", color:"#334155" }}>Periodo: <b>{periodoLabel}</b> ({pairs.length} mesi)</div>
         <button className="btn btn-gray" onClick={function(){ setApriComuni(!apriComuni); }}>{apriComuni ? "▲ Chiudi" : "⚙ Aliquote e costi fissi validi per tutti"}</button>
+        {/* ver138, punto 6 della direttiva di Christian. Dicitura scelta da lui:
+            «AGGIORNA TABELLE CCNL». */}
+        <button className="btn btn-blue" onClick={function(){ setApriCCNL(!apriCCNL); setCcErr(""); }}>{apriCCNL ? "▲ Chiudi" : "⚙ AGGIORNA TABELLE CCNL"}</button>
       </div>
+
+      {apriCCNL ?
+        <div style={box("#eef6ff","#bfdbfe")}>
+          <label style={titolo}>AGGIORNA TABELLE CCNL</label>
+          <div style={aiuto}>Qui si caricano le tabelle di un <b>rinnovo</b>. Le tabelle che ci sono già <b>non si toccano</b>: ognuna ha la sua data di decorrenza, e ogni mese usa quella che era in vigore allora. Così i calcoli degli anni passati <b>non cambiano</b>. Si carica <b>una volta sola</b> e tutte le schede la recepiscono da sé, ciascuna col proprio livello e i propri scatti.</div>
+          <div style={{ overflowX:"auto" }}>
+            <table style={{ width:"100%", borderCollapse:"collapse", fontSize:"13.5px" }}><tbody>
+              <tr>
+                <th style={{ textAlign:"left", borderBottom:"2px solid #1f4e82", padding:"3px 6px" }}>Tabella</th>
+                <th style={{ textAlign:"left", borderBottom:"2px solid #1f4e82", padding:"3px 6px" }}>Vale dal</th>
+                <th style={{ textAlign:"right", borderBottom:"2px solid #1f4e82", padding:"3px 6px" }}>Livelli</th>
+                <th style={{ textAlign:"right", borderBottom:"2px solid #1f4e82", padding:"3px 6px" }}>D1</th>
+                <th style={{ textAlign:"right", borderBottom:"2px solid #1f4e82", padding:"3px 6px" }}>Scatto D1</th>
+                <th style={{ textAlign:"left", borderBottom:"2px solid #1f4e82", padding:"3px 6px" }}>Da dove viene</th>
+                <th style={{ borderBottom:"2px solid #1f4e82" }}></th>
+              </tr>
+              {ccnlTranche(state).slice().reverse().map(function(t){
+                const nLiv = Object.keys(t.minimi || {}).length;
+                const d1 = (t.minimi && t.minimi["D1"] != null) ? fmt2(t.minimi["D1"]) : "—";
+                const s1 = fmt2(scattoDi(state, t.nome, "D1"));
+                const gg = String(t.dalN % 100).padStart(2,"0"), aa = Math.floor(t.dalN/100);
+                return <tr key={t.nome + "-" + t.dalN}>
+                  <td style={{ padding:"3px 6px", fontWeight:700 }}>{t.nome}</td>
+                  <td style={{ padding:"3px 6px" }}>{t.dal || ("01/" + gg + "/" + aa)}</td>
+                  <td style={{ padding:"3px 6px", textAlign:"right" }}>{nLiv}</td>
+                  <td style={{ padding:"3px 6px", textAlign:"right", ...cifre }}>{d1}</td>
+                  <td style={{ padding:"3px 6px", textAlign:"right", ...cifre }}>{s1}</td>
+                  <td style={{ padding:"3px 6px", color: t.fonte==="app" ? "#475569" : "#1f4e82", fontWeight: t.fonte==="app" ? 400 : 700 }}>{t.fonte==="app" ? "nell'app" : "caricata da te"}</td>
+                  <td style={{ padding:"3px 6px", textAlign:"right" }}>{t.fonte==="tuo"
+                    ? <button className="btn btn-red btn-mini" onClick={function(){ ccElimina(t.dal); }}>✕</button>
+                    : null}</td>
+                </tr>;
+              })}
+            </tbody></table>
+          </div>
+          <div style={{ fontSize:"12.5px", color:"#475569", lineHeight:1.35, margin:"5px 0" }}>Le tabelle <b>nell'app</b> non si possono cancellare: sono il punto di partenza. Quelle caricate da te si possono togliere con la ✕, e i calcoli tornano alla tabella di prima.</div>
+
+          <div style={{ borderTop:"2px solid #bfdbfe", marginTop:"6px", paddingTop:"6px" }}>
+            <label style={titolo}>Carica una tabella nuova</label>
+            <div className="co-grid" style={grigliaCampi}>
+              <label style={cella}><span style={etich}>Vale dal (gg/mm/aaaa)</span>
+                <input value={ccDal} placeholder="01/10/2026" style={giallo} onChange={function(e){ setCcDal(maskDate(e.target.value)); }} /></label>
+              <label style={cella}><span style={etich}>Nome (facoltativo)</span>
+                <input value={ccNome} placeholder="es. Ott26" style={giallo} onChange={function(e){ setCcNome(e.target.value); }} />
+                <span style={{ fontSize:"12.5px", color:"#475569" }}>se lo lasci vuoto si usa la data</span></label>
+            </div>
+            <div style={{ marginTop:"6px" }}>
+              <div style={etich}>Minimi tabellari — una riga per livello</div>
+              <textarea value={ccTesto} rows={7} placeholder={"A1 1.400,00\nA2 1.412,00\nB1 1.478,00\nD1 1.690,00\n…"}
+                style={Object.assign({ width:"100%", fontFamily:"ui-monospace, Menlo, Consolas, monospace", fontSize:"13.5px", lineHeight:1.4 }, giallo)}
+                onChange={function(e){ setCcTesto(e.target.value); }} />
+              <div style={{ fontSize:"12.5px", color:"#475569", lineHeight:1.35 }}>Importi <b>al mese, a tempo pieno</b> (165 ore). Vanno bene sia 1.690,00 sia 1690.00. I livelli sono: {LIV_CCNL.join(" · ")}.</div>
+            </div>
+            <div style={{ marginTop:"6px" }}>
+              <div style={etich}>Scatti di anzianità — solo se il rinnovo li cambia</div>
+              <textarea value={ccScatti} rows={3} placeholder={"(lascia vuoto se restano quelli di prima)\nD1 21,50\nD2 24,10"}
+                style={Object.assign({ width:"100%", fontFamily:"ui-monospace, Menlo, Consolas, monospace", fontSize:"13.5px", lineHeight:1.4 }, giallo)}
+                onChange={function(e){ setCcScatti(e.target.value); }} />
+              <div style={{ fontSize:"12.5px", color:"#475569", lineHeight:1.35 }}>Lasciandolo <b>vuoto</b> gli scatti restano quelli in vigore prima: è il caso normale, perché non sono mai stati alzati dai rinnovi.</div>
+            </div>
+            {(function(){
+              const m = ccLeggi(ccTesto); const n = Object.keys(m.valori).length;
+              const s = ccLeggi(ccScatti); const ns = Object.keys(s.valori).length;
+              if (!ccTesto.trim() && !ccScatti.trim()) return null;
+              const mancanti = LIV_CCNL.filter(function(l){ return m.valori[l] == null; });
+              return <div style={{ background:"#fff", border:"1px solid #bfdbfe", borderRadius:"8px", padding:"6px 9px", marginTop:"6px", fontSize:"13px", lineHeight:1.4, color:"#334155" }}>
+                Ho letto <b>{n}</b> minimi {ns ? <span>e <b>{ns}</b> scatti</span> : null}
+                {mancanti.length ? <span> — <b style={{ color:"#b45309" }}>senza importo: {mancanti.join(" ")}</b></span> : <span> — <b style={{ color:"#15803d" }}>tutti e {LIV_CCNL.length} i livelli</b></span>}
+                {m.ignorate.length || s.ignorate.length ? <div style={{ color:"#b45309", marginTop:"2px" }}>⚠ righe non capite e saltate: {m.ignorate.concat(s.ignorate).join(" | ")}</div> : null}
+                {n ? <div style={{ marginTop:"2px" }}>D1 → <b style={cifre}>{m.valori["D1"] != null ? fmt2(m.valori["D1"]) : "—"}</b> €/mese a tempo pieno</div> : null}
+              </div>;
+            })()}
+            {ccErr ? <div style={{ color:"#b91c1c", fontSize:"13px", fontWeight:700, marginTop:"4px" }}>{ccErr}</div> : null}
+            <div style={{ display:"flex", gap:"6px", flexWrap:"wrap", marginTop:"6px" }}>
+              <button className="btn btn-blue" onClick={ccSalva}>✔ Aggiungi questa tabella</button>
+              <button className="btn btn-gray" onClick={function(){ setCcDal(""); setCcNome(""); setCcTesto(""); setCcScatti(""); setCcErr(""); }}>Svuota</button>
+            </div>
+            <div style={{ fontSize:"12.5px", color:"#475569", lineHeight:1.35, marginTop:"4px" }}>Dopo averla aggiunta serve <b>💾</b> per salvare, come per tutto il resto.</div>
+          </div>
+        </div>
+      : null}
 
       {apriComuni ?
         <div style={box("#eef6ff","#bfdbfe")}>
@@ -5704,6 +5917,25 @@ function App(){
     next.costoComune[campo] = val;
     touch(next);
   };
+  /* ver138: le tabelle CCNL caricate da Christian. Vivono nei DATI (`state.ccnlTab`), quindi
+     finiscono da sole nel backup JSON e nel sync; le tre tabelle dell'app restano nel codice e
+     non si possono cancellare. Come tutto il resto: serve 💾 per salvare. */
+  const onCCNLAdd = function(rec){
+    const next = JSON.parse(JSON.stringify(state));
+    if (!Array.isArray(next.ccnlTab)) next.ccnlTab = [];
+    const dalN = ccnlDalN(rec && rec.dal);
+    next.ccnlTab = next.ccnlTab.filter(function(t){ return ccnlDalN(t && t.dal) !== dalN; });
+    next.ccnlTab.push(rec);
+    next.ccnlTab.sort(function(a,b){ return ccnlDalN(a && a.dal) - ccnlDalN(b && b.dal); });
+    touch(next);
+  };
+  const onCCNLDel = function(dal){
+    const next = JSON.parse(JSON.stringify(state));
+    if (!Array.isArray(next.ccnlTab)) return;
+    const dalN = ccnlDalN(dal);
+    next.ccnlTab = next.ccnlTab.filter(function(t){ return ccnlDalN(t && t.dal) !== dalN; });
+    touch(next);
+  };
   const onCessCleanup = function(dipId){
     const dp0 = state.dipendenti.find(function(d){ return d.id===dipId; }); if(!dp0) return;
     const ce = cessEffStr(dp0); const ceInt = ymdIt(ce); if(!ceInt){ window.alert("Nessuna data di cessazione impostata."); return; }
@@ -6074,7 +6306,7 @@ function App(){
       <div className="content" style={{ zoom: zoom / 100 }}>
         {vista === "rep" ? <Riepiloghi state={state} anno={anno} /> :
          vista === "ana" ? <Anagrafica key={"ana-"+(anaSel||"")} selInit={anaSel} onDipPatch={onDipPatch} onMensTutti={onMensTutti} state={state} onAnaField={onAnaField} onAnaSet={onAnaSet} onCessCleanup={onCessCleanup} onTemplateChanged={onTemplateChanged} onImportAna={onImportAna} onExportAna={onExportAna} onAddDip={addDipDiretto} onEditDip={apriScheda} onSave={doSave} dirty={dirty} /> :
-         vista === "costo" ? <CostoOrario state={state} anno={anno} onCostoPatch={onCostoPatch} onCostoPatchMulti={onCostoPatchMulti} onCostoComune={onCostoComune} onSave={doSave} dirty={dirty} /> :
+         vista === "costo" ? <CostoOrario state={state} anno={anno} onCostoPatch={onCostoPatch} onCostoPatchMulti={onCostoPatchMulti} onCostoComune={onCostoComune} onCCNLAdd={onCCNLAdd} onCCNLDel={onCCNLDel} onSave={doSave} dirty={dirty} /> :
          vista === "query" ? <QueryPanel state={state} /> :
           <div>
             <div className="toolbar">

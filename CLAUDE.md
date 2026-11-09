@@ -18,7 +18,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver137 · 09nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver138 · 09nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -120,6 +120,10 @@ Banca ore, tetto annuo, contratti e export.
   `mesiInPeriodo`, `oreRendPeriodo`, `addizTDAuto`, `oreSettPeriodo`, `indetAFine`,
   componente **`CostoOrario`**. Tabelle `MINIMI_CCNL` (dalla **ver128**: Feb24/Ott24/Ott25, **13
   livelli** A1→F2, scelte **per data**), `SCATTI_CCNL` e `COSTO_COMUNE_DEF`.
+  ⚠️ **Dalla ver138 le tabelle si LEGGONO SEMPRE da `ccnlTranche(state)`**, non direttamente da
+  `MINIMI_CCNL`: le tre dell'app restano il punto di partenza, ma Christian può aggiungerne altre
+  dal pulsante **⚙ AGGIORNA TABELLE CCNL** e finiscono in `state.ccnlTab`. Usare `minimiDi` e
+  `scattoDi`, mai gli oggetti nudi.
   - **Dati**: `state.costoComune` (valori uguali per tutti) e `dp.costo` (scostamenti della
     singola persona). **Nessun calcolo preesistente è stato toccato**: il costo orario legge e
     basta (ore dei mesi con lo stesso `totOfRec` dei Riepiloghi, contratto dalla scheda).
@@ -391,6 +395,69 @@ Banca ore, tetto annuo, contratti e export.
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
 
+- 📊 **⚙ AGGIORNA TABELLE CCNL: LO STORICO DEGLI IMPORTI, SENZA TOCCARE IL CODICE** (ver138,
+  09/11/2026, **punto 6** della direttiva di Christian: «voglio poter caricare le nuove tabelle
+  retributive in occasione di ogni rinnovo … conservare integralmente le tabelle precedenti e le
+  rispettive decorrenze … aggiornare una sola volta e fare in modo che tutti i calcoli
+  recepiscano automaticamente le nuove condizioni». Dicitura del pulsante **scelta da lui**).
+  - ✅ **Verificato prima di costruire che non esistesse già** (lo chiedeva il suo punto 6): le
+    tabelle stavano **solo** dentro `index.html` come costanti, e non c'era **nessun** modo di
+    aggiungerne una senza che Claude modificasse il file. Non si duplica niente.
+  - **Dove sta**: nella barra del **Costo orario**, accanto a *⚙ Aliquote e costi fissi validi per
+    tutti*. Il pannello mostra **l'elenco delle tranche in vigore** (nome · vale dal · quanti
+    livelli · il D1 · lo scatto D1 · se viene «nell'app» o «caricata da te») e sotto il modulo per
+    caricarne una nuova.
+  - **Modello dati nuovo: `state.ccnlTab`**, un elenco di `{dal:"01/07/2026", nome, minimi:{…},
+    scatti:{…}}`. Vive nei **dati**, quindi finisce da sé nel **backup JSON** e nel sync. Come
+    tutto il resto: **serve 💾** per salvare.
+  - **Come si carica**: data di decorrenza, nome facoltativo, e i minimi **incollati** nel formato
+    che Christian aveva chiesto — **una riga per livello, «D1 1.637,57»**. `ccLeggi` accetta
+    `D1 1.690,00`, `D1  1690.00` e `D1 = 1.690,00`, salta le righe vuote e **conta quelle che non
+    capisce**. Un'**anteprima** dice quanti livelli ha letto, quali mancano, e il D1 risultante,
+    **prima** di premere il pulsante. Poi una **conferma** elenca tutto (nome, data, livelli
+    letti, scatti letti, livelli senza importo, se prende il posto di un'altra) e ripete che *«Le
+    tabelle precedenti NON vengono toccate»*.
+  - **Funzioni nuove** (sopra `tabellaAl`): `ccnlDalN`, **`ccnlTranche(state)`** (le tre dell'app
+    più le sue, ordinate per data), **`ccnlAl(state,y,m)`** (quella in vigore in quel mese),
+    **`minimiDi(state,nome)`** e **`scattoDi(state,nome,liv)`**. In `App`: `onCCNLAdd` e
+    `onCCNLDel`.
+  - 🔑 **Gli importi storici non si sovrascrivono MAI** (suo punto 4): ogni tranche porta la sua
+    decorrenza e ogni mese usa quella che era in vigore allora. **Misurato in esecuzione**:
+    caricando una tranche dal **01/07/2026**, il **2026** passa da **18.197,43 € a 18.476,82 €**
+    (minimo 1.727,83 → 1.778,00) e il periodo **si taglia a luglio**, mentre il **2025 resta
+    8.288,89 €, identico al centesimo**.
+  - **Le tre tabelle dell'app non si possono cancellare**: sono il punto di partenza e **non hanno
+    la ✕** (verificato: zero pulsanti rossi finché non se ne carica una propria). Quelle caricate
+    da lui si togliono con la **✕**, con conferma, e i calcoli tornano alla tabella di prima.
+  - **Una sua tranche con la STESSA decorrenza di una dell'app prende il suo posto**: serve a
+    correggere un importo. **Misurato**: con una tranche dal 01/10/2025 e D2 = 1.730,00, il
+    minimo del periodo diventa **1.730,00** invece di 1.727,83, l'elenco mostra la sua al posto
+    della «Ott25», e **Feb24 e Ott24 restano**. ⚠️ La riga originale resta **nel codice** e
+    ricompare se lui cancella la sua.
+  - **Gli SCATTI**: Christian ha detto che sono «**fissi**, nel senso che il loro importo non è
+    mai stato alzato con i rinnovi» (09/11/2026), ma il suo punto 6.2 chiede di poterli
+    aggiornare con la decorrenza. Perciò una tranche **può** portare anche i suoi scatti, e se non
+    li porta **si eredita quello della tranche precedente** (in fondo, la tabella dell'app).
+    Funziona sia se non cambiano mai, sia se un giorno cambiano. **Misurato**: senza scatti
+    scritti la riga nuova mostra **20,66**; scrivendo 30 mostra **30,00**.
+  - ⚠️ **Il terzo parametro di `tabellaAl(y, m, state)` è FACOLTATIVO**: senza `state` la funzione
+    si comporta esattamente come prima (solo le tre tranche dell'app). Serve a non rompere
+    nessuna chiamata.
+  - ⚠️ **La tendina «Tabella CCNL» dei valori comuni è rimasta dov'era** ma, dalla **ver137**, non
+    viene più letta (`tabScritta = ""`): la tabella è sempre quella della data. **Non è stata
+    tolta** perché è una dicitura di Christian. **Da decidere con lui.**
+  - **Provato in esecuzione** (`ccnl138.cjs` **27/28** + `ccnlE.cjs` **6/6** = **33 controlli**,
+    zero errori di pagina): il pulsante c'è; l'elenco mostra le tre tranche dell'app col D1
+    1.637,57 e lo scatto 20,66; nessuna ✕ sulle tabelle dell'app; il modulo legge 13 livelli su
+    13 e lo dice; la conferma elenca tutto; la tranche nuova compare come «caricata da te» e le
+    tre dell'app restano; il 2026 usa la tabella nuova, il minimo e il costo salgono, il periodo
+    si taglia a luglio; **il 2025 non cambia di un centesimo**; gli scatti ereditati e quelli
+    scritti; la sostituzione a pari decorrenza; e la **NON REGRESSIONE**: senza nessuna tabella
+    caricata, **ver137 e ver138 danno costo e €/h identici per tutti e 16 i dipendenti**
+    (gen→ott 2026, **0 differenze**).
+    ⚠️ **L'unico «fallito» dei 28 era un'attesa sbagliata del mio script**, non un difetto
+    dell'app: il nome di prova «Ott25 corretta» contiene uno spazio e la mia espressione di
+    lettura ne prendeva solo il primo pezzo. Rifatto con un nome senza spazi: **6 su 6**.
 - 🩶 **LA SCHEDA ANAGRAFICA COMANDA: CINQUE CASELLE DEL COSTO ORARIO SONO GRIGIE E DI SOLA
   LETTURA** (ver137, 09/11/2026, direttiva di Christian «**LA SCHEDA ANAGRAFICA È IL MOTORE DEL
   SISTEMA**» + sua scelta **«a»**: «la casella del Costo orario diventa grigia e di sola lettura,
