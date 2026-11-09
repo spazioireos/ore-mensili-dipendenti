@@ -459,7 +459,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver141";
+const APP_VER = "ver142";
 const APP_DATA = "09nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -507,17 +507,29 @@ CODICI.forEach(function(x){
   CODE_UP[u] = x.c;
   for (let i = 1; i <= u.length; i++) CODE_PREFIX[u.slice(0, i)] = true;
 });
+/* ver142 (09/11/2026, scelta di Christian: «ok 13»). In un giorno non si possono scrivere piu'
+   di 13 ore. Prima il limite era solo sul NUMERO DI CIFRE (ver102, due cifre), quindi restava
+   possibile scrivere 99 ore in un giorno: un numero assurdo che faceva crescere TOT, tetto
+   annuo e straordinario senza che niente lo segnalasse.
+   ⚠️ Verificato sui dati veri PRIMA di metterlo: nessuna cella supera le 13 ore (il massimo
+   mai scritto e' 8,5), quindi nessun dato gia' presente diventa irraggiungibile. */
+const ORE_MAX_GIORNO = 13;
+function oreEntroIlMassimo(t){
+  const v = parseFloat(String(t == null ? "" : t).replace(",", "."));
+  if (!isFinite(v)) return true;      /* "", "," o "1." : non c'e' ancora un numero da giudicare */
+  return v <= ORE_MAX_GIORNO;
+}
 function cellaScritturaAmmessa(t){        // va bene COME PEZZO mentre si scrive?
   const v = String(t == null ? "" : t);
   if (v === "") return true;
-  if (/^\d{0,2}([.,]\d{0,2})?$/.test(v)) return true;        // un numero, anche a meta' ("6," )
+  if (/^\d{0,2}([.,]\d{0,2})?$/.test(v)) return oreEntroIlMassimo(v);   /* ver142: e sotto il tetto */
   return CODE_PREFIX[v.toUpperCase()] === true;               // l'inizio di un codice
 }
 function cellaValoreFinale(t){            // alla fine: il codice vero, il numero, oppure null
   const v = String(t == null ? "" : t).trim();
   if (v === "") return "";
   if (CODE_UP[v.toUpperCase()] !== undefined) return CODE_UP[v.toUpperCase()];
-  if (isNumeric(v)) return v;
+  if (isNumeric(v)) return oreEntroIlMassimo(v) ? v : null;      /* ver142: mai piu' di 13 ore */
   return null;                                                 // non ammesso
 }
 
@@ -1784,7 +1796,10 @@ function CellInput(props){
         if (fin === null){
           if (grezzo !== "" && grezzo !== String(iniz.current).trim()){
             props.onChange("");
-            if (props.onAvviso) props.onAvviso("«" + grezzo + "» non è un codice né un numero: la cella è stata lasciata vuota.", true);
+            if (props.onAvviso) props.onAvviso(
+              (isNumeric(grezzo) && !oreEntroIlMassimo(grezzo))
+                ? ("In un giorno non si possono scrivere più di " + ORE_MAX_GIORNO + " ore: la cella è stata lasciata vuota.")   /* ver142 */
+                : ("«" + grezzo + "» non è un codice né un numero: la cella è stata lasciata vuota."), true);
           }
         } else if (fin !== grezzo){
           props.onChange(fin);
@@ -1796,7 +1811,10 @@ function CellInput(props){
         if (cellaScritturaAmmessa(v)){ setRif(false); props.onChange(v); }
         else {
           setRif(true);                               /* ver102: la scrittura NON entra */
-          if (props.onAvviso) props.onAvviso("Qui si scrive un numero di ore oppure un codice dell'elenco (FERIE, MAL, EXF…).", true);
+          if (props.onAvviso) props.onAvviso(
+            /^\d{0,2}([.,]\d{0,2})?$/.test(v) && !oreEntroIlMassimo(v)
+              ? ("In un giorno non si possono scrivere più di " + ORE_MAX_GIORNO + " ore.")   /* ver142 */
+              : "Qui si scrive un numero di ore oppure un codice dell'elenco (FERIE, MAL, EXF…).", true);
         }
       }} />
   );

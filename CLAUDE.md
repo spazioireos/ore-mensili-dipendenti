@@ -18,7 +18,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver141 · 09nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver142 · 09nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -394,6 +394,36 @@ Banca ore, tetto annuo, contratti e export.
     «— ore» e «non calcolabile»; la stessa persona su «Teoriche» → 18,67 €/h; e il **foglio Excel
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
+
+- ⏱️ **IN UN GIORNO NON SI SCRIVONO PIÙ DI 13 ORE** (ver142, 09/11/2026, scelta di Christian
+  «ok 13» dopo che il collaudo generale aveva misurato che si potevano scrivere **99 ore in un
+  giorno**).
+  - **Com'era**: la ver102 limitava solo il **numero di cifre** (due), quindi `999` veniva
+    rifiutato al terzo carattere ma restava `99`. Novantanove ore in un giorno entravano
+    nel TOT, nel tetto annuo e nello straordinario **senza che niente lo segnalasse**.
+  - **Ora**: costante **`ORE_MAX_GIORNO = 13`** e funzione **`oreEntroIlMassimo(t)`**, usate
+    **sia** mentre si scrive (`cellaScritturaAmmessa`) **sia** all'uscita dalla cella
+    (`cellaValoreFinale`). Il carattere che farebbe sforare **non entra**, esattamente come per
+    gli altri rifiuti della ver102.
+  - **L'avviso dice il motivo vero**: «**In un giorno non si possono scrivere più di 13 ore.**»
+    (e, all'uscita, «… : la cella è stata lasciata vuota»), invece del messaggio generico «non è
+    un codice né un numero», che sarebbe stato falso perché 14 **è** un numero.
+    ⚠️ **Diciture nuove, scritte da Claude.**
+  - ✅ **Verificato sui dati VERI prima di metterlo**: **nessuna cella supera le 13 ore** (il
+    massimo mai scritto è **8,5**), quindi **nessun dato già presente diventa irraggiungibile**.
+  - ⚠️ **NON toccato: «Compila veloce»**, che non passa da `CellInput` (è così dalla ver102):
+    di là un valore oltre il tetto entrerebbe ancora. Da decidere con Christian se estenderlo.
+  - ⚠️ **I codici non c'entrano**: FERIE, MAL, EXF… continuano a entrare come prima.
+  - **Provato in esecuzione** (`ore142.cjs`): `13` → 13,00 e `12,5` → 12,50 **entrano**; `14`
+    si ferma a `1`, `99` si ferma a `9`, `13,5` si ferma a `13`; incollare `20` non scrive
+    nulla; l'avviso nomina il tetto. **Zero errori di pagina.**
+  - 🔴 **UNA MODIFICA FATTA E SUBITO TOLTA, da non rifare**: nella **Query → Totale su
+    intervallo** avevo creduto che con le date vuote comparisse la scritta **rossa** «Date non
+    valide o intervallo rovesciato», e Christian aveva autorizzato a correggerla. **Era un mio
+    errore di lettura**: l'app mostra già, in **grigio**, «**Inserisci le due date per calcolare
+    il totale.**» (guardia `{(!bFrom||!bTo) ? … }`), e il rosso compare **solo** quando una data
+    c'è davvero ed è sbagliata. La modifica è stata **rimossa**: il file è tornato identico.
+    **Non riproporla.**
 
 - 🎓 **L'E.A.R. DEGLI EDUCATORI D1 SI CALCOLA DA SOLO** (ver141, 09/11/2026, dato di Christian:
   «Vi sono stati due etar, ossia maggiorazioni per educatori con livello d1: dal 1° gennaio 2025
