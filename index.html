@@ -459,7 +459,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver135";
+const APP_VER = "ver136";
 const APP_DATA = "09nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -2488,13 +2488,25 @@ function SchedaContratto(props){
     if(!mm||mm<1||mm>12||!yy||yy<2000||yy>2100){ setErrTra("Scegli un mese e un anno di 4 cifre (es. 2026)."); return false; }
     const rec={ data:"01/"+(mm<10?"0":"")+mm+"/"+yy };
     if(ntLiv.trim()!=="") rec.livello=ntLiv.trim().toUpperCase();
-    const oreV=String(ntOre).replace(",",".").trim();
-    if(oreV!=="" && !isNaN(Number(oreV))) rec.oreSett=Number(oreV);
+    /* ver136 — DIFETTO PREESISTENTE: qui si leggeva il numero con
+       `String(x).replace(",",".")`, che NON capisce il punto delle migliaia. Scrivendo
+       «1.500,00» nel superminimo usciva "1.500.00" -> NaN -> il campo veniva BUTTATO IN
+       SILENZIO, e la trasformazione si salvava comunque (senza il superminimo) se c'era almeno
+       il livello. Ora si usa `cNum`, la stessa funzione delle 35 caselle del Costo orario, e
+       un numero illeggibile FERMA il salvataggio dicendolo. ⚠️ Diciture nuove, scritte da
+       Claude: prima questi due messaggi non esistevano. */
+    const oreTxt=String(ntOre).trim();
+    const oreV=(oreTxt==="")? null : cNum(oreTxt, null);
+    if(oreTxt!=="" && oreV==null){ setErrTra("Il monte ore non è un numero: scrivilo come 30 oppure 30,5."); return false; }
+    if(oreV!=null) rec.oreSett=oreV;
     if(ntIndet) rec.toIndet=true;
     /* ver131: il superminimo. Lo ZERO e' un valore valido (serve a TOGLIERE un superminimo che
        c'era prima), quindi si guarda se la casella e' scritta, non se il numero e' > 0. */
-    const supV=String(ntSup).replace(",",".").trim();
-    if(supV!=="" && !isNaN(Number(supV)) && Number(supV)>=0) rec.superminimo=Number(supV);
+    const supTxt=String(ntSup).trim();
+    const supV=(supTxt==="")? null : cNum(supTxt, null);
+    if(supTxt!=="" && supV==null){ setErrTra("Il superminimo non è un numero: scrivilo come 100 oppure 1.500,00."); return false; }
+    if(supV!=null && supV<0){ setErrTra("Il superminimo non può essere negativo."); return false; }
+    if(supV!=null) rec.superminimo=supV;
     if(!rec.livello && rec.oreSett==null && rec.superminimo==null && !rec.toIndet){ setErrTra("Compila almeno uno tra livello, monte ore, superminimo o la spunta \u00aba tempo indeterminato\u00bb."); return false; }
     patch({ trasformazioni: trasf.concat([rec]).sort(function(a,b){ return ymdIt(a.data)-ymdIt(b.data); }) });
     setNtLiv(""); setNtOre(""); setNtSup(""); setNtIndet(false); setErrTra(""); return true;
@@ -3293,7 +3305,14 @@ function calcCosto(o){
   const L15 = J5+J6+J8+J12+J13+J14;                     // imponibile I
   const O5calc = (H2-I2)*4.3452;                        // settimane del periodo, come le calcola il foglio
   const O5 = (o.settPeriodoOv>0) ? o.settPeriodoOv : O5calc;
-  const O6calc = O5-((c.ferie+c.altriPermessi)*H3/12 + fGod + E13)/Q2;
+  /* ver136: Q2 (giorni settimanali) e tfrDiv (divisore TFR) sono due caselle scrivibili, e
+     scriverci ZERO portava a una divisione per zero: il risultato diventava Infinity/NaN, poi
+     R2 lo riduceva a 0 e fmt2 lo mostrava come «0,00», cioe' un costo rotto presentato come un
+     numero vero. Ora si usa il valore di riserva e la bandierina `divNonValidi` lo dice a video.
+     ⚠️ Con valori normali il conto e' identico a prima. */
+  const Q2s = (isFinite(Q2) && Q2 > 0) ? Q2 : COSTO_COMUNE_DEF.ggSett;
+  const tfrDivS = (isFinite(Number(c.tfrDiv)) && Number(c.tfrDiv) > 0) ? Number(c.tfrDiv) : COSTO_COMUNE_DEF.tfrDiv;
+  const O6calc = O5-((c.ferie+c.altriPermessi)*H3/12 + fGod + E13)/Q2s;
   const O6 = (o.settLavOv>0) ? o.settLavOv : O6calc;    // settimane davvero lavorabili (si possono scrivere)
   const O8 = O6*O2;                                     // ore ordinarie lavorate
   const O11 = o.sottoSoglia||0;
@@ -3323,7 +3342,7 @@ function calcCosto(o){
   /* ver79: dal TFR si toglie lo 0,50%, che e' una quota dei contributi dovuti all'INPS
      e si calcola sulla stessa base dei contributi (imponibile II). */
   const J20 = L18*0.005;                                // 0,50% a carico dei contributi
-  const J19 = H19/c.tfrDiv - J20;                       // TFR al netto dello 0,50%
+  const J19 = H19/tfrDivS - J20;                        // TFR al netto dello 0,50% (ver136: divisore protetto)
   /* ver114 (06/11/2026, Christian: «il più veritiero?» → scelta la strada 2).
      La legge (art. 2120 c.c.) rivaluta il **FONDO TFR già accantonato al 31 dicembre dell'anno
      prima**, non la quota che matura adesso: tasso = 1,50% fisso + 75% dell'aumento ISTAT.
@@ -3367,6 +3386,11 @@ function calcCosto(o){
            O5:O5,O6:O6,O8:O8,O5calc:O5calc,O6calc:O6calc,E18:E18,J17:J17,J18:J18,L18:L18,H19:H19,J19:J19,J21:J21,
            J20:J20,J23:J23,J25:J25,J26:J26,J27:J27,J28:J28,J29:J29,J30:J30,J31:J31,J32:J32,J34:J34,
            fGod:fGod, fNon:fNon,
+           /* ver136: quali divisori erano scritti a zero (o illeggibili) e sono stati sostituiti
+              dal valore di riserva. Serve solo all'avviso a video. */
+           divNonValidi: [].concat(
+             (isFinite(Q2) && Q2 > 0) ? [] : ["Giorni settimanali"],
+             (isFinite(Number(c.tfrDiv)) && Number(c.tfrDiv) > 0) ? [] : ["Divisore TFR"]),
            J35:J35,F38:F38,H38:H38, orario:(H38>0? J35/H38 : 0) };
 }
 
@@ -3632,6 +3656,17 @@ function datiCosto(state, dp, pairs){
       const res = {};
       campi.forEach(function(k){ res[k] = prep.reduce(function(a,x){ return a + (Number(x.res[k])||0); }, 0); });
       res.J32 = o.res.J32;                                  /* formazione: una volta sola */
+      /* ver136 — DIFETTO PREESISTENTE: il rimborso km «secco» si moltiplicava per il numero di
+         pezzi. `J34` sta nell'elenco dei campi sommati, e con la tendina su «secco» ogni blocco
+         tornava l'importo INTERO: misurato, 50,00 € su periodo unico diventavano 100,00 € con
+         due pezzi. È lo stesso caso della formazione, che era già gestito qui sopra: una spesa
+         «una volta sola» non si somma fra i blocchi. ⚠️ Col rimborso «al mese» non cambia
+         niente: lì ogni blocco deve davvero portare i suoi mesi. */
+      if (o.kmTipo === "secco") res.J34 = o.res.J34;         /* rimborso secco: una volta sola */
+      /* ver136: la bandierina dei divisori non valídi non è un importo da sommare: va portata
+         avanti, altrimenti con il periodo tagliato in pezzi l'avviso non compare mai (trovato
+         in esecuzione: la prima stesura lo perdeva proprio nei casi più frequenti). */
+      res.divNonValidi = o.res.divNonValidi || [];
       const mesiTot = prep.reduce(function(a,x){ return a + x.ob.mesi; }, 0);
       ["E18","H5","J2","P2"].forEach(function(k){            /* valori "al mese": media pesata sui mesi */
         res[k] = mesiTot>0 ? prep.reduce(function(a,x){ return a + (Number(x.res[k])||0)*x.ob.mesi; }, 0)/mesiTot : 0;
@@ -3769,7 +3804,10 @@ function CostoOrario(props){
     J17: fmt2(d.premiMese) + " €/mese × " + mesiTxt(R2(d.mesi - d.premiMesiTolti, 3)),
     J18: fmt2(oreAggTot) + " h sul periodo × " + dec4(euroOraAgg) + " €/h (maggiorazione " + (d.oreSett>=38 ? "15% sul minimo" : "27%") + ")",
     L18: "imponibile I + premi + ore aggiuntive",
-    J19: "base TFR " + fmt2(r.H19) + " € ÷ " + nTxt(c.tfrDiv),
+    /* ver136: la nota scriveva «÷ 0» quando la casella era a zero, cioè mostrava un conto
+       impossibile mentre l'importo era calcolato col valore di riserva. Ora dice il divisore
+       davvero usato. */
+    J19: "base TFR " + fmt2(r.H19) + " € ÷ " + nTxt((isFinite(Number(c.tfrDiv)) && Number(c.tfrDiv) > 0) ? Number(c.tfrDiv) : COSTO_COMUNE_DEF.tfrDiv),
     J20: "0,50% su imponibile II",
     /* ver114: due note diverse, perché sono due conti diversi. Col fondo scritto si vede il
        conto di legge; senza, resta la stima di prima. */
@@ -4178,6 +4216,17 @@ function CostoOrario(props){
                   </div>
                 )}
               </div>
+
+              {/* ver136: un divisore scritto a ZERO rompeva il calcolo e il risultato veniva
+                   mostrato come «0,00», senza dire niente. Ora si usa il valore di riserva e
+                   l'avviso dice quale casella va rimessa a posto. ⚠️ Dicitura nuova, scritta da
+                   Claude: prima non c'era nessun avviso. */}
+              {(r.divNonValidi && r.divNonValidi.length) ? (
+                <div style={{ background:"#FEE2E2", border:"2px solid #b91c1c", borderRadius:"8px", padding:"7px 10px", marginTop:"8px", fontSize:"13px", lineHeight:1.35, color:"#7f1d1d" }}>
+                  🔴 <b>{r.divNonValidi.length === 1 ? "Un valore comune non è valido" : "Due valori comuni non sono validi"}: {r.divNonValidi.join(" e ")}.</b> Non può valere zero, perché è un divisore. Il costo qui sopra è calcolato con il valore di riserva ({r.divNonValidi.indexOf("Giorni settimanali") >= 0 ? ("giorni settimanali " + nTxt(COSTO_COMUNE_DEF.ggSett)) : ""}{r.divNonValidi.length === 2 ? " · " : ""}{r.divNonValidi.indexOf("Divisore TFR") >= 0 ? ("divisore TFR " + nTxt(COSTO_COMUNE_DEF.tfrDiv)) : ""}), quindi <b>non è il numero vero</b>.
+                  <div style={{ marginTop:"3px" }}>Rimetti il valore giusto in <b>⚙ Aliquote e costi fissi validi per tutti</b> (o nella scheda della persona) e premi 💾.</div>
+                </div>
+              ) : null}
 
               {/* ver120 (Christian ha scelto la strada 1: solo un avviso, nessun numero toccato) */}
               {/* ver125: se le ferie non godute vengono LIQUIDATE (c'e' una cessazione nel

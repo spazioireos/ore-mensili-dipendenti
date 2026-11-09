@@ -18,7 +18,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver135 · 09nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver136 · 09nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -391,6 +391,57 @@ Banca ore, tetto annuo, contratti e export.
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
 
+- 🐞 **TRE DIFETTI PREESISTENTI CHIUSI, tutti e tre misurati** (ver136, 09/11/2026, trovati con la
+  verifica del motore `calcCosto` chiesta da Christian nella direttiva «RICOGNIZIONE GENERALE»).
+  Nessuno dei tre era stato introdotto da una versione recente.
+  - 🚗 **a) Il rimborso km «secco» si moltiplicava per il numero di pezzi.** `J34` sta nell'elenco
+    dei campi sommati fra i blocchi (ver84) e, con la tendina su *secco*, **ogni blocco tornava
+    l'importo intero**. È lo stesso caso della **formazione**, che era già gestito una riga sopra:
+    una spesa «una volta sola» non si somma fra i pezzi.
+    **Misurato in esecuzione** su una persona vera con una trasformazione (periodo gen→dic 2026,
+    **2 pezzi**, rimborso 50 € secco): costo **18.297,43 € → 18.247,43 €**, cioè **esattamente
+    50,00 € in meno**. Controprova aritmetica: *al mese* dà 18.797,43 € (= 12 × 50), e
+    18.797,43 − 550 = **18.247,43**, il numero del *secco*. ⚠️ Con la tendina su **«al mese» non
+    cambia niente** (verificato: differenza 0,00 €), perché lì ogni blocco deve davvero portare
+    i suoi mesi.
+  - 🔴 **b) Un divisore scritto a ZERO rompeva il calcolo, e il risultato si vedeva come «0,00».**
+    Due caselle dei valori comuni sono divisori: **Giorni settimanali** (`Q2`, in `O6calc`) e
+    **Divisore TFR** (`c.tfrDiv`, in `J19`). `costoComune` le legge con `cNum(raw, def)`, e
+    **`cNum` accetta lo zero come numero valido**, quindi lo zero arrivava davvero nel conto →
+    `Infinity`/`NaN` → **`R2` riduce a 0** ogni valore non finito e **`fmt2` manda NaN a 0**: a
+    video compariva `0,00 €` come se fosse un numero vero. Era una **bugia silenziosa**, vietata
+    dal §10.1.
+    Ora `Q2s` e `tfrDivS` usano il valore di riserva (`COSTO_COMUNE_DEF`), il risultato torna
+    quello giusto, e `r.divNonValidi` fa comparire una **fascia rossa** che nomina la casella da
+    rimettere a posto. ⚠️ **Dicitura nuova, scritta da Claude**: prima non c'era nessun avviso.
+    - 🔴 **DUE TRAPPOLE NELLA MIA PRIMA STESURA, trovate in esecuzione e chiuse:**
+      1. **`divNonValidi` si perdeva quando il periodo si taglia in pezzi.** La somma dei blocchi
+         ricostruisce `res` dall'elenco `campi`, che contiene solo importi: la bandierina non c'era
+         e **l'avviso non compariva mai** proprio nei casi più frequenti. Ora si porta avanti come
+         `J32`.
+      2. **La nota a lato scriveva «÷ 0»**, cioè un conto impossibile, mentre l'importo era già
+         calcolato col valore di riserva. Ora la nota dice il divisore **davvero usato**.
+  - 🧾 **c) Un superminimo scritto «1.500,00» veniva buttato in silenzio.** `addTrasf` leggeva il
+    numero con `String(x).replace(",",".")`, che **non capisce il punto delle migliaia**:
+    `"1.500,00"` → `"1.500.00"` → **NaN** → `rec.superminimo` non veniva messo, **ma la
+    trasformazione si salvava comunque** se c'era almeno il livello. Nessun messaggio.
+    Ora si usa **`cNum`**, la stessa funzione delle 35 caselle del Costo orario, e un numero
+    illeggibile **ferma** il salvataggio dicendolo. Lo stesso vale per il monte ore.
+    ⚠️ **Due diciture nuove, scritte da Claude** (prima non esistevano): «Il monte ore non è un
+    numero…» e «Il superminimo non è un numero…», più il controllo sul negativo.
+    **Misurato**: scrivendo 1.500,00 nel modulo, la ver135 arrivava al Costo orario con
+    **niente**, la ver136 con **«dalle trasformazioni: 1.500,00 €»**.
+  - **Provato in esecuzione** (`dif136.cjs` e `dif136b.cjs`, **28 controlli su 28**, zero errori
+    di pagina): le tre prove sopra, l'avviso che compare solo col valore a zero e non col valore
+    sano, il costo che resta quello del valore di riserva, la nota senza «÷ 0», e la
+    **NON REGRESSIONE sui 16 dipendenti veri** (gen→ott 2026: costo e €/h **identici** fra ver135
+    e ver136, 16 su 16, zero differenze).
+    ⚠️ **La prima stesura della prova aveva 4 «falliti» che erano errori MIEI, non dell'app**: il
+    lettore prendeva la riga sbagliata per il rimborso km (pescava l'aiutino del TFR) e i
+    selettori del modulo cercavano un `<label>` dove l'etichetta è un `<div>` **fratello**
+    dell'`input` — la stessa trappola già incontrata nella ver135 sull'Anagrafica. Corretti negli
+    script; la prova del km è stata rifatta **in aritmetica sul costo totale**, che non dipende da
+    nessun selettore.
 - 🎖️ **GLI SCATTI ALL'ASSUNZIONE SI SCRIVONO IN ANAGRAFICA, E L'AVVISO CHE MANCAVA** (ver135,
   09/11/2026, due richieste di Christian: «è bene che compaia anche in anagrafica e qui si
   compili automaticamente e resti sfondo grigiolino, come per tutte le cose copiate in maniera
