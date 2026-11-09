@@ -459,7 +459,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver140";
+const APP_VER = "ver141";
 const APP_DATA = "09nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -1025,6 +1025,42 @@ function valoriNow(dp){ return valoriAt(dp, 9999, 12); }
 function tipoNow(dp){ return valoriNow(dp).tipo; }
 function livelloAt(dp,y,m){ return valoriAt(dp,y,m).livello; }
 function superminimoAt(dp,y,m){ return valoriAt(dp,y,m).superm; }   /* ver131 */
+
+/* ======================= E.A.R. — ver141 (09/11/2026) =========================
+   Elemento Aggiuntivo Retributivo degli EDUCATORI inquadrati al livello D1.
+   Importi MENSILI A TEMPO PIENO, con le loro decorrenze, dati da Christian il 09/11/2026:
+     01/01/2025 -> 41,00 €   (= 0,248 €/h, cioe' 41/165)
+     01/09/2025 -> 82,00 €   (= 0,4969 €/h)
+     01/01/2026 -> 0,00 €    "finisce il 31/12/2025 per tutti, qualunque livello" (sua scelta 2)
+   DUE condizioni, entrambe necessarie (sue parole: «maggiorazioni per educatori con livello
+   d1» e «gli altri erano gia' d2 oppure d1, ma non erano educatori»):
+     a) la persona e' segnata EDUCATORE in ANAGRAFICA -> Contratto;
+     b) in QUEL MESE il suo livello e' D1 (quindi passando a D2 si spegne da se').
+   Gli importi storici non si sovrascrivono: ogni mese usa la tranche in vigore allora. */
+const EAR_TRANCHE = [ { dal:"01/01/2025", eur:41.00 }, { dal:"01/09/2025", eur:82.00 }, { dal:"01/01/2026", eur:0 } ];
+const EAR_LIV = "D1";
+function earAl(y, m){
+  const q = y*10000 + m*100 + 1;
+  let v = 0;
+  EAR_TRANCHE.forEach(function(t){ const d = ymdIt(t.dal); if (d && d <= q) v = t.eur; });
+  return v;
+}
+function eduOn(dp){ const v = (dp && dp.ana) ? dp.ana.educatore : ""; return String(v==null?"":v).trim().toUpperCase().charAt(0) === "S"; }
+function earMese(dp, y, m, liv){
+  if (!eduOn(dp)) return 0;
+  if (String(liv==null?"":liv).toUpperCase().trim() !== EAR_LIV) return 0;
+  return earAl(y, m);
+}
+/* l'E.A.R. dell'ULTIMO mese in cui il contratto e' in piedi dentro il periodo, come fa
+   superminimoPeriodo: serve come valore quando il periodo NON si taglia in pezzi. */
+function earPeriodo(dp, pairs){
+  let v = 0;
+  (pairs||[]).forEach(function(pr){
+    const primo = pr.y*10000 + pr.m*100 + 1;
+    if (inForceAt(dp, primo) || inForceAt(dp, pr.y*10000+pr.m*100+daysInMonth(pr.y,pr.m))) v = earMese(dp, pr.y, pr.m, livelloAt(dp, pr.y, pr.m));
+  });
+  return v;
+}
 function oreSettAt(dp,y,m){ return valoriAt(dp,y,m).oreSett; }
 function tipoAt(dp,y,m){ return valoriAt(dp,y,m).tipo; }
 function hoursDisp(v){ const n=Number(v)||0; return Number.isInteger(n) ? String(n) : fmt2(n); }
@@ -2150,7 +2186,7 @@ const ANA_SECTIONS = [
   { t:"Dati anagrafici", f:[["cognome","Cognome"],["nome","Nome"],["luogoNascita","Luogo di nascita"],["dataNascita","Data di nascita (gg/mm/aaaa)","date"],["sesso","Sesso","sex"],["cf","Codice fiscale","cf"],["email","Email"]] },
   { t:"Residenza", f:[["indRes","Indirizzo residenza"],["capRes","CAP"],["luogoRes","Comune"]] },
   { t:"Domicilio", f:[["indDom","Indirizzo domicilio"],["capDom","CAP"],["luogoDom","Comune"]] },
-  { t:"Contratto", f:[["dataContratto","Data contratto","date"],["dataAssunzione","Data avvio / assunzione","date"],["scadenza","Data conclusione / scadenza","date"],["cessazione","Data cessazione","cess"],["tipoContratto","Tipo contratto","tipo"],["partFull","Part / Full time","list:partFull"],["orizz","Orizzontale / Verticale / Misto","list:orizz"],["qualifica","Ruolo / qualifica","qual"],["livello","Livello di inquadramento"],["scattiAss","Scatti riconosciuti all'assunzione"],["__scattoDec","Prossimo scatto — decorrenza (automatica)","roauto:scattoDec"],["__scattoN","Scatti maturati a oggi (automatico)","roauto:scattoN"]] },
+  { t:"Contratto", f:[["dataContratto","Data contratto","date"],["dataAssunzione","Data avvio / assunzione","date"],["scadenza","Data conclusione / scadenza","date"],["cessazione","Data cessazione","cess"],["tipoContratto","Tipo contratto","tipo"],["partFull","Part / Full time","list:partFull"],["orizz","Orizzontale / Verticale / Misto","list:orizz"],["qualifica","Ruolo / qualifica","qual"],["livello","Livello di inquadramento"],["educatore","Educatore (E.A.R.)","sino"],["scattiAss","Scatti riconosciuti all'assunzione"],["__scattoDec","Prossimo scatto — decorrenza (automatica)","roauto:scattoDec"],["__scattoN","Scatti maturati a oggi (automatico)","roauto:scattoN"]] },
   { t:"Luogo di lavoro", f:[["luogo","Luogo di lavoro","luogo"],["specificaStruttura","Specifica struttura (nome istituto/centro…)"],["ubicazione","Ubicazione / indirizzo"]] },
   { t:"Orario", f:[["oreSett","Monte ore settimanali"],["giorniLav","Giorni di lavoro nella settimana","list:giorniLav"],["periodo","Periodo di lavoro nell'anno","list:periodo"],["giorniProva","Giorni di prova"]] },
   { t:"Orari settimanali (per la tabella del contratto)", f:[["orarioLun","Lunedì"],["orarioMar","Martedì"],["orarioMer","Mercoledì"],["orarioGio","Giovedì"],["orarioVen","Venerdì"],["orarioSab","Sabato"]] },
@@ -3340,7 +3376,10 @@ function firmaMese(state, dp, y, m, fisso){
           f.scatti ? "-" : String(scattiAl(state, dp, y, m, (f.prec != null ? f.prec : null), (f.ass != null ? f.ass : null)).n),
           /* ver131: anche il SUPERMINIMO fa parte della firma, cosi' il periodo si taglia da
              solo alla data in cui cambia. Scritto a mano vale uguale dappertutto: non taglia. */
-          f.superm ? "-" : String(v.superm)].join("|");
+          f.superm ? "-" : String(v.superm),
+          /* ver141: anche l'E.A.R. fa parte della firma, cosi' il periodo si taglia da solo al
+             01/09/2025 (cambio di tranche) e quando il livello non e' piu' D1. */
+          String(earMese(dp, y, m, v.livello))].join("|");
 }
 function blocchiPeriodo(state, dp, pairs, fisso){
   const out = [];
@@ -3389,7 +3428,10 @@ function calcCosto(o){
   const H3 = (o.mesiRatei!=null) ? o.mesiRatei : Math.round(H2);
   /* ver106: H4 = mesi in cui esce un cedolino (almeno un giorno di contratto). */
   const H4 = (o.mesiCedolini!=null) ? o.mesiCedolini : Math.ceil(H2);
-  const tot=K+L+M+N;
+  /* ver141: l'E.A.R. e' una componente mensile a tempo pieno come il superminimo: entra nel
+     totale, quindi in importo orario, mensile fisso, 13ª, 14ª, festività, imponibili e TFR. */
+  const EA=o.ear||0;
+  const tot=K+L+M+N+EA;
   const J2 = tot/165;                                   // importo orario globale
   const P2 = O2*165/38;                                 // ore mese teoriche
   const H5 = tot/38*O2;                                 // mensile fisso
@@ -3580,6 +3622,7 @@ function datiCosto(state, dp, pairs){
      casella della scheda, se scritta, continua a vincere (e allora compare l'avviso). */
   const supermAuto = superminimoPeriodo(dp, pairs);
   const supermAMano = (p.superminimo != null && String(p.superminimo).trim() !== "");
+  const earAuto = earPeriodo(dp, pairs);          /* ver141 */
   const addizAuto = addizTDAuto(dp, pairs);
   const nProroghe = prorogheAttiveA(dp, fineRapportoYmd(dp, pairs));   // ver83/ver110: quelle gia' partite, entro la fine del rapporto
   const oreDaRiep = oreRendPeriodo(state, dp, pairs);
@@ -3618,6 +3661,7 @@ function datiCosto(state, dp, pairs){
     scatti: scattiAMano ? cNum(p.scatti, scattiAuto) : scattiAuto,   /* ver128 */
     premiTP: cNum(p.premiTP, 0),
     superminimo: cNum(p.superminimo, supermAuto),   /* ver131: segue le trasformazioni */
+    ear: earAuto,                                   /* ver141: E.A.R. educatori D1, per data */
     oreSett: oreSettAuto,                           /* ver137: dall'ANAGRAFICA, non piu' a mano */
     ggSett: cNum(p.ggSett, c.ggSett),
     addizTD: addizAuto,                             /* ver137: dalle proroghe, non piu' a mano */
@@ -3719,6 +3763,7 @@ function datiCosto(state, dp, pairs){
   const contiInMesi = (o.mesiMater>0) || (o.kmMesiTolti>0) || (o.premiMesiTolti>0);
   o.noTaglio = scrittoAMano ? "valori scritti a mano" : (contiInMesi ? "maternità o mesi tolti" : "");
   o.supermAuto = supermAuto; o.supermAMano = supermAMano;   /* ver131: per l'avviso sulla casella */
+  o.eduOn = eduOn(dp);   /* ver141: per la riga grigia della scheda */
   o.blocchi = null;
   const fissoSplit = { tab: !!tabScritta, scatti: scattiAMano, prec: scattiPrecRaw, ass: scattiAssRaw, superm: supermAMano };
   o.tagliPossibili = (pairs && pairs.length) ? blocchiPeriodo(state, dp, pairs, fissoSplit).length : 1;
@@ -3750,6 +3795,8 @@ function datiCosto(state, dp, pairs){
           scatti: scattiB,
           /* ver131: il superminimo del pezzo. Se e' scritto a mano vale quello, su tutti i pezzi. */
           superminimo: supermAMano ? o.superminimo : vv.superm,
+          /* ver141: l'E.A.R. del pezzo, dalla tranche in vigore nei suoi mesi e dal suo livello. */
+          ear: earMese(dp, pr0.y, pr0.m, vv.livello),
           indeterminato: indetB,
           addizTD: indetB ? 0 : R2(1.40 + 0.5*prorogheAttiveA(dp, fineB)),
           festGodute: ff.god, festNonGod: ff.non,
@@ -3803,6 +3850,7 @@ function datiCosto(state, dp, pairs){
         const p0=x.b.pairs[0], p1=x.b.pairs[x.b.pairs.length-1];
         return { da: mLabelY(p0.y,p0.m), a: mLabelY(p1.y,p1.m), mesi: x.ob.mesi, liv: x.liv || "—",
                  tab: x.tab, nSc: x.nSc, scatti: x.ob.scatti,
+                 ear: x.ob.ear||0,                    /* ver141 */
                  oreSett: x.ob.oreSett, addiz: x.ob.addizTD, indet: x.indet,
                  agg: R2((Number(x.res.E18)||0) * x.ob.mesi, 2),
                  ore: R2(x.res.H38,2), costo: R2(x.res.J35 - x.res.J32, 2) };
@@ -3984,6 +4032,9 @@ function CostoOrario(props){
   /* ⚠️ Quando il periodo si taglia in BLOCCHI (ver84), livello, ore settimanali e addizionale
      cambiano da pezzo a pezzo: le aliquote comuni valgono per tutti, l'addizionale no. */
   const aPezzi = !!d.blocchi;
+  /* ver141: la colonna E.A.R. nella tabella dei pezzi compare solo se in almeno un pezzo
+     c'e' davvero l'E.A.R., per non allargare la tabella a chi non e' educatore. */
+  const earCol = (d.blocchi || []).some(function(b){ return (b.ear||0) > 0; });
   const oreAggTot = R2((Number(r.E18)||0)*d.mesi, 2);
   const euroOraAgg = (oreAggTot>0) ? (r.J18/oreAggTot)
     : (r.J2 + ((d.oreSett>=38) ? (d.minimo/165*0.15) : (r.J2*0.27)));
@@ -4391,6 +4442,16 @@ function CostoOrario(props){
                       <b> Svuota la casella</b> per tornare al calcolo automatico, che segue le date.
                     </div>;
                   })()}
+                  {/* ver141: l'E.A.R. degli educatori D1. GRIGIO e di sola lettura: il dato
+                      sta in ANAGRAFICA → Contratto (spunta «Educatore (E.A.R.)») e l'importo
+                      viene dalla tabella delle tranche, per data. Qui si legge e basta. */}
+                  {campoRO("E.A.R. (educatore D1) €", d.eduOn ? fmt2(d.ear||0) : "\u2014",
+                    d.eduOn
+                      ? ((d.ear > 0)
+                          ? "educatore al livello D1 \u2014 al mese, a tempo pieno"
+                          : "educatore, ma in questo periodo non spetta (livello diverso da D1, oppure dopo il 31/12/2025)")
+                      : "si accende con \u00abEducatore (E.A.R.)\u00bb in ANAGRAFICA \u2192 Contratto",
+                    "Automatico: 41,00 € dal 01/01/2025, 82,00 € dal 01/09/2025, cessato dal 01/01/2026. Spetta solo agli educatori inquadrati al livello D1; il periodo si taglia da sé alla data in cui cambia.")}
                   {campoNum("Premio €/mese", cMostra(d.raw.premiMese, ""), function(v){ setPar("premiMese", v); })}
                   {campoNum("Rimborso km €", cMostra(d.raw.kmMese, c.kmMese || ""), function(v){ setPar("kmMese", v); }, "comune: " + fmt2(c.kmMese))}
                   <label style={cella}><span style={etich}>Rimborso: come si conta</span>
@@ -4441,12 +4502,12 @@ function CostoOrario(props){
                     l'importo orario derivante dalle varie componenti inserite»). Solo lettura:
                     sono `J2` e `H5` di calcCosto, gli stessi numeri che il conto usa davvero. */}
                 <table style={{ width:"100%", borderCollapse:"collapse", marginTop:"7px", borderTop:"1px solid #d7dde5", paddingTop:"4px" }}><tbody>
-                  <tr><td style={tdE}>Totale delle componenti</td><td style={Object.assign({}, tdV, cifre, azzurro, { padding:"4px 8px" })}>{fmt2(d.minimo + d.scatti + d.premiTP + d.superminimo)} € al mese</td></tr>
+                  <tr><td style={tdE}>Totale delle componenti</td><td style={Object.assign({}, tdV, cifre, azzurro, { padding:"4px 8px" })}>{fmt2(d.minimo + d.scatti + d.premiTP + d.superminimo + (d.ear||0))} € al mese</td></tr>
                   <tr><td style={tdE}>Importo orario</td><td style={Object.assign({}, tdV, cifre, azzurro, { padding:"4px 8px", fontSize:"16px", color:"#1f4e82" })}>{dec4(r.J2)} €/h</td></tr>
                   <tr><td style={tdE}>Mensile fisso di questa persona</td><td style={Object.assign({}, tdV, cifre, azzurro, { padding:"4px 8px" })}>{fmt2(r.H5)} € al mese</td></tr>
                 </tbody></table>
                 <div style={{ fontSize:"12.5px", color:"#475569", lineHeight:1.3, marginTop:"3px" }}>
-                  <b>Minimo tabellare + scatti + premi (tempo pieno) + superminimo</b>, diviso <b>165</b> ore. ⚠️ Le componenti sono a <b>tempo pieno</b>: l'importo orario <b>non cambia</b> con il part-time, cambia il mensile fisso (totale ÷ 38 × <b style={cifre}>{fmt2(d.oreSett)}</b> h/settimana). Le <b>ore aggiuntive</b> si pagano su questo importo maggiorato del <b>{d.oreSett >= 38 ? "15% sul minimo" : "27%"}</b>, cioè <b style={cifre}>{dec4(euroOraAgg)}</b> €/h.
+                  <b>Minimo tabellare + scatti + premi (tempo pieno) + superminimo + E.A.R.</b>, diviso <b>165</b> ore. ⚠️ Le componenti sono a <b>tempo pieno</b>: l'importo orario <b>non cambia</b> con il part-time, cambia il mensile fisso (totale ÷ 38 × <b style={cifre}>{fmt2(d.oreSett)}</b> h/settimana). Le <b>ore aggiuntive</b> si pagano su questo importo maggiorato del <b>{d.oreSett >= 38 ? "15% sul minimo" : "27%"}</b>, cioè <b style={cifre}>{dec4(euroOraAgg)}</b> €/h.
                 </div>
               </div>
 
@@ -4593,7 +4654,7 @@ function CostoOrario(props){
                   {voce("Formazione", r.J32, false, par.J32)}
                   {voce("Rimborso km", r.J34, false, par.J34)}
                   {voce("Costo totale", r.J35, true, par.J35)}
-                  {aPezzi ? <div style={{ fontSize:"12.5px", color:"#7c4a03", background:"#fff8e1", border:"1px solid #eac87a", borderRadius:"8px", padding:"5px 7px", marginTop:"6px", lineHeight:1.3 }}>Il periodo è stato calcolato <b>a pezzi</b>: le aliquote comuni (INPS, FIS, INAIL, IRAP, TFR) valgono per tutti i pezzi, mentre <b>livello, tabella CCNL, scatti, minimo, ore settimanali e addizionale</b> cambiano da pezzo a pezzo — li trovi nella tabella «Come si divide il periodo». Le voci che partono dal mensile fisso (retribuzione, 13ª, 14ª, festività) sono la <b>somma dei pezzi</b>, quindi rifacendole col mensile medio può restare qualche centesimo di differenza.</div> : null}
+                  {aPezzi ? <div style={{ fontSize:"12.5px", color:"#7c4a03", background:"#fff8e1", border:"1px solid #eac87a", borderRadius:"8px", padding:"5px 7px", marginTop:"6px", lineHeight:1.3 }}>Il periodo è stato calcolato <b>a pezzi</b>: le aliquote comuni (INPS, FIS, INAIL, IRAP, TFR) valgono per tutti i pezzi, mentre <b>livello, tabella CCNL, scatti, minimo, ore settimanali, E.A.R. e addizionale</b> cambiano da pezzo a pezzo — li trovi nella tabella «Come si divide il periodo». Le voci che partono dal mensile fisso (retribuzione, 13ª, 14ª, festività) sono la <b>somma dei pezzi</b>, quindi rifacendole col mensile medio può restare qualche centesimo di differenza.</div> : null}
                   <div style={{ fontSize:"12.5px", color:"#475569", lineHeight:1.3, marginTop:"5px" }}>I parametri a lato sono scritti arrotondati: rifacendo i conti a mano può restare qualche <b>centesimo</b> di differenza, mentre gli importi sono quelli giusti.</div>
                   <table style={{ width:"100%", borderCollapse:"collapse", marginTop:"10px" }}><tbody>
                     <tr><td style={tdE}>Ore ordinarie lavorabili</td><td style={Object.assign({}, tdV, cifre)}>{fmt2(r.O8)} h</td></tr>
@@ -4678,6 +4739,7 @@ function CostoOrario(props){
                       <td style={{ padding:"1px 6px", textAlign:"right" }}>Scatti</td>
                       <td style={{ padding:"1px 6px" }}>h/sett</td>
                       <td style={{ padding:"1px 6px" }}>Addiz.</td>
+                      {earCol ? <td style={{ padding:"1px 6px", textAlign:"right" }}>E.A.R.</td> : null}
                       <td style={{ padding:"1px 6px", textAlign:"right" }}>Aggiunt.</td>
                       <td style={{ padding:"1px 6px", textAlign:"right" }}>Ore</td>
                       <td style={{ padding:"1px 0", textAlign:"right" }}>Costo</td>
@@ -4691,6 +4753,7 @@ function CostoOrario(props){
                           <td style={Object.assign({ padding:"1px 6px", textAlign:"right" }, cifre)}>{nTxt(bb.nSc) + " = " + fmt2(bb.scatti) + " €"}</td>
                           <td style={Object.assign({ padding:"1px 6px" }, cifre)}>{fmt2(bb.oreSett)}</td>
                           <td style={Object.assign({ padding:"1px 6px" }, cifre)}>{bb.indet ? "—" : (fmt2(bb.addiz) + "%")}</td>
+                          {earCol ? <td style={Object.assign({ padding:"1px 6px", textAlign:"right" }, cifre)}>{(bb.ear||0) > 0 ? (fmt2(bb.ear) + " \u20ac") : "\u2014"}</td> : null}
                           <td style={Object.assign({ padding:"1px 6px", textAlign:"right" }, cifre)}>{fmt2(bb.agg)}</td>
                           <td style={Object.assign({ padding:"1px 6px", textAlign:"right" }, cifre)}>{fmt2(bb.ore)}</td>
                           <td style={Object.assign({ padding:"1px 0", textAlign:"right" }, cifre)}>{fmt2(bb.costo)} €</td>
@@ -4926,6 +4989,13 @@ function Anagrafica(props){
                     return <div key={key} className="field" style={{margin:0}}><label>{lbl}</label>
                       <input value={dv} maxLength={10} placeholder="gg/mm/aaaa" inputMode="numeric" onChange={function(e){ props.onAnaField(dp.id,key,maskDate(e.target.value)); }} style={bad?{borderColor:"#dc2626",background:"#fef2f2"}:undefined} title={bad?"Data non valida: usa gg/mm/aaaa":""} />
                       {bad?<div style={{color:"#dc2626",fontSize:"11px",marginTop:"2px",fontWeight:700}}>Formato richiesto: gg/mm/aaaa</div>:null}</div>; }
+                  /* ver141: tendina SI'/NO per «Educatore (E.A.R.)». E' un DATO che scrive
+                     Christian, quindi giallina con cornice ocra (ver140). */
+                  if (kind==="sino"){ const sv=anaVal(dp,key);
+                    return <div key={key} className="field" style={{margin:0}}><label>{lbl}</label>
+                      <select value={sv} onChange={function(e){ props.onAnaField(dp.id,key,e.target.value); }}
+                        style={{ border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px", padding:"7px 9px", fontFamily:"inherit", fontSize:"15px", width:"100%" }}>
+                        <option value=""></option><option value="SÌ">SÌ</option><option value="NO">NO</option></select></div>; }
                   if (kind && kind.indexOf("list:")===0){ const lname=kind.slice(5); const lopts=ANA_DATALISTS[lname]||[]; const lid="dl_"+lname;
                     return <div key={key} className="field" style={{margin:0}}><label>{lbl}</label>
                       <input value={anaVal(dp,key)} list={lid} onChange={function(e){ props.onAnaField(dp.id,key,e.target.value); }} />

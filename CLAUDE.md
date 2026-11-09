@@ -18,7 +18,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver140 · 09nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver141 · 09nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -394,6 +394,73 @@ Banca ore, tetto annuo, contratti e export.
     «— ore» e «non calcolabile»; la stessa persona su «Teoriche» → 18,67 €/h; e il **foglio Excel
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
+
+- 🎓 **L'E.A.R. DEGLI EDUCATORI D1 SI CALCOLA DA SOLO** (ver141, 09/11/2026, dato di Christian:
+  «Vi sono stati due etar, ossia maggiorazioni per educatori con livello d1: dal 1° gennaio 2025
+  € 41,00 mensili per il tempo pieno (= 0,248 euro orari); dal 1° settembre 2025 incremento a
+  € 82,00 mensili (= 0,4969 euro orari); dal 1° gennaio 2026 transito al livello D2, con
+  cessazione dell'E.A.R.» → sue scelte **1a** (tabella automatica) e **2** (finisce il
+  31/12/2025 per tutti, qualunque livello)).
+  - 🔑 **Perché non bastava scriverlo a mano**: l'unico posto dove un importo mensile con una
+    decorrenza poteva stare era il **superminimo delle trasformazioni** (ver131). Sarebbero state
+    **9 righe** da scrivere (3 persone × 3 gradini, l'ultimo con lo **0** per spegnerlo), e
+    l'app lo avrebbe registrato come «superminimo»: la **lettera** di trasformazione avrebbe
+    scritto «riconoscimento di un superminimo mensile di 41,00 euro», parola sbagliata.
+  - **Modello dati**: costante **`EAR_TRANCHE`** = `[{dal:"01/01/2025",eur:41},
+    {dal:"01/09/2025",eur:82},{dal:"01/01/2026",eur:0}]` e **`EAR_LIV = "D1"`**. Gli importi
+    storici **non si sovrascrivono**: ogni mese usa la tranche in vigore allora.
+  - **DUE condizioni, entrambe necessarie**: (a) la persona è segnata **educatore** in
+    ANAGRAFICA → Contratto; (b) **in quel mese** il suo livello è **D1**. Così il passaggio a D2
+    lo spegne **da sé**, senza nessuna data da scrivere, e la terza tranche a **0** lo spegne
+    comunque dal 01/01/2026 anche a chi resta D1 — che è la risposta di Christian alla domanda
+    sulla cessazione. ⚠️ **Non togliere nessuna delle due**: la (b) serve a non darlo ai D2, la
+    terza tranche serve alla sua regola della data.
+  - **Funzioni nuove** (accanto a `superminimoAt`): `earAl(y,m)`, **`eduOn(dp)`**,
+    **`earMese(dp,y,m,liv)`** e **`earPeriodo(dp,pairs)`** (gemella di `superminimoPeriodo`).
+  - **Dove entra**: in `calcCosto` il totale delle componenti diventa `K+L+M+N+EA`, quindi
+    l'E.A.R. segue **importo orario, mensile fisso, 13ª, 14ª, festività, imponibili, contributi
+    e TFR**, esattamente come il superminimo. ⚠️ **Scelta dichiarata**: piena incidenza su tutti
+    gli istituti. Se la busta paga dicesse altro, va corretto.
+  - **`firmaMese` lo guarda**, quindi **il periodo si taglia da solo** al 01/09/2025 e quando il
+    livello non è più D1; ogni pezzo porta il suo (`ear: earMese(dp, pr0.y, pr0.m, vv.livello)`).
+  - **A video**: in ANAGRAFICA → Contratto una tendina nuova **«Educatore (E.A.R.)»**
+    (vuoto / SÌ / NO), **giallina** perché è un dato che scrive lui (tipo di campo nuovo
+    `"sino"`); nel **Costo orario** la casella **«E.A.R. (educatore D1) €» è GRIGIA e di sola
+    lettura**, come vuole il §10.6 e la direttiva «la scheda anagrafica è il motore»; e nella
+    tabella «Come si divide il periodo» una **colonna E.A.R.**, che compare **solo** se in almeno
+    un pezzo c'è davvero (`earCol`), per non allargare la tabella agli altri.
+    ⚠️ **Diciture nuove, scritte da Claude**: «Educatore (E.A.R.)» e «E.A.R. (educatore D1) €».
+  - 🔴 **Quanto mancava, misurato in esecuzione** su una persona vera (D1 19 h/sett., passata a D2
+    dal 01/01/2026), periodo gennaio 2025 → dicembre 2026: costo **27.748,55 € → 28.211,54 €**,
+    cioè **+462,99 €**, e €/h da 24,28 a **24,69**. Il periodo passa da **3 a 4 pezzi**:
+    | periodo | liv | E.A.R. | costo |
+    |---|---|--:|--:|
+    | Gennaio → Agosto 2025 | D1 | **41,00 €** | 8.292,64 € |
+    | Settembre 2025 | D1 | **82,00 €** | 1.316,87 € |
+    | Ottobre → Dicembre 2025 | D1 | 82,00 € | 4.295,93 € |
+    | Gennaio → Dicembre 2026 | **D2** | **—** | 13.806,09 € |
+    ⚠️ Settembre sta da solo perché a **ottobre cambia anche la tabella CCNL**: i due tagli sono
+    indipendenti e si vedono tutti e due.
+  - ✅ **I dati gli danno ragione da soli**: il campo **«Ruolo / qualifica»** dell'Anagrafica dice
+    già chi è chi — due persone sono «ANIMATORE / ASSISTENTE EDUCATIVO» **e D1** (sono due delle
+    tre che ha nominato), due sono «EDUCATORE» ma **D2**, una è «ANIMATORE / ASSISTENTE
+    EDUCATIVO» ma **D2**, e le altre D1 sono **«IMPIEGATO»**. Combacia esattamente con «gli altri
+    erano già d2 oppure d1, ma non erano educatori». ⚠️ **La spunta NON viene dedotta da quel
+    campo**: è testo libero, un refuso cambierebbe un costo in silenzio. Resta una scelta
+    esplicita.
+  - ⚠️ **Una persona ha la scheda vuota** (né livello né data di assunzione) e per lei l'E.A.R.
+    **non è calcolabile** finché non li scrive. Un'altra è assunta a luglio 2025, quindi i 41 €
+    le spettano solo da allora — **verificato**: il suo primo pezzo con E.A.R. parte da luglio.
+  - ✅ **NON REGRESSIONE, misurata**: **ver140 e ver141 danno costo e €/h identici** per tutti e
+    **16 i dipendenti veri** (gen→ott 2026, **0 differenze**), perché nessuno è segnato educatore.
+    **Larghezza di pagina identica** a 390 · 768 · 1280 · 1680px, **scritte sotto i 12,5px
+    identiche (7)** e **comandi sotto i 32px identici (10)**.
+  - **Provato in esecuzione** (`ear141.cjs`, **23 controlli su 23**, zero errori di pagina): la
+    tendina c'è ed è giallina con cornice ocra; scegliendo SÌ il dato finisce nella persona (dopo
+    il 💾); la casella del Costo orario è grigia, disabilitata e mostra 82,00; i quattro pezzi con
+    41 / 82 / 82 / —; la colonna E.A.R. c'è solo quando serve; **un D2 segnato educatore non lo
+    prende** (costo identico al centesimo); **un D1 educatore lo prende nel 2025 e NON nel 2026**;
+    e la non regressione sui 16.
 
 - 🎨 **I TRE COLORI DELLE CELLE, FINITI** (ver140, 09/11/2026, richiesta di Christian: «per potere
   inserirti bene tutti i dati di tutti, predisponi celle giallline chiare ed incorniciate ocra.
