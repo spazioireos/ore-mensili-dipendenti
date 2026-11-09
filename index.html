@@ -459,7 +459,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver139";
+const APP_VER = "ver140";
 const APP_DATA = "09nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -2466,6 +2466,10 @@ function SchedaContratto(props){
 
   const giallo = { border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px", padding:"6px 8px", fontFamily:"inherit", fontSize:"13px" };
   const etich = { fontSize:"11px", fontWeight:700, marginBottom:"2px" };
+  /* ver140: le tendine di questa scheda sono DATI scritti da Christian (mese e anno di una
+     trasformazione, del monte ore temporaneo, della mensilizzazione, il periodo del massimale):
+     quindi giallline con cornice ocra come le caselle, non il grigio del sistema operativo. */
+  const gialloSel = { border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px", padding:"6px 8px", fontFamily:"inherit", fontSize:"14px" };
 
   // --- trasformazioni e proroghe ---
   const trasfSummary = function(t){
@@ -2642,7 +2646,7 @@ function SchedaContratto(props){
           <div>
             <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(150px, 1fr))", gap:"6px", alignItems:"end", marginTop:"6px" }}>
               <div><div style={etich}>Dal mese</div>
-                <select value={ntMese} onChange={function(e){ setNtMese(e.target.value); }} style={{ width:"100%", padding:"6px" }}>{MONTH_LABEL.map(function(l,i){ return <option key={i} value={String(i+1)}>{l}</option>; })}</select></div>
+                <select value={ntMese} onChange={function(e){ setNtMese(e.target.value); }} style={Object.assign({width:"100%"}, gialloSel)}>{MONTH_LABEL.map(function(l,i){ return <option key={i} value={String(i+1)}>{l}</option>; })}</select></div>
               <div><div style={etich}>Anno</div>
                 <input value={ntAnno} inputMode="numeric" style={Object.assign({width:"100%"}, giallo)} onChange={function(e){ setNtAnno(e.target.value.replace(/[^0-9]/g,"").slice(0,4)); }} /></div>
               <div><div style={etich}>Nuovo livello</div>
@@ -2678,11 +2682,11 @@ function SchedaContratto(props){
           <div style={{ marginTop:"6px" }}><button className="btn btn-blue" onClick={function(){ setApOt(true); setErrOt(""); }}>+ Aggiungi periodo</button></div> :
           <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(140px, 1fr))", gap:"6px", alignItems:"end", marginTop:"6px" }}>
             <div><div style={etich}>Da — mese</div>
-              <select value={otMeseI} onChange={function(e){ setOtMeseI(e.target.value); }} style={{ width:"100%", padding:"6px" }}>{MONTH_LABEL.map(function(l,i){ return <option key={i} value={String(i+1)}>{l}</option>; })}</select></div>
+              <select value={otMeseI} onChange={function(e){ setOtMeseI(e.target.value); }} style={Object.assign({width:"100%"}, gialloSel)}>{MONTH_LABEL.map(function(l,i){ return <option key={i} value={String(i+1)}>{l}</option>; })}</select></div>
             <div><div style={etich}>Anno</div>
               <input value={otAnnoI} inputMode="numeric" style={Object.assign({width:"100%"}, giallo)} onChange={function(e){ setOtAnnoI(e.target.value.replace(/[^0-9]/g,"").slice(0,4)); }} /></div>
             <div><div style={etich}>A — mese</div>
-              <select value={otMeseF} onChange={function(e){ setOtMeseF(e.target.value); }} style={{ width:"100%", padding:"6px" }}>{MONTH_LABEL.map(function(l,i){ return <option key={i} value={String(i+1)}>{l}</option>; })}</select></div>
+              <select value={otMeseF} onChange={function(e){ setOtMeseF(e.target.value); }} style={Object.assign({width:"100%"}, gialloSel)}>{MONTH_LABEL.map(function(l,i){ return <option key={i} value={String(i+1)}>{l}</option>; })}</select></div>
             <div><div style={etich}>Anno</div>
               <input value={otAnnoF} inputMode="numeric" style={Object.assign({width:"100%"}, giallo)} onChange={function(e){ setOtAnnoF(e.target.value.replace(/[^0-9]/g,"").slice(0,4)); }} /></div>
             <div><div style={etich}>Ore a settimana</div>
@@ -2704,7 +2708,7 @@ function SchedaContratto(props){
         {dp.mensilizzato ?
           <div style={{ display:"flex", gap:"8px", alignItems:"end", flexWrap:"wrap" }}>
             <div><div style={etich}>Dal mese</div>
-              <select value={mensMese} style={{ padding:"6px" }} onChange={function(e){ setMensMese(e.target.value); patch({ mensilizzatoDal: dalStr(e.target.value, mensAnno) }); }}>{MONTH_LABEL.map(function(l,i){ return <option key={i} value={String(i+1)}>{l}</option>; })}</select></div>
+              <select value={mensMese} style={gialloSel} onChange={function(e){ setMensMese(e.target.value); patch({ mensilizzatoDal: dalStr(e.target.value, mensAnno) }); }}>{MONTH_LABEL.map(function(l,i){ return <option key={i} value={String(i+1)}>{l}</option>; })}</select></div>
             <div><div style={etich}>Anno</div>
               <input value={mensAnno} inputMode="numeric" style={Object.assign({width:"100px"}, giallo)}
                 onChange={function(e){ const v=e.target.value.replace(/[^0-9]/g,"").slice(0,4); setMensAnno(v); patch({ mensilizzatoDal: dalStr(mensMese, v) }); }} /></div>
@@ -2717,7 +2721,7 @@ function SchedaContratto(props){
         <div style={aiuto}>È il <b>numero massimo di ore</b> che questa persona può fare in un anno. Nella scheda del mese compare una barra con <b>quante ne restano</b>. Se non ti serve, lascia la lista vuota. Il massimale <b>può cambiare di anno in anno</b>: scrivi un valore per ogni anno in cui cambia, e vale da lì in poi. Se lasci l'anno vuoto, quel valore vale <b>da sempre</b>.</div>
         <div style={{ marginBottom:"6px" }}>
           <div style={etich}>Periodo dell'anno</div>
-          <select value={tettoPeriodo} style={{ padding:"6px" }} onChange={function(e){ patch({ tettoPeriodo: e.target.value }); }}>
+          <select value={tettoPeriodo} style={gialloSel} onChange={function(e){ patch({ tettoPeriodo: e.target.value }); }}>
             <option value="scolastico">Anno scolastico (1/9 → 31/8)</option>
             <option value="civile">Anno civile (1/1 → 31/12)</option>
           </select>
@@ -3834,6 +3838,16 @@ function CostoOrario(props){
   const dp = dips.find(function(x){ return x.id===selId; }) || dips[0];
 
   const giallo = { border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px", padding:"7px 9px", fontFamily:"inherit", fontSize:"15px", width:"100%" };
+  /* ver140 (09/11/2026, richiesta di Christian: «predisponi celle giallline chiare ed
+     incorniciate ocra. Le celle che sono frutto di formule siano azzurrine o grigioline (se
+     frutto di copiature ed intoccabili)»). I tre colori erano già in uso, ma OTTO tendine
+     erano rimaste col grigio brutto del sistema operativo, e mancava l'azzurrino.
+     🟡 `giallo` = lo scrivi tu · ⬜ `grigio` = copiato da altrove, intoccabile ·
+     🟦 `azzurro` = frutto di una formula · `neutro` = non è un dato, è una scelta di
+     navigazione (il periodo che stai guardando) — scelta **1b** di Christian. */
+  const gialloSel = { border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px", padding:"7px 9px", fontFamily:"inherit", fontSize:"15px", width:"100%" };
+  const azzurro = { background:"#eef5fc", border:"2px solid #b9d5f1", borderRadius:"6px" };
+  const neutro = { border:"2px solid #cbd5e1", background:"#fff", borderRadius:"6px", padding:"7px 9px", fontFamily:"inherit", fontSize:"15px", color:"#334155" };
   const etich = { fontSize:"13px", fontWeight:700, color:"#374151", marginBottom:"2px" };
   const cella = { display:"block" };
   let nomeQui = function(){ return null; };   /* ver135: riempita nel render, vedi sotto */
@@ -4073,13 +4087,13 @@ function CostoOrario(props){
 
       <div style={{ display:"flex", gap:"8px", alignItems:"end", flexWrap:"wrap", marginBottom:"8px" }}>
         <div><div style={etich}>Dal mese</div>
-          <select value={faM} onChange={function(e){ setFaM(parseInt(e.target.value,10)); }} style={{ padding:"8px" }}>{MONTH_LABEL.map(function(l,i){ return <option key={i} value={i+1}>{l}</option>; })}</select></div>
+          <select value={faM} onChange={function(e){ setFaM(parseInt(e.target.value,10)); }} style={neutro}>{MONTH_LABEL.map(function(l,i){ return <option key={i} value={i+1}>{l}</option>; })}</select></div>
         <div><div style={etich}>Anno</div>
-          <select value={faY} onChange={function(e){ setFaY(parseInt(e.target.value,10)); }} style={{ padding:"8px" }}>{anniDisp.map(function(y){ return <option key={y} value={y}>{y}</option>; })}</select></div>
+          <select value={faY} onChange={function(e){ setFaY(parseInt(e.target.value,10)); }} style={neutro}>{anniDisp.map(function(y){ return <option key={y} value={y}>{y}</option>; })}</select></div>
         <div><div style={etich}>Al mese</div>
-          <select value={taM} onChange={function(e){ setTaM(parseInt(e.target.value,10)); }} style={{ padding:"8px" }}>{MONTH_LABEL.map(function(l,i){ return <option key={i} value={i+1}>{l}</option>; })}</select></div>
+          <select value={taM} onChange={function(e){ setTaM(parseInt(e.target.value,10)); }} style={neutro}>{MONTH_LABEL.map(function(l,i){ return <option key={i} value={i+1}>{l}</option>; })}</select></div>
         <div><div style={etich}>Anno</div>
-          <select value={taY} onChange={function(e){ setTaY(parseInt(e.target.value,10)); }} style={{ padding:"8px" }}>{anniDisp.map(function(y){ return <option key={y} value={y}>{y}</option>; })}</select></div>
+          <select value={taY} onChange={function(e){ setTaY(parseInt(e.target.value,10)); }} style={neutro}>{anniDisp.map(function(y){ return <option key={y} value={y}>{y}</option>; })}</select></div>
         <div style={{ fontSize:"14px", color:"#334155" }}>Periodo: <b>{periodoLabel}</b> ({pairs.length} mesi)</div>
         <button className="btn btn-gray" onClick={function(){ setApriComuni(!apriComuni); }}>{apriComuni ? "▲ Chiudi" : "⚙ Aliquote e costi fissi validi per tutti"}</button>
         {/* ver138, punto 6 della direttiva di Christian. Dicitura scelta da lui:
@@ -4187,7 +4201,7 @@ function CostoOrario(props){
             {campoNum("Altri permessi (gg/anno)", cMostra(sc.altriPermessi, COSTO_COMUNE_DEF.altriPermessi), function(v){ setComune("altriPermessi", v); })}
             {campoNum("Ore supplementari stimate %", cMostra(sc.suppPct, COSTO_COMUNE_DEF.suppPct), function(v){ setComune("suppPct", v); }, "% delle ore del mese", "", !suppAttiva)}
             <label style={cella}><span style={etich}>Supplementari nel TFR</span>
-              <select value={c.tfrSupp} style={{ padding:"8px", width:"100%" }} onChange={function(e){ setComune("tfrSupp", e.target.value); }}>
+              <select value={c.tfrSupp} style={gialloSel} onChange={function(e){ setComune("tfrSupp", e.target.value); }}>
                 <option value="SI">SI</option><option value="NO">NO</option></select></label>
             {campoNum("Divisore TFR", cMostra(sc.tfrDiv, COSTO_COMUNE_DEF.tfrDiv), function(v){ setComune("tfrDiv", v); }, "13,5")}
             {campoNum("Anni per rivalutazione TFR", cMostra(sc.anniTfr, COSTO_COMUNE_DEF.anniTfr), function(v){ setComune("anniTfr", v); }, anniTfrAttivo ? anniTfrNota : "", "", anniTfrAttivo ? false : anniTfrNota)}
@@ -4380,7 +4394,7 @@ function CostoOrario(props){
                   {campoNum("Premio €/mese", cMostra(d.raw.premiMese, ""), function(v){ setPar("premiMese", v); })}
                   {campoNum("Rimborso km €", cMostra(d.raw.kmMese, c.kmMese || ""), function(v){ setPar("kmMese", v); }, "comune: " + fmt2(c.kmMese))}
                   <label style={cella}><span style={etich}>Rimborso: come si conta</span>
-                    <select value={d.kmTipo} style={{ padding:"8px", width:"100%" }} onChange={function(e){ setPar("kmTipo", e.target.value); }}>
+                    <select value={d.kmTipo} style={gialloSel} onChange={function(e){ setPar("kmTipo", e.target.value); }}>
                       <option value="mese">al mese (× i mesi del periodo)</option>
                       <option value="secco">secco (una volta sola)</option>
                     </select></label>
@@ -4427,9 +4441,9 @@ function CostoOrario(props){
                     l'importo orario derivante dalle varie componenti inserite»). Solo lettura:
                     sono `J2` e `H5` di calcCosto, gli stessi numeri che il conto usa davvero. */}
                 <table style={{ width:"100%", borderCollapse:"collapse", marginTop:"7px", borderTop:"1px solid #d7dde5", paddingTop:"4px" }}><tbody>
-                  <tr><td style={tdE}>Totale delle componenti</td><td style={Object.assign({}, tdV, cifre)}>{fmt2(d.minimo + d.scatti + d.premiTP + d.superminimo)} € al mese</td></tr>
-                  <tr><td style={tdE}>Importo orario</td><td style={Object.assign({}, tdV, cifre, { fontSize:"16px", color:"#1f4e82" })}>{dec4(r.J2)} €/h</td></tr>
-                  <tr><td style={tdE}>Mensile fisso di questa persona</td><td style={Object.assign({}, tdV, cifre)}>{fmt2(r.H5)} € al mese</td></tr>
+                  <tr><td style={tdE}>Totale delle componenti</td><td style={Object.assign({}, tdV, cifre, azzurro, { padding:"4px 8px" })}>{fmt2(d.minimo + d.scatti + d.premiTP + d.superminimo)} € al mese</td></tr>
+                  <tr><td style={tdE}>Importo orario</td><td style={Object.assign({}, tdV, cifre, azzurro, { padding:"4px 8px", fontSize:"16px", color:"#1f4e82" })}>{dec4(r.J2)} €/h</td></tr>
+                  <tr><td style={tdE}>Mensile fisso di questa persona</td><td style={Object.assign({}, tdV, cifre, azzurro, { padding:"4px 8px" })}>{fmt2(r.H5)} € al mese</td></tr>
                 </tbody></table>
                 <div style={{ fontSize:"12.5px", color:"#475569", lineHeight:1.3, marginTop:"3px" }}>
                   <b>Minimo tabellare + scatti + premi (tempo pieno) + superminimo</b>, diviso <b>165</b> ore. ⚠️ Le componenti sono a <b>tempo pieno</b>: l'importo orario <b>non cambia</b> con il part-time, cambia il mensile fisso (totale ÷ 38 × <b style={cifre}>{fmt2(d.oreSett)}</b> h/settimana). Le <b>ore aggiuntive</b> si pagano su questo importo maggiorato del <b>{d.oreSett >= 38 ? "15% sul minimo" : "27%"}</b>, cioè <b style={cifre}>{dec4(euroOraAgg)}</b> €/h.
@@ -4453,7 +4467,7 @@ function CostoOrario(props){
                     <input type="radio" name={"fonte-"+dp.id} checked={d.fonte==="mano"} onChange={function(){ setPar("fonteOre","mano"); }} />
                     <span>Scritte <b>a mano</b>:</span>
                     <input value={d.raw.oreManuali==null?"":String(d.raw.oreManuali)} inputMode="decimal" placeholder="es. 850" disabled={d.fonte!=="mano"}
-                      style={{ width:"110px", border:"2px solid #f59e0b", background: d.fonte==="mano" ? "#fffde7" : "#f1f5f9", borderRadius:"6px", padding:"7px 9px", fontSize:"15px", fontVariantNumeric:"tabular-nums" }}
+                      style={{ width:"110px", border: d.fonte==="mano" ? "2px solid #f59e0b" : "2px solid #cbd5e1", background: d.fonte==="mano" ? "#fffde7" : "#f1f5f9", borderRadius:"6px", padding:"7px 9px", fontSize:"15px", fontVariantNumeric:"tabular-nums" }}
                       onChange={function(e){ setPar("oreManuali", e.target.value); }} /> <span>h</span>
                   </label>
                   <label style={{ display:"flex", alignItems:"center", gap:"8px", cursor:"pointer" }}>

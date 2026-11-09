@@ -18,7 +18,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver139 · 09nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver140 · 09nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -395,6 +395,58 @@ Banca ore, tetto annuo, contratti e export.
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
 
+- 🎨 **I TRE COLORI DELLE CELLE, FINITI** (ver140, 09/11/2026, richiesta di Christian: «per potere
+  inserirti bene tutti i dati di tutti, predisponi celle giallline chiare ed incorniciate ocra.
+  Le celle che sono frutto di formule siano azzurrine o grigioline (se frutto di copiature ed
+  intoccabili)» → sue scelte **1b**, **2a**, **3 ok**, e **Nu\***).
+  - 🔑 **La regola che ha dato era GIÀ quella in uso**: prima di toccare qualunque cosa sono state
+    misurate in esecuzione **tutte e 90 le caselle** delle due schede, e il risultato è stato
+    questo:
+    | | Anagrafica | Costo orario |
+    |---|--:|--:|
+    | 🟡 giallline con cornice ocra (`#fffde7` / `#f59e0b` 2px) | 49 ✅ | 14 ✅ |
+    | ⬜ grigioline di sola lettura (`#f1f5f9` / `#cbd5e1`) | 7 ✅ | 6 ✅ |
+    | 🟦 azzurrine, frutto di formula (`#eef5fc` / `#b9d5f1`) | 1 ✅ | **0** 🔴 |
+    | 🔴 **grigie del sistema operativo, mai vestite** (`#efefef`, bordo 1px) | **2** | **5** |
+    | ⚠️ incoerente: fondo grigiolino **con cornice ocra** | — | **1** |
+    Mancavano quindi **otto tendine** e **l'azzurrino nel Costo orario**.
+  - 🔴 **Le otto caselle mai vestite erano tutte `<select>`**: il foglio di stile copre
+    `.field input, .field select` (riga 196), ma quelle stanno **fuori** da `.field` — nella
+    **barra del periodo** del Costo orario e nella **`SchedaContratto`** in fondo all'Anagrafica.
+  - **Che cosa è stato fatto**, con tre stili condivisi (`gialloSel`, `azzurro`, `neutro`):
+    - **tendine che sono un DATO → giallline con cornice ocra**: *Rimborso: come si conta* e
+      *TFR supplementari* nel Costo orario; nella `SchedaContratto` il **mese della
+      trasformazione**, i **due mesi del monte ore temporaneo**, il **mese della
+      mensilizzazione** e il **periodo del massimale**;
+    - **selettori del PERIODO → neutri** (bianco con cornice grigiolina 2px), **scelta 1b di
+      Christian**: *Dal mese · Anno · Al mese* non sono un dato che si salva, sono «il periodo che
+      stai guardando», e il giallino significa «qui dentro c'è un dato». ⚠️ Non riportarli a
+      giallino senza che lo chieda lui.
+    - **🟦 tre celle AZZURRINE nel blocco *La retribuzione*, scelta 2a**: *Totale delle
+      componenti*, *Importo orario* (÷ 165) e *Mensile fisso di questa persona* — sono gli unici
+      tre numeri **calcolati da una formula** che si leggono lì. Misurati in esecuzione:
+      `rgb(238,245,252)` con cornice `rgb(185,213,241)`, tutte e tre.
+    - **punto 3, l'incoerenza chiusa**: la casella delle ore *Scritte a mano*, quando il pallino
+      è su un'altra fonte, aveva fondo grigiolino **ma cornice OCRA** — sembrava scrivibile e non
+      lo era. Ora la cornice segue lo stato: ocra quando è attiva, grigiolina quando è spenta.
+  - **Misurato dopo, in esecuzione**: Anagrafica da **49 a 51** giallline e **zero** grigie di
+    sistema; Costo orario da **14 a 15** giallline, da **6 a 7** grigioline (la casella spenta ora
+    è coerente) e **zero** grigie di sistema; i quattro selettori del periodo bianchi con cornice
+    `rgb(203,213,225)`.
+  - ⚠️ **NON toccati**: i **radio** delle tre fonti delle ore (non sono caselle), la tendina dei
+    **mesi in testata** (è navigazione, fuori dalle due schede), e le celle delle ore del
+    **TABELLONE**, già giallline e protette dal §10.6. ⚠️ La tendina **«Tabella CCNL»** dei valori
+    comuni è stata **lasciata col grigio di sistema** di proposito: dalla ver137 non viene più
+    letta, e vestirla di giallino l'avrebbe fatta sembrare un dato vivo. **Resta da decidere con
+    Christian se togliere quella tendina.**
+  - ✅ **NON REGRESSIONE, misurata**: **ver139 e ver140 danno costo e €/h identici** per tutti e
+    **16 i dipendenti veri** (gen→ott 2026, **0 differenze**); **larghezza di pagina identica**
+    (1700px); **comandi sotto i 32px: 10 prima, 10 dopo** — nessuno nuovo, come vuole il §10.6.
+    ⚠️ Due tendine passano da **32 a 34px** (bordo 1px → 2px): **crescono**, non si abbassano,
+    quindi la regola è rispettata.
+  - **Provato in esecuzione** (`colori.cjs` per l'inventario prima e dopo, `azz140.cjs` **4/4**,
+    `nr140.cjs` **5/5**): zero errori di pagina, e **tre anteprime PNG mostrate a Christian prima
+    di committare** (§10.3).
 - 🎖️ **LA DECORRENZA DELLO SCATTO SI LEGGE IN ANAGRAFICA** (ver139, 09/11/2026, **punto 13C**
   della direttiva di Christian: «La decorrenza dello scatto deve essere riportata automaticamente
   nella scheda anagrafica e recepita nel foglio di calcolo del costo orario»).
