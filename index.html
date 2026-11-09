@@ -459,7 +459,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver145";
+const APP_VER = "ver146";
 const APP_DATA = "09nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -1037,6 +1037,55 @@ function valoriNow(dp){ return valoriAt(dp, 9999, 12); }
 function tipoNow(dp){ return valoriNow(dp).tipo; }
 function livelloAt(dp,y,m){ return valoriAt(dp,y,m).livello; }
 function superminimoAt(dp,y,m){ return valoriAt(dp,y,m).superm; }   /* ver131 */
+
+/* ============ ver146: le VOCI DEL COSTO scritte in ANAGRAFICA (punto A1) ============
+   Christian, 09/11/2026: «tutto cio' che puo' stare in anagrafica ci stia, anche magari
+   temporizzando: ad esempio, se ti do un rimborso, puo' essere che non sia perpetuo, ma abbia
+   un tempo proprio (ad esempio mensile da gen26 a giu26)».
+   Le tre voci ricorrenti (premi, premio al mese, rimborso km) possono avere un DAL e un AL:
+   fuori da quei mesi valgono ZERO, dentro valgono il loro importo. Le altre non hanno periodo.
+   ⚠️ REGOLA DI SICUREZZA: se in Anagrafica la casella e' VUOTA, la funzione torna `null` e il
+   motore continua a leggere il vecchio valore della scheda del Costo orario, esattamente come
+   prima (stesso modo degli «scatti riconosciuti» della ver135). Cosi' nessun dato gia' scritto
+   smette di funzionare. */
+function mmAnno(x){
+  const m=String(x==null?"":x).trim().match(/^(\d{1,2})\/(\d{4})$/);
+  if(!m) return 0;
+  const mo=parseInt(m[1],10), y=parseInt(m[2],10);
+  return (mo>=1&&mo<=12) ? (y*100+mo) : 0;
+}
+function anaVoceNum(dp,campo){
+  const v=(dp&&dp.ana)?dp.ana[campo]:null;
+  return (v==null||String(v).trim()==="") ? null : cNum(v,0);
+}
+function anaVoceTesto(dp,campo){
+  const v=(dp&&dp.ana)?dp.ana[campo]:null;
+  return (v==null||String(v).trim()==="") ? null : String(v).trim();
+}
+function anaDentroIlPeriodo(dp,campo,y,m){
+  const q=y*100+m, A=(dp&&dp.ana)?dp.ana:{};
+  const d=mmAnno(A[campo+"dal"]), a=mmAnno(A[campo+"al"]);
+  if(d && q<d) return false;
+  if(a && q>a) return false;
+  return true;
+}
+function voceAnaAt(dp,campo,y,m){
+  const v=anaVoceNum(dp,campo);
+  if(v==null) return null;
+  return anaDentroIlPeriodo(dp,campo,y,m) ? v : 0;
+}
+/* il valore dell'ULTIMO mese in cui il contratto e' in piedi dentro il periodo, come fanno
+   gia' livelloPeriodo e superminimoPeriodo: serve quando il periodo non si taglia in pezzi. */
+function voceAnaPeriodo(dp,campo,pairs){
+  const v=anaVoceNum(dp,campo);
+  if(v==null) return null;
+  let r=v, visto=false;
+  (pairs||[]).forEach(function(pr){
+    const primo=pr.y*10000+pr.m*100+1;
+    if(inForceAt(dp,primo)||inForceAt(dp,pr.y*10000+pr.m*100+daysInMonth(pr.y,pr.m))){ r=voceAnaAt(dp,campo,pr.y,pr.m); visto=true; }
+  });
+  return visto ? r : v;
+}
 
 /* ======================= E.A.R. — ver141 (09/11/2026) =========================
    Elemento Aggiuntivo Retributivo degli EDUCATORI inquadrati al livello D1.
@@ -2219,7 +2268,8 @@ const ANA_DATALISTS = {
   giorniLav:["DA LUNEDI' A SABATO","DA LUNEDI' A VENERDI'"],
   periodo:["TUTTO IL PERIODO CONTRATTUALE","TUTTO IL PERIODO CONTRATTUALE (TEMPO DETERMINATO)","NELL' ANNO SCOLASTICO SECONDO I CALENDARI PUBBLICATI (A TEMPO INDETERMINATO)","NELL' ANNO SCOLASTICO SECONDO I CALENDARI PUBBLICATI DAGLI ENTI COMPETENTI"],
   partFull:["PART TIME","FULL TIME"],
-  orizz:["ORIZZONTALE","VERTICALE","MISTO"]
+  orizz:["ORIZZONTALE","VERTICALE","MISTO"],
+  kmTipo:["al mese","secco (una volta sola)"]
 };
 const ANA_SECTIONS = [
   { t:"Dati anagrafici", f:[["cognome","Cognome"],["nome","Nome"],["luogoNascita","Luogo di nascita"],["dataNascita","Data di nascita (gg/mm/aaaa)","date"],["sesso","Sesso","sex"],["cf","Codice fiscale","cf"],["email","Email"]] },
@@ -2230,6 +2280,24 @@ const ANA_SECTIONS = [
   { t:"Orario", f:[["oreSett","Monte ore settimanali"],["giorniLav","Giorni di lavoro nella settimana","list:giorniLav"],["periodo","Periodo di lavoro nell'anno","list:periodo"],["giorniProva","Giorni di prova"]] },
   { t:"Orari settimanali (per la tabella del contratto)", f:[["orarioLun","Lunedì"],["orarioMar","Martedì"],["orarioMer","Mercoledì"],["orarioGio","Giovedì"],["orarioVen","Venerdì"],["orarioSab","Sabato"]] },
   { t:"Economico", f:[["impBase","Importo orario base €"],["impSuper","Superminimo €"],["tipoSuper","Superminimo: variante","super"],["scatti","Scatti di anzianità €"],["impAltro","Altro importo orario €"],["tipoAltro","Tipologia altro"],["impTot","Importo orario totale € (automatico)","auto"]] },
+  /* ver146 (09/11/2026, punto A1 della ricognizione, risposta di Christian: «tutto cio' che
+     puo' stare in anagrafica ci stia, anche magari temporizzando: ad esempio, se ti do un
+     rimborso, puo' essere che non sia perpetuo, ma abbia un tempo proprio (ad esempio mensile
+     da gen26 a giu26). Solo i dati per le simulazioni puoi tenerli nella scheda costo orario»).
+     Qui stanno i DATI della persona che prima si scrivevano nella scheda del Costo orario.
+     ⚠️ Le tre voci ricorrenti (premi, premio al mese, rimborso km) hanno un DAL e un AL
+     facoltativi: lasciati vuoti valgono sempre, scritti valgono solo in quei mesi. */
+  { t:"Costo del lavoro", f:[
+    ["premiTP","Premi (tempo pieno) €"],["premiTPdal","Premi — dal mese (mm/aaaa)","mm"],["premiTPal","Premi — al mese (mm/aaaa)","mm"],
+    ["premiMese","Premio €/mese"],["premiMesedal","Premio — dal mese (mm/aaaa)","mm"],["premiMeseal","Premio — al mese (mm/aaaa)","mm"],
+    ["kmMese","Rimborso km €"],["kmTipo","Rimborso: come si conta","list:kmTipo"],
+    ["kmMesedal","Rimborso — dal mese (mm/aaaa)","mm"],["kmMeseal","Rimborso — al mese (mm/aaaa)","mm"],
+    ["sottoSoglia","Ore/mese sotto soglia perse"],
+    ["tfrFondo","TFR accantonato al 31/12 €"],["tfrFondoAnno","TFR accantonato — anno"],
+    ["ferieResidue","Giornate di ferie residue da anni precedenti"],
+    ["mesiMater","Mesi di maternità"],
+    ["ggSettCosto","Giorni settimanali (per il costo orario)"]
+  ] },
   { t:"Note", f:[["note","Note"],["note2","Note 2"]] },
   { t:"Proroga — dati per la lettera", f:[
     ["__proroAvvio","Data di avvio proroga (automatica)","roauto:proroAvvio"],
@@ -3418,7 +3486,12 @@ function firmaMese(state, dp, y, m, fisso){
           f.superm ? "-" : String(v.superm),
           /* ver141: anche l'E.A.R. fa parte della firma, cosi' il periodo si taglia da solo al
              01/09/2025 (cambio di tranche) e quando il livello non e' piu' D1. */
-          String(earMese(dp, y, m, v.livello))].join("|");
+          String(earMese(dp, y, m, v.livello)),
+          /* ver146: anche le voci con un PERIODO (premi, premio al mese, rimborso km) fanno
+             parte della firma, cosi' il periodo si taglia da solo al mese in cui partono o
+             finiscono. Se in Anagrafica non sono scritte, `voceAnaAt` torna null e la firma
+             non cambia mai: il comportamento resta identico a prima. */
+          String(voceAnaAt(dp,"premiTP",y,m))+"/"+String(voceAnaAt(dp,"premiMese",y,m))+"/"+String(voceAnaAt(dp,"kmMese",y,m))].join("|");
 }
 function blocchiPeriodo(state, dp, pairs, fisso){
   const out = [];
@@ -3662,6 +3735,18 @@ function datiCosto(state, dp, pairs){
   const supermAuto = superminimoPeriodo(dp, pairs);
   const supermAMano = (p.superminimo != null && String(p.superminimo).trim() !== "");
   const earAuto = earPeriodo(dp, pairs);          /* ver141 */
+  /* ver146 (A1): le voci del costo scritte in ANAGRAFICA. Se la casella là è vuota la
+     funzione torna null e si continua a leggere il vecchio valore della scheda, come prima. */
+  const aPremiTP   = voceAnaPeriodo(dp,"premiTP",pairs);
+  const aPremiMese = voceAnaPeriodo(dp,"premiMese",pairs);
+  const aKmMese    = voceAnaPeriodo(dp,"kmMese",pairs);
+  const aSottoSog  = anaVoceNum(dp,"sottoSoglia");
+  const aTfrFondo  = anaVoceNum(dp,"tfrFondo");
+  const aTfrAnno   = anaVoceTesto(dp,"tfrFondoAnno");
+  const aFerieRes  = anaVoceNum(dp,"ferieResidue");
+  const aMesiMater = anaVoceNum(dp,"mesiMater");
+  const aGgSett    = anaVoceNum(dp,"ggSettCosto");
+  const aKmTipo    = anaVoceTesto(dp,"kmTipo");
   const addizAuto = addizTDAuto(dp, pairs);
   const nProroghe = prorogheAttiveA(dp, fineRapportoYmd(dp, pairs));   // ver83/ver110: quelle gia' partite, entro la fine del rapporto
   const oreDaRiep = oreRendPeriodo(state, dp, pairs);
@@ -3691,25 +3776,25 @@ function datiCosto(state, dp, pairs){
     /* ver114: se i mesi sono scritti a mano, anche la rivalutazione segue quel numero. */
     mesiRapporto: (p.mesi!=null && p.mesi!=="") ? cNum(p.mesi, mesiAuto) : mesiRapportoAuto,
     mesiRapportoAuto: mesiRapportoAuto,
-    tfrFondo: cNum(p.tfrFondo, 0),                  /* ver114: 0 o vuoto = si usa la stima di prima */
-    ferieResidue: cNum(p.ferieResidue, 0),          /* ver125: giornate di ferie residue da anni precedenti */
-    tfrFondoAnno: (p.tfrFondoAnno==null||String(p.tfrFondoAnno).trim()==="") ? "" : String(p.tfrFondoAnno).trim(),
+    tfrFondo: (aTfrFondo!=null)? aTfrFondo : cNum(p.tfrFondo, 0),   /* ver146 */                  /* ver114: 0 o vuoto = si usa la stima di prima */
+    ferieResidue: (aFerieRes!=null)? aFerieRes : cNum(p.ferieResidue, 0),   /* ver146 */          /* ver125: giornate di ferie residue da anni precedenti */
+    tfrFondoAnno: (aTfrAnno!=null) ? aTfrAnno : ((p.tfrFondoAnno==null||String(p.tfrFondoAnno).trim()==="") ? "" : String(p.tfrFondoAnno).trim()),   /* ver146 */
     annoIniz: pairs.length ? pairs[0].y : null,
-    mesiMater: cNum(p.mesiMater, 0),
+    mesiMater: (aMesiMater!=null)? aMesiMater : cNum(p.mesiMater, 0),   /* ver146 */
     minimo: minimoAuto,                            /* ver137: dalla tabella CCNL, non piu' a mano */
     scatti: scattiAMano ? cNum(p.scatti, scattiAuto) : scattiAuto,   /* ver128 */
-    premiTP: cNum(p.premiTP, 0),
+    premiTP: (aPremiTP!=null)? aPremiTP : cNum(p.premiTP, 0),   /* ver146 */
     superminimo: cNum(p.superminimo, supermAuto),   /* ver131: segue le trasformazioni */
     ear: earAuto,                                   /* ver141: E.A.R. educatori D1, per data */
     oreSett: oreSettAuto,                           /* ver137: dall'ANAGRAFICA, non piu' a mano */
-    ggSett: cNum(p.ggSett, c.ggSett),
+    ggSett: (aGgSett!=null)? aGgSett : cNum(p.ggSett, c.ggSett),   /* ver146 */
     addizTD: addizAuto,                             /* ver137: dalle proroghe, non piu' a mano */
-    kmMese: (p.kmMese==null||p.kmMese==="")? null : cNum(p.kmMese, c.kmMese),
-    kmTipo: (p.kmTipo==="secco") ? "secco" : "mese",            // ver80: secco oppure al mese
+    kmMese: (aKmMese!=null)? aKmMese : ((p.kmMese==null||p.kmMese==="")? null : cNum(p.kmMese, c.kmMese)),   /* ver146 */
+    kmTipo: (aKmTipo!=null) ? (/secco/i.test(aKmTipo)?"secco":"mese") : ((p.kmTipo==="secco") ? "secco" : "mese"),   /* ver80; ver146: prima l'Anagrafica */
     kmMesiTolti: cNum(p.kmMesiTolti, 0),
-    premiMese: cNum(p.premiMese, 0),
+    premiMese: (aPremiMese!=null)? aPremiMese : cNum(p.premiMese, 0),   /* ver146 */
     premiMesiTolti: cNum(p.premiMesiTolti, 0),
-    sottoSoglia: cNum(p.sottoSoglia, 0),
+    sottoSoglia: (aSottoSog!=null)? aSottoSog : cNum(p.sottoSoglia, 0),   /* ver146 */
     festGodute: ff.god, festNonGod: ff.non,                // ver79: contate dal calendario del periodo
     settPeriodoOv: cNum(p.settPeriodo, 0),                 // 0 = usa il valore calcolato
     settLavOv: cNum(p.settLav, 0),
@@ -3760,7 +3845,7 @@ function datiCosto(state, dp, pairs){
     const mrat = mesiRateiPeriodo(dp, prs, sr);
     const fb = ferieBilancio(state, dp, prs, c, sr, mrat);
     const serveMano = !sp || sp.dalPrimoDato;          /* assunto prima dei dati, o senza data */
-    const ggPrec = serveMano ? cNum(p.ferieResidue, 0) : 0;
+    const ggPrec = serveMano ? ((aFerieRes!=null)? aFerieRes : cNum(p.ferieResidue, 0)) : 0;   /* ver146 */
     const ggTot = R2(Math.max(0, fb.debitoGG) + Math.max(0, ggPrec), 2);
     const p0 = prs[0], pN = prs[prs.length-1];
     o.ferieLiqGG = (ggTot > 0) ? ggTot : 0;
@@ -3836,6 +3921,11 @@ function datiCosto(state, dp, pairs){
           superminimo: supermAMano ? o.superminimo : vv.superm,
           /* ver141: l'E.A.R. del pezzo, dalla tranche in vigore nei suoi mesi e dal suo livello. */
           ear: earMese(dp, pr0.y, pr0.m, vv.livello),
+          /* ver146: ogni pezzo porta le SUE voci con periodo. Se in Anagrafica non ci sono,
+             resta il valore del periodo intero, come prima. */
+          premiTP:   (voceAnaAt(dp,"premiTP",pr0.y,pr0.m)   != null) ? voceAnaAt(dp,"premiTP",pr0.y,pr0.m)   : o.premiTP,
+          premiMese: (voceAnaAt(dp,"premiMese",pr0.y,pr0.m) != null) ? voceAnaAt(dp,"premiMese",pr0.y,pr0.m) : o.premiMese,
+          kmMese:    (voceAnaAt(dp,"kmMese",pr0.y,pr0.m)    != null) ? voceAnaAt(dp,"kmMese",pr0.y,pr0.m)    : o.kmMese,
           indeterminato: indetB,
           addizTD: indetB ? 0 : R2(1.40 + 0.5*prorogheAttiveA(dp, fineB)),
           festGodute: ff.god, festNonGod: ff.non,
@@ -4035,6 +4125,15 @@ function CostoOrario(props){
      TABELLE CCNL. È il «grigiolino» del suo punto 7.
      ⚠️ Lo stesso grigio già usato per i campi automatici dell'Anagrafica (`roauto:`) e per gli
      scatti riconosciuti della ver135: #f1f5f9 con bordo #cbd5e1. */
+  /* ver146 (A1): queste caselle non si scrivono più qui. La nota dice da dove arriva il dato:
+     dall'ANAGRAFICA se è scritto là, oppure — per non perdere niente — dal vecchio valore
+     rimasto in questa scheda, con l'invito a riscriverlo in Anagrafica. */
+  const AIUTO_ANA = "Automatico: si scrive in ANAGRAFICA → Costo del lavoro.";
+  const notaAna = function(campo, extra){
+    const inAna = !!(dp && dp.ana && String(dp.ana[campo]==null?"":dp.ana[campo]).trim() !== "");
+    return (inAna ? "si scrive in ANAGRAFICA → Costo del lavoro" : "da scrivere in ANAGRAFICA → Costo del lavoro (qui c'è ancora il vecchio valore della scheda)")
+      + (extra ? (" · " + extra) : "");
+  };
   const campoRO = function(lbl, valore, nota, titoloAiuto){
     return <label style={cella} title={titoloAiuto||""}><span style={etich}>{lbl}</span>
       <input value={valore==null?"":String(valore)} disabled
@@ -4377,7 +4476,7 @@ function CostoOrario(props){
                       <b> Svuota la casella</b> per tornare al calcolo automatico.
                     </div>;
                   })()}
-                  {campoNum("Mesi di maternità", cMostra(d.raw.mesiMater, ""), function(v){ setPar("mesiMater", v); })}
+                  {campoRO("Mesi di maternità", fmt2(d.mesiMater), notaAna("mesiMater"), AIUTO_ANA)}
                   {/* ver137: queste due arrivano dall'ANAGRAFICA e dalle proroghe registrate, e
                       scriverle a mano spegneva il taglio del periodo in pezzi SENZA dirlo.
                       Ora sono grigie e di sola lettura (strada «a» scelta da Christian).
@@ -4397,7 +4496,7 @@ function CostoOrario(props){
                   {/* ⚠️ «Giorni settimanali» RESTA GIALLINO e scrivibile: non lo ricava né
                       l'Anagrafica né il CCNL — è una scelta vera (chi lavora su 5 giorni invece
                       di 6), quindi per il §7 di Christian è un campo da compilare a mano. */}
-                  {campoNum("Giorni settimanali", cMostra(d.raw.ggSett, c.ggSett), function(v){ setPar("ggSett", v); }, "comune: " + c.ggSett)}
+                  {campoRO("Giorni settimanali", fmt2(d.ggSett), notaAna("ggSettCosto", "comune: " + c.ggSett), AIUTO_ANA)}
                   {campoRO("Addizionale tempo determ. %", d.indeterminato ? "0" : nTxt(R2(d.addizAuto,2)),
                     d.indeterminato ? "non dovuta: contratto a tempo indeterminato"
                       : ("1,40 + 0,5 × " + d.nProroghe + " proroghe già partite = " + fmt2(d.addizAuto) + " — le proroghe si registrano in fondo alla scheda"),
@@ -4465,7 +4564,7 @@ function CostoOrario(props){
                           ? "da lì l'app conta i mesi utili veri e aggiunge uno scatto ogni 24"
                           : "quanti scatti aveva già maturato a quella data: prima di lì l'app non ha dati")
                     : null}
-                  {campoNum("Premi (tempo pieno) €", cMostra(d.raw.premiTP, ""), function(v){ setPar("premiTP", v); })}
+                  {campoRO("Premi (tempo pieno) €", fmt2(d.premiTP), notaAna("premiTP"), AIUTO_ANA)}
                   {campoNum("Superminimo €", cMostra(d.raw.superminimo, d.supermAuto > 0 ? d.supermAuto : ""), function(v){ setPar("superminimo", v); },
                     d.supermAuto > 0 ? ("dalle trasformazioni: " + fmt2(d.supermAuto) + " \u20ac") : null)}
                   {(function(){
@@ -4494,27 +4593,24 @@ function CostoOrario(props){
                           : "educatore, ma in questo periodo non spetta (livello diverso da D1, oppure dopo il 31/12/2025)")
                       : "si accende con \u00abEducatore (E.A.R.)\u00bb in ANAGRAFICA \u2192 Contratto",
                     "Automatico: 41,00 € dal 01/01/2025, 82,00 € dal 01/09/2025, cessato dal 01/01/2026. Spetta solo agli educatori inquadrati al livello D1; il periodo si taglia da sé alla data in cui cambia.")}
-                  {campoNum("Premio €/mese", cMostra(d.raw.premiMese, ""), function(v){ setPar("premiMese", v); })}
-                  {campoNum("Rimborso km €", cMostra(d.raw.kmMese, c.kmMese || ""), function(v){ setPar("kmMese", v); }, "comune: " + fmt2(c.kmMese))}
-                  <label style={cella}><span style={etich}>Rimborso: come si conta</span>
-                    <select value={d.kmTipo} style={gialloSel} onChange={function(e){ setPar("kmTipo", e.target.value); }}>
-                      <option value="mese">al mese (× i mesi del periodo)</option>
-                      <option value="secco">secco (una volta sola)</option>
-                    </select></label>
-                  {campoNum("Ore/mese sotto soglia perse", cMostra(d.raw.sottoSoglia, ""), function(v){ setPar("sottoSoglia", v); })}
-                  {campoNum("TFR accantonato al 31/12 €", cMostra(d.raw.tfrFondo, ""), function(v){ setPar("tfrFondo", v); }, "vuoto = rivalutazione stimata con gli «Anni per rivalutazione TFR»")}
-                  {campoNum("TFR accantonato — anno", cMostra(d.raw.tfrFondoAnno, ""), function(v){ setPar("tfrFondoAnno", v); }, "l'anno a cui si riferisce il fondo, es. 2025")}
+                  {campoRO("Premio €/mese", fmt2(d.premiMese), notaAna("premiMese"), AIUTO_ANA)}
+                  {campoRO("Rimborso km €", (d.kmMese==null? fmt2(c.kmMese) : fmt2(d.kmMese)), notaAna("kmMese", "comune: " + fmt2(c.kmMese)), AIUTO_ANA)}
+                  {/* ver146 (A1): anche questa si sceglie in ANAGRAFICA → Costo del lavoro. */}
+                  {campoRO("Rimborso: come si conta", (d.kmTipo==="secco" ? "secco (una volta sola)" : "al mese (× i mesi del periodo)"), notaAna("kmTipo"), AIUTO_ANA)}
+                  {campoRO("Ore/mese sotto soglia perse", fmt2(d.sottoSoglia), notaAna("sottoSoglia"), AIUTO_ANA)}
+                  {campoRO("TFR accantonato al 31/12 €", (d.tfrFondo>0? fmt2(d.tfrFondo) : "—"), notaAna("tfrFondo", "vuoto = rivalutazione stimata con gli «Anni per rivalutazione TFR»"), AIUTO_ANA)}
+                  {campoRO("TFR accantonato — anno", (d.tfrFondoAnno||"—"), notaAna("tfrFondoAnno", "l'anno a cui si riferisce il fondo, es. 2025"), AIUTO_ANA)}
                   {/* ver127 (06/11/2026, Christian: «perché farmi inserire per tutti le ferie
                       residue? lo sai da te»). Giusto: il saldo si conta dall'assunzione, quindi
                       l'app se lo ricava da sola per chi è stato assunto DOPO l'inizio dei dati.
                       La casella compare SOLO per chi è entrato prima — lì l'app non può sapere
                       niente — e l'aiutino dice da sé a quale data si riferisce il numero. */}
                   {(d.ferieLiq && d.ferieLiq.serveMano)
-                    ? campoNum("Giornate di ferie residue al " + (d.ferieLiq.residuoAl || "inizio dei dati"), cMostra(d.raw.ferieResidue, ""),
-                        function(v){ setPar("ferieResidue", v); },
+                    ? campoRO("Giornate di ferie residue al " + (d.ferieLiq.residuoAl || "inizio dei dati"), fmt2(d.ferieResidue),
+                        notaAna("ferieResidue",
                         (d.ferieLiq.residuoAl
                            ? ("il residuo al " + d.ferieLiq.residuoAl + ": prima di lì l'app non ha dati. Lo trovi nel riquadro RATEI di un cedolino SENZA liquidazione")
-                           : "il residuo prima del primo mese che l'app conosce. Lo trovi nel riquadro RATEI di un cedolino SENZA liquidazione"))
+                           : "il residuo prima del primo mese che l'app conosce. Lo trovi nel riquadro RATEI di un cedolino SENZA liquidazione")), AIUTO_ANA)
                     : null}
                   {(d.ferieLiq && d.ferieLiq.senzaAssunzione) ? (
                     <div style={{ gridColumn:"1 / -1", background:"#FFEDD5", border:"1px solid #F59E0B", borderRadius:"8px", padding:"7px 10px", marginTop:"2px", fontSize:"13px", lineHeight:1.35, color:"#7c2d12" }}>
@@ -5033,6 +5129,11 @@ function Anagrafica(props){
                       {bad?<div style={{color:"#dc2626",fontSize:"11px",marginTop:"2px",fontWeight:700}}>Formato richiesto: gg/mm/aaaa</div>:null}</div>; }
                   /* ver141: tendina SI'/NO per «Educatore (E.A.R.)». E' un DATO che scrive
                      Christian, quindi giallina con cornice ocra (ver140). */
+                  /* ver146: mese/anno, per i periodi delle voci ricorrenti */
+                  if (kind==="mm"){ const mv=anaVal(dp,key);
+                    return <div key={key} className="field" style={{margin:0}}><label>{lbl}</label>
+                      <input value={mv} maxLength={7} placeholder="mm/aaaa" inputMode="numeric"
+                        onChange={function(e){ props.onAnaField(dp.id,key,e.target.value.replace(/[^0-9/]/g,"").slice(0,7)); }} /></div>; }
                   if (kind==="sino"){ const sv=anaVal(dp,key);
                     return <div key={key} className="field" style={{margin:0}}><label>{lbl}</label>
                       <select value={sv} onChange={function(e){ props.onAnaField(dp.id,key,e.target.value); }}

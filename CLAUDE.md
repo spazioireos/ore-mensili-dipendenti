@@ -18,7 +18,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver145 · 09nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver146 · 09nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -394,6 +394,51 @@ Banca ore, tetto annuo, contratti e export.
     «— ore» e «non calcolabile»; la stessa persona su «Teoriche» → 18,67 €/h; e il **foglio Excel
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
+
+- 🏛️ **I DATI DEL COSTO SI SCRIVONO IN ANAGRAFICA, E POSSONO AVERE UN PERIODO** (ver146,
+  09/11/2026, punto **A1** della ricognizione, risposta di Christian: «tutto ciò che può stare in
+  anagrafica ci stia, **anche magari temporizzando**: ad esempio, se ti do un rimborso, può
+  essere che non sia perpetuo, ma abbia un tempo proprio (ad esempio mensile da gen26 a giu26).
+  Solo i dati per le simulazioni puoi tenerli nella scheda costo orario»).
+  - **Sezione nuova in ANAGRAFICA: «Costo del lavoro»**, con le nove voci che prima si
+    scrivevano nella scheda del Costo orario: *Premi (tempo pieno) €*, *Premio €/mese*,
+    *Rimborso km €* + *come si conta*, *Ore/mese sotto soglia perse*, *TFR accantonato al 31/12 €*
+    + *anno*, *Giornate di ferie residue*, *Mesi di maternità*, *Giorni settimanali*.
+  - 🕐 **Il periodo**: le tre voci **ricorrenti** (premi, premio al mese, rimborso km) hanno un
+    **dal** e un **al** facoltativi, scritti come `mm/aaaa`. Vuoti valgono sempre; scritti,
+    **fuori da quei mesi la voce vale ZERO**. `firmaMese` li guarda, quindi **il periodo si
+    taglia da solo** al mese in cui la voce parte o finisce, e ogni pezzo porta il suo.
+  - **Funzioni nuove** (accanto a `superminimoAt`): `mmAnno`, **`anaVoceNum`**, `anaVoceTesto`,
+    `anaDentroIlPeriodo`, **`voceAnaAt(dp,campo,y,m)`** e **`voceAnaPeriodo(dp,campo,pairs)`**.
+  - 🔑 **REGOLA DI SICUREZZA, ed è la ragione per cui non si rompe niente**: se in Anagrafica la
+    casella è **vuota**, la funzione torna **`null`** e il motore continua a leggere il **vecchio
+    valore** della scheda del Costo orario, esattamente come prima — lo stesso meccanismo degli
+    «scatti riconosciuti» della ver135. ⚠️ **Nessun dato già scritto smette di funzionare.**
+  - **Nel Costo orario** quelle nove caselle sono ora **grigie e di sola lettura**, e la nota
+    sotto dice da dove arriva il numero: «si scrive in ANAGRAFICA → Costo del lavoro» oppure
+    «da scrivere in ANAGRAFICA → Costo del lavoro (qui c'è ancora il vecchio valore della
+    scheda)». ⚠️ **Diciture nuove, scritte da Claude.**
+  - 🔴 **L'esempio di Christian, misurato in esecuzione**: su una persona vera, periodo gennaio →
+    dicembre 2026, un rimborso di **100 €/mese**:
+    | | costo |
+    |---|--:|
+    | senza rimborso | 18.197,43 € |
+    | 100 €/mese **sempre** | 19.397,43 € (**+1.200,00**) |
+    | 100 €/mese **solo da gennaio a giugno** | 18.797,43 € (**+600,00**) |
+    **Esattamente la metà**: la temporizzazione funziona mese per mese.
+  - ✅ **NON REGRESSIONE, misurata**: con l'Anagrafica vuota **ver145 e ver146 danno costo e €/h
+    identici per tutti e 16 i dipendenti veri** (gen→ott 2026, **0 differenze**).
+  - **Provato in esecuzione** (`ver146.cjs`, **27 controlli su 28**, zero errori di pagina): la
+    sezione c'è con tutte e nove le voci e le caselle del periodo; il rimborso entra nel costo e
+    con il periodo costa la metà; le nove caselle del Costo orario sono **grigie e disabilitate**
+    e mostrano il valore scritto in Anagrafica.
+    ⚠️ **L'unico «fallito» era un'attesa sbagliata del mio script**: controllavo che il numero
+    dei pezzi aumentasse, ma quel periodo era **già diviso in 13 pezzi** (uno per mese), quindi
+    il taglio in più non si poteva vedere dal conteggio. Che la temporizzazione agisca è provato
+    dal numero: +600,00 invece di +1.200,00.
+  - 🔜 **Resta da fare di A1**: raccogliere in un **riquadro «Simulazione»** le caselle giallline
+    che restano nel Costo orario (mesi di contratto, settimane del periodo, settimane lavorabili,
+    ore scritte a mano, % supplementari), come Christian ha detto «eventualmente».
 
 - 🧹 **VIA LA TENDINA MORTA, E LA FRASE CHE MENTIVA** (ver145, 09/11/2026, due risposte di
   Christian alla ricognizione delle questioni aperte: «a7: togli» e «a8: correggi»).
