@@ -18,7 +18,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver146 · 09nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver148 · 09nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -395,6 +395,65 @@ Banca ore, tetto annuo, contratti e export.
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
 
+- 🚫 **«COMPILA VELOCE» NON ACCETTA PIÙ I NEGATIVI** (ver148, 09/11/2026, difetto **trovato dal
+  SECONDO collaudo** e corretto applicando la regola che Christian aveva già dato ad **A4**:
+  «vieta sempre i negativi nelle celle compilabili da me»).
+  - 🔴 **Misurato prima di correggere**: battendo **`-3`** nella finestra «Compila veloce» la nota
+    diceva «ore: -3», il pulsante restava **ACCESO** e premendolo scriveva **22 celle a −3**, con
+    **TOT calcolato −66,00** e TOT teorico −66,000. Anche `-12` e `-0,5` passavano.
+  - **Perché era rimasto aperto**: nella cella del Tabellone il meno non si può scrivere (ver102,
+    il modello `^\d{0,2}([.,]\d{0,2})?$`), ma **«Compila veloce» NON passa da `CellInput`** — è
+    la stessa ragione per cui servirono la **ver143** (il tetto delle 13 ore) e la **ver144** (il
+    testo libero). Sul **segno** il buco era rimasto: `-3` è un numero valido e sta sotto le 13.
+  - **La correzione**: bandierina **`valNegativo`** accanto a `valOltreIlTetto` e `valNonValido`;
+    il pulsante **«Compila N giorni» si spegne** e la nota diventa rossa con
+    «**Le ore non possono essere negative.**» ⚠️ **Dicitura nuova, scritta da Claude**, come
+    quelle della ver142/143/144.
+  - ⚠️ **I codici non sono toccati** (FERIE, MAL, EXF… passano come prima) e lo **zero** resta
+    ammesso: serve per azzerare un mese.
+  - **Provato in esecuzione** (`sc-dip-C.cjs`): `-3` · `-12` · `-0,5` e il solo `-` spengono il
+    pulsante e la nota dice il motivo; `7` · `13` · `0` · `12,5` · `FERIE` passano; **forzando il
+    clic nessuna cella viene scritta**; con `7` il mese si riempie ancora.
+
+- 🧪 **IL RIQUADRO «SIMULAZIONE»: LE GIALLINE CHE RESTANO, TUTTE IN UN POSTO** (ver147,
+  09/11/2026, Christian: «**Simulazione a1 provvedi**», cioè il pezzo che mancava di **A1** —
+  sua frase: «Solo i dati per le simulazioni puoi tenerli nella scheda costo orario,
+  eventualmente creando un box apposito con celle gialline per inserire i dati»).
+  - **Dove sta**: un quarto riquadro in fondo alla scheda del Costo orario, dopo *Le ore da
+    dichiarare*, con il filetto **ocra** invece di azzurro, titolo **«🧪 Simulazione»**.
+  - **Che cosa ci è finito dentro**, spostato **senza toccare niente**: **Mesi di contratto** (con
+    l'avviso giallo della ver108), **Settimane del periodo** e **Settimane davvero lavorabili**
+    (con l'avviso della ver133) e il pulsante **«↺ Rimetti i valori calcolati»**, che ora svuota
+    **tutte e tre** in una sola copia dello stato (ver107).
+  - 🚦 **In cima il riquadro dice se stai simulando**: in verde «✅ **Non stai simulando niente**»
+    oppure in giallo «⚠️ **Stai simulando.** L'app sta usando quello che hai scritto a mano per:
+    …», che nomina **anche** gli **scatti**, il **superminimo** e le **ore scritte a mano** —
+    quelli restano dove sono (accanto a ciò che forzano) e il riquadro dice dove svuotarli.
+    Serviva perché una forzatura rimasta scritta cambia i numeri e prima bisognava andarla a
+    cercare in giro per la scheda. ⚠️ **Diciture nuove, scritte da Claude.**
+  - **Fuori dal riquadro**: «Mesi di contratto» resta visibile in *Il contratto* ma **grigia e di
+    sola lettura**, e le due righe delle settimane nella tabellina delle teoriche diventano **di
+    sola lettura**, con la nota «⚠️ scritte a mano in 🧪 Simulazione» quando lo sono.
+  - 🐞 **DIFETTO PREESISTENTE TROVATO E CHIUSO QUI**: la casella «Mesi di contratto» era
+    l'**ultima** con il difetto della **ver80** (il rimborso km): da vuota mostrava il valore
+    calcolato (**12**), quindi battendo una cifra in fondo diventava **«125»** e il costo passava
+    da **18.197,43 € a 164.566,02 €**. **Misurato in esecuzione, identico nella ver146.** Ora è
+    vuota con il calcolato come **segnaposto**, come le due righe delle settimane.
+    ⚠️ **Nessun calcolo è cambiato: cambia solo cosa si vede da vuota.**
+  - ✅ **NON REGRESSIONE, misurata due volte**: **ver146 e ver147** danno costo e €/h **identici**
+    per tutti e **16 i dipendenti veri** (gen→ott 2026, **0 differenze**); e — prova più forte —
+    **ver140 e ver147**, cioè *prima e dopo tutta la catena ver141→ver147*, danno anch'esse
+    **0 differenze sui 16**.
+  - **Provato in esecuzione** (`ver147.cjs` **25/27** + `sc-dip-B.cjs`): il riquadro c'è col
+    filetto ocra; le tre caselle partono **vuote** col segnaposto; senza niente scritto dice che
+    non stai simulando e **non** mostra il ↺; scrivendo le settimane il costo cambia, l'elenco
+    nomina la leva e la tabellina delle teoriche dice «scritte a mano»; scrivendo i mesi l'avviso
+    della ver108 compare **dentro** il riquadro e **non più** in «Il contratto»; il ↺ svuota tutte
+    e tre e **il costo torna esattamente quello di prima**.
+    ⚠️ **I due «falliti» su 27 erano attese sbagliate del mio script** (leggevo il valore di una
+    casella da `innerText`, che non lo contiene, e mi aspettavo vuota la casella dei mesi prima
+    della correzione del difetto della ver80).
+
 - 🏛️ **I DATI DEL COSTO SI SCRIVONO IN ANAGRAFICA, E POSSONO AVERE UN PERIODO** (ver146,
   09/11/2026, punto **A1** della ricognizione, risposta di Christian: «tutto ciò che può stare in
   anagrafica ci stia, **anche magari temporizzando**: ad esempio, se ti do un rimborso, può
@@ -436,9 +495,7 @@ Banca ore, tetto annuo, contratti e export.
     dei pezzi aumentasse, ma quel periodo era **già diviso in 13 pezzi** (uno per mese), quindi
     il taglio in più non si poteva vedere dal conteggio. Che la temporizzazione agisca è provato
     dal numero: +600,00 invece di +1.200,00.
-  - 🔜 **Resta da fare di A1**: raccogliere in un **riquadro «Simulazione»** le caselle giallline
-    che restano nel Costo orario (mesi di contratto, settimane del periodo, settimane lavorabili,
-    ore scritte a mano, % supplementari), come Christian ha detto «eventualmente».
+  - ✅ **Il resto di A1 è stato fatto nella ver147**: vedi la scheda 🧪 qui sopra.
 
 - 🧹 **VIA LA TENDINA MORTA, E LA FRASE CHE MENTIVA** (ver145, 09/11/2026, due risposte di
   Christian alla ricognizione delle questioni aperte: «a7: togli» e «a8: correggi»).

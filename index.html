@@ -459,7 +459,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver146";
+const APP_VER = "ver148";
 const APP_DATA = "09nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -4146,6 +4146,34 @@ function CostoOrario(props){
   const d = datiCosto(state, dp, pairs);
   const r = d.res;
 
+  /* ver147 (A1 «Simulazione», 09/11/2026, Christian: «Simulazione a1 provvedi», dopo che la
+     ver146 aveva portato in ANAGRAFICA i nove dati del costo del lavoro. Sua frase in a1:
+     «Solo i dati per le simulazioni puoi tenerli nella scheda costo orario, eventualmente
+     creando un box apposito con celle gialline per inserire i dati»).
+     Le caselle giallline che restano in questa scheda NON sono dati della persona: sono leve
+     per rispondere a «quanto costerebbe se...». Qui si conta quante sono accese, perche' una
+     forzatura rimasta scritta cambia i numeri e prima bisognava andarla a cercare in giro. */
+  const simMesi  = String(d.raw.mesi        == null ? "" : d.raw.mesi).trim()        !== "";
+  const simSettP = String(d.raw.settPeriodo == null ? "" : d.raw.settPeriodo).trim() !== "";
+  const simSettL = String(d.raw.settLav     == null ? "" : d.raw.settLav).trim()     !== "";
+  const simOre   = (d.fonte === "mano");
+  const simForz  = [];
+  if (simMesi)  simForz.push("i mesi di contratto");
+  if (simSettP) simForz.push("le settimane del periodo");
+  if (simSettL) simForz.push("le settimane davvero lavorabili");
+  if (simOre)   simForz.push("le ore scritte a mano");
+  if (d.scattiAMano) simForz.push("gli scatti di anzianita'");
+  if (d.supermAMano) simForz.push("il superminimo");
+  /* Una casella giallina della simulazione: vuota resta VUOTA (con il valore calcolato come
+     segnaposto), perche' stamparci dentro il calcolato farebbe credere che sia scritto, ed e'
+     il difetto chiuso nella ver80 sul rimborso km. */
+  const campoSim = function(lbl, raw, campo, segnaposto, nota){
+    return <label style={cella}><span style={etich}>{lbl}</span>
+      <input value={raw==null?"":String(raw)} inputMode="decimal" placeholder={segnaposto} style={giallo}
+        onChange={function(e){ setPar(campo, e.target.value); }} />
+      {nota ? <span style={{ fontSize:"12.5px", color:"#475569" }}>{nota}</span> : null}</label>;
+  };
+
   /* ver113 (06/11/2026, richiesta di Christian: «nel riepilogo costo orario indica aliquote e
      parametri di riferimento che consentono il calcolo a lato di ogni voce: es inps 26,90 -
      fis 0,55, tredicesima 4 mesi, ore aggiuntive 56 ore etc»).
@@ -4460,22 +4488,14 @@ function CostoOrario(props){
                   {d.nMesiAN > 0 ? <tr><td style={tdE}>Mesi non pagati</td><td style={Object.assign({}, tdV, { color:"#7c4a03" })}>{d.mesiAN} — {d.nMesiAN===1?"è tutto «AN»":"sono tutti «AN»"}: {d.nMesiAN===1?"non è pagato":"non sono pagati"} (nessuna busta paga), quindi {d.nMesiAN===1?"è fuori":"sono fuori"} da stipendio, ratei, cedolini e festività. Il rapporto però resta in piedi: contratto, livello e ore settimanali non cambiano.</td></tr> : null}
                 </tbody></table>
                 <div className="co-grid" style={grigliaCampi}>
-                  {campoNum("Mesi di contratto", cMostra(d.raw.mesi, d.mesiAuto), function(v){ setPar("mesi", v); }, "proposti: " + fmt2(d.mesiAuto) + " (giorni veri) · ferie, 13ª e 14ª su " + d.mesiRateiAuto)}
-                  {(function(){
-                    /* ver108 (05/11/2026, chiesto da Christian dopo la verifica meticolosa):
-                       avviso giallo quando i mesi sono SCRITTI A MANO e non coincidono con
-                       quelli calcolati sul periodo scelto. Senza, cambiando il periodo i conti
-                       restavano fermi sul numero scritto e non lo diceva nessuno. */
-                    const scritti = String(d.raw.mesi == null ? "" : d.raw.mesi).trim();
-                    if (scritti === "") return null;
-                    const nMan = cNum(d.raw.mesi, d.mesiAuto);
-                    if (Math.abs(nMan - d.mesiAuto) <= 0.005) return null;
-                    return <div style={{ gridColumn:"1 / -1", background:"#FFF8E1", border:"1px solid #EAC87A", borderRadius:"8px", padding:"7px 10px", marginTop:"2px", fontSize:"13px", lineHeight:1.35, color:"#7c4a03" }}>
-                      ⚠️ <b>I mesi sono scritti a mano</b>: l'app sta usando <b>{fmt2(nMan)}</b>, non i <b>{fmt2(d.mesiAuto)}</b> che risultano dal periodo scelto ({d.periodoLabel || "il periodo qui sopra"}).
-                      Anche ferie, 13ª, 14ª e assistenza sanitaria seguono il numero scritto (<b>{Math.round(nMan)}</b> invece di {d.mesiRateiAuto}), e i cedolini sono <b>{Math.ceil(nMan)}</b> invece di {d.mesiCedoAuto}.
-                      <b> Svuota la casella</b> per tornare al calcolo automatico.
-                    </div>;
-                  })()}
+                  {/* ver147 (A1): la casella si scrive ora nel riquadro «🧪 Simulazione», in
+                      fondo alla scheda, con le altre leve che servono solo a simulare. Qui si
+                      legge il numero in uso. ⚠️ Nessun calcolo e' cambiato. */}
+                  {campoRO("Mesi di contratto", fmt2(d.mesi),
+                    (simMesi
+                      ? ("⚠️ scritti a mano nel riquadro «🧪 Simulazione» — dal periodo risulterebbero " + fmt2(d.mesiAuto))
+                      : ("proposti: " + fmt2(d.mesiAuto) + " (giorni veri) · ferie, 13ª e 14ª su " + d.mesiRateiAuto)),
+                    "Automatico: i mesi in cui il contratto e' in piedi nel periodo scelto. Per simulare un periodo diverso si scrive nel riquadro «🧪 Simulazione».")}
                   {campoRO("Mesi di maternità", fmt2(d.mesiMater), notaAna("mesiMater"), AIUTO_ANA)}
                   {/* ver137: queste due arrivano dall'ANAGRAFICA e dalle proroghe registrate, e
                       scriverle a mano spegneva il taglio del periodo in pezzi SENZA dirlo.
@@ -4677,20 +4697,16 @@ function CostoOrario(props){
 
                 <div style={{ marginTop:"6px", borderTop:"1px solid #b9d5f1", paddingTop:"5px" }}>
                   <div style={{ fontSize:"14.5px", fontWeight:800, color:"#1f4e82", marginBottom:"2px" }}>Da dove escono le ore teoriche</div>
-                  <div style={{ fontSize:"13px", color:"#475569", lineHeight:1.3, marginBottom:"5px" }}>Le due caselle <b>giallino</b> si possono scrivere: servono a <b>simulare</b> — per esempio «in quel periodo si lavorano davvero 18 settimane». Lasciate vuote, l'app le calcola da sé.</div>
+                  {/* ver147 (A1): le due caselle giallline si scrivono nel riquadro
+                      «🧪 Simulazione»; qui si leggono i numeri in uso. */}
+                  <div style={{ fontSize:"13px", color:"#475569", lineHeight:1.3, marginBottom:"5px" }}>Le due righe delle <b>settimane</b> si possono forzare dal riquadro <b>🧪 Simulazione</b> in fondo alla scheda: servono a <b>simulare</b> — per esempio «in quel periodo si lavorano davvero 18 settimane». Lasciate vuote, l'app le calcola da sé.</div>
                   <table style={{ width:"100%", borderCollapse:"collapse" }}><tbody>
                     <tr><td style={tdE}>Settimane del periodo</td>
-                        <td style={{ padding:"1px 0", width:"130px" }}>
-                          <input value={d.raw.settPeriodo==null?"":String(d.raw.settPeriodo)} inputMode="decimal" placeholder={fmt2(r.O5calc)}
-                            style={{ width:"120px", border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px", padding:"6px 8px", fontSize:"15px", fontVariantNumeric:"tabular-nums" }}
-                            onChange={function(e){ setPar("settPeriodo", e.target.value); }} /></td>
-                        <td style={{ padding:"1px 0 1px 8px", fontSize:"13px", color:"#475569" }}>calcolate: <b style={cifre}>{fmt2(r.O5calc)}</b></td></tr>
+                        <td style={Object.assign({}, tdV, cifre, { width:"130px" })}>{fmt2(r.O5)}</td>
+                        <td style={{ padding:"1px 0 1px 8px", fontSize:"13px", color:"#475569" }}>{simSettP ? <span>⚠️ <b>scritte a mano</b> in 🧪 Simulazione — calcolate: <b style={cifre}>{fmt2(r.O5calc)}</b></span> : <span>calcolate: <b style={cifre}>{fmt2(r.O5calc)}</b></span>}</td></tr>
                     <tr><td style={tdE}>Settimane davvero lavorabili</td>
-                        <td style={{ padding:"1px 0" }}>
-                          <input value={d.raw.settLav==null?"":String(d.raw.settLav)} inputMode="decimal" placeholder={fmt2(r.O6calc)}
-                            style={{ width:"120px", border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px", padding:"6px 8px", fontSize:"15px", fontVariantNumeric:"tabular-nums" }}
-                            onChange={function(e){ setPar("settLav", e.target.value); }} /></td>
-                        <td style={{ padding:"1px 0 1px 8px", fontSize:"13px", color:"#475569" }}>tolte ferie, festività e malattia: <b style={cifre}>{fmt2(r.O6calc)}</b></td></tr>
+                        <td style={Object.assign({}, tdV, cifre)}>{fmt2(r.O6)}</td>
+                        <td style={{ padding:"1px 0 1px 8px", fontSize:"13px", color:"#475569" }}>{simSettL ? <span>⚠️ <b>scritte a mano</b> in 🧪 Simulazione — tolte ferie, festività e malattia: <b style={cifre}>{fmt2(r.O6calc)}</b></span> : <span>tolte ferie, festività e malattia: <b style={cifre}>{fmt2(r.O6calc)}</b></span>}</td></tr>
                     <tr><td style={tdE}>Ore settimanali</td><td style={Object.assign({}, tdV, cifre)}>{hoursDisp(d.oreSett)}</td><td></td></tr>
                     <tr><td style={tdE}>Ore lavorabili sul periodo</td><td style={Object.assign({}, tdV, cifre)}>{fmt2(r.O8)} h</td>
                         <td style={{ padding:"1px 0 1px 8px", fontSize:"13px", color:"#475569" }}>settimane × ore settimanali</td></tr>
@@ -4702,16 +4718,75 @@ function CostoOrario(props){
                       servono per contare le ore, ma scriverle spegne il conto mese per mese
                       (ver117) e il taglio del periodo in pezzi (ver84): l'app ora lo dice.
                       NESSUN calcolo è cambiato: è solo un avviso. */}
-                  {((d.raw.settPeriodo || d.raw.settLav) && d.fonte !== "teoriche") ?
-                    <div style={{ marginTop:"6px", background:"#fff8e1", border:"2px solid #eac87a", borderRadius:"8px", padding:"7px 9px", fontSize:"12.5px", color:"#78350f", lineHeight:1.35 }}>
-                      ⚠️ <b>Queste settimane sono scritte a mano, ma qui non servono.</b> Con le ore {d.fonte === "mano" ? "scritte a mano" : "dai Riepiloghi"} le ore del periodo arrivano da lì, non da questa tabellina: lei serve solo alle ore <b>Teoriche</b> e alle simulazioni.
+                </div>
+              </div>
+
+              {/* ver147 (A1, 09/11/2026, Christian: «Simulazione a1 provvedi»). Il riquadro
+                  raccoglie le caselle giallline che restano in questa scheda: non sono dati
+                  della persona (quelli stanno in ANAGRAFICA dalla ver146) ma leve per
+                  rispondere a «quanto costerebbe se...».
+                  ⚠️ NESSUN calcolo e' cambiato: sono le stesse caselle di prima, spostate, con
+                  gli stessi avvisi (ver108 per i mesi, ver133 per le settimane) e lo stesso
+                  pulsante. In cima l'elenco delle forzature accese. */}
+              <div style={Object.assign({}, blocco, { borderLeft:"4px solid #f59e0b" })}>
+                {nomeQui(false)}
+                <div style={capo}>🧪 Simulazione</div>
+                <div style={{ fontSize:"13px", color:"#475569", lineHeight:1.35 }}>Qui <b>non</b> si scrivono i dati della persona — quelli stanno in <b>ANAGRAFICA</b>. Queste caselle <b>giallino</b> servono a rispondere a «<i>quanto costerebbe se…</i>»: scritte, <b>vincono sul calcolo</b>; lasciate vuote, l'app calcola da sé.</div>
+                {simForz.length ?
+                  <div style={{ marginTop:"5px", background:"#fff8e1", border:"2px solid #eac87a", borderRadius:"8px", padding:"7px 9px", fontSize:"12.5px", color:"#78350f", lineHeight:1.35 }}>
+                    ⚠️ <b>Stai simulando.</b> L'app sta usando quello che hai scritto a mano per: <b>{simForz.join(" · ")}</b>.
+                    {(d.scattiAMano || d.supermAMano) ? <div style={{ marginTop:"3px" }}>⚠️ <b>Gli scatti di anzianità e il superminimo si svuotano nel riquadro «La retribuzione»</b>, dove stanno accanto al minimo tabellare che forzano.</div> : null}
+                    {simOre ? <div style={{ marginTop:"3px" }}>⚠️ Le <b>ore scritte a mano</b> si scelgono qui sopra, in «Le ore da dichiarare»: per tornare alle ore vere rimetti il pallino su <b>Dai Riepiloghi</b>.</div> : null}
+                  </div>
+                  : <div style={{ marginTop:"5px", background:"#ecfdf5", border:"2px solid #86c7a8", borderRadius:"8px", padding:"7px 9px", fontSize:"12.5px", color:"#065f46", lineHeight:1.35 }}>
+                      ✅ <b>Non stai simulando niente</b>: i numeri di questa scheda sono quelli che l'app calcola dai dati veri.
+                    </div>}
+                <div className="co-grid" style={grigliaCampi}>
+                  {/* ver147: la casella era l'ULTIMA con il difetto chiuso nella ver80 sul
+                      rimborso km: da vuota mostrava il valore calcolato (12), quindi battendo
+                      una cifra in fondo diventava «125» e il costo passava da 18.197,43 € a
+                      164.566,02 €. Misurato in esecuzione, identico nella ver146. Ora e' vuota
+                      con il calcolato come SEGNAPOSTO, come le due righe delle settimane.
+                      ⚠️ Nessun calcolo e' cambiato: cambia solo cosa si vede da vuota. */}
+                  {campoSim("Mesi di contratto", d.raw.mesi, "mesi", fmt2(d.mesiAuto),
+                    "proposti: " + fmt2(d.mesiAuto) + " (giorni veri) · ferie, 13ª e 14ª su " + d.mesiRateiAuto)}
+                  {(function(){
+                    /* ver108 (05/11/2026, chiesto da Christian dopo la verifica meticolosa):
+                       avviso giallo quando i mesi sono SCRITTI A MANO e non coincidono con
+                       quelli calcolati sul periodo scelto. Senza, cambiando il periodo i conti
+                       restavano fermi sul numero scritto e non lo diceva nessuno.
+                       ⚠️ ver147: spostato qui dentro, testo identico. */
+                    if (!simMesi) return null;
+                    const nMan = cNum(d.raw.mesi, d.mesiAuto);
+                    if (Math.abs(nMan - d.mesiAuto) <= 0.005) return null;
+                    return <div style={{ gridColumn:"1 / -1", background:"#FFF8E1", border:"1px solid #EAC87A", borderRadius:"8px", padding:"7px 10px", marginTop:"2px", fontSize:"13px", lineHeight:1.35, color:"#7c4a03" }}>
+                      ⚠️ <b>I mesi sono scritti a mano</b>: l'app sta usando <b>{fmt2(nMan)}</b>, non i <b>{fmt2(d.mesiAuto)}</b> che risultano dal periodo scelto ({d.periodoLabel || "il periodo scelto in cima"}).
+                      Anche ferie, 13ª, 14ª e assistenza sanitaria seguono il numero scritto (<b>{Math.round(nMan)}</b> invece di {d.mesiRateiAuto}), e i cedolini sono <b>{Math.ceil(nMan)}</b> invece di {d.mesiCedoAuto}.
+                      <b> Svuota la casella</b> per tornare al calcolo automatico.
+                    </div>;
+                  })()}
+                  {campoSim("Settimane del periodo", d.raw.settPeriodo, "settPeriodo", fmt2(r.O5calc), "calcolate: " + fmt2(r.O5calc))}
+                  {campoSim("Settimane davvero lavorabili", d.raw.settLav, "settLav", fmt2(r.O6calc), "tolte ferie, festività e malattia: " + fmt2(r.O6calc))}
+                  {/* ver133 (08/11/2026, Nu* di Christian: «la questione settimane davvero
+                      lavorabili in realtà ci serve? Non calcoliamo tutto dalle ore reali da
+                      tabellone?»). Con le ore dai Riepiloghi o a mano queste due caselle NON
+                      servono per contare le ore, ma scriverle spegne il conto mese per mese
+                      (ver117) e il taglio del periodo in pezzi (ver84): l'app lo dice.
+                      ⚠️ ver147: spostato qui dentro, testo identico. */}
+                  {((simSettP || simSettL) && d.fonte !== "teoriche") ?
+                    <div style={{ gridColumn:"1 / -1", background:"#fff8e1", border:"2px solid #eac87a", borderRadius:"8px", padding:"7px 9px", fontSize:"12.5px", color:"#78350f", lineHeight:1.35 }}>
+                      ⚠️ <b>Queste settimane sono scritte a mano, ma qui non servono.</b> Con le ore {d.fonte === "mano" ? "scritte a mano" : "dai Riepiloghi"} le ore del periodo arrivano da lì, non dalla tabellina delle teoriche: lei serve solo alle ore <b>Teoriche</b> e alle simulazioni.
                       <div style={{ marginTop:"3px" }}>⚠️ Scriverle però <b>spegne due cose</b>: le <b>ore in più</b> tornano a contarsi sul <b>totale del periodo</b> invece che <b>mese per mese</b>, e il periodo <b>non si divide più in pezzi</b> (niente riquadro «Come si divide il periodo»). Il costo cambia di conseguenza.</div>
                       <div style={{ marginTop:"3px" }}>Per tornare all'automatico premi <b>↺ Rimetti i valori calcolati</b> qui sotto.</div>
                     </div> : null}
-                  {(d.raw.settPeriodo || d.raw.settLav) ?
-                    <button className="btn btn-gray" style={{ marginTop:"6px" }}
-                      onClick={function(){ setParMulti({ settPeriodo:"", settLav:"" }); }}>↺ Rimetti i valori calcolati</button> : null}
                 </div>
+                {/* ver147: lo stesso pulsante della ver73, con la stessa dicitura, che ora
+                    svuota anche i mesi: sono le tre caselle di questo riquadro, e vanno in una
+                    sola copia dello stato (ver107, altrimenti la seconda scrittura cancella la
+                    prima). */}
+                {(simMesi || simSettP || simSettL) ?
+                  <button className="btn btn-gray" style={{ marginTop:"6px" }}
+                    onClick={function(){ setParMulti({ mesi:"", settPeriodo:"", settLav:"" }); }}>↺ Rimetti i valori calcolati</button> : null}
               </div>
             </div>
 
@@ -5484,7 +5559,14 @@ function QuickFillModal(props){
   /* ver144: e nemmeno il testo libero. Prima «PIPPO» riempiva decine di celle (poi segnalate in
      rosso dalla ver101): adesso non parte proprio. */
   const valNonValido = (!isCode) && vTrim !== "" && !isNumeric(valNorm);
-  const apply = function(){ if (vTrim === "" || valOltreIlTetto || valNonValido) return; props.onApply({ dpId:dp.id, valore:valNorm, target:target, overwrite:overwrite, occupied:occupied }); };
+  /* ver148 (09/11/2026, trovato dal SECONDO collaudo e corretto per la regola che Christian
+     aveva gia' dato ad A4: «vieta sempre i negativi nelle celle compilabili da me»).
+     ⚠️ Misurato prima di correggere: battendo «-3» il pulsante restava ACCESO e premendolo
+     scriveva 22 celle a -3, con TOT calcolato -66,00 e TOT teorico -66,000. Nella cella del
+     Tabellone il meno non si puo' scrivere (ver102), ma «Compila veloce» NON passa da
+     CellInput: era lo stesso buco della ver143 e della ver144, rimasto aperto sul segno. */
+  const valNegativo = (!isCode) && vTrim !== "" && isNumeric(valNorm) && cNum(valNorm, 0) < 0;
+  const apply = function(){ if (vTrim === "" || valOltreIlTetto || valNonValido || valNegativo) return; props.onApply({ dpId:dp.id, valore:valNorm, target:target, overwrite:overwrite, occupied:occupied }); };
   return (
     <div className="overlay" onClick={props.onClose}>
       <div className="modal" onClick={function(e){ e.stopPropagation(); }} style={{ maxWidth:"560px" }}>
@@ -5494,7 +5576,7 @@ function QuickFillModal(props){
           <label style={{ fontSize:"13px", fontWeight:"700" }}>Valore da inserire:</label>
           <input value={valore} onChange={function(e){ setValore(e.target.value); }} list="codici-list" placeholder="es. 7  oppure  FERIE"
             style={{ padding:"7px 9px", border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px", width:"160px", fontSize:"15px", fontWeight:"700" }} />
-          <span style={{ fontSize:"12px", color: (valOltreIlTetto||valNonValido) ? "#b91c1c" : "#64748b", fontWeight: (valOltreIlTetto||valNonValido) ? 700 : 400 }}>{vTrim==="" ? "" : (isCode ? "codice: " + CODE_SET[vTrim.toUpperCase()].l : (valNonValido ? "Qui va un numero di ore oppure un codice dell'elenco (FERIE, MAL, EXF…)." : (valOltreIlTetto ? ("In un giorno non si possono scrivere più di " + ORE_MAX_GIORNO + " ore.") : ("ore: " + valNorm))))}</span>
+          <span style={{ fontSize:"12px", color: (valOltreIlTetto||valNonValido||valNegativo) ? "#b91c1c" : "#64748b", fontWeight: (valOltreIlTetto||valNonValido||valNegativo) ? 700 : 400 }}>{vTrim==="" ? "" : (isCode ? "codice: " + CODE_SET[vTrim.toUpperCase()].l : (valNonValido ? "Qui va un numero di ore oppure un codice dell'elenco (FERIE, MAL, EXF…)." : (valNegativo ? "Le ore non possono essere negative." : (valOltreIlTetto ? ("In un giorno non si possono scrivere più di " + ORE_MAX_GIORNO + " ore.") : ("ore: " + valNorm)))))}</span>
         </div>
         <div style={{ marginBottom:"10px", background:"#f8fafc", border:"1px solid #e2e8f0", borderRadius:"8px", padding:"8px 10px" }}>
           <div style={{ fontSize:"13px", fontWeight:"700", marginBottom:"6px" }}>Quali giorni del mese:</div>
@@ -5551,7 +5633,7 @@ function QuickFillModal(props){
           <span></span>
           <span>
             <button className="btn btn-gray" onClick={props.onClose}>Annulla</button>
-            <button className="btn btn-blue" style={{ marginLeft:"8px" }} disabled={vTrim==="" || target.length===0 || valOltreIlTetto || valNonValido} onClick={apply}>Compila {target.length} giorni</button>
+            <button className="btn btn-blue" style={{ marginLeft:"8px" }} disabled={vTrim==="" || target.length===0 || valOltreIlTetto || valNonValido || valNegativo} onClick={apply}>Compila {target.length} giorni</button>
           </span>
         </div>
       </div>
