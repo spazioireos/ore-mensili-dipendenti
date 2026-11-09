@@ -459,7 +459,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver138";
+const APP_VER = "ver139";
 const APP_DATA = "09nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -2150,7 +2150,7 @@ const ANA_SECTIONS = [
   { t:"Dati anagrafici", f:[["cognome","Cognome"],["nome","Nome"],["luogoNascita","Luogo di nascita"],["dataNascita","Data di nascita (gg/mm/aaaa)","date"],["sesso","Sesso","sex"],["cf","Codice fiscale","cf"],["email","Email"]] },
   { t:"Residenza", f:[["indRes","Indirizzo residenza"],["capRes","CAP"],["luogoRes","Comune"]] },
   { t:"Domicilio", f:[["indDom","Indirizzo domicilio"],["capDom","CAP"],["luogoDom","Comune"]] },
-  { t:"Contratto", f:[["dataContratto","Data contratto","date"],["dataAssunzione","Data avvio / assunzione","date"],["scadenza","Data conclusione / scadenza","date"],["cessazione","Data cessazione","cess"],["tipoContratto","Tipo contratto","tipo"],["partFull","Part / Full time","list:partFull"],["orizz","Orizzontale / Verticale / Misto","list:orizz"],["qualifica","Ruolo / qualifica","qual"],["livello","Livello di inquadramento"],["scattiAss","Scatti riconosciuti all'assunzione"]] },
+  { t:"Contratto", f:[["dataContratto","Data contratto","date"],["dataAssunzione","Data avvio / assunzione","date"],["scadenza","Data conclusione / scadenza","date"],["cessazione","Data cessazione","cess"],["tipoContratto","Tipo contratto","tipo"],["partFull","Part / Full time","list:partFull"],["orizz","Orizzontale / Verticale / Misto","list:orizz"],["qualifica","Ruolo / qualifica","qual"],["livello","Livello di inquadramento"],["scattiAss","Scatti riconosciuti all'assunzione"],["__scattoDec","Prossimo scatto — decorrenza (automatica)","roauto:scattoDec"],["__scattoN","Scatti maturati a oggi (automatico)","roauto:scattoN"]] },
   { t:"Luogo di lavoro", f:[["luogo","Luogo di lavoro","luogo"],["specificaStruttura","Specifica struttura (nome istituto/centro…)"],["ubicazione","Ubicazione / indirizzo"]] },
   { t:"Orario", f:[["oreSett","Monte ore settimanali"],["giorniLav","Giorni di lavoro nella settimana","list:giorniLav"],["periodo","Periodo di lavoro nell'anno","list:periodo"],["giorniProva","Giorni di prova"]] },
   { t:"Orari settimanali (per la tabella del contratto)", f:[["orarioLun","Lunedì"],["orarioMar","Martedì"],["orarioMer","Mercoledì"],["orarioGio","Giovedì"],["orarioVen","Venerdì"],["orarioSab","Sabato"]] },
@@ -3284,6 +3284,44 @@ function scattiAl(state, dp, y, m, prec, ass0){
   return { n: Math.min(SCATTI_MAX, base + Math.floor(utili / SCATTI_MESI)),
            utili:utili, stimati:stimati, base:base, riconosciuti:riconosciuti,
            senzaAssunzione:!ass, primaDeiDati:primaDeiDati, daCasella:usaCasella };
+}
+/* ═══ ver139 — LA DECORRENZA DEGLI SCATTI, SCRITTA IN ANAGRAFICA ═══════════════════════════
+   Punto 13C della direttiva di Christian: «La decorrenza dello scatto deve essere riportata
+   automaticamente nella scheda anagrafica e recepita nel foglio di calcolo del costo orario».
+   Nel Costo orario è già recepita dalla ver128 (il periodo si taglia al mese dello scatto);
+   qui si fa VEDERE, in Anagrafica, di sola lettura.
+   ⚠️ Non cambia nessun calcolo: ricostruisce le date **con la stessa regola** di `scattiAl`,
+   cioè quella che Christian ha confermato il 09/11/2026 scegliendo la **1a** (il «giorno 25»
+   era un refuso): si contano i **mesi utili** dall'assunzione — dal mese SUCCESSIVO se è stato
+   assunto dopo il giorno 1 — un **mese tutto «AN» non è utile**, e lo scatto decorre dal mese
+   dopo che i 24 mesi utili si sono chiusi. Massimo 5.
+   Torna `{ righe:[{n, y, m}], prossimo, nOggi, senzaAssunzione }`. */
+function scattiStoria(state, dp, prec, ass0){
+  const assY = ymdIt(dp && dp.dataAssunzione);
+  const pd = primoMeseDati(state);
+  const pdN = pd ? (pd.y*100 + pd.m) : null;
+  const riconosciuti = (ass0 != null && ass0 !== "" && !isNaN(Number(ass0))) ? Math.max(0, Math.floor(Number(ass0))) : 0;
+  const primaDeiDati = (!assY) || (pdN != null && (Math.floor(assY/10000)*100 + Math.floor((assY%10000)/100)) < pdN);
+  const usaCasella = primaDeiDati && (prec != null) && (prec !== "") && !isNaN(Number(prec));
+  let cy, cm, base = 0;
+  if (usaCasella){ base = Math.max(0, Math.floor(Number(prec))); cy = pd.y; cm = pd.m; }
+  else if (assY){ base = riconosciuti; cy = Math.floor(assY/10000); cm = Math.floor((assY%10000)/100);
+    if ((assY % 100) > 1){ cm++; if (cm > 12){ cm = 1; cy++; } } }
+  else if (pd){ cy = pd.y; cm = pd.m; }
+  else return { righe:[], prossimo:null, nOggi:0, senzaAssunzione:true };
+  const righe = []; let utili = 0, n = base, guard = 0;
+  /* si guarda avanti fino a 40 anni: basta per arrivare al quinto scatto in qualunque caso */
+  while (n < SCATTI_MAX && guard < 480){
+    if (pdN != null && (cy*100 + cm) < pdN) utili++;
+    else if (!meseTuttoAN(state, dp, cy, cm)) utili++;
+    cm++; if (cm > 12){ cm = 1; cy++; }
+    guard++;
+    if (utili > 0 && utili % SCATTI_MESI === 0){ n++; righe.push({ n:n, y:cy, m:cm }); }
+  }
+  const oggi = new Date(); const oggiN = oggi.getFullYear()*100 + (oggi.getMonth()+1);
+  let nOggi = base; let prossimo = null;
+  righe.forEach(function(r){ if (r.y*100 + r.m <= oggiN) nOggi = r.n; else if (!prossimo) prossimo = r; });
+  return { righe:righe, prossimo:prossimo, nOggi:nOggi, base:base, senzaAssunzione:!assY };
 }
 function firmaMese(state, dp, y, m, fisso){
   const v = valoriAt(dp, y, m);
@@ -4837,10 +4875,26 @@ function Anagrafica(props){
                       </div>
                       <div style={{ fontSize:"11px", marginTop:"2px", color:"#64748b" }}>{manuale ? "Impostata a mano (uscita anticipata)." : "Automatica: fine contratto o ultima proroga. Le ore dopo questa data sono bloccate nel report."}</div></div>; }
                   if (kind && kind.indexOf("roauto:")===0){ const which=kind.slice(7);
-                    const val = which==="proroTermine" ? lastProroga(dp) : which==="proroAvvio" ? proroAvvioAuto(dp) : which==="trasfAvvio" ? trasfAvvioAuto(dp) : "";
-                    const ph = which==="trasfAvvio" ? "(nessuna trasformazione)" : "(nessuna proroga)";
+                    /* ver139 (punto 13C di Christian): la decorrenza dello scatto e quanti ne
+                       sono maturati a oggi, ricostruiti con la stessa regola del Costo orario. */
+                    const sst = (which==="scattoDec" || which==="scattoN")
+                      ? scattiStoria(state, dp, (costoPar(dp).scattiPrec != null && String(costoPar(dp).scattiPrec).trim()!=="") ? costoPar(dp).scattiPrec : null,
+                                     (anaVal(dp,"scattiAss")!=="" ? anaVal(dp,"scattiAss") : (costoPar(dp).scattiAss != null ? costoPar(dp).scattiAss : null)))
+                      : null;
+                    const val = which==="proroTermine" ? lastProroga(dp) : which==="proroAvvio" ? proroAvvioAuto(dp) : which==="trasfAvvio" ? trasfAvvioAuto(dp)
+                      /* ⚠️ senza la data di assunzione il conto partirebbe dal primo mese dei
+                         dati e darebbe una data inventata: meglio non mostrare niente. */
+                      : which==="scattoDec" ? ((!sst.senzaAssunzione && sst.prossimo) ? ("01/" + String(sst.prossimo.m).padStart(2,"0") + "/" + sst.prossimo.y + "  (il " + String(sst.prossimo.n) + "°)") : "")
+                      : which==="scattoN" ? (sst.senzaAssunzione ? "" : String(sst.nOggi))
+                      : "";
+                    const ph = which==="trasfAvvio" ? "(nessuna trasformazione)"
+                      : which==="scattoDec" ? (sst.senzaAssunzione ? "(serve la data di assunzione)" : (sst.nOggi>=SCATTI_MAX ? ("(ha già il massimo: " + SCATTI_MAX + ")") : "(non calcolabile)"))
+                      : which==="scattoN" ? "(serve la data di assunzione)"
+                      : "(nessuna proroga)";
                     const tip = which==="proroAvvio" ? "Automatica: giorno dopo la scadenza precedente. La data che conta si registra in fondo alla scheda, riquadro Trasformaz./proroghe."
                               : which==="trasfAvvio" ? "Automatica: decorrenza dell'ultima trasformazione registrata in fondo alla scheda, riquadro Trasformaz./proroghe."
+                              : which==="scattoDec" ? "Automatica: 24 mesi utili dall'assunzione (dal mese successivo se assunto dopo il giorno 1); un mese tutto AN non e' utile e fa slittare. Massimo 5 scatti. L'importo lo prende il Costo orario dalla tabella del livello in quel momento."
+                              : which==="scattoN" ? "Automatico: quanti scatti risultano maturati a oggi, compresi quelli riconosciuti all'assunzione."
                               : "Automatica: ultima proroga registrata in fondo alla scheda, riquadro Trasformaz./proroghe.";
                     return <div key={key} className="field" style={{margin:0}} title={tip}><label>{lbl}</label><input value={val} disabled placeholder={ph} style={{ background:"#f1f5f9", borderColor:"#cbd5e1", color:"#475569" }} /></div>; }
                   if (kind==="roblock"){ return <div key={key} className="field" style={{margin:0}}><label>{lbl}</label><input value="" disabled placeholder="—" style={{ background:"#f1f5f9", borderColor:"#cbd5e1", color:"#94a3b8" }} /></div>; }

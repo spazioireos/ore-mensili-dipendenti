@@ -18,7 +18,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver138 · 09nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver139 · 09nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -395,6 +395,62 @@ Banca ore, tetto annuo, contratti e export.
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
 
+- 🎖️ **LA DECORRENZA DELLO SCATTO SI LEGGE IN ANAGRAFICA** (ver139, 09/11/2026, **punto 13C**
+  della direttiva di Christian: «La decorrenza dello scatto deve essere riportata automaticamente
+  nella scheda anagrafica e recepita nel foglio di calcolo del costo orario»).
+  - Nel Costo orario era **già recepita** dalla ver128 (il periodo si taglia al mese dello
+    scatto); mancava il **farla vedere**. In **ANAGRAFICA → Contratto**, sotto *Scatti
+    riconosciuti all'assunzione*, due righe nuove **grigie e di sola lettura**:
+    **«Scatti maturati a oggi (automatico)»** e **«Prossimo scatto — decorrenza (automatica)»**,
+    che mostra per esempio `01/02/2027  (il 2°)`.
+  - **Funzione nuova `scattiStoria(state, dp, prec, ass0)`** (sopra `firmaMese`): ricostruisce le
+    date **con la stessa regola di `scattiAl`**, cioè quella confermata da Christian il 09/11/2026
+    scegliendo la **1a** — il «giorno 25» del suo punto 13B era **un refuso**. Mesi utili
+    dall'assunzione (dal mese **successivo** se assunto dopo il giorno 1), un mese **tutto «AN»**
+    non è utile e fa slittare, massimo 5. Torna `{righe, prossimo, nOggi, base, senzaAssunzione}`.
+  - ⚠️ **Nessun calcolo è stato toccato**: si ricostruiscono date che il motore già usava.
+    Verificato: **ver138 e ver139 danno costo identico sui 16 dipendenti veri** (0 differenze).
+  - ⚠️ **Senza la data di assunzione le due caselle restano VUOTE**, di proposito: il conto
+    partirebbe dal primo mese dei dati e darebbe una data inventata.
+  - ⚠️ **Le due righe NON entrano nell'export Excel**: il filtro dell'export include solo i due
+    campi `roauto:` storici (`proroAvvio`, `trasfAvvio`), quindi le 50 colonne restano quelle.
+  - 🐞 **UN MIO ERRORE, trovato dalla prova in esecuzione e non da Babel**: avevo usato **`nTxt`**
+    dentro il disegno dell'Anagrafica, ma `nTxt` è una funzione **locale di `CostoOrario`** →
+    `ReferenceError` a tempo di esecuzione, che **rompeva tutta la vista Anagrafica**. Babel
+    compilava senza una parola. Corretto con `String(...)`. ⚠️ **È la ragione per cui il §10.2
+    chiede le prove in esecuzione**: «una compilazione riuscita non è prova che l'applicazione
+    funzioni».
+  - **COLLAUDO DEL PUNTO 13D — i cinque casi chiesti da Christian, attesi RICALCOLATI A MANO
+    prima di scrivere lo script** (`scatti139.cjs`, oggi 09/11/2026, primo mese dei dati 2025-01):
+    | caso | assunzione | maturati a oggi | prossimo |
+    |---|---|--:|---|
+    | assunto il **giorno 1** | 01/02/2023 | **1** | **01/02/2027** (il 2°) |
+    | assunto **non** il giorno 1 | 07/01/2025 | **0** | **01/02/2027** (il 1°) |
+    | **più bienni** | 01/01/2021 | **2** | **01/01/2027** (il 3°) |
+    | con **2 mesi tutti «AN»** | 01/01/2024 | **1** | **01/03/2028** (il 2°) |
+    | **senza** data di assunzione | — | *(vuoto)* | *(vuoto)* |
+    Tutti e cinque **coincidono** col conto fatto a mano. ⚠️ Nel quarto caso i due mesi tutti AN
+    (luglio e agosto 2025) fanno slittare il primo scatto **di due mesi**, da gennaio a **marzo
+    2026**: è la regola di Christian, e si vede.
+    **E il Costo orario dice lo stesso numero**: 1 scatto → 20,66 €, 2 → 41,32 €.
+  - **COLLAUDO DEL PUNTO 9 — il caso completo** (`caso9.cjs`, **3 controlli su 3**): persona D1 a
+    38 h/sett. assunta 01/01/2023, **promossa D2 dal 01/07/2026**, con **due tranche CCNL
+    caricate** (Apr26 e Ott26), periodo gennaio→dicembre 2026. Il periodo si divide **da solo in
+    quattro pezzi**, ognuno col suo:
+    | periodo | liv | tabella | scatto | costo |
+    |---|---|---|--:|--:|
+    | Gennaio → Marzo 2026 | D1 | Ott25 | 1 = 20,66 € | 8.428,25 € |
+    | Aprile → Giugno 2026 | D1 | **Apr26** | 1 = 20,66 € | 8.540,81 € |
+    | Luglio → Settembre 2026 | **D2** | Apr26 | 1 = **23,24 €** | 9.005,25 € |
+    | Ottobre → Dicembre 2026 | D2 | **Ott26** | 1 = 23,24 € | 9.472,38 € |
+    Somma dei pezzi **35.446,69 €**, costo totale **35.696,69 €**: la differenza è **250,00 €
+    esatti**, cioè la **formazione**, che per la ver84 si conta una volta sola sul periodo e non
+    per pezzo. ✅ **Ogni variazione si applica dalla propria decorrenza, gli importi precedenti
+    restano, ogni pezzo ha il suo costo, e il €/h del periodo è la media pesata.**
+  - **Provato in esecuzione**: `scatti139.cjs` **28/29** + `caso9.cjs` **3/3** = **31 controlli**,
+    zero errori di pagina. ⚠️ L'unico «fallito» era **un'attesa sbagliata del mio script** (la
+    riga del pezzo finisce con « €» e la mia lettura voleva il numero in fondo), rifatta e
+    superata.
 - 📊 **⚙ AGGIORNA TABELLE CCNL: LO STORICO DEGLI IMPORTI, SENZA TOCCARE IL CODICE** (ver138,
   09/11/2026, **punto 6** della direttiva di Christian: «voglio poter caricare le nuove tabelle
   retributive in occasione di ogni rinnovo … conservare integralmente le tabelle precedenti e le
