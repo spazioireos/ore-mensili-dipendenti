@@ -18,7 +18,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver144 · 09nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver145 · 09nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -394,6 +394,22 @@ Banca ore, tetto annuo, contratti e export.
     «— ore» e «non calcolabile»; la stessa persona su «Teoriche» → 18,67 €/h; e il **foglio Excel
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
+
+- 🧹 **VIA LA TENDINA MORTA, E LA FRASE CHE MENTIVA** (ver145, 09/11/2026, due risposte di
+  Christian alla ricognizione delle questioni aperte: «a7: togli» e «a8: correggi»).
+  - **A7 — tolta la tendina «Tabella CCNL» dai valori comuni.** Stava lì dalla ver128, ma dalla
+    **ver137 non veniva più letta** (`tabScritta = ""`): il collaudo del 09/11/2026 ha
+    **misurato** che forzandola il costo non cambiava di un centesimo. A video sembrava un
+    comando vivo. ⚠️ **Il valore eventualmente salvato in `costoComune.tabella` NON è stato
+    cancellato**: semplicemente non si legge e non si scrive più, come `ana.proroAvvio` dalla
+    ver69 — **verificato** che un «Ott24» già nei dati resta innocuo. La tabella si sceglie
+    sempre dalla data e si aggiorna da **⚙ AGGIORNA TABELLE CCNL**, che resta.
+  - **A8 — corretta la frase in cima a *La retribuzione***. Diceva «**Scegli il livello e il
+    minimo si compila da sé**», ma dalla ver137 il livello **non si sceglie più da lì**. Ora dice
+    «**Il livello arriva da ANAGRAFICA → Contratto e il minimo dalla tabella CCNL in vigore.**»
+    ⚠️ **Dicitura nuova, scritta da Claude su autorizzazione esplicita di Christian**: era stata
+    segnalata e lasciata ferma dal 09/11 proprio per il §10.6.
+  - **Provato in esecuzione** (`ver145.cjs`, **7 controlli su 7**, zero errori di pagina).
 
 - 🔐 **DUE SCHEDE APERTE NON SI CANCELLANO PIÙ A VICENDA** (ver144, 09/11/2026, difetto trovato
   dal collaudo generale e corretto su richiesta di Christian: «1 fallito: correggi»).

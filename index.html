@@ -459,7 +459,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver144";
+const APP_VER = "ver145";
 const APP_DATA = "09nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -4277,11 +4277,14 @@ function CostoOrario(props){
           <label style={titolo}>Aliquote e costi fissi validi per tutti</label>
           <div style={aiuto}>Sono i numeri che non cambiano da persona a persona: contributi, festività, assenze presunte, voci fisse. Si scrivono <b>una volta sola</b> e valgono per tutte le schede. Dove serve, nella scheda della singola persona si può scrivere un valore diverso.</div>
           <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(190px, 1fr))", gap:"8px" }}>
-            <label style={cella}><span style={etich}>Tabella CCNL</span>
-              <select value={c.tabella || "auto"} style={{ padding:"8px", width:"100%" }} onChange={function(e){ setComune("tabella", e.target.value); }}>
-                <option value="auto">automatica (per data)</option>
-                {TAB_CCNL.map(function(t){ return <option key={t} value={t}>{t}</option>; })}</select>
-              <span style={{ fontSize:"12.5px", color:"#475569", lineHeight:1.35 }}>le tranche del rinnovo: Feb24 · Ott24 · Ott25. Con «automatica» ogni mese usa la sua</span></label>
+            {/* ver145 (09/11/2026, scelta di Christian: «a7: togli»). La tendina «Tabella CCNL»
+                stava qui dalla ver128, ma dalla ver137 NON VENIVA PIU' LETTA (`tabScritta = ""`):
+                forzarla non cambiava il costo di un centesimo — verificato in esecuzione dal
+                collaudo del 09/11/2026. Lasciata a video faceva credere a un comando vivo.
+                ⚠️ Il valore eventualmente salvato in `costoComune.tabella` NON viene cancellato:
+                semplicemente non si legge e non si scrive più, come `ana.proroAvvio` dalla ver69.
+                La tabella in vigore si sceglie SEMPRE dalla data, e si aggiorna da
+                ⚙ AGGIORNA TABELLE CCNL. */}
             {campoNum("Giorni settimanali", cMostra(sc.ggSett, COSTO_COMUNE_DEF.ggSett), function(v){ setComune("ggSett", v); }, "divisore giornaliero")}
             {campoNum("Quattordicesima %", cMostra(sc.quattordic, COSTO_COMUNE_DEF.quattordic), function(v){ setComune("quattordic", v); }, "50 = metà mensilità")}
             {campoNum("Ferie + permessi (gg/anno)", cMostra(sc.ferie, COSTO_COMUNE_DEF.ferie), function(v){ setComune("ferie", v); }, "26 ferie + 4 permessi")}
@@ -4405,7 +4408,7 @@ function CostoOrario(props){
               <div style={blocco}>
                 {nomeQui(false)}
                 <div style={capo}>La retribuzione</div>
-                <div style={{ fontSize:"13px", color:"#475569", lineHeight:1.35 }}>Scegli il livello e il minimo si compila da sé. Le caselle <b>giallino</b> si possono scrivere; quello che non è giallino lo calcola l'app.</div>
+                <div style={{ fontSize:"13px", color:"#475569", lineHeight:1.35 }}>Il livello arriva da <b>ANAGRAFICA → Contratto</b> e il minimo dalla tabella CCNL in vigore. Le caselle <b>giallino</b> si possono scrivere; quello che non è giallino lo calcola l'app.</div>
                 <div className="co-grid" style={grigliaCampi}>
                   {/* ver137: la tabella CCNL si ricava dalla DATA, e forzarla spegneva il taglio
                       del periodo al rinnovo senza dirlo. Ora è grigia e di sola lettura. */}
