@@ -18,7 +18,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver143 · 09nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver144 · 09nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -394,6 +394,42 @@ Banca ore, tetto annuo, contratti e export.
     «— ore» e «non calcolabile»; la stessa persona su «Teoriche» → 18,67 €/h; e il **foglio Excel
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
+
+- 🔐 **DUE SCHEDE APERTE NON SI CANCELLANO PIÙ A VICENDA** (ver144, 09/11/2026, difetto trovato
+  dal collaudo generale e corretto su richiesta di Christian: «1 fallito: correggi»).
+  - 🔴 **Il difetto, misurato**: con **due schede aperte sullo stesso browser**, la scheda A
+    scriveva 11,25 e salvava; poi la scheda B — aperta **prima** — scriveva 12,75 e salvava, e
+    **l'11,25 spariva**, **senza nessun avviso**. Causa: `doSave` riscrive **l'intero stato**
+    dalla memoria della propria scheda, quindi vince l'ultimo che preme 💾.
+  - **La difesa è un TIMBRO**: a ogni salvataggio riuscito `saveLocal` scrive una chiave a parte
+    **`LS_TIMBRO`** (`<LS_KEY>__timbro`) con un numero sempre diverso, e **torna quel timbro**
+    invece di `true` (una stringa non vuota resta "vera", quindi i controlli esistenti non
+    cambiano). Ogni scheda ricorda in **`timbroMio`** il timbro trovato all'avvio o scritto da
+    lei. `doSave` confronta: se il timbro nella memoria è **diverso**, qualcun altro ha salvato
+    nel frattempo e l'app **chiede** prima di sovrascrivere.
+  - **La domanda** usa il `ConfirmModal` che c'era già: «**Un'altra scheda ha salvato dopo di
+    te**» · «Se salvi adesso, QUELLE modifiche vengono sostituite… Per tenerle: annulla, fai un
+    ⬇ Backup di sicurezza, poi ricarica la pagina (F5)» · pulsante «**Salva lo stesso**».
+    ⚠️ **Dicitura nuova, scritta da Claude.**
+  - ⚠️ **Il formato dei dati NON cambia**: il timbro sta in una chiave **sua**, fuori dallo
+    stato, quindi il **backup JSON e il documento restano identici**.
+  - ⚠️ **Vale per le schede dello STESSO browser.** Due computer diversi collegati al cloud non
+    si vedono per questa strada: lì l'ultimo che salva vince, **come prima**. Non è stato
+    toccato il percorso Firebase.
+  - **Provato in esecuzione** (`ver144.cjs`, **14 controlli su 14**): A salva senza domande; B
+    **avvisa** invece di sovrascrivere e intanto l'11,25 **è ancora lì**; **annullando** A resta
+    e B non scrive; con «Salva lo stesso» B scrive davvero; e il **salvataggio successivo di B
+    non richiede più conferma**. Zero errori di pagina.
+- 🚫 **«COMPILA VELOCE» NON ACCETTA PIÙ TESTO LIBERO** (ver144, stessa richiesta: «2 fallito: ok
+  fallo»). Scrivendo **`PIPPO`** la nota diceva «ore: PIPPO» e il pulsante riempiva **22 celle**
+  (che la ver101 segnalava poi in rosso). Ora la bandierina **`valNonValido`** spegne il pulsante
+  e la nota dice «**Qui va un numero di ore oppure un codice dell'elenco (FERIE, MAL, EXF…).**»
+  ⚠️ **Dicitura nuova, scritta da Claude.** **Provato**: `PIPPO` e `ciao` spengono il pulsante,
+  `7` · `12,5` · `FERIE` passano, `14` resta fermato dal tetto, e forzando il clic **nessuna
+  cella viene scritta**.
+  🟠 **NON corretto, per scelta di Christian** («3 fallito minore: pazienza»): un testo di **200
+  caratteri** in un campo dell'anagrafica fa scorrere la pagina di lato (1.700 → 2.659 px; a 120
+  caratteri ancora no).
 
 - ⚡ **IL TETTO DELLE 13 ORE VALE ANCHE IN «COMPILA VELOCE»** (ver143, 09/11/2026, richiesta di
   Christian: «Estendi compila veloce»).

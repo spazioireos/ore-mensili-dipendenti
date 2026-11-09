@@ -459,7 +459,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver143";
+const APP_VER = "ver144";
 const APP_DATA = "09nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -1317,8 +1317,29 @@ function loadLocal(){
     return migrate(obj);
   } catch (e) { console.error("loadLocal", e); return null; }
 }
+/* ver144 (09/11/2026, difetto trovato dal collaudo e corretto su richiesta di Christian).
+   CON DUE SCHEDE APERTE sullo stesso browser il salvataggio della seconda cancellava in
+   SILENZIO il lavoro della prima: `doSave` riscrive l'INTERO stato dalla memoria della propria
+   scheda, quindi vinceva l'ultimo che premeva 💾. Misurato: la scheda A salvava 11,25, poi la
+   scheda B salvava e l'11,25 spariva, senza nessun avviso.
+   La difesa e' un TIMBRO: a ogni salvataggio riuscito si scrive una chiave a parte con un
+   numero sempre diverso. Ogni scheda ricorda il timbro che ha trovato quando e' partita (o
+   quello che ha scritto lei l'ultima volta); se al momento di salvare il timbro nella memoria
+   e' DIVERSO, vuol dire che qualcun altro ha salvato nel frattempo, e l'app CHIEDE prima di
+   sovrascrivere. ⚠️ Il timbro sta in una chiave SUA (`LS_TIMBRO`), fuori dai dati: il formato
+   del backup e del documento non cambia di una virgola.
+   ⚠️ Vale per le schede dello STESSO browser. Due computer diversi collegati al cloud non si
+   vedono per questa strada: li' l'ultimo che salva vince, come prima. */
+const LS_TIMBRO = LS_KEY + "__timbro";
+function timbroCorrente(){ try { return localStorage.getItem(LS_TIMBRO) || ""; } catch (e) { return ""; } }
+function timbroNuovo(){ return String(Date.now()) + "-" + Math.random().toString(36).slice(2, 8); }
 function saveLocal(state){
-  try { localStorage.setItem(LS_KEY, JSON.stringify(state)); return true; }
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify(state));
+    const t = timbroNuovo();
+    try { localStorage.setItem(LS_TIMBRO, t); } catch (e2) {}
+    return t;                                   /* una stringa: resta "vero" per chi la controlla */
+  }
   catch (e) { console.error("saveLocal", e); return false; }
 }
 function getRecFrom(state, y, m, dipId){
@@ -5356,7 +5377,10 @@ function QuickFillModal(props){
      CellInput, quindi di qua un valore oltre il tetto sarebbe entrato lo stesso, e per di piu'
      su decine di giorni in un colpo solo. */
   const valOltreIlTetto = (!isCode) && vTrim !== "" && isNumeric(valNorm) && !oreEntroIlMassimo(valNorm);
-  const apply = function(){ if (vTrim === "" || valOltreIlTetto) return; props.onApply({ dpId:dp.id, valore:valNorm, target:target, overwrite:overwrite, occupied:occupied }); };
+  /* ver144: e nemmeno il testo libero. Prima «PIPPO» riempiva decine di celle (poi segnalate in
+     rosso dalla ver101): adesso non parte proprio. */
+  const valNonValido = (!isCode) && vTrim !== "" && !isNumeric(valNorm);
+  const apply = function(){ if (vTrim === "" || valOltreIlTetto || valNonValido) return; props.onApply({ dpId:dp.id, valore:valNorm, target:target, overwrite:overwrite, occupied:occupied }); };
   return (
     <div className="overlay" onClick={props.onClose}>
       <div className="modal" onClick={function(e){ e.stopPropagation(); }} style={{ maxWidth:"560px" }}>
@@ -5366,7 +5390,7 @@ function QuickFillModal(props){
           <label style={{ fontSize:"13px", fontWeight:"700" }}>Valore da inserire:</label>
           <input value={valore} onChange={function(e){ setValore(e.target.value); }} list="codici-list" placeholder="es. 7  oppure  FERIE"
             style={{ padding:"7px 9px", border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px", width:"160px", fontSize:"15px", fontWeight:"700" }} />
-          <span style={{ fontSize:"12px", color: valOltreIlTetto ? "#b91c1c" : "#64748b", fontWeight: valOltreIlTetto ? 700 : 400 }}>{vTrim==="" ? "" : (isCode ? "codice: " + CODE_SET[vTrim.toUpperCase()].l : (valOltreIlTetto ? ("In un giorno non si possono scrivere più di " + ORE_MAX_GIORNO + " ore.") : ("ore: " + valNorm)))}</span>
+          <span style={{ fontSize:"12px", color: (valOltreIlTetto||valNonValido) ? "#b91c1c" : "#64748b", fontWeight: (valOltreIlTetto||valNonValido) ? 700 : 400 }}>{vTrim==="" ? "" : (isCode ? "codice: " + CODE_SET[vTrim.toUpperCase()].l : (valNonValido ? "Qui va un numero di ore oppure un codice dell'elenco (FERIE, MAL, EXF…)." : (valOltreIlTetto ? ("In un giorno non si possono scrivere più di " + ORE_MAX_GIORNO + " ore.") : ("ore: " + valNorm))))}</span>
         </div>
         <div style={{ marginBottom:"10px", background:"#f8fafc", border:"1px solid #e2e8f0", borderRadius:"8px", padding:"8px 10px" }}>
           <div style={{ fontSize:"13px", fontWeight:"700", marginBottom:"6px" }}>Quali giorni del mese:</div>
@@ -5423,7 +5447,7 @@ function QuickFillModal(props){
           <span></span>
           <span>
             <button className="btn btn-gray" onClick={props.onClose}>Annulla</button>
-            <button className="btn btn-blue" style={{ marginLeft:"8px" }} disabled={vTrim==="" || target.length===0 || valOltreIlTetto} onClick={apply}>Compila {target.length} giorni</button>
+            <button className="btn btn-blue" style={{ marginLeft:"8px" }} disabled={vTrim==="" || target.length===0 || valOltreIlTetto || valNonValido} onClick={apply}>Compila {target.length} giorni</button>
           </span>
         </div>
       </div>
@@ -6258,13 +6282,34 @@ function App(){
     if (next.anni.indexOf(nuovo) === -1){ next.anni.push(nuovo); next.anni.sort(function(a,b){ return a-b; }); touch(next); }
     setAnno(nuovo); showToast("Anno " + nuovo + " aggiunto");
   };
+  /* ver144: il timbro che questa scheda ha trovato quando e' partita, o che ha scritto lei. */
+  const timbroMio = useRef(null);
+  useEffect(function(){ if (timbroMio.current === null) timbroMio.current = timbroCorrente(); }, []);
   const onTemplateChanged = function(){ setDirty(true); };
-  const doSave = function(){
+  const salvaDavvero = function(){
     const okLocal = saveLocal(state);
+    if (okLocal) timbroMio.current = okLocal;          /* ver144: da ora il timbro buono e' il mio */
     if (FB_READY && uidRef.current && dbRef.current){
       dbRef.current.collection(FB_COLLECTION).doc(uidRef.current).set(withTemplatesForCloud(state)).then(function(){ setDirty(false); showToast("Salvato (cloud + locale)"); })
       .catch(function(e){ console.error(e); showToast(okLocal ? "Cloud non raggiungibile — salvato in locale" : "Salvataggio non riuscito"); if (okLocal) setDirty(false); });
     } else { if (okLocal){ setDirty(false); showToast("Salvato in locale"); } else showToast("Salvataggio non riuscito"); }
+  };
+  /* ver144: prima di scrivere, controlla se qualcun altro ha salvato dopo di te. */
+  const doSave = function(){
+    const ora = timbroCorrente();
+    if (timbroMio.current !== null && ora !== "" && ora !== timbroMio.current){
+      setConfirm({
+        title: "Un'altra scheda ha salvato dopo di te",
+        body: "Questa pagina era aperta da prima. Nel frattempo un'altra scheda (o un'altra finestra) ha salvato le sue modifiche. "
+            + "Se salvi adesso, QUELLE modifiche vengono sostituite da quello che vedi qui, e non si recuperano. "
+            + "Per tenerle: annulla, fai un ⬇ Backup di sicurezza, poi ricarica la pagina (F5) e riscrivi ciò che ti serve.",
+        confirmLabel: "Salva lo stesso",
+        onConfirm: function(){ setConfirm(null); salvaDavvero(); },
+        onCancel: function(){ setConfirm(null); }
+      });
+      return;
+    }
+    salvaDavvero();
   };
   const doBackup = function(){
     const blob = new Blob([JSON.stringify(Object.assign({}, state, { modelli: collectTemplates() }), null, 2)], { type:"application/json" });
