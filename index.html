@@ -459,7 +459,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver136";
+const APP_VER = "ver137";
 const APP_DATA = "09nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -3400,9 +3400,22 @@ function datiCosto(state, dp, pairs){
   const p = costoPar(dp);
   /* ver117: serve PRIMA di calcCosto, perche' decide anche se le ore in piu' si contano
      mese per mese. Stessa espressione di sempre, solo spostata piu' in su. */
-  const scrittoAMano = (p.mesi!=null && p.mesi!=="") || (p.oreSett!=null && p.oreSett!=="") ||
-    (p.livello!=null && p.livello!=="") || (p.minimo!=null && p.minimo!=="") ||
-    (p.addizTD!=null && p.addizTD!=="") || cNum(p.settPeriodo,0)>0 || cNum(p.settLav,0)>0;
+  /* ver137 (09/11/2026, strada «a» scelta da Christian). Cinque caselle del Costo orario
+     — livello, minimo tabellare, ore settimanali, addizionale TD, tabella CCNL — sono diventate
+     GRIGIE e di sola lettura: il dato arriva dall'ANAGRAFICA (livello, ore, proroghe,
+     trasformazioni) o dalle TABELLE CCNL (minimo, tabella). Siccome la casella non si può più
+     né scrivere né SVUOTARE, uno scavalcamento rimasto nei dati vecchi resterebbe bloccato per
+     sempre: quindi qui NON si leggono più.
+     ⚠️ **Misurato prima di cambiare**: sui 16 dipendenti veri (backup del 04/11) NESSUNO aveva
+     scritto una di quelle cinque caselle, quindi nessun costo si muove.
+     ⚠️ **I valori restano nel database** (`dp.costo.livello`, `.minimo`, `.oreSett`, `.addizTD`,
+     `.tabella`): non vengono cancellati, semplicemente non si leggono più. Come per
+     `ana.proroAvvio` nella ver69.
+     ⚠️ Restano invece scrivibili, e continuano a prevalere con il loro avviso giallo:
+     **mesi di contratto** (ver108), **settimane** della simulazione (ver133), **scatti**
+     (ver135), **superminimo** (ver131). Quelli sono forzature volute, non dati derivati. */
+  const scrittoAMano = (p.mesi!=null && p.mesi!=="") ||
+    cNum(p.settPeriodo,0)>0 || cNum(p.settLav,0)>0;
   const indet = indetAFine(dp, pairs);
   /* ver112 (05/11/2026). Storia in tre passi, da non rifare a rovescio:
      · ver110 — «se è tutto AN non c'è rapporto»: i mesi tutti AN venivano esclusi da tutto;
@@ -3429,12 +3442,14 @@ function datiCosto(state, dp, pairs){
   /* ver128: la tabella CCNL si sceglie DA SOLA in base al mese; «auto» (o vuoto) = automatica.
      Se l'utente ne forza una, quella vale su tutto il periodo, come prima. */
   const ultimoPr = (pairs && pairs.length) ? pairs[pairs.length-1] : null;
-  const tabScritta = (p.tabella && p.tabella !== "auto") ? p.tabella
-                   : ((c.tabella && c.tabella !== "auto") ? c.tabella : "");
+  /* ver137: la tabella non si forza più, né dalla scheda né dai valori comuni: è sempre quella
+     in vigore nel mese, e il periodo si taglia da sé al rinnovo. `tabScritta` resta a "" così
+     `fissoSplit.tab` è sempre falso e il taglio non si spegne più. */
+  const tabScritta = "";
   const tabAuto = ultimoPr ? tabellaAl(ultimoPr.y, ultimoPr.m) : "Ott25";
-  const tab = tabScritta || tabAuto;
+  const tab = tabAuto;
   const livAuto = (function(){ const l=String(livelloPeriodo(dp, pairs)||"").toUpperCase().trim(); return MINIMI_CCNL[tab] && MINIMI_CCNL[tab][l] ? l : ""; })();
-  const liv = p.livello!=null && p.livello!=="" ? p.livello : livAuto;
+  const liv = livAuto;
   const minimoAuto = (MINIMI_CCNL[tab] && MINIMI_CCNL[tab][liv]) ? MINIMI_CCNL[tab][liv] : 0;
   /* ver128: gli SCATTI si contano da soli dall'assunzione, uno ogni 24 mesi utili, massimo 5.
      Il valore e' quello del livello, a tempo pieno (come il minimo). */
@@ -3491,13 +3506,13 @@ function datiCosto(state, dp, pairs){
     tfrFondoAnno: (p.tfrFondoAnno==null||String(p.tfrFondoAnno).trim()==="") ? "" : String(p.tfrFondoAnno).trim(),
     annoIniz: pairs.length ? pairs[0].y : null,
     mesiMater: cNum(p.mesiMater, 0),
-    minimo: cNum(p.minimo, minimoAuto),
+    minimo: minimoAuto,                            /* ver137: dalla tabella CCNL, non piu' a mano */
     scatti: scattiAMano ? cNum(p.scatti, scattiAuto) : scattiAuto,   /* ver128 */
     premiTP: cNum(p.premiTP, 0),
     superminimo: cNum(p.superminimo, supermAuto),   /* ver131: segue le trasformazioni */
-    oreSett: cNum(p.oreSett, oreSettAuto),
+    oreSett: oreSettAuto,                           /* ver137: dall'ANAGRAFICA, non piu' a mano */
     ggSett: cNum(p.ggSett, c.ggSett),
-    addizTD: cNum(p.addizTD, addizAuto),
+    addizTD: addizAuto,                             /* ver137: dalle proroghe, non piu' a mano */
     kmMese: (p.kmMese==null||p.kmMese==="")? null : cNum(p.kmMese, c.kmMese),
     kmTipo: (p.kmTipo==="secco") ? "secco" : "mese",            // ver80: secco oppure al mese
     kmMesiTolti: cNum(p.kmMesiTolti, 0),
@@ -3746,6 +3761,18 @@ function CostoOrario(props){
       {segno ? <span style={{ fontSize:"12.5px", color:"#475569" }}>{segno}</span> : null}
       {spento ? <span style={{ display:"block", fontSize:"13px", fontWeight:700, color:"#64748b" }}>{(typeof spento==="string") ? spento : "non in uso: serve solo con le ore «Teoriche»"}</span> : null}</label>;
   };
+  /* ver137 (09/11/2026, scelta «a» di Christian: «la casella del Costo orario diventa grigia e
+     di sola lettura, il dato si scrive solo in Anagrafica»). Gemella di `campoNum`, ma GRIGIA e
+     non scrivibile: serve per tutto ciò che il sistema ricava da sé — dall'ANAGRAFICA o dalle
+     TABELLE CCNL. È il «grigiolino» del suo punto 7.
+     ⚠️ Lo stesso grigio già usato per i campi automatici dell'Anagrafica (`roauto:`) e per gli
+     scatti riconosciuti della ver135: #f1f5f9 con bordo #cbd5e1. */
+  const campoRO = function(lbl, valore, nota, titoloAiuto){
+    return <label style={cella} title={titoloAiuto||""}><span style={etich}>{lbl}</span>
+      <input value={valore==null?"":String(valore)} disabled
+        style={{ width:"100%", border:"2px solid #cbd5e1", background:"#f1f5f9", color:"#475569", borderRadius:"6px", padding:"7px 9px", fontFamily:"inherit", fontSize:"15px" }} />
+      {nota ? <span style={{ display:"block", fontSize:"12.5px", color:"#475569", lineHeight:1.3 }}>{nota}</span> : null}</label>;
+  };
 
   if (!dp) return <div style={{ padding:"20px", color:"#475569" }}>Nessun dipendente: aggiungine uno dalla scheda ANAGRAFICA.</div>;
 
@@ -3993,9 +4020,30 @@ function CostoOrario(props){
                     </div>;
                   })()}
                   {campoNum("Mesi di maternità", cMostra(d.raw.mesiMater, ""), function(v){ setPar("mesiMater", v); })}
-                  {campoNum("Ore settimanali", cMostra(d.raw.oreSett, d.oreSettAuto), function(v){ setPar("oreSett", v); }, "dalla scheda: " + hoursDisp(d.oreSettAuto))}
+                  {/* ver137: queste due arrivano dall'ANAGRAFICA e dalle proroghe registrate, e
+                      scriverle a mano spegneva il taglio del periodo in pezzi SENZA dirlo.
+                      Ora sono grigie e di sola lettura (strada «a» scelta da Christian).
+                      ⚠️ Misurato prima di cambiarle: sui 16 dipendenti veri NESSUNO le aveva
+                      scritte, quindi nessun costo si muove. */}
+                  {campoRO("Ore settimanali", hoursDisp(d.oreSettAuto),
+                    "si scrivono in ANAGRAFICA → Orario; i periodi con orario diverso nel riquadro Monte ore",
+                    "Automatico: il monte ore settimanali della scheda, e i periodi con orario diverso registrati in fondo alla scheda.")}
+                  {/* ver137, scelta «6a» di Christian: «il part time lo calcoli tu». Non è un
+                      dato da scrivere: sono le ore settimanali divise per il tempo pieno (38).
+                      ⚠️ Il calcolo NON la usa: lavora direttamente sulle ore settimanali. È un
+                      numero che si legge, e per questo è grigio. ⚠️ La casella
+                      *Part / Full time* dell'ANAGRAFICA NON è stata toccata: serve alla lettera. */}
+                  {campoRO("Part-time %", (d.oreSettAuto > 0) ? (fmt2(R2(d.oreSettAuto / 38 * 100, 2)) + " %") : "—",
+                    (d.oreSettAuto > 0) ? (hoursDisp(d.oreSettAuto) + " ÷ 38 ore del tempo pieno") : "servono le ore settimanali in ANAGRAFICA → Orario",
+                    "Automatica: ore settimanali ÷ 38. Il calcolo usa le ore, non la percentuale.")}
+                  {/* ⚠️ «Giorni settimanali» RESTA GIALLINO e scrivibile: non lo ricava né
+                      l'Anagrafica né il CCNL — è una scelta vera (chi lavora su 5 giorni invece
+                      di 6), quindi per il §7 di Christian è un campo da compilare a mano. */}
                   {campoNum("Giorni settimanali", cMostra(d.raw.ggSett, c.ggSett), function(v){ setPar("ggSett", v); }, "comune: " + c.ggSett)}
-                  {campoNum("Addizionale tempo determ. %", cMostra(d.raw.addizTD, d.addizAuto), function(v){ setPar("addizTD", v); }, d.indeterminato ? "indeterminato: 0" : ("1,40 + 0,5 × " + d.nProroghe + " = " + fmt2(d.addizAuto)))}
+                  {campoRO("Addizionale tempo determ. %", d.indeterminato ? "0" : nTxt(R2(d.addizAuto,2)),
+                    d.indeterminato ? "non dovuta: contratto a tempo indeterminato"
+                      : ("1,40 + 0,5 × " + d.nProroghe + " proroghe già partite = " + fmt2(d.addizAuto) + " — le proroghe si registrano in fondo alla scheda"),
+                    "Automatica: 1,40% al primo contratto, +0,5 per ogni proroga già partita, 0 se il contratto è a tempo indeterminato.")}
                 </div>
               </div>
 
@@ -4004,16 +4052,24 @@ function CostoOrario(props){
                 <div style={capo}>La retribuzione</div>
                 <div style={{ fontSize:"13px", color:"#475569", lineHeight:1.35 }}>Scegli il livello e il minimo si compila da sé. Le caselle <b>giallino</b> si possono scrivere; quello che non è giallino lo calcola l'app.</div>
                 <div className="co-grid" style={grigliaCampi}>
-                  <label style={cella}><span style={etich}>Tabella</span>
-                    <select value={(d.raw.tabella && d.raw.tabella !== "auto") ? d.raw.tabella : "auto"} style={{ padding:"8px", width:"100%" }} onChange={function(e){ setPar("tabella", e.target.value); }}>
-                      <option value="auto">automatica (per data)</option>
-                      {TAB_CCNL.map(function(t){ return <option key={t} value={t}>{t}</option>; })}</select>
-                    <span style={{ fontSize:"12.5px", color:"#475569", lineHeight:1.35 }}>{d.tabScritta ? ("forzata: vale " + d.tabScritta + " su tutto il periodo") : ("automatica: in questo periodo l'ultima è " + d.tabAuto)}</span></label>
-                  <label style={cella}><span style={etich}>Livello</span>
-                    <select value={d.liv} style={{ padding:"8px", width:"100%" }} onChange={function(e){ setPar("livello", e.target.value); setPar("minimo", ""); }}>
-                      <option value="">— scegli —</option>
-                      {LIV_CCNL.map(function(l){ return <option key={l} value={l}>{l}</option>; })}</select></label>
-                  {campoNum("Minimo tabellare €", cMostra(d.raw.minimo, d.minimoAuto), function(v){ setPar("minimo", v); }, d.minimoAuto ? ("da tabella: " + fmt2(d.minimoAuto)) : "scrivilo a mano")}
+                  {/* ver137: la tabella CCNL si ricava dalla DATA, e forzarla spegneva il taglio
+                      del periodo al rinnovo senza dirlo. Ora è grigia e di sola lettura. */}
+                  <label style={cella} title="Automatica: la tabella del CCNL in vigore in ciascun mese del periodo. Il periodo si taglia da sé al rinnovo.">
+                    <span style={etich}>Tabella</span>
+                    <select value="auto" disabled style={{ padding:"8px", width:"100%", border:"2px solid #cbd5e1", background:"#f1f5f9", color:"#475569" }}>
+                      <option value="auto">automatica (per data)</option></select>
+                    <span style={{ fontSize:"12.5px", color:"#475569", lineHeight:1.35 }}>{"in questo periodo l'ultima è " + d.tabAuto + " — si aggiorna da ⚙ AGGIORNA TABELLE CCNL"}</span></label>
+                  {/* ver137: il livello arriva dall'ANAGRAFICA e dalle trasformazioni registrate,
+                      e scriverlo qui spegneva il taglio del periodo al passaggio di livello.
+                      Il minimo non è un dato della persona: è livello × data sulla tabella CCNL.
+                      ⚠️ Misurato: sui 16 dipendenti veri nessuno dei due era scritto a mano. */}
+                  {campoRO("Livello", d.liv || "—",
+                    "si scrive in ANAGRAFICA → Contratto; i passaggi di livello nel riquadro Trasformaz./proroghe",
+                    "Automatico: il livello della scheda, più le trasformazioni registrate in fondo alla scheda. Il periodo si taglia da sé al passaggio di livello.")}
+                  {campoRO("Minimo tabellare €", d.minimoAuto ? fmt2(d.minimoAuto) : "—",
+                    d.minimoAuto ? ("tabella " + d.tabAuto + ", livello " + (d.liv || "—") + " — al mese, a tempo pieno")
+                                 : "serve il livello in ANAGRAFICA → Contratto",
+                    "Automatico: minimo del livello sulla tabella CCNL in vigore. Non si scrive a mano: si aggiorna da ⚙ AGGIORNA TABELLE CCNL.")}
                   {campoNum("Scatti di anzianità €", cMostra(d.raw.scatti, d.scattiAuto || ""), function(v){ setPar("scatti", v); },
                     d.scattiInfo.senzaAssunzione
                       ? "serve la data di assunzione in ANAGRAFICA per contarli da soli"

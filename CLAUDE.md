@@ -18,7 +18,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver136 · 09nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver137 · 09nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -391,6 +391,65 @@ Banca ore, tetto annuo, contratti e export.
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
 
+- 🩶 **LA SCHEDA ANAGRAFICA COMANDA: CINQUE CASELLE DEL COSTO ORARIO SONO GRIGIE E DI SOLA
+  LETTURA** (ver137, 09/11/2026, direttiva di Christian «**LA SCHEDA ANAGRAFICA È IL MOTORE DEL
+  SISTEMA**» + sua scelta **«a»**: «la casella del Costo orario diventa grigia e di sola lettura,
+  il dato si scrive solo in Anagrafica»; e **«6a»** sul part-time).
+  - **Che cosa è diventato grigio** (`#f1f5f9`, bordo `#cbd5e1`, `disabled` — lo stesso grigio dei
+    campi `roauto:` dell'Anagrafica e degli scatti riconosciuti della ver135), con sotto ciascuna
+    la riga che dice **da dove arriva il dato**:
+    | casella | fonte |
+    |---|---|
+    | **Livello** | ANAGRAFICA → Contratto + le trasformazioni registrate |
+    | **Minimo tabellare €** | tabella CCNL in vigore × livello |
+    | **Tabella** | la data (sempre «automatica (per data)») |
+    | **Ore settimanali** | ANAGRAFICA → Orario + i periodi con orario diverso |
+    | **Addizionale tempo determ. %** | 1,40 + 0,5 × proroghe già partite |
+    | **Part-time %** (NUOVA) | ore settimanali ÷ 38 |
+  - **Funzione nuova `campoRO(lbl, valore, nota, titolo)`**, gemella di `campoNum`: stessa
+    struttura, ma grigia e non scrivibile. `campoNum` **non è stata toccata** e la usano ancora
+    tutte le altre caselle.
+  - 🔑 **Perché NON bastava renderle grigie**: una casella che non si può più né scrivere né
+    **svuotare** terrebbe per sempre uno scavalcamento rimasto nei dati vecchi. Quindi
+    `datiCosto` **non li legge più**: `minimo`, `oreSett` e `addizTD` prendono il valore
+    automatico, `liv = livAuto`, `tabScritta = ""`. Di conseguenza `scrittoAMano` perde cinque
+    dei sette casi e `fissoSplit.tab` è sempre falso: **il periodo torna a tagliarsi** al
+    rinnovo, al passaggio di livello e al cambio di orario.
+    ⚠️ **I valori restano nel database** (`dp.costo.livello`, `.minimo`, `.oreSett`, `.addizTD`,
+    `.tabella`): non vengono cancellati, semplicemente non si leggono più — come
+    `ana.proroAvvio` dalla ver69.
+  - 🔴 **QUANTO ERA PERICOLOSO, misurato in esecuzione**: mettendo a mano livello **F2** e minimo
+    **9999** su una persona vera (periodo gen→ott 2026), la **ver136 dava 158.381,47 €** e il
+    periodo **non si tagliava**; la **ver137 dà 14.427,24 €** (il numero giusto) e **si taglia in
+    pezzi**. Era una porta aperta su un costo dieci volte più alto, senza nessun avviso.
+  - ✅ **E sui dati veri non si muove un centesimo**: prima di toccare qualunque cosa è stato
+    contato quante persone avessero scritto una di quelle cinque caselle — **ZERO su 16** —
+    e verificato in esecuzione che **ver136 e ver137 danno costo e €/h identici per tutti e 16 i
+    dipendenti, su due periodi** (gen→ott e gen→dic 2026): **0 differenze**.
+  - ⚠️ **Che cosa RESTA giallino e scrivibile, di proposito**: *Giorni settimanali* (non lo ricava
+    né l'Anagrafica né il CCNL: è una scelta vera, 5 o 6 giorni), *Mesi di contratto* (ver108),
+    le *Settimane* della simulazione (ver133), *Scatti di anzianità €* (ver135), *Superminimo €*
+    (ver131). Quelle sono **forzature volute**, e continuano a prevalere con il loro avviso
+    giallo. **Non trasformarle in grigie** senza che Christian lo chieda.
+  - ⚠️ **Il part-time % NON entra in nessun calcolo**: il motore lavora sulle **ore settimanali**.
+    È un numero che si legge, e per questo è grigio. La casella *Part / Full time* dell'ANAGRAFICA
+    **non è stata toccata**: serve alla lettera di contratto.
+  - 🔴 **UNA DICITURA ORA RIMANDA A QUALCOSA CHE NON SI PUÒ PIÙ FARE, e NON è stata corretta**
+    (§10.6: segnalarla e aspettare). In cima al blocco *La retribuzione* c'è «**Scegli il livello
+    e il minimo si compila da sé**»: il livello non si scegle più da lì, si scrive in Anagrafica.
+    **Da decidere con Christian.**
+  - ⚠️ **Le caselle dell'Anagrafica che Christian ha compilato NON sono state toccate**
+    (sua istruzione del 09/11/2026: «lasciamo stare le cose che ho inserito io»). *Importo orario
+    base*, *Superminimo*, *Scatti*, *Altro importo orario*, *Importo orario totale* restano dove
+    sono e continuano a servire **solo** alla lettera .docx e all'export Excel. In particolare
+    **l'ETAR** (scritto come *Altro importo orario*, 0,25 e 0,50 €/h su due persone = 41,25 e
+    82,50 €/mese a tempo pieno) **continua a non entrare nel costo**: per entrarci va scritto nel
+    *Superminimo* del Costo orario, che resta giallino.
+  - **Provato in esecuzione** (`ro137.cjs`, **23 controlli su 23**, zero errori di pagina): le sei
+    caselle grigie col loro sfondo misurato `rgb(241,245,249)` e `disabled=true`; le quattro che
+    restano giallline `rgb(255,253,231)` e scrivibili; Part-time 18 h → **47,37 %**; lo
+    scavalcamento vecchio che non prevale più e il periodo che torna a tagliarsi; la non
+    regressione sui 16 dipendenti su due periodi.
 - 🐞 **TRE DIFETTI PREESISTENTI CHIUSI, tutti e tre misurati** (ver136, 09/11/2026, trovati con la
   verifica del motore `calcCosto` chiesta da Christian nella direttiva «RICOGNIZIONE GENERALE»).
   Nessuno dei tre era stato introdotto da una versione recente.
