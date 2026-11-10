@@ -18,7 +18,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver149 · 10nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver150 · 10nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -394,6 +394,70 @@ Banca ore, tetto annuo, contratti e export.
     «— ore» e «non calcolabile»; la stessa persona su «Teoriche» → 18,67 €/h; e il **foglio Excel
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
+
+- 👥 **DUE PERSONE CON LO STESSO NOME NON SI FONDONO PIÙ IN SILENZIO** (ver150, 10/11/2026,
+  punto **1** dell'elenco consegnato dopo il collaudo delle interconnessioni, risposta di
+  Christian: «**avvisa**»).
+  - 🔴 **Il difetto, misurato.** L'unico identificativo che attraversa il confine fra le app è il
+    **nome**, scritto a mano in **due anagrafiche diverse**; e dalla **ver149** il confronto usa
+    `foChiave`, che ignora accenti e apostrofo finale — quindi due nomi possono diventare
+    omonimi **senza che si veda**. Due casi, tutti e due silenziosi:
+    1. **due account in Fogli ore con lo stesso nome**: in `foLeggiMese` l'aggregato di uno
+       sovrascriveva quello dell'altro, e la riga del confronto mostrava le ore **di una sola
+       persona** come se fossero di questa;
+    2. **due schede in QUESTA app con lo stesso nome**: entrambe venivano confrontate con lo
+       stesso account, e **📤 Pubblica i residui** scriveva **due volte sullo stesso documento**
+       `residui/<uid>`, così il residuo di una finiva addosso all'altra. **Misurato sulla
+       ver149**: due schede che dicono **655** e **703** h di residuo, e nel database ne resta
+       **703** — l'operatore vedrebbe il numero dell'altra persona, e nessun avviso lo diceva.
+  - **Che cosa fa la ver150**:
+    - **funzioni nuove** `foRaggruppaPerChiave`, **`foOmonimiUtenti`** (gli account di Fogli ore
+      che condividono un nome) e **`dipOmonimi`** (le schede di qui che lo condividono), più
+      `dipAmb` in `App`;
+    - in **`foLeggiMese`** le chiavi ambigue vengono **togliere** da `perNome` (quel numero
+      sarebbe una bugia) e finiscono in **`perNome.__ambigue`**;
+    - nella **scheda del mese** un **riquadro rosso** dice «**Due persone con lo stesso nome**
+      — NOME · in Fogli ore ci sono 2 account con questo nome / qui dentro ci sono 2 schede con
+      questo nome · il confronto con Fogli ore è **sospeso** e il residuo **non viene
+      pubblicato**… Per sbloccarlo distingui i nomi nelle due anagrafiche», e **il confronto non
+      esce più** (`foDiff` torna `null`);
+    - in **`pubblicaResidui`** gli omonimi vengono **saltati**: né pubblicati né tolti. La
+      conferma li elenca sotto «**OMONIMI (saltati…)**» con quanti account e quante schede, e
+      l'avviso compare **anche** quando sono l'unica cosa rimasta (altrimenti non ci sarebbe
+      nessuna conferma in cui dirlo);
+    - il **promemoria della ver149** («I residui pubblicati non sono più aggiornati») **non li
+      nomina più**: non si possono pubblicare, quindi nominarli sarebbe un invito inutile.
+  - ⚠️ **Christian ha scelto «avvisa», NON «somma»**: non sommare le ore di due omonimi, e non
+    scegliere «la prima» o «l'ultima». ⚠️ **Diciture nuove, scritte da Claude.**
+  - ⚠️ **Un residuo già pubblicato per un nome diventato ambiguo NON viene toccato**: né
+    riscritto né cancellato (verificato in esecuzione). Resta quello di prima finché i nomi non
+    vengono distinti.
+  - ⚠️ **Nessun calcolo è stato toccato**, e `users`/`timesheets` di Fogli ore restano in
+    **sola lettura**.
+  - **Provato in esecuzione** (`ver150.cjs`, **31 controlli su 31**, zero errori di pagina): il
+    confronto diretto con la **ver149** (la riga del confronto che usciva comunque, e il residuo
+    703 scritto al posto del 655); il riquadro rosso nei **due** casi, col colore misurato
+    (`#fef2f2` / `#dc2626`); il confronto **sospeso**; la conferma che elenca gli omonimi e dice
+    come si sbloccano; nessun residuo scritto per l'omonimo e quello già pubblicato **intatto**.
+  - ✅ **NON REGRESSIONE, misurata**: senza omonimi la riga del confronto è **identica** a quella
+    della ver149, il riquadro rosso non compare, la pubblicazione scrive **gli stessi residui con
+    gli stessi numeri** e la conferma non nomina nessun omonimo.
+  - ⚠️ **Resta vero che l'abbinamento è sempre sul NOME**: non esiste nessun codice condiviso
+    fra le app. Questa versione non lo rende più sicuro, lo rende **non silenzioso**.
+  - **Batteria rieseguita, confrontata con lo storico, zero falliti nuovi**: `sc-dip-A` **38/3** ·
+    `sc-dip-B` **32/2** (e dentro c'è **ver140 contro ver150: 0 differenze sui 16**) · `sc-dip-C`
+    **106/1** · `sc-dip-D` **11/0** · `ver144` **14/0** · `ver145` **7/0** · `ver146` **27/1** ·
+    `ver147` **26/1** · `ver149` **29/0** · `ic-fodip-A` **19/1** · `ic-fodip-B` **20/1/1** ·
+    `nr149` **4/0**.
+    ⚠️ **Tutti i «falliti» sono gli STESSI di prima e sono attese sbagliate dei MIEI script**,
+    non difetti dell'app. Quello di `ic-fodip-A` è stato **riprovato sulla ver149** e dà lo
+    stesso identico fallito con lo stesso messaggio: è **preesistente**.
+    ⚠️ In `ver149` l'attesa della targhetta era scritta a mano: **aggiornata, non aggirata**.
+    🐞 In `nr149` il mio stesso aggiornamento dell'etichetta aveva **rotto lo script** (il
+    confronto leggeva ancora la chiave vecchia e andava in errore): corretto e **rieseguito**,
+    perché senza quello la non regressione numerica non era dimostrata.
+  - ✅ **NON REGRESSIONE NUMERICA, misurata**: **ver148 e ver150 danno costo, ore e €/h
+    IDENTICI per tutti e 16 i dipendenti veri** (gen→ott 2026, **0 differenze**).
 
 - 🔗 **TRE RISPOSTE DI CHRISTIAN SUL COLLEGAMENTO CON FOGLI ORE** (ver149, 10/11/2026, punti
   **5** «Ricorda», **6** «Se tolgo il tetto, non deve vedere più niente» e **8** «Ignorali e

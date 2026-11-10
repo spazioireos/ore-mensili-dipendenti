@@ -459,7 +459,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver149";
+const APP_VER = "ver150";
 const APP_DATA = "10nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -2000,6 +2000,13 @@ function EmployeeCard(props){
         </div>;
       })()}
       {props.fuoriPeriodo ? <div style={{ background:"#fef3c7", borderBottom:"2px solid #f59e0b", color:"#92400e", fontSize:"12px", fontWeight:700, padding:"5px 10px" }}>⚠️ Mese fuori dal periodo di rapporto (prima dell'assunzione o dopo la cessazione), ma contiene ore già inserite: controlla e, se vanno tolte, usa 🧹 Pulisci ore dopo nella scheda (✎).</div> : null}
+      {/* ver150 (10/11/2026, punto 1: «avvisa»). ⚠ Dicitura nuova, scritta da Claude. */}
+      {props.fogliOreOmon ? <div style={{ background:"#fef2f2", borderLeft:"4px solid #dc2626", borderBottom:"1px solid #fecaca", color:"#991b1b", fontSize:"12px", fontWeight:700, padding:"6px 10px", lineHeight:"1.5" }}>
+        ⚠️ <b>Due persone con lo stesso nome</b> — {dp.nome}
+        {props.fogliOreOmon.fo ? <span> · in Fogli ore ci sono <b>{props.fogliOreOmon.fo.length} account</b> con questo nome</span> : null}
+        {props.fogliOreOmon.dip ? <span> · qui dentro ci sono <b>{props.fogliOreOmon.dip.length} schede</b> con questo nome</span> : null}
+        <span> · il confronto con Fogli ore è <b>sospeso</b> e il residuo <b>non viene pubblicato</b>: l'app non può sapere quali ore sono di chi, e mostrarne una sola sarebbe una bugia. Per sbloccarlo distingui i nomi nelle due anagrafiche.</span>
+      </div> : null}
       {props.fogliOre ? (function(){
         const fo = props.fogliOre;
         const info = !!fo.soloInfo;
@@ -6105,6 +6112,33 @@ function foConfronta(rec, y, m, agg){
            assConta: (agg && agg.assConta) ? agg.assConta : {},
            soloInfo: (!diffTot && giorni.length === 0) };
 }
+/* ver150 (10/11/2026, punto 1 dell'elenco, risposta di Christian: «avvisa»).
+   L'unico identificativo che attraversa il confine fra le app e' il NOME, scritto a mano in
+   due anagrafiche diverse. Se due persone hanno lo stesso nome, l'app non puo' sapere quali
+   ore sono di chi: prima vinceva l'ultima IN SILENZIO (il confronto mostrava le ore di una
+   sola, e la pubblicazione scriveva due volte sullo stesso documento `residui`).
+   ⚠ Christian ha scelto «avvisa», NON «somma»: quindi si salta e si dice.
+   ⚠ Il confronto usa `foChiave` (ver149), quindi «NICOLO'» e «NICOLÒ» contano come lo
+   stesso nome: e' proprio per questo che possono diventare omonimi senza che si veda. */
+function foRaggruppaPerChiave(valori, nomeDi){
+  const perK = {};
+  (valori || []).forEach(function(v){
+    const nm = nomeDi(v); const k = foChiave(nm);
+    if (!k) return; if (!perK[k]) perK[k] = []; perK[k].push(nm);
+  });
+  const out = {};
+  Object.keys(perK).forEach(function(k){ if (perK[k].length > 1) out[k] = perK[k]; });
+  return out;
+}
+/* gli account di Fogli ore che condividono lo stesso nome */
+function foOmonimiUtenti(utenti){
+  return foRaggruppaPerChiave(Object.keys(utenti || {}), function(uid){ return utenti[uid]; });
+}
+/* i dipendenti di QUESTA app che condividono lo stesso nome */
+function dipOmonimi(st){
+  try { return foRaggruppaPerChiave(dipSorted(st), function(dp){ return dp.nome; }); }
+  catch (e){ return {}; }
+}
 /* lettura utenti di Fogli ore (uid -> "COGNOME NOME"), solo ruoli che compilano i fogli ore */
 function foLeggiUtenti(db, cache){
   if (cache.__users) return Promise.resolve(cache.__users);
@@ -6146,6 +6180,12 @@ function foLeggiMese(db, cache, y, m){
       });
       const perNome = {};
       Object.keys(perUid).forEach(function(u){ perNome[foChiave(utenti[u])] = foAggregaMese(perUid[u]); });   /* ver149 (punto 8): la chiave ignora accenti e apostrofo finale */
+      /* ver150 (punto 1): se due account di Fogli ore hanno lo stesso nome, l'aggregato di
+         uno ha appena sovrascritto quello dell'altro. Quel numero sarebbe una bugia: si
+         TOGLIE, e la chiave finisce in `__ambigue` perche' la scheda lo possa dire. */
+      const ambigue = foOmonimiUtenti(utenti);
+      Object.keys(ambigue).forEach(function(k){ delete perNome[k]; });
+      perNome.__ambigue = ambigue;
       cache[key] = perNome;
       return perNome;
     });
@@ -6611,8 +6651,10 @@ function App(){
       const pub = (pubTimbro && pubTimbro.valori) || null;
       if (!pub) return null;
       const diversi = [];
+      const ambD = dipOmonimi(state);   /* ver150 (punto 1): gli omonimi non si pubblicano, quindi non si ricordano */
       dipSorted(state).forEach(function(dp){
         const k = foChiave(dp.nome);
+        if (ambD[k]) return;
         const prima = Object.prototype.hasOwnProperty.call(pub, k) ? Number(pub[k]) : null;
         const tetto = tettoForPeriod(dp, anno, mese);
         const haTetto = !isNaN(tetto) && tetto > 0;
@@ -6624,6 +6666,9 @@ function App(){
       return diversi.length ? diversi : null;
     } catch (e){ return null; }
   }, [state, anno, mese, pubTimbro]);
+  /* ver150 (punto 1): i nomi che qui dentro appartengono a due schede. Serve alla scheda
+     del mese (per sospendere il confronto e dirlo) e alla pubblicazione dei residui. */
+  const dipAmb = useMemo(function(){ return dipOmonimi(state); }, [state]);
   const pubblicaResidui = function(){
     if (!FB_READY || !dbRef.current){ window.alert("Serve il collegamento al database: questa funzione non lavora in modalità locale."); return; }
     const righe = [];
@@ -6644,14 +6689,25 @@ function App(){
     const db = dbRef.current;
     foLeggiUtenti(db, foCacheRef.current).then(function(utenti){
       const perNome = {}; Object.keys(utenti).forEach(function(uid){ perNome[foChiave(utenti[uid])] = uid; });   /* ver149 (punto 8) */
-      const daScrivere = [], senzaAccount = [];
+      /* ver150 (punto 1): un nome che in Fogli ore o qui dentro appartiene a due persone non
+         si pubblica e non si cancella: scriveremmo due volte sullo stesso documento e il
+         residuo di uno finirebbe addosso all'altro, in silenzio. */
+      const ambFo = foOmonimiUtenti(utenti), ambDip = dipOmonimi(state);
+      const ambiguo = function(nm){ const k = foChiave(nm); return !!(ambFo[k] || ambDip[k]); };
+      const daScrivere = [], senzaAccount = [], omonimi = [];
       righe.forEach(function(r){
+        if (ambiguo(r.nome)){
+          const k = foChiave(r.nome);
+          omonimi.push(r.nome + (ambFo[k] ? (" \u2014 " + ambFo[k].length + " account in Fogli ore") : "") +
+                                (ambDip[k] ? (" \u2014 " + ambDip[k].length + " schede qui") : ""));
+          return;
+        }
         const uid = perNome[foChiave(r.nome)];   /* ver149 (punto 8) */
         if (uid) daScrivere.push(Object.assign({ uid:uid }, r)); else senzaAccount.push(r.nome);
       });
       /* ver149 (punto 6): chi non ha più nessun massimale, e ha un account, va ripulito */
       const uidSenzaTetto = {};
-      senzaTetto.forEach(function(nm){ const u = perNome[foChiave(nm)]; if (u) uidSenzaTetto[u] = nm; });
+      senzaTetto.forEach(function(nm){ if (ambiguo(nm)) return; const u = perNome[foChiave(nm)]; if (u) uidSenzaTetto[u] = nm; });
       const uidConTetto = {};
       daScrivere.forEach(function(r){ uidConTetto[r.uid] = true; });
       /* leggo la collection `residui` per cancellare SOLO quello che c'e' davvero */
@@ -6661,18 +6717,23 @@ function App(){
           if (uidSenzaTetto[d.id]) daTogliere.push({ uid:d.id, nome:uidSenzaTetto[d.id] });
           else if (!uidConTetto[d.id]) altri.push(d.id);
         });
-        return { daScrivere:daScrivere, senzaAccount:senzaAccount, daTogliere:daTogliere, altri:altri, lettoElenco:true };
+        return { daScrivere:daScrivere, senzaAccount:senzaAccount, omonimi:omonimi, daTogliere:daTogliere, altri:altri, lettoElenco:true };
       }).catch(function(e){
         console.error("residui (elenco)", e);
-        return { daScrivere:daScrivere, senzaAccount:senzaAccount, daTogliere:[], altri:[], lettoElenco:false };
+        return { daScrivere:daScrivere, senzaAccount:senzaAccount, omonimi:omonimi, daTogliere:[], altri:[], lettoElenco:false };
       });
     }).then(function(pl){
       const daScrivere = pl.daScrivere, senzaAccount = pl.senzaAccount, daTogliere = pl.daTogliere;
+      const omonimi = pl.omonimi || [];
+      /* ver150 (punto 1): l'avviso sugli omonimi compare sia nella conferma sia qui, perche'
+         se sono l'UNICA cosa rimasta non ci sarebbe nessuna conferma in cui dirlo.
+         ⚠ Dicitura nuova, scritta da Claude. */
+      const avvOmon = omonimi.length ? ("\n\nOMONIMI (saltati: né pubblicati né tolti, perché l'app non può sapere quali ore sono di chi):\n" + omonimi.map(function(x){ return "• " + x; }).join("\n") + "\nPer pubblicarli distingui i nomi nelle due anagrafiche.") : "";
       if (!daScrivere.length && !daTogliere.length){
         setPubEsito("");
-        window.alert(senzaAccount.length
+        window.alert((senzaAccount.length
           ? ("Nessuno dei dipendenti con un massimale ha un account in Fogli ore con lo stesso COGNOME NOME:\n\n" + senzaAccount.join("\n"))
-          : "Non c'è niente da pubblicare e niente da togliere.");
+          : "Non c'è niente da pubblicare e niente da togliere.") + avvOmon);
         return;
       }
       const elenco = daScrivere.map(function(r){ return "• " + r.nome + ": restano " + fmt3(r.restano) + " h su " + fmt3(r.tetto); }).join("\n");
@@ -6680,7 +6741,7 @@ function App(){
       const avvTog = daTogliere.length ? ("\n\nA QUESTI VIENE TOLTO il residuo, perché non hanno più nessun massimale in scheda (dentro Fogli ore non vedranno più niente):\n" + daTogliere.map(function(x){ return "• " + x.nome; }).join("\n")) : "";
       const avvAltri = pl.altri.length ? ("\n\nCi sono anche " + pl.altri.length + " residui pubblicati che non corrispondono a nessun dipendente di oggi: NON vengono toccati.") : "";
       const avvElenco = pl.lettoElenco ? "" : "\n\n⚠️ Non sono riuscito a leggere l'elenco dei residui già pubblicati: questa volta non ne viene tolto nessuno.";
-      if (!window.confirm("Vuoi pubblicare il residuo a questi " + daScrivere.length + " dipendenti?\nLo vedranno dentro Fogli ore, ciascuno solo il proprio.\n\n" + elenco + avviso + avvTog + avvAltri + avvElenco)){ setPubEsito(""); return; }
+      if (!window.confirm("Vuoi pubblicare il residuo a questi " + daScrivere.length + " dipendenti?\nLo vedranno dentro Fogli ore, ciascuno solo il proprio.\n\n" + elenco + avviso + avvOmon + avvTog + avvAltri + avvElenco)){ setPubEsito(""); return; }
       setPubEsito("pubblicazione in corso…");
       const db = dbRef.current;
       const scritture = daScrivere.map(function(r){
@@ -6847,10 +6908,16 @@ function App(){
                 const tettoNum = tettoForPeriod(dp, anno, mese);
                 const tettoC = (!isNaN(tettoNum) && tettoNum>0) ? consumoTetto(state, dp, anno, mese) : 0;
                 const ferieApr = (mese===4) ? { year:anno-1, mat:ferieMaturato(state,dp,anno-1), god:ferieGodute(state,dp,anno-1), res:ferieResiduo(state,dp,anno-1), noData:!annoHasData(state,anno-1) } : null;
-                const foDiff = (function(){ try { if (!foPerNome) return null; const agg = foPerNome[foChiave(dp.nome)];   /* ver149 (punto 8) */ return agg ? foConfronta(recDp, anno, mese, agg) : null; } catch (e){ console.error("confronto Fogli ore", e); return null; } })();
+                /* ver150 (punto 1): due persone con lo stesso nome. Il confronto si SOSPENDE,
+                   perche' mostrerebbe le ore di una sola persona come se fossero di questa. */
+                const foOmon = (function(){ try { const k = foChiave(dp.nome);
+                  const a = (foPerNome && foPerNome.__ambigue) ? foPerNome.__ambigue[k] : null;
+                  const b = dipAmb[k] || null;
+                  return (a || b) ? { fo:(a || null), dip:(b || null) } : null; } catch (e){ return null; } })();
+                const foDiff = (function(){ try { if (foOmon) return null; if (!foPerNome) return null; const agg = foPerNome[foChiave(dp.nome)];   /* ver149 (punto 8) */ return agg ? foConfronta(recDp, anno, mese, agg) : null; } catch (e){ console.error("confronto Fogli ore", e); return null; } })();
                 return <EmployeeCard key={dp.id} dp={dp} rec={recDp} fuoriPeriodo={fuoriPeriodo} anno={anno} mese={mese} fset={fset} mLocked={mLocked}
                   dipList={dipList} onCell={onCell} onEro={onEro} onNota={onNota} onFestConfirm={onFestConfirm} onQuickFill={onQuickFill}
-                  onVoceSet={onVoceSet} onVoceAdd={onVoceAdd} onVoceDel={onVoceDel} ferieApr={ferieApr} fogliOre={foDiff}
+                  onVoceSet={onVoceSet} onVoceAdd={onVoceAdd} onVoceDel={onVoceDel} ferieApr={ferieApr} fogliOre={foDiff} fogliOreOmon={foOmon}
                   onDich={onDich} onSvuotaMese={onSvuotaMese} saldoPrec={saldoP} bancaPrec={bancaP} tettoConsumo={tettoC} onAzzeraSaldo={onAzzeraSaldo} onAnnullaAzzera={onAnnullaAzzera}
                   onSostAdd={onSostAdd} onSostChange={onSostChange} onSostDel={onSostDel} onOpenPerm={onOpenPerm}
                   festOre={festGoduteMese(state, dp, anno, mese, null).ore} festGG={festGoduteMese(state, dp, anno, mese, null).gg}
