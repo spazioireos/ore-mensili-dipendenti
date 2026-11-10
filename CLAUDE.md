@@ -435,6 +435,18 @@ Banca ore, tetto annuo, contratti e export.
     abbinano** e il residuo viene scritto.
   - ✅ **NON REGRESSIONE, misurata**: **ver148 e ver149 danno costo, ore e €/h IDENTICI per tutti
     e 16 i dipendenti veri** (gen→ott 2026, **0 differenze**), zero errori di pagina su entrambe.
+  - **Batteria rieseguita, confrontata con lo storico**: `sc-dip-A` **38/3** (uno **in più** di
+    prima: il negativo in «Compila veloce» chiuso dalla ver148) · `sc-dip-B` **32/2** (identico,
+    e dentro c'è **ver140 contro ver149: 0 differenze sui 16**) · `sc-dip-C` **106/1** (identico)
+    · `sc-dip-D` **11/0** · `ver144` **14/0** · `ver145` **7/0** · `ver146` **27/1** · `ver147`
+    **26/1** (uno in meno di prima) · `ic-fodip-A` **19/1** (identico) · `ic-fodip-B` **20/1/1**
+    (identico) · `nr149` **4/4**.
+    ⚠️ **Tutti i «falliti» sono gli STESSI di prima e sono attese sbagliate dei MIEI script**,
+    non difetti dell'app: il valore «13,» durante la battitura, l'avviso a comparsa che è
+    transitorio, il 🗑 che sta nel **Tabellone** e non in Anagrafica, la tendina E.A.R. il cui
+    `<label>` è un **fratello** e non un padre, il titolo di sezione che `innerText` restituisce
+    in **MAIUSCOLO**, il conteggio dei pezzi su un periodo già diviso in 13, il valore di una
+    casella letto da `innerText`, e la finta Firestore che fa cadere **solo le scritture**.
   - **Provato in esecuzione** (`ver149.cjs`, **29 controlli su 29**, zero errori di pagina):
     la chiave che equipara accenti e apostrofo; il percorso vero dell'abbinamento; il residuo che
     **sparisce** dal database e il riquadro che **non compare più** dentro Fogli ore; la guardia
