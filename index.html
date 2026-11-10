@@ -283,7 +283,7 @@ input:focus,select:focus,textarea:focus{outline:3px solid #1d4ed8;outline-offset
   .foot-line .foot-tot { font-size:16px; }
   .foot-line .foot-tot b { font-size:22px; font-weight:900; color:#0F2740; }
 
-  /* ===== ver130 (07/11/2026) — LEGGIBILITA': niente sotto i 12,5px FUORI dalle griglie =====
+  /* ===== ver149 (07/11/2026) — LEGGIBILITA': niente sotto i 12,5px FUORI dalle griglie =====
      Trovato con il collaudo integrale chiesto da Christian. La sua regola permanente (§10.6)
      dice che nessuna scritta scende sotto i 12,5px fuori dalle griglie dense; misurando a
      390/768/1024/1280/1680px risultavano 209 scritte a 11-12px nel Tabellone, 79
@@ -459,8 +459,8 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver148";
-const APP_DATA = "09nov26";
+const APP_VER = "ver149";
+const APP_DATA = "10nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
 const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
@@ -1380,6 +1380,19 @@ function loadLocal(){
    ⚠️ Vale per le schede dello STESSO browser. Due computer diversi collegati al cloud non si
    vedono per questa strada: li' l'ultimo che salva vince, come prima. */
 const LS_TIMBRO = LS_KEY + "__timbro";
+/* ver149 (10/11/2026, punto 5 dell'elenco, risposta di Christian: «Ricorda»). Il residuo che
+   l'operatore vede dentro Fogli ore e' una FOTOGRAFIA: se non si preme «📤 Pubblica i residui»
+   continua a vedere il numero vecchio, e niente lo diceva. Qui si tiene da parte quanto e' stato
+   pubblicato a ciascuno, cosi' la barra puo' ricordare che va rifatto.
+   ⚠️ Sta in una chiave SUA, come il timbro della ver144: il formato del documento e del backup
+   NON cambia, e non serve premere 💾. ⚠️ Vale per questo browser. */
+const LS_RESPUB = LS_KEY + "__residuipub";
+function respubLeggi(){ try { const v = localStorage.getItem(LS_RESPUB); const o = v ? JSON.parse(v) : null; return (o && typeof o === "object") ? o : null; } catch (e){ return null; } }
+function respubScrivi(valori){
+  const o = { quando: Date.now(), valori: valori || {} };
+  try { localStorage.setItem(LS_RESPUB, JSON.stringify(o)); } catch (e){}
+  return o;
+}
 function timbroCorrente(){ try { return localStorage.getItem(LS_TIMBRO) || ""; } catch (e) { return ""; } }
 function timbroNuovo(){ return String(Date.now()) + "-" + Math.random().toString(36).slice(2, 8); }
 function saveLocal(state){
@@ -5976,6 +5989,20 @@ const FO_ASSENZE = {
   "ALTRO AUTORIZ.":   null
 };
 function foNorm(s){ return String(s === null || s === undefined ? "" : s).replace(/\s+/g, " ").trim().toUpperCase(); }
+/* ver149 (10/11/2026, punto 8 dell'elenco, risposta di Christian: «Ignorali e attenzione a
+   accenti e apostrofi in fine di parola, perche' si equivalgono»).
+   IL DIFETTO, misurato dal collaudo delle interconnessioni: l'UNICO identificativo che
+   attraversa il confine fra le app e' il NOME scritto a mano in due anagrafiche diverse, e
+   `foNorm` confrontava lettera per lettera: «NICOLO'» e «NICOLÒ» erano due persone diverse, e
+   le ore non si abbinavano piu'.
+   ⚠️ `foNorm` NON e' stata toccata: serve a come il nome si VEDE. `foChiave` serve solo a
+   CONFRONTARE: toglie i segni (accenti, dieresi) con NFD e l'apostrofo in fine di parola. */
+function foChiave(s){
+  let t = foNorm(s);
+  try { t = t.normalize("NFD").replace(/[\u0300-\u036f]/g, ""); } catch (e){}
+  t = t.replace(/['\u2019\u00b4`\u02bc]+(?=\s|$)/g, "");
+  return t.replace(/\s+/g, " ").trim();
+}
 /* "COGNOME NOME" dell'utente di Fogli ore: se cognome/nome mancano si ricava da name
    (PRIMA parola = cognome, resto = nome) */
 function foNomeUtente(u){
@@ -6118,7 +6145,7 @@ function foLeggiMese(db, cache, y, m){
         } catch (e){ console.error("foLeggiMese", e); }
       });
       const perNome = {};
-      Object.keys(perUid).forEach(function(u){ perNome[utenti[u]] = foAggregaMese(perUid[u]); });
+      Object.keys(perUid).forEach(function(u){ perNome[foChiave(utenti[u])] = foAggregaMese(perUid[u]); });   /* ver149 (punto 8): la chiave ignora accenti e apostrofo finale */
       cache[key] = perNome;
       return perNome;
     });
@@ -6561,47 +6588,125 @@ function App(){
      SEMPRE manuale: nessun salvataggio automatico. Le collection "users" e
      "timesheets" restano in sola lettura, come sempre. */
   const [pubEsito, setPubEsito] = useState("");
+  /* ver149 (10/11/2026, due risposte di Christian all'elenco delle interconnessioni:
+     punto 6 «Se tolgo il tetto, non deve vedere più niente» e punto 5 «Ricorda»).
+     PUNTO 6: togliendo il massimale a una persona, il suo documento `residui` restava dov'era e
+     l'operatore continuava a leggere «Ti restano 649,00 h» per sempre. Ora la pubblicazione
+     CANCELLA il residuo di chi non ha PIÙ NESSUN massimale.
+     ⚠️ Si guarda `tettiList(dp).length === 0`, cioe' «nessun massimale scritto in scheda», NON
+     «nessun massimale per il mese che sto guardando»: altrimenti, aprendo un mese fuori dal
+     periodo del tetto, si cancellerebbe il residuo di chi ce l'ha ancora.
+     ⚠️ I documenti `residui` che non corrispondono a nessun dipendente di oggi NON si toccano:
+     vengono solo elencati nella conferma, perché possono essere di qualcuno che non è più
+     nell'elenco e cancellarli in silenzio sarebbe una sorpresa.
+     PUNTO 5: dopo una pubblicazione riuscita si tiene da parte, in `localStorage` (chiave
+     `LS_RESPUB`, FUORI dai dati: il formato del documento e del backup non cambia), quanto è
+     stato pubblicato a ciascuno. Se i numeri di oggi sono diversi, la barra lo RICORDA. */
+  const [pubTimbro, setPubTimbro] = useState(function(){ return respubLeggi(); });
+  /* ver149 (punto 5): che cosa e' cambiato dall'ultima pubblicazione. Si confronta solo il
+     numero che l'operatore VEDE (le ore che gli restano), non le ore usate: e' quello il dato
+     pubblicato. Se non si e' mai pubblicato niente, non si ricorda niente. */
+  const residuiDaRifare = useMemo(function(){
+    try {
+      const pub = (pubTimbro && pubTimbro.valori) || null;
+      if (!pub) return null;
+      const diversi = [];
+      dipSorted(state).forEach(function(dp){
+        const k = foChiave(dp.nome);
+        const prima = Object.prototype.hasOwnProperty.call(pub, k) ? Number(pub[k]) : null;
+        const tetto = tettoForPeriod(dp, anno, mese);
+        const haTetto = !isNaN(tetto) && tetto > 0;
+        if (!haTetto){ if (prima !== null && !tettiList(dp).length) diversi.push(dp.nome + " (massimale tolto)"); return; }
+        const ora = R2(tetto - consumoTetto(state, dp, anno, mese), 3);
+        if (prima === null) diversi.push(dp.nome + " (nuovo)");
+        else if (Math.abs(prima - ora) > 0.0005) diversi.push(dp.nome);
+      });
+      return diversi.length ? diversi : null;
+    } catch (e){ return null; }
+  }, [state, anno, mese, pubTimbro]);
   const pubblicaResidui = function(){
     if (!FB_READY || !dbRef.current){ window.alert("Serve il collegamento al database: questa funzione non lavora in modalità locale."); return; }
     const righe = [];
+    const senzaTetto = [];                                  /* ver149 (punto 6) */
     dipSorted(state).forEach(function(dp){
       const tetto = tettoForPeriod(dp, anno, mese);
-      if (isNaN(tetto) || tetto <= 0) return;
+      if (isNaN(tetto) || tetto <= 0){
+        if (!tettiList(dp).length) senzaTetto.push(dp.nome);   /* nessun massimale in scheda */
+        return;
+      }
       const usate = consumoTetto(state, dp, anno, mese);
       righe.push({ nome:dp.nome, periodo:(dp.tettoPeriodo==="civile"?"civile":"scolastico"),
                    annoRif: tettoStartYear(dp, anno, mese),
                    tetto:R2(tetto,3), usate:R2(usate,3), restano:R2(tetto-usate,3) });
     });
-    if (!righe.length){ window.alert("Nessun dipendente ha un massimale annuo impostato per questo periodo: non c'è niente da pubblicare."); return; }
+    if (!righe.length && !senzaTetto.length){ window.alert("Nessun dipendente ha un massimale annuo impostato per questo periodo: non c'è niente da pubblicare."); return; }
     setPubEsito("lettura degli operatori di Fogli ore in corso…");
-    foLeggiUtenti(dbRef.current, foCacheRef.current).then(function(utenti){
-      const perNome = {}; Object.keys(utenti).forEach(function(uid){ perNome[foNorm(utenti[uid])] = uid; });
+    const db = dbRef.current;
+    foLeggiUtenti(db, foCacheRef.current).then(function(utenti){
+      const perNome = {}; Object.keys(utenti).forEach(function(uid){ perNome[foChiave(utenti[uid])] = uid; });   /* ver149 (punto 8) */
       const daScrivere = [], senzaAccount = [];
       righe.forEach(function(r){
-        const uid = perNome[foNorm(r.nome)];
+        const uid = perNome[foChiave(r.nome)];   /* ver149 (punto 8) */
         if (uid) daScrivere.push(Object.assign({ uid:uid }, r)); else senzaAccount.push(r.nome);
       });
-      if (!daScrivere.length){
+      /* ver149 (punto 6): chi non ha più nessun massimale, e ha un account, va ripulito */
+      const uidSenzaTetto = {};
+      senzaTetto.forEach(function(nm){ const u = perNome[foChiave(nm)]; if (u) uidSenzaTetto[u] = nm; });
+      const uidConTetto = {};
+      daScrivere.forEach(function(r){ uidConTetto[r.uid] = true; });
+      /* leggo la collection `residui` per cancellare SOLO quello che c'e' davvero */
+      return db.collection("residui").get().then(function(snap){
+        const daTogliere = [], altri = [];
+        snap.forEach(function(d){
+          if (uidSenzaTetto[d.id]) daTogliere.push({ uid:d.id, nome:uidSenzaTetto[d.id] });
+          else if (!uidConTetto[d.id]) altri.push(d.id);
+        });
+        return { daScrivere:daScrivere, senzaAccount:senzaAccount, daTogliere:daTogliere, altri:altri, lettoElenco:true };
+      }).catch(function(e){
+        console.error("residui (elenco)", e);
+        return { daScrivere:daScrivere, senzaAccount:senzaAccount, daTogliere:[], altri:[], lettoElenco:false };
+      });
+    }).then(function(pl){
+      const daScrivere = pl.daScrivere, senzaAccount = pl.senzaAccount, daTogliere = pl.daTogliere;
+      if (!daScrivere.length && !daTogliere.length){
         setPubEsito("");
-        window.alert("Nessuno dei dipendenti con un massimale ha un account in Fogli ore con lo stesso COGNOME NOME:\n\n" + senzaAccount.join("\n"));
+        window.alert(senzaAccount.length
+          ? ("Nessuno dei dipendenti con un massimale ha un account in Fogli ore con lo stesso COGNOME NOME:\n\n" + senzaAccount.join("\n"))
+          : "Non c'è niente da pubblicare e niente da togliere.");
         return;
       }
       const elenco = daScrivere.map(function(r){ return "• " + r.nome + ": restano " + fmt3(r.restano) + " h su " + fmt3(r.tetto); }).join("\n");
       const avviso = senzaAccount.length ? ("\n\nSENZA ACCOUNT in Fogli ore (saltati):\n" + senzaAccount.join("\n")) : "";
-      if (!window.confirm("Vuoi pubblicare il residuo a questi " + daScrivere.length + " dipendenti?\nLo vedranno dentro Fogli ore, ciascuno solo il proprio.\n\n" + elenco + avviso)){ setPubEsito(""); return; }
+      const avvTog = daTogliere.length ? ("\n\nA QUESTI VIENE TOLTO il residuo, perché non hanno più nessun massimale in scheda (dentro Fogli ore non vedranno più niente):\n" + daTogliere.map(function(x){ return "• " + x.nome; }).join("\n")) : "";
+      const avvAltri = pl.altri.length ? ("\n\nCi sono anche " + pl.altri.length + " residui pubblicati che non corrispondono a nessun dipendente di oggi: NON vengono toccati.") : "";
+      const avvElenco = pl.lettoElenco ? "" : "\n\n⚠️ Non sono riuscito a leggere l'elenco dei residui già pubblicati: questa volta non ne viene tolto nessuno.";
+      if (!window.confirm("Vuoi pubblicare il residuo a questi " + daScrivere.length + " dipendenti?\nLo vedranno dentro Fogli ore, ciascuno solo il proprio.\n\n" + elenco + avviso + avvTog + avvAltri + avvElenco)){ setPubEsito(""); return; }
       setPubEsito("pubblicazione in corso…");
       const db = dbRef.current;
-      Promise.all(daScrivere.map(function(r){
+      const scritture = daScrivere.map(function(r){
         return db.collection("residui").doc(r.uid).set({
           tetto:r.tetto, usate:r.usate, restano:r.restano, periodo:r.periodo, anno:r.annoRif,
           aggiornato: firebase.firestore.FieldValue.serverTimestamp()
         }, { merge:true }).then(function(){ return { ok:true, nome:r.nome }; })
           .catch(function(e){ console.error("residui", r.nome, e); return { ok:false, nome:r.nome, err:(e && e.message) || "errore" }; });
-      })).then(function(esiti){
+      });
+      const cancellazioni = daTogliere.map(function(x){
+        return db.collection("residui").doc(x.uid).delete().then(function(){ return { ok:true, nome:x.nome, tolto:true }; })
+          .catch(function(e){ console.error("residui (togli)", x.nome, e); return { ok:false, nome:x.nome, tolto:true, err:(e && e.message) || "errore" }; });
+      });
+      Promise.all(scritture.concat(cancellazioni)).then(function(esiti){
         const ko = esiti.filter(function(x){ return !x.ok; });
+        const nTog = esiti.filter(function(x){ return x.tolto && x.ok; }).length;
         setPubEsito("");
-        if (!ko.length){ window.alert("Pubblicati " + esiti.length + " residui. Ogni dipendente vede il proprio dentro Fogli ore."); return; }
-        window.alert("Pubblicati " + (esiti.length - ko.length) + " su " + esiti.length + ".\n\nNON riusciti:\n" +
+        /* ver149 (punto 5): si tiene da parte quanto e' stato pubblicato, per poterlo ricordare */
+        if (!ko.length){
+          const val = {};
+          daScrivere.forEach(function(r){ val[foChiave(r.nome)] = r.restano; });
+          setPubTimbro(respubScrivi(val));
+        }
+        const codaTog = nTog ? ("\nTolto il residuo a " + nTog + (nTog===1?" persona":" persone") + " senza massimale.") : "";
+        if (!ko.length){ window.alert("Pubblicati " + (esiti.length - nTog) + " residui. Ogni dipendente vede il proprio dentro Fogli ore." + codaTog); return; }
+        window.alert("Riusciti " + (esiti.length - ko.length) + " su " + esiti.length + "." + codaTog + "\n\nNON riusciti:\n" +
           ko.map(function(x){ return "• " + x.nome + " — " + x.err; }).join("\n") +
           "\n\nSe l'errore parla di permessi, le regole di sicurezza nuove non sono ancora pubblicate in console Firebase.");
       });
@@ -6712,6 +6817,16 @@ function App(){
                 title="Manda a ogni dipendente, dentro Fogli ore, quante ore gli restano del suo massimale annuo. Ognuno vede solo il proprio.">📤 Pubblica i residui</button>
               {pubEsito ? <span style={{ fontSize:"12.5px", color:"#475569" }}>{pubEsito}</span> : null}
             </div>
+            {/* ver149 (punto 5, risposta di Christian: «Ricorda»): il residuo che l'operatore vede
+                dentro Fogli ore e' una fotografia. Se i numeri di oggi sono diversi da quelli
+                pubblicati l'ultima volta, qui lo ricorda. ⚠️ Dicitura nuova, scritta da Claude. */}
+            {residuiDaRifare ?
+              <div style={{ background:"#fff8e1", border:"1px solid #eac87a", borderRadius:"8px", color:"#92400e",
+                            fontSize:"13px", fontWeight:700, padding:"7px 10px", margin:"6px 0", lineHeight:1.45 }}
+                   title="Il residuo lo vedono dentro Fogli ore solo dopo che premi «📤 Pubblica i residui»">
+                ⚠️ <b>I residui pubblicati non sono più aggiornati</b>: {residuiDaRifare.length === 1 ? "è cambiato" : "sono cambiati"} {residuiDaRifare.slice(0,6).join(", ")}{residuiDaRifare.length > 6 ? (" e altri " + (residuiDaRifare.length - 6)) : ""}.
+                Dentro Fogli ore vedono ancora i numeri di prima: premi <b>📤 Pubblica i residui</b>.
+              </div> : null}
             {mLocked ? <div className="lock-info">Questo mese è bloccato: le celle non sono modificabili. Premi "Sblocca mese" per riaprirlo.</div> : null}
             {foErr ? <div style={{ background:"#f8fafc", border:"1px solid #e2e8f0", borderRadius:"8px", color:"#64748b", fontSize:"11px", padding:"4px 9px", margin:"6px 0", display:"inline-block" }}>confronto Fogli ore non disponibile (permessi)</div> : null}
             {state.dipendenti.length === 0 ?
@@ -6732,7 +6847,7 @@ function App(){
                 const tettoNum = tettoForPeriod(dp, anno, mese);
                 const tettoC = (!isNaN(tettoNum) && tettoNum>0) ? consumoTetto(state, dp, anno, mese) : 0;
                 const ferieApr = (mese===4) ? { year:anno-1, mat:ferieMaturato(state,dp,anno-1), god:ferieGodute(state,dp,anno-1), res:ferieResiduo(state,dp,anno-1), noData:!annoHasData(state,anno-1) } : null;
-                const foDiff = (function(){ try { if (!foPerNome) return null; const agg = foPerNome[foNorm(dp.nome)]; return agg ? foConfronta(recDp, anno, mese, agg) : null; } catch (e){ console.error("confronto Fogli ore", e); return null; } })();
+                const foDiff = (function(){ try { if (!foPerNome) return null; const agg = foPerNome[foChiave(dp.nome)];   /* ver149 (punto 8) */ return agg ? foConfronta(recDp, anno, mese, agg) : null; } catch (e){ console.error("confronto Fogli ore", e); return null; } })();
                 return <EmployeeCard key={dp.id} dp={dp} rec={recDp} fuoriPeriodo={fuoriPeriodo} anno={anno} mese={mese} fset={fset} mLocked={mLocked}
                   dipList={dipList} onCell={onCell} onEro={onEro} onNota={onNota} onFestConfirm={onFestConfirm} onQuickFill={onQuickFill}
                   onVoceSet={onVoceSet} onVoceAdd={onVoceAdd} onVoceDel={onVoceDel} ferieApr={ferieApr} fogliOre={foDiff}

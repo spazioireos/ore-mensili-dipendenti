@@ -18,7 +18,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver148 · 09nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver149 · 10nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -394,6 +394,53 @@ Banca ore, tetto annuo, contratti e export.
     «— ore» e «non calcolabile»; la stessa persona su «Teoriche» → 18,67 €/h; e il **foglio Excel
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
+
+- 🔗 **TRE RISPOSTE DI CHRISTIAN SUL COLLEGAMENTO CON FOGLI ORE** (ver149, 10/11/2026, punti
+  **5** «Ricorda», **6** «Se tolgo il tetto, non deve vedere più niente» e **8** «Ignorali e
+  attenzione a accenti e apostrofi in fine di parola, perché si equivalgono», dall'elenco
+  consegnato dopo il collaudo delle interconnessioni).
+  - 🗑️ **6 — togliendo il massimale, il residuo si CANCELLA.** Prima il documento `residui`
+    restava dov'era e l'operatore continuava a leggere «Ti restano 649,00 h» **per sempre**.
+    Ora **📤 Pubblica i residui** legge la collection `residui` (l'admin può: le regole gli danno
+    `read, write`), e **cancella** il documento di chi non ha **più nessun massimale**.
+    - ⚠️ **La condizione è `tettiList(dp).length === 0`**, cioe' «nessun massimale scritto in
+      scheda», **NON** «nessun massimale per il mese che sto guardando»: altrimenti, aprendo un
+      mese fuori dal periodo del tetto, si cancellerebbe il residuo di chi ce l'ha ancora.
+      **Misurato**: guardando gennaio 2026 (fuori dall'a.s. 2026/27) **nessun residuo viene
+      toccato**. **Non cambiare questa condizione.**
+    - ⚠️ I documenti `residui` che **non corrispondono a nessun dipendente di oggi NON si
+      toccano**: vengono solo contati nella conferma, perché possono essere di qualcuno che non è
+      più nell'elenco.
+    - ⚠️ Se la **lettura dell'elenco** non riesce, la pubblicazione va avanti **senza cancellare
+      niente** e la conferma lo dice.
+    - La conferma elenca a chi viene **TOLTO** il residuo e l'esito lo ripete.
+      ⚠️ **Diciture nuove, scritte da Claude.**
+  - ⏰ **5 — il promemoria di ripubblicare.** Il residuo che l'operatore vede dentro Fogli ore è
+    una **fotografia**: se non si premeva 📤 continuava a vedere il numero vecchio, e **niente lo
+    diceva**. Ora, dopo una pubblicazione riuscita, quanto è stato pubblicato a ciascuno si tiene
+    da parte in **`LS_RESPUB`** (`<LS_KEY>__residuipub`), e se i numeri di oggi sono diversi
+    compare un riquadro giallo nella barra del Tabellone che **nomina le persone** e dice di
+    premere 📤. ⚠️ La chiave sta **fuori dai dati**, come il timbro della ver144: il **formato
+    del documento e del backup NON cambia** e **non serve premere 💾**. ⚠️ Vale per **questo
+    browser**. ⚠️ **Dicitura nuova, scritta da Claude.**
+  - 🔤 **8 — accenti e apostrofo finale si equivalgono.** L'unico identificativo che attraversa
+    il confine fra le app è il **nome scritto a mano in due anagrafiche diverse**, e `foNorm`
+    confrontava lettera per lettera: «NICOLO'» e «NICOLÒ» erano **due persone diverse** e le ore
+    non si abbinavano. Funzione nuova **`foChiave(s)`**: toglie i segni con **NFD** e
+    l'**apostrofo in fine di parola**. ⚠️ **`foNorm` NON è stata toccata**: serve a come il nome
+    si **vede**; `foChiave` serve solo a **confrontare**, nei **quattro** punti del confronto
+    (chiave del mese, riga del confronto, e le due mappe della pubblicazione).
+    ⚠️ **L'apostrofo DENTRO la parola non si tocca**: «D'AMICO» resta «D'AMICO».
+    **Misurato nel percorso vero**: «FERRARÈ» in Fogli ore e «FERRARE'» in Dipendenti **si
+    abbinano** e il residuo viene scritto.
+  - ✅ **NON REGRESSIONE, misurata**: **ver148 e ver149 danno costo, ore e €/h IDENTICI per tutti
+    e 16 i dipendenti veri** (gen→ott 2026, **0 differenze**), zero errori di pagina su entrambe.
+  - **Provato in esecuzione** (`ver149.cjs`, **29 controlli su 29**, zero errori di pagina):
+    la chiave che equipara accenti e apostrofo; il percorso vero dell'abbinamento; il residuo che
+    **sparisce** dal database e il riquadro che **non compare più** dentro Fogli ore; la guardia
+    del mese fuori periodo; il residuo di chi ha ancora il massimale che **resta**; e il
+    promemoria che compare quando si cambiano le ore, nomina la persona, sparisce ripubblicando e
+    dice «massimale tolto» quando il tetto viene tolto.
 
 - 🚫 **«COMPILA VELOCE» NON ACCETTA PIÙ I NEGATIVI** (ver148, 09/11/2026, difetto **trovato dal
   SECONDO collaudo** e corretto applicando la regola che Christian aveva già dato ad **A4**:
