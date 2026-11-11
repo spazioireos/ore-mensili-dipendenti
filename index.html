@@ -471,7 +471,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver156";
+const APP_VER = "ver158";
 const APP_DATA = "11nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -1505,6 +1505,63 @@ function saldoPrec(state, anno, mese, dipId){
     s += (D - totOfRec(months[i].rec, months[i].y, months[i].m));
   }
   return Math.round(s * 100) / 100;
+}
+/* ===================== ver157 — IL CODICE OPERATORE (sigla) =====================
+   Richiesta di Christian dell'11/11/2026, dopo la riconciliazione delle urgenze (TR-03):
+   «ok codice condiviso che crei tu di max 4 caratteri 3 dei quali contengono le prime lettere
+   del cognome», e, alla domanda sul 4° carattere, «cifra progressiva».
+   ⚠️ L'unico identificativo che attraversava il confine fra le app era il NOME, scritto a mano
+   in due anagrafiche diverse: bastava un accento o un omonimo e le ore finivano alla persona
+   sbagliata o non arrivavano. Il codice nasce QUI, perché questa è l'app con l'anagrafica vera.
+   ⚠️ Il codice NON si scrive a mano: la casella in ANAGRAFICA è grigia e di sola lettura, e i
+   codici si assegnano col pulsante «🔖 Assegna i codici mancanti», che chiede conferma e
+   richiede il 💾 (§10.1: niente si scrive da solo).
+   ⚠️ Un codice già assegnato NON viene mai ricalcolato: è un identificativo, e se cambiasse
+   si romperebbe il legame con le altre app. Cambiando cognome il codice resta quello. */
+function siglaPulisci(x){
+  let t = String(x == null ? "" : x);
+  try { t = t.normalize("NFD").replace(/[\u0300-\u036f]/g, ""); } catch (e){}
+  return t.toUpperCase().replace(/[^A-Z]/g, "");
+}
+/* il cognome: prima quello vero dell'anagrafica, poi la prima parola di «COGNOME NOME» */
+function siglaCognome(dp){
+  const c = (dp && dp.ana && dp.ana.cognome) ? String(dp.ana.cognome) : "";
+  if (siglaPulisci(c)) return c;
+  const n = String((dp && dp.nome) || "").trim();
+  return n ? n.split(/\s+/)[0] : "";
+}
+function siglaBase(dp){ return siglaPulisci(siglaCognome(dp)).slice(0, 3); }
+function siglaDi(dp){ return String((dp && dp.sigla) || "").trim().toUpperCase(); }
+/* Propone i codici a chi non ce l'ha. Non tocca niente: torna soltanto le tre liste.
+   ⚠️ Si lavora in ordine alfabetico, così la cifra progressiva è sempre la stessa a parità di
+   elenco, e i codici già usati (anche quelli assegnati prima) non si ripetono mai. */
+function sigleProposte(state){
+  const dips = ((state && state.dipendenti) || []).slice()
+    .sort(function(a,b){ return String(a.nome||"").localeCompare(String(b.nome||"")); });
+  const usate = {};
+  dips.forEach(function(d){ const s = siglaDi(d); if (s) usate[s] = 1; });
+  const nuove = [], gia = [], senza = [];
+  dips.forEach(function(d){
+    const s0 = siglaDi(d);
+    if (s0){ gia.push({ id:d.id, nome:d.nome, sigla:s0 }); return; }
+    const b = siglaBase(d);
+    if (!b){ senza.push({ id:d.id, nome:d.nome || "(senza nome)" }); return; }
+    let n = 1, s = b + n;
+    while (usate[s] && n < 999){ n++; s = b + n; }
+    usate[s] = 1;
+    nuove.push({ id:d.id, nome:d.nome, sigla:s });
+  });
+  return { nuove:nuove, gia:gia, senza:senza };
+}
+/* due persone con lo STESSO codice non devono esistere: serve a dirlo, non a correggerlo */
+function sigleDoppie(state){
+  const per = {};
+  ((state && state.dipendenti) || []).forEach(function(d){
+    const s = siglaDi(d); if (!s) return;
+    if (!per[s]) per[s] = []; per[s].push(d.nome || "(senza nome)");
+  });
+  const out = {}; Object.keys(per).forEach(function(s){ if (per[s].length > 1) out[s] = per[s]; });
+  return out;
 }
 function dipSorted(state){
   const arr = state.dipendenti.slice();
@@ -2776,7 +2833,7 @@ const ANA_SECTIONS = [
   { t:"Dati anagrafici", f:[["cognome","Cognome"],["nome","Nome"],["luogoNascita","Luogo di nascita"],["dataNascita","Data di nascita (gg/mm/aaaa)","date"],["sesso","Sesso","sex"],["cf","Codice fiscale","cf"],["email","Email"]] },
   { t:"Residenza", f:[["indRes","Indirizzo residenza"],["capRes","CAP"],["luogoRes","Comune"]] },
   { t:"Domicilio", f:[["indDom","Indirizzo domicilio"],["capDom","CAP"],["luogoDom","Comune"]] },
-  { t:"Contratto", f:[["dataContratto","Data contratto","date"],["dataAssunzione","Data avvio / assunzione","date"],["scadenza","Data conclusione / scadenza","date"],["cessazione","Data cessazione","cess"],["tipoContratto","Tipo contratto","tipo"],["partFull","Part / Full time","list:partFull"],["orizz","Orizzontale / Verticale / Misto","list:orizz"],["qualifica","Ruolo / qualifica","qual"],["livello","Livello di inquadramento"],["educatore","Educatore (E.A.R.)","sino"],["scattiAss","Scatti riconosciuti all'assunzione"],["__scattoDec","Prossimo scatto — decorrenza (automatica)","roauto:scattoDec"],["__scattoN","Scatti maturati a oggi (automatico)","roauto:scattoN"]] },
+  { t:"Contratto", f:[["dataContratto","Data contratto","date"],["dataAssunzione","Data avvio / assunzione","date"],["scadenza","Data conclusione / scadenza","date"],["cessazione","Data cessazione","cess"],["tipoContratto","Tipo contratto","tipo"],["partFull","Part / Full time","list:partFull"],["orizz","Orizzontale / Verticale / Misto","list:orizz"],["qualifica","Ruolo / qualifica","qual"],["livello","Livello di inquadramento"],["educatore","Educatore (E.A.R.)","sino"],["scattiAss","Scatti riconosciuti all'assunzione"],["__scattoDec","Prossimo scatto — decorrenza (automatica)","roauto:scattoDec"],["__scattoN","Scatti maturati a oggi (automatico)","roauto:scattoN"],["__sigla","Codice operatore (automatico)","roauto:sigla"]] },
   { t:"Luogo di lavoro", f:[["luogo","Luogo di lavoro","luogo"],["specificaStruttura","Specifica struttura (nome istituto/centro…)"],["ubicazione","Ubicazione / indirizzo"]] },
   { t:"Orario", f:[["oreSett","Monte ore settimanali"],["giorniLav","Giorni di lavoro nella settimana","list:giorniLav"],["periodo","Periodo di lavoro nell'anno","list:periodo"],["giorniProva","Giorni di prova"]] },
   { t:"Orari settimanali (per la tabella del contratto)", f:[["orarioLun","Lunedì"],["orarioMar","Martedì"],["orarioMer","Mercoledì"],["orarioGio","Giovedì"],["orarioVen","Venerdì"],["orarioSab","Sabato"]] },
@@ -5578,6 +5635,13 @@ function Anagrafica(props){
       <div style={{ display:"flex", gap:"8px", alignItems:"center", flexWrap:"wrap", marginBottom:"10px" }}>
         <span style={{ fontSize:"11px", fontWeight:800, color:"#64748b", textTransform:"uppercase", letterSpacing:".4px" }}>Azioni su tutti:</span>
         <button className="btn btn-gray" onClick={function(){ setMtOpen(!mtOpen); setMsg(""); }} title="Imposta la mensilizzazione su piu' persone in una sola volta">📅 Mensilizza tutti dal mese…</button>
+        {/* ver157 (TR-03): il codice operatore, assegnato a chi non ce l'ha. */}
+        <button className="btn btn-gray" title="Assegna il codice operatore (3 lettere del cognome + una cifra) a chi non ce l'ha ancora" onClick={function(){
+          const r = props.onSigle ? props.onSigle() : null;
+          if (r && r.n) setMsg("🔖 Codice assegnato a " + r.n + (r.n===1?" persona":" persone") + ". Premi 💾 per salvare.");
+        }}>🔖 Assegna i codici mancanti</button>
+        {/* ver158 (TR-03): l'aggancio all'account di Fogli ore, fatto una volta sola. */}
+        <button className="btn btn-gray" title="Collega una volta per tutte ogni persona al suo account di Fogli ore: da li' in poi il legame non dipende piu' dal nome" onClick={function(){ if (props.onAgganciaFO) props.onAgganciaFO(function(t){ setMsg(t); }); }}>🔗 Aggancia gli account di Fogli ore</button>
       </div>
       {mtOpen ?
         <div style={{ background:"#ecfdf5", border:"2px solid #6ee7b7", borderRadius:"10px", padding:"12px 14px", marginBottom:"12px" }}>
@@ -5672,17 +5736,19 @@ function Anagrafica(props){
                       ? scattiStoria(state, dp, (costoPar(dp).scattiPrec != null && String(costoPar(dp).scattiPrec).trim()!=="") ? costoPar(dp).scattiPrec : null,
                                      (anaVal(dp,"scattiAss")!=="" ? anaVal(dp,"scattiAss") : (costoPar(dp).scattiAss != null ? costoPar(dp).scattiAss : null)))
                       : null;
-                    const val = which==="proroTermine" ? lastProroga(dp) : which==="proroAvvio" ? proroAvvioAuto(dp) : which==="trasfAvvio" ? trasfAvvioAuto(dp)
+                    const val = which==="sigla" ? (siglaDi(dp) || "") : which==="proroTermine" ? lastProroga(dp) : which==="proroAvvio" ? proroAvvioAuto(dp) : which==="trasfAvvio" ? trasfAvvioAuto(dp)
                       /* ⚠️ senza la data di assunzione il conto partirebbe dal primo mese dei
                          dati e darebbe una data inventata: meglio non mostrare niente. */
                       : which==="scattoDec" ? ((!sst.senzaAssunzione && sst.prossimo) ? ("01/" + String(sst.prossimo.m).padStart(2,"0") + "/" + sst.prossimo.y + "  (il " + String(sst.prossimo.n) + "°)") : "")
                       : which==="scattoN" ? (sst.senzaAssunzione ? "" : String(sst.nOggi))
                       : "";
-                    const ph = which==="trasfAvvio" ? "(nessuna trasformazione)"
+                    const ph = which==="sigla" ? "(non ancora assegnato)"
+                      : which==="trasfAvvio" ? "(nessuna trasformazione)"
                       : which==="scattoDec" ? (sst.senzaAssunzione ? "(serve la data di assunzione)" : (sst.nOggi>=SCATTI_MAX ? ("(ha già il massimo: " + SCATTI_MAX + ")") : "(non calcolabile)"))
                       : which==="scattoN" ? "(serve la data di assunzione)"
                       : "(nessuna proroga)";
-                    const tip = which==="proroAvvio" ? "Automatica: giorno dopo la scadenza precedente. La data che conta si registra in fondo alla scheda, riquadro Trasformaz./proroghe."
+                    const tip = which==="sigla" ? "Il codice con cui le altre app riconoscono questa persona: 3 lettere del cognome piu' una cifra. Si assegna dal pulsante «Assegna i codici mancanti» in cima alla schermata, e poi non cambia piu'."
+                              : which==="proroAvvio" ? "Automatica: giorno dopo la scadenza precedente. La data che conta si registra in fondo alla scheda, riquadro Trasformaz./proroghe."
                               : which==="trasfAvvio" ? "Automatica: decorrenza dell'ultima trasformazione registrata in fondo alla scheda, riquadro Trasformaz./proroghe."
                               : which==="scattoDec" ? "Automatica: 24 mesi utili dall'assunzione (dal mese successivo se assunto dopo il giorno 1); un mese tutto AN non e' utile e fa slittare. Massimo 5 scatti. L'importo lo prende il Costo orario dalla tabella del livello in quel momento."
                               : which==="scattoN" ? "Automatico: quanti scatti risultano maturati a oggi, compresi quelli riconosciuti all'assunzione."
@@ -6661,6 +6727,13 @@ function foLeggiMese(db, cache, y, m){
       });
       const perNome = {};
       Object.keys(perUid).forEach(function(u){ perNome[foChiave(utenti[u])] = foAggregaMese(perUid[u]); });   /* ver149 (punto 8): la chiave ignora accenti e apostrofo finale */
+      /* ver158 (TR-03): lo stesso aggregato tenuto anche per UID dell'account. Chi ha
+         l'account agganciato in scheda non passa piu' dal nome, quindi gli omonimi e le
+         scritture diverse non lo toccano. ⚠ `perNome` resta identico: nessuno dei conti di
+         prima cambia. */
+      const perUidAgg = {};
+      Object.keys(perUid).forEach(function(u){ perUidAgg[u] = foAggregaMese(perUid[u]); });
+      perNome.__perUid = perUidAgg;
       /* ver150 (punto 1): se due account di Fogli ore hanno lo stesso nome, l'aggregato di
          uno ha appena sovrascritto quello dell'altro. Quel numero sarebbe una bugia: si
          TOGLIE, e la chiave finisce in `__ambigue` perche' la scheda lo possa dire. */
@@ -6792,6 +6865,80 @@ function App(){
     if (!dp.ana) dp.ana = {};
     Object.keys(patch).forEach(function(k){ if (ANA_SHARED[k]) dp[k]=patch[k]; else dp.ana[k]=patch[k]; });
     touch(next);
+  };
+  /* ver157 (TR-03): assegna il CODICE OPERATORE a chi non ce l'ha. Chiede conferma elencando
+     chi riceve che cosa, e poi serve il 💾: niente viene scritto da solo (§10.1). */
+  /* ver158 (TR-03): aggancia UNA VOLTA l'account di Fogli ore di ciascuno. L'abbinamento si
+     fa col NOME, come si e' sempre fatto, ma poi si CONGELA nell'`foUid` della scheda: da li'
+     in poi il nome puo' cambiare, avere accenti diversi o essere uguale a quello di un
+     collega, e il residuo continua ad andare alla persona giusta.
+     ⚠ `users` resta in SOLA LETTURA: qui non si scrive niente nei dati degli esterni, il
+     legame sta nella scheda di QUESTA app (scelta di Christian dell'11/11/2026).
+     ⚠ Chiede conferma e poi serve il 💾 (§10.1). */
+  const onAgganciaFO = function(done){
+    if (!FB_READY || !dbRef.current){ window.alert("Serve il collegamento al database: questa funzione non lavora in modalità locale."); return; }
+    showToast("Lettura degli operatori di Fogli ore in corso…");
+    foLeggiUtenti(dbRef.current, foCacheRef.current).then(function(utenti){
+      const perNome = {}; Object.keys(utenti).forEach(function(uid){ perNome[foChiave(utenti[uid])] = uid; });
+      const ambFo = foOmonimiUtenti(utenti), ambDip = dipOmonimi(state);
+      const nuovi = [], gia = [], senza = [], ambigui = [];
+      dipSorted(state).forEach(function(dp){
+        if (dp.foUid){ gia.push(dp.nome + "  \u2192  " + (utenti[dp.foUid] || "(account non piu' in elenco)")); return; }
+        const k = foChiave(dp.nome);
+        if (ambFo[k] || ambDip[k]){ ambigui.push(dp.nome + (ambFo[k] ? (" \u2014 " + ambFo[k].length + " account con questo nome") : "") + (ambDip[k] ? (" \u2014 " + ambDip[k].length + " schede con questo nome") : "")); return; }
+        const uid = perNome[k];
+        if (!uid){ senza.push(dp.nome); return; }
+        nuovi.push({ id:dp.id, nome:dp.nome, uid:uid, acc:utenti[uid] });
+      });
+      if (!nuovi.length){
+        window.alert("Non c'\u00e8 nessun account nuovo da agganciare."
+          + (gia.length ? ("\n\nGi\u00e0 agganciati: " + gia.length) : "")
+          + (senza.length ? ("\n\nSenza un account con lo stesso nome in Fogli ore:\n\u00b7 " + senza.join("\n\u00b7 ")) : "")
+          + (ambigui.length ? ("\n\nNON agganciabili perch\u00e9 il nome \u00e8 di due persone:\n\u00b7 " + ambigui.join("\n\u00b7 ") + "\n\nDistingui i nomi nelle due anagrafiche e riprova.") : ""));
+        return;
+      }
+      const righe = nuovi.map(function(x){ return x.nome + "  \u2192  " + x.acc; });
+      if (!window.confirm("Aggancio l'account di Fogli ore a " + nuovi.length + (nuovi.length===1?" persona":" persone")
+        + ":\n\n" + righe.join("\n")
+        + (senza.length ? ("\n\nRestano senza account (nessuno con lo stesso nome in Fogli ore):\n\u00b7 " + senza.join("\n\u00b7 ")) : "")
+        + (ambigui.length ? ("\n\nNON agganciate perch\u00e9 il nome \u00e8 di due persone:\n\u00b7 " + ambigui.join("\n\u00b7 ")) : "")
+        + "\n\nDa qui in avanti il collegamento NON dipende pi\u00f9 dal nome: anche cambiandolo, le ore e il residuo restano della persona giusta.\n\nIn Fogli ore non viene scritto niente. Dopo, premi 💾 Salva.")) return;
+      const next = JSON.parse(JSON.stringify(state));
+      const perId = {}; nuovi.forEach(function(x){ perId[x.id] = x.uid; });
+      (next.dipendenti || []).forEach(function(d){ if (perId[d.id]) d.foUid = perId[d.id]; });
+      touch(next);
+      const testo = "🔗 Account agganciato a " + nuovi.length + (nuovi.length===1?" persona":" persone") + ". Premi 💾 per salvare.";
+      showToast(testo);
+      /* ⚠ il toast sparisce da se': il messaggio resta anche nella schermata, come per i codici */
+      if (typeof done === "function") done(testo);
+    }).catch(function(e){ console.error(e); window.alert("Non sono riuscito a leggere gli operatori di Fogli ore: riprova quando torna la linea."); });
+  };
+  const onSigle = function(){
+    const p = sigleProposte(state);
+    /* ver157: due persone con lo STESSO codice non possono nascere da qui, ma possono arrivare
+       da un backup rimesso o da una modifica a mano: se succede si dice, perche' un codice
+       doppio manderebbe le ore alla persona sbagliata nelle altre app. */
+    const dop = sigleDoppie(state);
+    const kDop = Object.keys(dop);
+    if (kDop.length) window.alert("ATTENZIONE: questo codice \u00e8 di pi\u00f9 di una persona:\n\n"
+      + kDop.map(function(k){ return k + ": " + dop[k].join(" \u00b7 "); }).join("\n")
+      + "\n\nFinch\u00e9 resta cos\u00ec, nelle altre app le ore potrebbero andare alla persona sbagliata. Correggi i dati e riprova.");
+    if (!p.nuove.length){
+      window.alert(p.senza.length
+        ? ("Tutte le persone con un cognome hanno gi\u00e0 il loro codice.\n\nSenza codice restano queste, perch\u00e9 non hanno un cognome scritto:\n\u00b7 " + p.senza.map(function(x){ return x.nome; }).join("\n\u00b7 ") + "\n\nScrivi il cognome in ANAGRAFICA e riprova.")
+        : "Hanno gi\u00e0 tutti il loro codice: non c'\u00e8 niente da assegnare.");
+      return null;
+    }
+    const righe = p.nuove.map(function(x){ return x.nome + "  \u2192  " + x.sigla; });
+    const coda = p.senza.length ? ("\n\nRestano SENZA codice (manca il cognome):\n\u00b7 " + p.senza.map(function(x){ return x.nome; }).join("\n\u00b7 ")) : "";
+    if (!window.confirm("Assegno il codice a " + p.nuove.length + (p.nuove.length===1?" persona":" persone") +
+      ":\n\n" + righe.join("\n") + coda +
+      "\n\nIl codice \u00e8 fatto dalle prime 3 lettere del cognome pi\u00f9 una cifra, e NON cambia pi\u00f9: serve alle altre app per riconoscere la persona anche se il nome viene scritto in modo diverso.\n\nChi un codice ce l'ha gi\u00e0 NON viene toccato. Dopo, premi 💾 Salva.")) return null;
+    const next = JSON.parse(JSON.stringify(state));
+    const perId = {}; p.nuove.forEach(function(x){ perId[x.id] = x.sigla; });
+    (next.dipendenti || []).forEach(function(d){ if (perId[d.id]) d.sigla = perId[d.id]; });
+    touch(next);
+    return { n: p.nuove.length };
   };
   const onMensTutti = function(ids, mese, anno){                                   // mensilizzazione su piu' persone, con conferma esplicita
     const mm=parseInt(mese,10), yy=parseInt(anno,10);
@@ -7181,7 +7328,7 @@ function App(){
         return;
       }
       const usate = consumoTetto(state, dp, anno, mese);
-      righe.push({ nome:dp.nome, periodo:(dp.tettoPeriodo==="civile"?"civile":"scolastico"),
+      righe.push({ nome:dp.nome, foUid:(dp.foUid||""),   /* ver158 (TR-03) */ periodo:(dp.tettoPeriodo==="civile"?"civile":"scolastico"),
                    annoRif: tettoStartYear(dp, anno, mese),
                    tetto:R2(tetto,3), usate:R2(usate,3), restano:R2(tetto-usate,3) });
     });
@@ -7197,6 +7344,9 @@ function App(){
       const ambiguo = function(nm){ const k = foChiave(nm); return !!(ambFo[k] || ambDip[k]); };
       const daScrivere = [], senzaAccount = [], omonimi = [];
       righe.forEach(function(r){
+        /* ver158 (TR-03): chi ha l'account AGGANCIATO non passa dal nome, quindi l'omonimia
+           non lo riguarda: si scrive diritti sul suo documento. */
+        if (r.foUid && utenti[r.foUid]){ daScrivere.push(Object.assign({ uid:r.foUid }, r)); return; }
         if (ambiguo(r.nome)){
           const k = foChiave(r.nome);
           omonimi.push(r.nome + (ambFo[k] ? (" \u2014 " + ambFo[k].length + " account in Fogli ore") : "") +
@@ -7208,7 +7358,10 @@ function App(){
       });
       /* ver149 (punto 6): chi non ha più nessun massimale, e ha un account, va ripulito */
       const uidSenzaTetto = {};
-      senzaTetto.forEach(function(nm){ if (ambiguo(nm)) return; const u = perNome[foChiave(nm)]; if (u) uidSenzaTetto[u] = nm; });
+      const foUidDi = {}; (state.dipendenti||[]).forEach(function(d){ if (d && d.foUid) foUidDi[d.nome] = d.foUid; });   /* ver158 */
+      senzaTetto.forEach(function(nm){ const ag = foUidDi[nm];
+        if (ag && utenti[ag]){ uidSenzaTetto[ag] = nm; return; }                                   /* ver158: agganciato */
+        if (ambiguo(nm)) return; const u = perNome[foChiave(nm)]; if (u) uidSenzaTetto[u] = nm; });
       const uidConTetto = {};
       daScrivere.forEach(function(r){ uidConTetto[r.uid] = true; });
       /* leggo la collection `residui` per cancellare SOLO quello che c'e' davvero */
@@ -7366,7 +7519,7 @@ function App(){
 
       <div className="content" style={{ zoom: zoom / 100 }}>
         {vista === "rep" ? <Riepiloghi state={state} anno={anno} /> :
-         vista === "ana" ? <Anagrafica key={"ana-"+(anaSel||"")} selInit={anaSel} onDipPatch={onDipPatch} onMensTutti={onMensTutti} state={state} onAnaField={onAnaField} onAnaSet={onAnaSet} onCessCleanup={onCessCleanup} onTemplateChanged={onTemplateChanged} onImportAna={onImportAna} onExportAna={onExportAna} onAddDip={addDipDiretto} onEditDip={apriScheda} onSave={doSave} dirty={dirty} /> :
+         vista === "ana" ? <Anagrafica key={"ana-"+(anaSel||"")} selInit={anaSel} onDipPatch={onDipPatch} onMensTutti={onMensTutti} onSigle={onSigle} onAgganciaFO={onAgganciaFO} state={state} onAnaField={onAnaField} onAnaSet={onAnaSet} onCessCleanup={onCessCleanup} onTemplateChanged={onTemplateChanged} onImportAna={onImportAna} onExportAna={onExportAna} onAddDip={addDipDiretto} onEditDip={apriScheda} onSave={doSave} dirty={dirty} /> :
          vista === "costo" ? <CostoOrario state={state} anno={anno} onCostoPatch={onCostoPatch} onCostoPatchMulti={onCostoPatchMulti} onCostoComune={onCostoComune} onCCNLAdd={onCCNLAdd} onCCNLDel={onCCNLDel} onSave={doSave} dirty={dirty} /> :
          vista === "query" ? <QueryPanel state={state} /> :
           <div>
@@ -7413,11 +7566,16 @@ function App(){
                 const ferieApr = (mese===4) ? { year:anno-1, mat:ferieMaturato(state,dp,anno-1), god:ferieGodute(state,dp,anno-1), res:ferieResiduo(state,dp,anno-1), noData:!annoHasData(state,anno-1) } : null;
                 /* ver150 (punto 1): due persone con lo stesso nome. Il confronto si SOSPENDE,
                    perche' mostrerebbe le ore di una sola persona come se fossero di questa. */
-                const foOmon = (function(){ try { const k = foChiave(dp.nome);
+                /* ver158 (TR-03): se la persona ha l'account di Fogli ore AGGANCIATO in
+                   scheda, il nome non conta piu': niente ambiguita' da omonimia. */
+                const foLeg = (dp && dp.foUid && foPerNome && foPerNome.__perUid) ? (foPerNome.__perUid[dp.foUid] || null) : null;
+                const foOmon = (function(){ if (dp && dp.foUid) return null; try { const k = foChiave(dp.nome);
                   const a = (foPerNome && foPerNome.__ambigue) ? foPerNome.__ambigue[k] : null;
                   const b = dipAmb[k] || null;
                   return (a || b) ? { fo:(a || null), dip:(b || null) } : null; } catch (e){ return null; } })();
-                const foDiff = (function(){ try { if (foOmon) return null; if (!foPerNome) return null; const agg = foPerNome[foChiave(dp.nome)];   /* ver149 (punto 8) */ return agg ? foConfronta(recDp, anno, mese, agg) : null; } catch (e){ console.error("confronto Fogli ore", e); return null; } })();
+                const foDiff = (function(){ try { if (foOmon) return null; if (!foPerNome) return null;
+                  const agg = foLeg || foPerNome[foChiave(dp.nome)];   /* ver158: prima l'account agganciato, poi il nome (ver149 punto 8) */
+                  return agg ? foConfronta(recDp, anno, mese, agg) : null; } catch (e){ console.error("confronto Fogli ore", e); return null; } })();
                 return <EmployeeCard key={dp.id} dp={dp} rec={recDp} fuoriPeriodo={fuoriPeriodo} anno={anno} mese={mese} fset={fset} mLocked={mLocked}
                   dipList={dipList} onCell={onCell} onEro={onEro} onNota={onNota} onFestConfirm={onFestConfirm} onQuickFill={onQuickFill}
                   onSvuotaRosso={onSvuotaRosso}   /* ver155 */

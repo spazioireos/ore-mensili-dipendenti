@@ -8,7 +8,8 @@ Banca ore, tetto annuo, contratti e export.
   Accesso mail+password, **solo l'admin** `spazioireos@gmail.com`.
 - ⚠️ **TRAPPOLA GIÀ COSTATA UN ERRORE**: nel documento i campi (`dipendenti`, `dati`, …) stanno
   al **PRIMO LIVELLO**, NON dentro un campo `state`. Leggere `snap.data()`, non `snap.data().state`.
-- **Struttura dati**: `dipendenti[]` = `{id, nome "COGNOME NOME", …}`;
+- **Struttura dati**: `dipendenti[]` = `{id, nome "COGNOME NOME", sigla "ROS1" (ver157),
+  foUid "<uid dell'account di Fogli ore>" (ver158), …}`;
   `dati["YYYY-MM"][dipId].giorni` = mappa giorno → ore **oppure** STRINGA-codice
   (assenza, vale 0 ore; codici in `CODICI`/`CODE_SET`). Totale mese = `totOfRec(rec,y,m)`.
   ⚠️ **Le ore non sono sempre un numero** (verificato sul backup del 04/11 col collaudo del
@@ -18,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver156 · 11nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver158 · 11nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -397,6 +398,98 @@ Banca ore, tetto annuo, contratti e export.
     «— ore» e «non calcolabile»; la stessa persona su «Teoriche» → 18,67 €/h; e il **foglio Excel
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
+
+- 🔗 **IL CODICE OPERATORE: LE APP NON SI PARLANO PIÙ SOLO COL NOME** (ver157 e ver158,
+  11/11/2026, richiesta di Christian dopo la riconciliazione delle urgenze — **TR-03**: «ok
+  codice condiviso che crei tu di max 4 caratteri 3 dei quali contengono le prime lettere del
+  cognome», e alle due domande di progetto: **«cifra progressiva»** e **«resta solo in
+  Dipendenti»**).
+  - 🔴 **Il problema, vecchio quanto il gestionale**: l'unico identificativo che attraversava il
+    confine fra le app era il **NOME**, scritto a mano in **due anagrafiche diverse**. Un accento,
+    un apostrofo o due omonimi bastavano a far finire le ore e i residui alla persona sbagliata,
+    o a non farli arrivare. Le ver149, ver150, ver130 e ver132 lo avevano reso **tollerante** e
+    **non silenzioso**, mai **sicuro**.
+  - 🔖 **ver157 — il CODICE.** Campo nuovo **`dp.sigla`**: **3 lettere del cognome + una cifra**
+    (`ROS1`, `ROS2`, `BIA1`). Il cognome viene da **ANAGRAFICA → Cognome** e, se è vuoto, dalla
+    prima parola di «COGNOME NOME»; accenti e apostrofi vengono tolti con **NFD**.
+    - Funzioni nuove, accanto a `dipSorted`: **`siglaPulisci`**, **`siglaCognome`**,
+      **`siglaBase`**, **`siglaDi`**, **`sigleProposte(state)`** e **`sigleDoppie(state)`**.
+    - **Pulsante «🔖 Assegna i codici mancanti»** nella riga *Azioni su tutti* dell'ANAGRAFICA:
+      elenca chi riceve che cosa, chiede conferma e **poi serve il 💾** (§10.1: niente si scrive
+      da solo). ⚠️ **Dicitura nuova, scritta da Claude.**
+    - **In scheda** la casella *Codice operatore (automatico)* è **grigia e di sola lettura**
+      (`roauto:sigla`), come le date automatiche della ver69: il codice **non si scrive a mano**.
+      ⚠️ Non entra nell'**export Excel**, come gli altri campi `roauto:` tranne i due storici: le
+      50 colonne restano quelle.
+    - 🔑 **Un codice già assegnato NON viene MAI ricalcolato**: è un identificativo. Cambiando
+      cognome il codice resta quello, altrimenti si romperebbe il legame con le altre app.
+      **Verificato**: con un `XYZ9` scritto nei dati, il pulsante non lo tocca.
+    - ⚠️ **Chi non ha il cognome resta senza codice**, e la conferma lo dice per nome.
+    - ⚠️ **`sigleDoppie(state)`** avvisa se due persone hanno lo **stesso** codice: da qui non può
+      succedere, ma può arrivare da un backup rimesso o da una modifica a mano, e un codice
+      doppio manderebbe le ore alla persona sbagliata nelle altre app.
+    - ⚠️ L'ordine è **alfabetico**, così la cifra è sempre la stessa a parità di elenco, e i
+      codici già usati non si ripetono: **ROSSETTI → ROS1, ROSSI → ROS2** (misurato).
+  - 🔗 **ver158 — l'AGGANCIO all'account di Fogli ore.** Campo nuovo **`dp.foUid`**: l'account
+    dell'operatore in Fogli ore, trovato **una volta** col nome — come si è sempre fatto — e poi
+    **congelato**. Da lì in avanti il legame **non dipende più dal nome**.
+    - **Pulsante «🔗 Aggancia gli account di Fogli ore»**, accanto all'altro: legge `users`,
+      propone gli abbinamenti, elenca chi resta fuori e **perché** (nessun account con quel nome,
+      oppure nome di due persone), chiede conferma, **poi serve il 💾**.
+      ⚠️ **Dicitura nuova, scritta da Claude.**
+    - 🔴 **In Fogli ore NON si scrive NIENTE**: è la scelta di Christian («resta solo in
+      Dipendenti»). `users` e `timesheets` restano in **sola lettura**, e il divieto storico
+      «non scrivere MAI lì» **resta in piedi**. **Verificato in esecuzione: zero scritture.**
+    - **Dove si usa**: `foLeggiMese` tiene ora gli aggregati **anche per uid**
+      (`perNome.__perUid`), e la scheda del mese usa **prima** l'account agganciato e **poi** il
+      nome; `pubblicaResidui` scrive diritto sul documento di chi è agganciato, **saltando il
+      controllo degli omonimi**, che per lui non ha più senso. ⚠️ **`perNome` non è cambiato**:
+      chi non è agganciato si comporta esattamente come prima.
+    - ⚠️ **Chi ha un nome ambiguo NON viene agganciato**: l'app non può indovinare quale dei due
+      account sia il suo. Prima si distinguono i nomi, poi si riaggancia.
+  - 🚦 **Che cosa risolve e che cosa no, detto chiaro**: su **Dipendenti ↔ Fogli ore** il problema
+    è **chiuso** (il legame è un uid, unico per costruzione). Su **Dipendenti → USOINT** il
+    codice rende stabile l'abbinamento anche se il nome cambia, ma **due omonimi dentro USOINT
+    restano indistinguibili**, perché lì gli operatori non hanno un'anagrafica: sono i nomi
+    scritti nelle righe del budget. Lì resta l'avviso della ver132.
+  - **Provato in esecuzione** (`ver157.cjs` **28 su 28**, `ver158.cjs` **19 su 19**, zero errori
+    di pagina): la casella grigia col suo segnaposto e il suo suggerimento; `BIA1` · `FER1`
+    (l'accento tolto) · `ROS1`/`ROS2`; chi non ha cognome resta senza e la conferma lo dice;
+    rispondendo **no** l'archivio non cambia; **prima del 💾 l'archivio non cambia**; ripremendo
+    dice che ce l'hanno già tutti e i codici **non** si muovono; l'aggancio che elenca gli
+    account, non scrive niente in Fogli ore e si congela col 💾; e la prova che conta:
+    **rinominando l'operatore in Fogli ore** (tutti e tre i campi `cognome`, `nome` e `name`), il
+    confronto del mese **sparisce senza il legame** e **regge con il legame**, con le ore vere
+    (23,00 h).
+  - 🔢 **Il numero di schema del backup NON è stato toccato** (resta `version: 4`): `sigla` e
+    `foUid` sono **due campi facoltativi in più** dentro `dipendenti[]`. Un backup vecchio letto
+    da questa versione semplicemente non ha i codici e si comporta come prima; un backup nuovo
+    letto da una versione vecchia li ignora. Non c'è nessuna incompatibilità da segnalare.
+  - **Batteria rieseguita sulle ver157/ver158, ZERO falliti nuovi**: `sc-dip-A` **38/3** ·
+    `sc-dip-B` **32/2** · `sc-dip-C` **107/0** · `sc-dip-D` **11/0** · `ver144` **14/0** ·
+    `ver145` **7/0** · `ver146` **27/1** · `ver147` **26/1** · `ver149` **29/0** · `ver150`
+    **31/0** · `ver151` **27/0** · `ver152` **23/0** · `ver153` **41/0** · `ver154` **41/0** ·
+    `ver155` **18/0** · `ver156` **19/0** · `ver157` **28/0** · `ver158` **24/0** · `nr153`
+    **5/0** · `graf155` **15/0** · `graf155b` **4/0** · `ic-fodip-A` **20/0** · `ic-fodip-B`
+    **21/0**.
+    ⚠️ I «falliti» che restano sono gli **STESSI di sempre**, attese sbagliate dei MIEI script,
+    verificate una per una.
+    ⚠️ **`sc-dip-C` passa ora 107/0 invece di 106/1**: il suo unico fallito storico era un mio
+    **errore di aritmetica** — l'attesa diceva «22 × 6,5 = 143,00», ma il seme **sovrascrive tre
+    di quelle 22 celle** con FERIE, FERIE e MAL, che valgono 0 ore: le celle di ore sono **19**,
+    quindi **19 × 6,5 = 123,50**. **Corretta, non aggirata.**
+  - ⚠️ **Non verificato con Firebase vero**: le prove girano con una finta Firestore.
+  - 🐞 **UNA TRAPPOLA DEL BANCO DI PROVA, non dell'app, che mi è costata un'ora** e che va
+    ricordata: `sc-dip-B` e `sc-dip-C` confrontano la versione di oggi (porta **8200**) con una
+    **copia congelata** di una versione vecchia (porta **8201**). Ricostruendo quella copia avevo
+    dimenticato la riga che il banco mette sempre — **`const FB_READY = false`** — così la
+    versione di confronto si fermava sulla **schermata di accesso** e misurava una pagina vuota:
+    `sc-dip-C` dava **63/44**, con 44 «regressioni» che non esistevano («0 → 12 comandi sotto i
+    32px»). **Misurato dopo averla ricostruita in modalità locale: ver140 e ver158 danno gli
+    stessi identici numeri** (larghezza 1680, 6 scritte piccole, 12 comandi sotto i 32px).
+    ⚠️ **Una copia di confronto che non entra nell'app fa sembrare regressione tutto quello che
+    la versione nuova disegna.** Prima di credere a una regressione di aspetto, guardare che la
+    pagina di confronto sia **davvero dentro l'app**.
 
 - ✅ **COLLAUDO GENERALE DEL 11/11/2026 — DIPENDENTI NON HA ANOMALIE APERTE** (è l'unica delle
   quattro app). **898 controlli superati** fra batteria, interconnessioni, regole Firestore e PDF
@@ -3348,6 +3441,9 @@ Banca ore, tetto annuo, contratti e export.
   **tornano ancora al centesimo** dopo la correzione.
 - **Funzione presente**: confronto non vincolante con l'app "Fogli ore" (SOLA LETTURA delle
   collection `users` e `timesheets` dello stesso progetto Firebase). Non scrivere MAI lì.
+  ⚠️ **Dalla ver158 questo divieto è stato RICONFERMATO da Christian** («resta solo in
+  Dipendenti»): l'aggancio all'account sta in `dp.foUid`, nei dati di QUESTA app, e in Fogli ore
+  non si scrive niente. **Verificato in esecuzione: zero scritture.**
 - **Leggibilità (ver66, 31/10/2026)**: blocco in fondo al `<style>`. Le scritte sotto i 12px
   scritte nell'attributo `style` salgono a 12,5px, i grigi chiari (#94a3b8, #cbd5e1, #9ca3af)
   diventano `#475569`, i pulsanti `.btn` sono alti almeno 40px e la casella in cui scrivi ha un
