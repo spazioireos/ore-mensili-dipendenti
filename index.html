@@ -471,7 +471,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver155";
+const APP_VER = "ver156";
 const APP_DATA = "11nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -1960,6 +1960,34 @@ function esportaPDFMens(state, pairs){
     /* ---- la pagina delle presenze ---- */
     const chunks = []; for (let i=0; i<righe.length; i+=MAXCOL) chunks.push(righe.slice(i, i+MAXCOL));
     const permMese = [];
+    /* ver156 (11/11/2026, Christian: «i report pdf devono stare su una pagina il primo e va bene
+       anche su due quello per l'ufficio paghe»). La griglia delle presenze ha 31 giorni PIU' una
+       riga per ogni voce (ver154): con i caratteri fissi della ver153 non ci stava piu' in una
+       pagina. Qui si calcola la misura che la fa stare, e piu' sotto si VERIFICA con jsPDF vero.
+       ⚠️ La pagina per l'ufficio paghe NON e' toccata: puo' andare su due pagine, l'ha detto lui. */
+    const H_DISP = FONDO - 16;                 /* da startY al fondo utile */
+    const altRiga = function(fs, pad){ return fs * 0.3528 * 1.18 + 2 * pad + 0.25; };
+    const misura = (function(){
+      const nGiorni = daysInMonth(anno, m);
+      const nTot = 1 + (CODICI.filter(function(c){ return c.c!=="--" && c.c!=="AN" &&
+            righe.some(function(r){ return (r.am.cop.perCod[c.c]||0) + (r.am.nonRetr.perCod[c.c]||0) +
+              ((c.c==="FESTNG") ? r.am.festngCelle.gg : 0) > 0; }); }).length) + 2;   /* gg P + voci + AN + R */
+      let nPerm = 0;
+      righe.forEach(function(r){ if (r.rec.permessi) nPerm += Object.keys(r.rec.permessi).length; });
+      nPerm = Math.min(nPerm, nGiorni);
+      let fs = 8.5, pad = 0.8, hPerm = 10.5;
+      for (let i = 0; i < 40; i++){
+        const hG = altRiga(fs + 2.5, pad);                 /* le celle «P» sono piu' grandi */
+        const hT = altRiga(fs + 0.5, pad);
+        const serve = (nGiorni - nPerm) * hG + nPerm * Math.max(hG, hPerm) + nTot * hT + altRiga(6.5, pad);
+        if (serve <= H_DISP) break;
+        if (pad > 0.3) pad = Math.round((pad - 0.05) * 100) / 100;
+        else if (hPerm > 7) hPerm = Math.round((hPerm - 0.25) * 100) / 100;
+        else if (fs > 4.5) fs = Math.round((fs - 0.25) * 100) / 100;
+        else break;
+      }
+      return { fs:fs, pad:pad, hPerm:hPerm, nGiorni:nGiorni, nTot:nTot };
+    })();
     const colW = Math.round((269 / (2 + Math.min(righe.length, MAXCOL))) * 100) / 100;
     chunks.forEach(function(chunk, ci){
       if (ci > 0) doc.addPage();
@@ -2004,10 +2032,12 @@ function esportaPDFMens(state, pairs){
       });
       const nTot = totRighe.length;
       const lastIdx = chunk.length + 1;
-      doc.autoTable({
+      /* ver156: le opzioni della griglia stanno in una funzione, cosi' si possono
+         PROVARE a varie misure finche' la tabella non sta in UNA pagina sola. */
+      const optG = function(mis){ return {
         head: head, body: body, startY: 16, theme:"grid", margin:{ left:14, right:14, top:16, bottom:8 },
         tableWidth: (2 + chunk.length) * colW,
-        styles:{ fontSize:8.5, cellPadding:0.8, halign:"center", valign:"middle", lineColor:[210,210,210], lineWidth:0.1, overflow:"linebreak", cellWidth:colW, fontStyle:"bold" },
+        styles:{ fontSize:mis.fs, cellPadding:mis.pad, halign:"center", valign:"middle", lineColor:[210,210,210], lineWidth:0.1, overflow:"linebreak", cellWidth:colW, fontStyle:"bold" },
         headStyles:{ fillColor:[15,39,64], textColor:[255,255,255], fontSize:6.5, valign:"middle", fontStyle:"bold", cellWidth:colW },
         columnStyles:(function(){ const cs={ 0:{ halign:"left", fontStyle:"bold", cellWidth:colW } }; cs[lastIdx]={ halign:"left", fontStyle:"bold", cellWidth:colW }; return cs; })(),
         didParseCell: function(data){
@@ -2022,8 +2052,8 @@ function esportaPDFMens(state, pairs){
           if (ri >= nd){                                   /* le righe dei totali in calce */
             data.cell.styles.fontStyle = "bold";
             data.cell.styles.fillColor = (ri === nd) ? [238,242,255] : [245,247,252];
-            if (isDayCol){ data.cell.styles.fontSize = 6.5; data.cell.styles.halign = "left"; }
-            else data.cell.styles.fontSize = 9;
+            if (isDayCol){ data.cell.styles.fontSize = Math.min(6.5, mis.fs); data.cell.styles.halign = "left"; }
+            else data.cell.styles.fontSize = mis.fs + 0.5;
             return;
           }
           const day = ri + 1;
@@ -2031,7 +2061,7 @@ function esportaPDFMens(state, pairs){
             if (isRosso(fset, anno, m, day)){ data.cell.styles.fillColor = [178,34,34]; data.cell.styles.textColor = [255,255,255]; }
           } else {
             const txt = raw.replace(/\*\*\*$/, "");
-            if (txt === "P"){ data.cell.styles.fontSize = 11; data.cell.styles.textColor = [21,101,52]; }
+            if (txt === "P"){ data.cell.styles.fontSize = mis.fs + 2.5; data.cell.styles.textColor = [21,101,52]; }
             else if (txt === "R"){ data.cell.styles.textColor = [178,34,34]; }
             else if (CODE_SET[txt]){
               const hx = CODE_SET[txt].bg.replace("#","");
@@ -2059,7 +2089,34 @@ function esportaPDFMens(state, pairs){
           y += 2.4; doc.text("+ aggiunta", cx, y, { align:"center", baseline:"middle" });
           y += 2.4; doc.text("come sotto ***", cx, y, { align:"center", baseline:"middle" });
         }
-      });
+      }; };
+      /* 🔎 LA PROVA VERA, non una stima: si disegna la tabella su una pagina di scorta,
+         si guarda se jsPDF ne ha aggiunta un'altra, e in quel caso si butta tutto e si
+         rimpicciolisce. ⚠️ Solo se jsPDF offre addPage/deletePage/getNumberOfPages: col
+         finto jsPDF del banco di prova non ci sono, e allora vale la misura calcolata. */
+      let mis = misura;
+      const puoMisurare = (typeof doc.addPage === "function" && typeof doc.deletePage === "function"
+        && typeof doc.setPage === "function" && doc.internal && typeof doc.internal.getNumberOfPages === "function");
+      if (puoMisurare){
+        for (let t = 0; t < 16; t++){
+          const n0 = doc.internal.getNumberOfPages();
+          let sta = true;
+          try {
+            doc.addPage();
+            doc.autoTable(optG(mis));
+            const n1 = doc.internal.getNumberOfPages();
+            sta = (n1 === n0 + 1);
+            for (let pg = n1; pg > n0; pg--) doc.deletePage(pg);
+            doc.setPage(n0);
+          } catch (e){ break; }
+          if (sta) break;
+          if (mis.pad > 0.3) mis = Object.assign({}, mis, { pad: Math.round((mis.pad-0.1)*100)/100 });
+          else if (mis.hPerm > 6.5) mis = Object.assign({}, mis, { hPerm: Math.round((mis.hPerm-0.5)*100)/100 });
+          else if (mis.fs > 4) mis = Object.assign({}, mis, { fs: Math.round((mis.fs-0.3)*100)/100 });
+          else break;
+        }
+      }
+      doc.autoTable(optG(mis));
     });
     /* ---- la pagina per l'ufficio paghe: UNA SOLA tabella ---- */
     doc.addPage();
