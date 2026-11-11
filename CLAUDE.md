@@ -18,7 +18,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver154 · 11nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver155 · 11nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -397,6 +397,48 @@ Banca ore, tetto annuo, contratti e export.
     «— ore» e «non calcolabile»; la stessa persona su «Teoriche» → 18,67 €/h; e il **foglio Excel
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
+
+- 🗑️ **UN VALORE RIMASTO SU UN GIORNO ROSSO SI PUÒ TOGLIERE, E IL GIORNO RESTA BLOCCATO**
+  (ver155, 11/11/2026, punto **1** dell'elenco, risposta di Christian: «**1 togli**» e poi
+  «**procedi con il punto 1 se però poi sarà nuovamente possibile bloccare i gg rossi**»).
+  - 🔴 **Il problema, misurato**: le **7 celle `FESTNG`** dei dati veri stanno **tutte su
+    domenica 7 dicembre 2025** (Sant'Ambrogio caduto di domenica), una per ciascuna di 7 persone.
+    Dalla **ver77** i giorni rossi **non si compilano**, quindi quelle celle **non si potevano né
+    correggere né svuotare dall'app**: erano irraggiungibili. E Christian ha detto che `FESTNG`
+    **non lo scriverà mai**, perché le non godute le conta il **calendario**.
+  - **La soluzione, alla sua condizione**: sotto la cella compare un **🗑 togli**. ⚠️ **NON
+    sblocca niente**: la casella resta `disabled`, il giorno resta rosso e **scrivere resta
+    impossibile, prima e dopo**. Il pulsante **toglie e basta**, e sparisce appena la cella è
+    vuota. **Misurato**: 74 caselle del mese restano bloccate anche dopo.
+  - 🔑 **Compare SOLO su `FESTNG`**, e questa è la parte importante. Prima di decidere sono state
+    **contate le celle con un valore sui giorni rossi di TUTTO l'archivio: 922**, e sono quasi
+    tutte **dati veri** — **695 `--`** (i riposi di domenica), **153 `FEST`**, 34 `MAT-OBB`,
+    17 `MAT-ANT`, più qualche ora scritta prima della ver77. Un 🗑 su tutte sarebbe stato un
+    **invito a cancellare dati buoni**. ⚠️ **Non allargarlo** senza che lo chieda lui.
+  - **Conferma esplicita** (§10.1), che nomina persona, giorno e valore e dice che **il giorno
+    RESTA rosso e NON compilabile**; la cancellazione va **solo in memoria**: serve il **💾**.
+    ⚠️ **Dicitura nuova, scritta da Claude.**
+  - **Funzione nuova `onSvuotaRosso(dipId, d, valore)`** in `App`, passata a `EmployeeCard`;
+    classe CSS nuova `.svuota-rosso` (dentro la griglia densa, dove le misure piccole sono
+    l'eccezione già dichiarata del §10.6).
+  - **Provato in esecuzione** (`ver155.cjs` **18/18**, `graf155.cjs` **15/15**, `graf155b.cjs`
+    **4/4**, zero errori di pagina): le 7 celle ci sono tutte su 2025-12 giorno 7; le caselle
+    sono **disabilitate** e sotto ciascuna — e **solo** sotto quelle — c'è il 🗑; **annullando non
+    cambia niente**; confermando la cella si svuota **a video** ma **l'archivio non cambia finché
+    non si preme 💾**; col 💾 sparisce davvero (7 → 6); il giorno **resta non compilabile** e il
+    🗑 sparisce; in un mese senza `FESTNG` **non c'è nessun 🗑** e le celle feriali restano
+    scrivibili.
+  - ✅ **Grafica misurata**: a 390 · 1280 · 1700px larghezza di pagina, scritte sotto i 12,5px
+    fuori dalle griglie (133) e comandi sotto i 32px (79) **identici**; la **tabella del mese
+    resta 2283px**. In dicembre 2025 la riga dei 7 pulsanti cresce di **17px**, e solo lì.
+  - **Batteria rieseguita sulla ver155, ZERO falliti nuovi**: `sc-dip-A` **38/3** · `sc-dip-B`
+    **32/2** · `sc-dip-C` **106/1** · `sc-dip-D` **11/0** · `ver144` **14/0** · `ver145` **7/0** ·
+    `ver146` **27/1** · `ver147` **26/1** · `ver149` **29/0** · `ver150` **31/0** · `ic-fodip-A`
+    **19/1** · `ic-fodip-B` **20/1/1** · `ver151` **27/0** · `ver152` **23/0** · `ver153` **41/0**
+    · `ver154` **41/0** · `nr153` **5/0**.
+    ⚠️ I «falliti» sono gli **STESSI di sempre**, attese sbagliate dei MIEI script.
+    ⚠️ In `ver154` l'attesa della targhetta era scritta a mano: resa **dinamica** come nelle
+    altre cinque (si confronta con l'`APP_VER` della pagina), così non invecchia più.
 
 - 🧾 **IL REPORT DELLE PAGHE DIVENTA UNA TABELLA SOLA, CON LE ORE VOCE PER VOCE**
   (ver154, 11/11/2026, quattro risposte di Christian nello stesso giorno).
@@ -3179,7 +3221,9 @@ Banca ore, tetto annuo, contratti e export.
   `nonScriv = blocked || rosso` disattiva la casella e il pulsante del permesso orario.
   ⚠️ **Conseguenze accettate da Christian**, dopo averle avute scritte: non si può più registrare
   chi lavora davvero a Natale o di domenica, e **le ore già scritte sui festivi negli anni
-  passati restano visibili ma non più correggibili**. Il colore rosso e il messaggio «Giorno
+  passati restano visibili ma non più correggibili**.
+  ⚠️ **Dalla ver155** un valore rimasto su un giorno rosso si può almeno **TOGLIERE**, ma solo
+  se è un **`FESTNG`**: vedi la scheda 🗑️. La scrittura resta impossibile. Il colore rosso e il messaggio «Giorno
   festivo/domenica — non si compila» restano, `blocked` continua a significare «fuori dal periodo
   di rapporto / mese bloccato» (colore e messaggio diversi).
   In **Compila veloce** la spunta *«Salta i giorni festivi e le domeniche»* è ora **forzata e

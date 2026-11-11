@@ -137,6 +137,12 @@
   .cong-row { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-bottom:6px; }
   /* ver152: la riga del dettaglio delle assenze, sotto il TOT. Usa le pastiglie .cong-chip
      che ci sono gia', cosi' vale anche per lei il minimo di 12,5px del §10.6. */
+  /* ver155: il 🗑 che svuota un valore rimasto su un giorno ROSSO. Sta dentro la griglia
+     densa del mese, dove le misure piccole sono l'eccezione gia' dichiarata del §10.6. */
+  .svuota-rosso { display:block; width:100%; margin-top:2px; font-size:10px; line-height:1.1;
+    padding:1px 0; border:1px solid #b22222; background:#fff1f1; color:#b22222;
+    border-radius:4px; cursor:pointer; font-weight:800; }
+  .svuota-rosso:hover { background:#b22222; color:#fff; }
   .ass-line { display:flex; flex-wrap:wrap; align-items:center; gap:6px; padding:0 14px 6px; }
   /* ⚠️ 12,5px, non 12: fuori dalle griglie dense il §10.6 non ammette niente sotto i 12,5px.
      Con 12px la misura in esecuzione contava 6 scritte piccole in piu' (13 invece di 7). */
@@ -465,7 +471,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver154";
+const APP_VER = "ver155";
 const APP_DATA = "11nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -2435,6 +2441,23 @@ function EmployeeCard(props){
                       onClick={function(){ if(!nonScriv) props.onOpenPerm(dp.id, d); }}
                       onKeyDown={function(e){ if(!nonScriv && (e.key==="Enter"||e.key===" ")){ e.preventDefault(); props.onOpenPerm(dp.id, d); } }}
                       >+{fmt2(perm.ore)} h {perm.tipo}</div> : null}
+                  {/* ver155 (11/11/2026, risposta di Christian: «procedi con il punto 1 se però
+                      poi sarà nuovamente possibile bloccare i gg rossi»). Dalla ver77 i giorni
+                      rossi non si compilano, quindi un valore rimasto dai dati vecchi NON si
+                      poteva più né correggere né togliere. Questo 🗑 lo toglie e BASTA:
+                      ⚠️ non sblocca niente — la casella resta `disabled`, il giorno resta rosso
+                      e scrivere resta impossibile, prima e dopo.
+                      ⚠️ Compare SOLO su «FESTNG», la voce che Christian ha detto che non scriverà
+                      mai (le non godute le conta il calendario) e che dalla ver151 non entra in
+                      nessun calcolo. MISURATO prima di decidere: sui giorni rossi dell'archivio
+                      ci sono 922 celle con un valore, ma sono quasi tutte «--» (695 riposi di
+                      domenica) e «FEST» (153), che sono dati VERI e non vanno toccati. Un 🗑 su
+                      tutte sarebbe stato un invito a cancellarli. Non allargarlo senza che lo
+                      chieda lui.
+                      ⚠️ Scrive solo in memoria: serve il 💾. */}
+                  {(rosso && !blocked && svalC === "FESTNG") ? <button className="svuota-rosso"
+                      title={"Togli «" + svalC + "» da questo giorno rosso. Il giorno resta non compilabile."}
+                      onClick={function(){ props.onSvuotaRosso(dp.id, d, svalC); }}>🗑 togli</button> : null}
                   {isCovAbs ? (function(){
                     const ero = eroOn(rec, d);
                     return <div className={"teor-abs" + (ero ? "" : " no-ero")} role="button" tabIndex={0}
@@ -6837,6 +6860,26 @@ function App(){
       onCancel: function(){ onCell(dipId, d, ""); setConfirm(null); }
     });
   };
+  /* ver155 (11/11/2026). Dalla ver77 i giorni rossi non si compilano: un valore rimasto nei
+     dati VECCHI non era piu' ne' correggibile ne' togliibile. Questo lo toglie, e basta.
+     ⚠️ NON sblocca la scrittura: la casella resta disabilitata prima e dopo, il giorno resta
+     rosso. ⚠️ Conferma esplicita, come vuole il §10.1, e scrittura SOLO in memoria: serve il
+     💾. ⚠️ Dicitura nuova, scritta da Claude. */
+  const onSvuotaRosso = function(dipId, d, valore){
+    const dp = (state.dipendenti || []).filter(function(x){ return x.id === dipId; })[0];
+    setConfirm({
+      title: "Togliere il valore da un giorno rosso?",
+      body: (dp ? dp.nome + " — " : "") + d + " " + MONTH_LABEL[mese-1] + " " + anno +
+            " è un giorno rosso: dalla ver77 non si compila più, quindi quello che c'è scritto "
+            + "è rimasto dai dati vecchi.\n\nIn questa cella c'è: " + valore +
+            "\n\nLo tolgo? Il giorno RESTA rosso e NON compilabile: questo pulsante serve solo a "
+            + "svuotare quello che c'era già, non a sbloccare la scrittura."
+            + "\n\nSi scrive solo in memoria: serve 💾 Salva per registrarlo.",
+      confirmLabel: "Sì, togli",
+      onConfirm: function(){ onCell(dipId, d, ""); setConfirm(null); },
+      onCancel: function(){ setConfirm(null); }
+    });
+  };
   const onQuickFill = function(dp){ setQuickFill(dp); };
   const onQuickFillApply = function(cfg){
     const doFill = function(overwriteAll){
@@ -7320,6 +7363,7 @@ function App(){
                 const foDiff = (function(){ try { if (foOmon) return null; if (!foPerNome) return null; const agg = foPerNome[foChiave(dp.nome)];   /* ver149 (punto 8) */ return agg ? foConfronta(recDp, anno, mese, agg) : null; } catch (e){ console.error("confronto Fogli ore", e); return null; } })();
                 return <EmployeeCard key={dp.id} dp={dp} rec={recDp} fuoriPeriodo={fuoriPeriodo} anno={anno} mese={mese} fset={fset} mLocked={mLocked}
                   dipList={dipList} onCell={onCell} onEro={onEro} onNota={onNota} onFestConfirm={onFestConfirm} onQuickFill={onQuickFill}
+                  onSvuotaRosso={onSvuotaRosso}   /* ver155 */
                   onVoceSet={onVoceSet} onVoceAdd={onVoceAdd} onVoceDel={onVoceDel} ferieApr={ferieApr} fogliOre={foDiff} fogliOreOmon={foOmon}
                   onDich={onDich} onSvuotaMese={onSvuotaMese} saldoPrec={saldoP} bancaPrec={bancaP} tettoConsumo={tettoC} onAzzeraSaldo={onAzzeraSaldo} onAnnullaAzzera={onAnnullaAzzera}
                   onSostAdd={onSostAdd} onSostChange={onSostChange} onSostDel={onSostDel} onOpenPerm={onOpenPerm}
