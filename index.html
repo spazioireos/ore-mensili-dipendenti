@@ -135,6 +135,12 @@
   .cong.over { background:#eef5fc; border-color:#5a9ce2; color:#1e3a8a; }
   .cong-head { font-weight:800; font-size:13px; margin-bottom:6px; }
   .cong-row { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-bottom:6px; }
+  /* ver152: la riga del dettaglio delle assenze, sotto il TOT. Usa le pastiglie .cong-chip
+     che ci sono gia', cosi' vale anche per lei il minimo di 12,5px del §10.6. */
+  .ass-line { display:flex; flex-wrap:wrap; align-items:center; gap:6px; padding:0 14px 6px; }
+  /* ⚠️ 12,5px, non 12: fuori dalle griglie dense il §10.6 non ammette niente sotto i 12,5px.
+     Con 12px la misura in esecuzione contava 6 scritte piccole in piu' (13 invece di 7). */
+  .ass-line .ass-lbl { font-size:12.5px; font-weight:800; color:#1f4e82; }
   .cong-chip { background:#fff; border:1px solid rgba(0,0,0,.15); border-radius:999px; padding:2px 10px; font-size:12px; font-weight:600; }
   .cong-chip b { font-weight:800; font-size:13px; }
   .cong-chip.strong { border-width:2px; border-color:currentColor; }
@@ -459,8 +465,8 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver150";
-const APP_DATA = "10nov26";
+const APP_VER = "ver153";
+const APP_DATA = "11nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
 const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
@@ -484,7 +490,9 @@ const CODICI = [
   { c:"MATR",   l:"Licenza matrimoniale",               pay:true,  bg:"#FEA59C" },
   { c:"CONGP",  l:"Congedo parentale",                  pay:true,  bg:"#EADCF4" },
   { c:"MAL",    l:"Malattia",                           pay:true,  bg:"#F8CBAD" },
-  { c:"MAL 0h", l:"Malattia non pagata",                pay:false, bg:"#763E18" },
+  /* ver151: Christian (11/11/2026): «Mal 0h va tra i retribuiti ... e' la carenza dei primi
+     tre giorni». La DICITURA resta la sua: «mi ricorda che l'INPS non paga». */
+  { c:"MAL 0h", l:"Malattia non pagata",                pay:true,  bg:"#763E18" },
   { c:"MALFG",  l:"Malattia figlio",                    pay:true,  bg:"#800000" },
   { c:"INFOR",  l:"Infortunio",                         pay:true,  bg:"#663300" },
   { c:"RICOV",  l:"Ricovero",                           pay:true,  bg:"#EFE5F7" },
@@ -492,7 +500,7 @@ const CODICI = [
   { c:"MAT-FC", l:"Maternità facoltativa",              pay:true,  bg:"#FF66CC" },
   { c:"MAT-ANT",l:"Maternità anticipata",               pay:true,  bg:"#FF66CC" },
   { c:"ASP 0h", l:"Aspettativa non pagata",             pay:false, bg:"#FF0066" },
-  { c:"CASSA",  l:"Cassa integrazione o simili",        pay:false, bg:"#CC3300" }
+  { c:"CASSA",  l:"Cassa integrazione o simili",        pay:true,  bg:"#CC3300" }   /* ver151: retribuita (Christian) */
 ];
 const CODE_SET = {};
 CODICI.forEach(function(x){ CODE_SET[x.c] = x; });
@@ -730,11 +738,54 @@ const MONTE_MESE_FULLTIME = 165;    // monte ore mensile fisso del full-time (ri
 function monteFissoMese(dp,y,m){ return MONTE_MESE_FULLTIME * oreSettAt(dp,y,m) / SETT_FULLTIME; } // fisso mensile = 165 h a 38 h/sett, riproporzionato
 function quotaGiorno(dp,y,m){ return monteFissoMese(dp,y,m)/26; }           // quota giornaliera allineata al mese = monte ÷ 26
 function mensDalYM(dp){ const v=ymdIt(dp && dp.mensilizzatoDal); return v?Math.floor(v/100):0; } // YM di decorrenza mensilizzazione (0 = da sempre)
+/* ===== ver151 (11/11/2026) — CHE COSA COPRE LE ORE DOVUTE DEL MESE ===========
+   Regole date da Christian l'11/11/2026:
+   - `MAL 0h` e `CASSA` sono assenze RETRIBUITE (la MAL 0h e' «la carenza dei primi tre
+     giorni») -> COPRONO le ore dovute, come ferie e malattia;
+   - `ASP 0h` NON e' retribuita -> NON copre: quel giorno finisce nelle ore in meno, cioe'
+     diventa da se' una TRATTENUTA sul cedolino mensilizzato, ed e' quello che serve;
+   - `FESTNG` e' retribuita MA NON copre: e' un festivo che cade di domenica, quindi
+     «va pagato in piu' rispetto alle ore dovute ordinarie del mese».
+   ⚠️ Fino alla ver150 si contava QUALUNQUE codice tranne `--` e `AN`, quindi `ASP 0h` e
+   `FESTNG` coprivano le ore e il supplementare risultava gonfiato di una quota giornaliera
+   per ogni giorno cosi'. MISURATO sui dati veri prima di toccare: nessuna cella `ASP 0h`,
+   7 celle `FESTNG` (dicembre 2025), 27 `MAL 0h` (fino a settembre 2026) — tutte PRIMA di
+   ottobre 2026, cioe' prima della decorrenza della base mensile. Nessun supplementare gia'
+   visibile cambia: la correzione serve da qui in avanti.
+   ⚠️ Le festivita' NON GODUTE si contano dal CALENDARIO (`contaFestivita`: i festivi che
+   cadono di domenica piu' il 4 novembre sempre), NON dalle celle: Christian non le scrivera'
+   mai nel Tabellone. Il conteggio di quelle scritte a mano serve solo alle 7 celle vecchie. */
+function copreOre(cv){
+  const c = CODE_SET[cv];
+  if (!c) return false;
+  if (cv === "--" || cv === "AN") return false;   /* riposo e giorno non lavorativo: ore non dovute */
+  if (c.pay === false) return false;              /* non retribuita (ASP 0h) */
+  if (cv === "FESTNG") return false;              /* retribuita, ma si paga IN PIU' */
+  return true;
+}
+/* Un solo giro sul mese, e tutti i pezzi che servono: quello che COPRE le ore dovute (anche
+   diviso per voce), quello che NON e' retribuito, le `FESTNG` scritte a mano e i riposi.
+   ⚠️ Le ore NON si arrotondano qui: entrano nei conti a precisione piena, come prima. */
+function assMese(rec,dp,y,m){
+  const q=quotaGiorno(dp,y,m); const nd=daysInMonth(y,m);
+  const out={ cop:{gg:0,ore:0,perCod:{}}, nonRetr:{gg:0,ore:0,perCod:{}},
+              festngCelle:{gg:0,ore:0}, riposi:{gg:0,dom:0}, quota:q };
+  const g=(rec&&rec.giorni)?rec.giorni:{};
+  for(let d=1; d<=nd; d++){
+    const cv=String(g[d]==null?"":g[d]).trim();
+    const dom=(weekdayOf(y,m,d)===0);
+    if(cv==="--" || (cv==="" && dom)){ out.riposi.gg++; if(dom) out.riposi.dom++; continue; }
+    if(!CODE_SET[cv] || cv==="AN") continue;
+    if(cv==="FESTNG"){ out.festngCelle.gg++; continue; }
+    const t = copreOre(cv) ? out.cop : out.nonRetr;
+    t.gg++; t.perCod[cv]=(t.perCod[cv]||0)+1;
+  }
+  out.cop.ore=out.cop.gg*q; out.nonRetr.ore=out.nonRetr.gg*q; out.festngCelle.ore=out.festngCelle.gg*q;
+  return out;
+}
 function coverAbsHours(rec,dp,y,m){                                        // ore assenze retribuite del mese, a quota esatta (coperte)
   if(!rec||!rec.giorni) return 0;
-  const q=quotaGiorno(dp,y,m); const nd=daysInMonth(y,m); let days=0;
-  for(let d=1; d<=nd; d++){ const cv=String(rec.giorni[d]==null?"":rec.giorni[d]).trim(); if(CODE_SET[cv] && cv!=="--" && cv!=="AN") days++; }
-  return days*q;
+  return assMese(rec,dp,y,m).cop.ore;
 }
 /* ===== ver121: ANCHE LE FESTIVITA' GODUTE SONO ASSENZE RETRIBUITE =============
    Christian (06/11/2026): «Perché il tabellone non conteggia le festività godute?? Sono
@@ -783,7 +834,14 @@ function bancaMeseA(state,dp,y,m){                                          // b
   const rec=getRecFrom(state,y,m,dp.id);
   if(!recHasData(rec)) return null;                                         // mese non compilato -> non conteggiato
   const rese=totOfRec(rec,y,m);                                            // ore effettivamente rese = somma delle celle
-  const eff=rese + coverAbsHours(rec,dp,y,m) + festOreMese(state,dp,y,m);   // ver121: + festivita' godute
+  /* ver151 (scelta 2a di Christian, 11/11/2026): dentro anche i PERMESSI ORARI retribuiti.
+     Fino alla ver150 questa funzione — usata dal totale dell'anno (Query -> Straordinario) e
+     dal blocco RECUPERO/ORE NUOVE del Report — NON li contava, mentre il riquadro del
+     Tabellone SI': lo stesso numero era sommato in due modi diversi e si scostava al primo
+     permesso orario. Ora il riquadro del Tabellone usa QUESTA funzione, quindi non possono
+     piu' divergere. ⚠️ Misurato: nei dati veri non c'e' nessun permesso orario, quindi oggi
+     nessun numero cambia. */
+  const eff=rese + coverAbsHours(rec,dp,y,m) + festOreMese(state,dp,y,m) + permOreMese(rec).pagate;
   return R2((eff - monteFissoMese(dp,y,m)),3);
 }
 function bancaPrecA(state,dp,anno,mese){                                    // banca cumulata dei mesi PRECEDENTI (dopo l'ultimo azzeramento, dalla decorrenza mensilizzazione)
@@ -949,7 +1007,7 @@ function straoRange(state, dp, fromYM, toYM){   // somma per persona dei delta m
     const y=parseInt(mm[1],10), mo=parseInt(mm[2],10); const ym=y*100+mo;
     if(ym<start || ym>toYM) return;
     if(!state.dati[k][dp.id]) return;
-    const bm = bancaMeseA(state, dp, y, mo);   // delta del mese = (rese + assenze coperte) - monte fisso
+    const bm = bancaMeseA(state, dp, y, mo);   // delta = (rese + assenze coperte + festivita' godute + permessi orari) - monte (ver151)
     if(bm==null) return;
     if(bm>0) piu+=bm; else if(bm<0) meno+=(-bm);
   });
@@ -1438,9 +1496,10 @@ function dipSorted(state){
   arr.sort(function(a,b){ return a.nome.localeCompare(b.nome); });
   return arr;
 }
-function fileName(ext){
+function fileName(ext, desc){
   const now = new Date();
-  return "Spazio Ireos Report Ore mensile - " + pad2(now.getDate()) + MESE_ABBR_FILE[now.getMonth()] +
+  /* ver153: `desc` e' facoltativa; senza, il nome resta identico a prima. */
+  return "Spazio Ireos " + (desc || "Report Ore mensile") + " - " + pad2(now.getDate()) + MESE_ABBR_FILE[now.getMonth()] +
     String(now.getFullYear()).slice(2) + " - " + APP_VER + " - " + pad2(now.getHours()) + "." + pad2(now.getMinutes()) + "." + ext;
 }
 
@@ -1798,6 +1857,262 @@ function esportaPDF(state, pairs){
   doc.save(fileName("pdf"));
 }
 
+/* ===== ver153 (11/11/2026) — REPORT PDF A4 MENSILIZZ. =========================
+   Richiesta di Christian: «un pdf a4 report in dipendenti che segnali giornalmente la presenza,
+   AN oppure altra assenza retribuita indicando P se presente il dipendente, oppure AN oppure
+   altra assenza retribuita e a parte il totale supplementare da dare all'ufficio paghe che
+   elabora i cedolini mensilizzati». Nome del pulsante scelto da lui: «Report PDF A4 mensilizz.».
+   ⚠️ Il Report che c'era PRIMA non e' stato toccato: la «P» ne era stata TOLTA da Christian
+   stesso il 04/11/2026 (ver87, «il pdf a4 mi deve dare le ore come in precedenza, non con A o
+   P»), quindi questo e' un SECONDO report, separato.
+   ⚠️ Ci vanno dentro solo i MENSILIZZATI del mese (sua regola: «ci vanno dentro i mensilizzati,
+   da ottobre 26 sono tutti mensilizzati»). Se in quel mese non ce n'e' nessuno, lo dice.
+   ⚠️ Il «supplementare» e' il Risultato del mese del Tabellone (`bancaMeseA`), col suo SEGNO:
+   puo' essere piu', meno o zero. Esiste solo dai mesi >= ottobre 2026 (BM_DAL_YM): prima si
+   scrive «—», non uno zero che sarebbe una bugia.
+   ⚠️ Le festivita' NON GODUTE stanno in una colonna A PARTE: sono retribuite ma NON coprono le
+   ore dovute, quindi si pagano IN PIU' (sua regola dell'11/11/2026). Si contano dal CALENDARIO
+   con `contaFestivita` (i festivi che cadono di domenica piu' il 4 novembre sempre) e si pagano
+   alla stessa quota delle festivita' godute, cioe' ore settimanali / giorni settimanali.
+   ⚠️ Diciture nuove, scritte da Claude. */
+function esportaPDFMens(state, pairs){
+  const JsPDF = window.jspdf.jsPDF;
+  const doc = new JsPDF({ orientation:"landscape", unit:"mm", format:"a4" });
+  const PG_H = (doc.internal && doc.internal.pageSize && doc.internal.pageSize.getHeight)
+    ? doc.internal.pageSize.getHeight() : 210;
+  const FONDO = PG_H - 10;
+  const dips = dipSorted(state);
+  const MAXCOL = 14;
+  let first = true;
+  pairs.forEach(function(pr){
+    const anno = pr.y, m = pr.m;
+    const fset = festivitaSet(anno);
+    const mk = monthKey(anno, m);
+    const dati = state.dati[mk] || {};
+    const ymP = anno*100 + m;
+    const inForzaMese = function(dp){ const aInt=assunzInt(dp); const aMon=aInt?Math.floor(aInt/100):0; const ceStr=cessEffStr(dp); const ceInt=ymdIt(ceStr); const ceMon=ceInt?Math.floor(ceInt/100):0; return (!aMon || ymP>=aMon) && (!ceMon || ymP<=ceMon); };
+    const mensAl = function(dp){ return !!dp.mensilizzato && (mensDalYM(dp)===0 || ymP >= mensDalYM(dp)); };
+    const dipsMese = dips.filter(function(dp){ return inForzaMese(dp) && mensAl(dp); });
+    const haData = Object.keys(dati).some(function(k){ const rr=dati[k]; return rr.giorni && Object.keys(rr.giorni).length>0; });
+    if (!haData && dipsMese.length === 0) return;
+    const nd = daysInMonth(anno, m);
+    if (!first) doc.addPage();
+    first = false;
+    if (dipsMese.length === 0){
+      doc.setFontSize(12); doc.setTextColor(15,39,64); doc.setFont(undefined,"bold");
+      doc.text("Spazio Ireos — Presenze mensilizzati   ·   " + MONTH_LABEL[m-1] + " " + anno, 14, 12);
+      doc.setFontSize(10); doc.setFont(undefined,"normal"); doc.setTextColor(120,20,20);
+      doc.text("In questo mese non c'è nessun dipendente mensilizzato: niente da mandare alle paghe.", 14, 22);
+      return;
+    }
+    /* ---- i numeri di ciascuno, una volta sola ---- */
+    const righe = dipsMese.map(function(dp){
+      const rec = getRecFrom(state, anno, m, dp.id);
+      const am = assMese(rec, dp, anno, m);
+      const fg = festGoduteMese(state, dp, anno, m, null);
+      const perm = permOreMese(rec);
+      const nonGodGG = contaFestivita([{ y:anno, m:m }], dp).non;
+      const quotaFest = oreSettAt(dp, anno, m) / ggSettDi(state, dp);
+      let ggP = 0, ggAN = 0;
+      for (let d=1; d<=nd; d++){
+        const cv = String(rec.giorni[d] == null ? "" : rec.giorni[d]).trim();
+        if (cv === "") continue;
+        if (CODE_SET[cv]){ if (cv === "AN") ggAN++; continue; }
+        if (parseHour(cv) > 0) ggP++;
+      }
+      return { dp:dp, rec:rec, am:am, ggP:ggP, ggAN:ggAN,
+               rese: totOfRec(rec, anno, m), dovute: monteFissoMese(dp, anno, m),
+               festOre: fg.ore, festGG: fg.gg, permOre: perm.pagate, permAltre: perm.altre,
+               nonGodGG: nonGodGG, nonGodOre: nonGodGG * quotaFest,
+               compilato: recHasData(rec), sup: bancaMeseA(state, dp, anno, m) };
+    });
+    /* ---- le pagine delle presenze, a blocchi di 14 ---- */
+    const chunks = []; for (let i=0; i<righe.length; i+=MAXCOL) chunks.push(righe.slice(i, i+MAXCOL));
+    const permMese = [];
+    const colW = Math.round((269 / (2 + Math.min(righe.length, MAXCOL))) * 100) / 100;
+    chunks.forEach(function(chunk, ci){
+      if (ci > 0) doc.addPage();
+      doc.setFontSize(12); doc.setTextColor(15,39,64); doc.setFont(undefined,"bold");
+      let titolo = "Spazio Ireos — Presenze mensilizzati   ·   " + MONTH_LABEL[m-1] + " " + anno;
+      if (chunks.length > 1) titolo += "   (dipendenti " + (ci*MAXCOL+1) + "–" + (ci*MAXCOL+chunk.length) + " di " + righe.length + " · pag. " + (ci+1) + "/" + chunks.length + ")";
+      doc.text(titolo, 14, 12);
+      doc.setFont(undefined,"normal");
+      const head = [["Giorno"].concat(chunk.map(function(r){ return r.dp.nome; })).concat(["Giorno"])];
+      const body = [];
+      for (let d=1; d<=nd; d++){
+        const rosso = isRosso(fset, anno, m, d);
+        const isDom = weekdayOf(anno, m, d) === 0;
+        const dayLabel = d + " " + WD[weekdayOf(anno, m, d)];
+        const row = [dayLabel];
+        chunk.forEach(function(r){
+          const cv = String(r.rec.giorni[d] == null ? "" : r.rec.giorni[d]).trim();
+          const perm = (r.rec.permessi && r.rec.permessi[d]) ? r.rec.permessi[d] : null;
+          let txt;
+          if (cv === "--") txt = "R";
+          else if (cv === "") txt = isDom ? "R" : (rosso ? "–" : "");
+          else if (CODE_SET[cv]) txt = cv;                 /* AN e le assenze col loro codice */
+          else txt = (parseHour(cv) > 0) ? "P" : "";       /* ore scritte -> presente */
+          if (perm){ txt = (txt === "" ? "***" : txt + "***"); permMese.push({ nome:r.dp.nome, giorno:d, ore:perm.ore, tipo:perm.tipo }); }
+          row.push(txt);
+        });
+        row.push(dayLabel);
+        body.push(row);
+      }
+      body.push(["gg P"].concat(chunk.map(function(r){ return String(r.ggP); })).concat(["gg P"]));
+      const lastIdx = chunk.length + 1;
+      doc.autoTable({
+        head: head, body: body, startY: 16, theme:"grid", margin:{ left:14, right:14, top:16, bottom:8 },
+        tableWidth: (2 + chunk.length) * colW,
+        styles:{ fontSize:8.5, cellPadding:0.8, halign:"center", valign:"middle", lineColor:[210,210,210], lineWidth:0.1, overflow:"linebreak", cellWidth:colW, fontStyle:"bold" },
+        headStyles:{ fillColor:[15,39,64], textColor:[255,255,255], fontSize:6.5, valign:"middle", fontStyle:"bold", cellWidth:colW },
+        columnStyles:(function(){ const cs={ 0:{ halign:"left", fontStyle:"bold", cellWidth:colW } }; cs[lastIdx]={ halign:"left", fontStyle:"bold", cellWidth:colW }; return cs; })(),
+        didParseCell: function(data){
+          const ci2 = data.column.index;
+          const isDayCol = (ci2 === 0 || ci2 === lastIdx);
+          if (isDayCol){ data.cell.styles.lineColor = [15,39,64]; data.cell.styles.lineWidth = 0.5; }
+          if (data.section !== "body") return;
+          const ri = data.row.index;
+          const raw = String(data.cell.raw || "").trim();
+          const isPerm = raw.slice(-3) === "***";
+          if (!isDayCol && isPerm && ri !== nd){ data.cell.__perm3 = true; data.cell.text = [""]; data.cell.styles.minCellHeight = 10.5; }
+          if (ri === nd){ data.cell.styles.fontStyle = "bold"; data.cell.styles.fillColor = [238,242,255]; if (!isDayCol) data.cell.styles.fontSize = 9.5; return; }
+          const day = ri + 1;
+          if (isDayCol){
+            if (isRosso(fset, anno, m, day)){ data.cell.styles.fillColor = [178,34,34]; data.cell.styles.textColor = [255,255,255]; }
+          } else {
+            const txt = raw.replace(/\*\*\*$/, "");
+            if (txt === "P"){ data.cell.styles.fontSize = 11; data.cell.styles.textColor = [21,101,52]; }
+            else if (txt === "R"){ data.cell.styles.textColor = [178,34,34]; }
+            else if (CODE_SET[txt]){
+              const hx = CODE_SET[txt].bg.replace("#","");
+              data.cell.styles.fillColor = [parseInt(hx.slice(0,2),16), parseInt(hx.slice(2,4),16), parseInt(hx.slice(4,6),16)];
+              data.cell.styles.textColor = lumaText(CODE_SET[txt].bg) === "#ffffff" ? [255,255,255] : [17,24,39];
+            }
+          }
+        },
+        didDrawCell: function(data){
+          if (data.section === "body" && data.row.index < nd && weekdayOf(anno, m, data.row.index + 1) === 0){
+            doc.setDrawColor(15, 39, 64); doc.setLineWidth(0.5);
+            doc.line(data.cell.x, data.cell.y + data.cell.height, data.cell.x + data.cell.width, data.cell.y + data.cell.height);
+          }
+          if (!data.cell.__perm3) return;
+          const raw = String(data.cell.raw || "").trim();
+          const val = raw.slice(0, raw.length - 3);
+          const fs = data.cell.styles.fontSize || 8;
+          const cx = data.cell.x + data.cell.width / 2;
+          let y = data.cell.y + 1.6;
+          doc.setFont(undefined, "bold");
+          const tc = data.cell.styles.textColor;
+          if (Array.isArray(tc)) doc.setTextColor(tc[0], tc[1], tc[2]); else doc.setTextColor(17, 24, 39);
+          if (val){ doc.setFontSize(fs); y += fs * 0.3528 * 0.8; doc.text(val, cx, y, { align:"center", baseline:"middle" }); }
+          doc.setTextColor(109, 40, 217); doc.setFontSize(6);
+          y += 2.4; doc.text("+ aggiunta", cx, y, { align:"center", baseline:"middle" });
+          y += 2.4; doc.text("come sotto ***", cx, y, { align:"center", baseline:"middle" });
+        }
+      });
+    });
+    /* ---- la pagina per l'ufficio paghe ---- */
+    doc.addPage();
+    doc.setFontSize(12); doc.setTextColor(15,39,64); doc.setFont(undefined,"bold");
+    doc.text("Spazio Ireos — Per l'ufficio paghe   ·   " + MONTH_LABEL[m-1] + " " + anno, 14, 12);
+    doc.setFont(undefined,"normal");
+    const supEsiste = (ymP >= BM_DAL_YM);
+    const dash = "—";
+    const headA = [["Dipendente","Ore dovute","Ore rese","Ass. retrib. (h)","Fest. godute (h)","Permessi (h)","SUPPLEMENTARE","Fest. non godute (gg / h) da pagare in più"]];
+    let tDov=0,tRes=0,tAss=0,tFes=0,tPer=0,tSup=0,tNgG=0,tNgO=0, nSup=0;
+    const bodyA = righe.map(function(r){
+      if (!r.compilato) return [r.dp.nome, fmt3(r.dovute), "mese non compilato", dash, dash, dash, dash,
+                                 r.nonGodGG + " / " + fmt3(r.nonGodOre)];
+      tDov+=r.dovute; tRes+=r.rese; tAss+=r.am.cop.ore; tFes+=r.festOre; tPer+=r.permOre;
+      tNgG+=r.nonGodGG; tNgO+=r.nonGodOre;
+      let sup = dash;
+      if (supEsiste && r.sup != null){ sup = (r.sup > 0.0005 ? "+" : "") + fmt3(r.sup); tSup+=r.sup; nSup++; }
+      return [r.dp.nome, fmt3(r.dovute), fmt3(r.rese), fmt3(r.am.cop.ore), fmt3(r.festOre), fmt3(r.permOre),
+              sup, r.nonGodGG + " / " + fmt3(r.nonGodOre)];
+    });
+    bodyA.push(["TOTALE", fmt3(tDov), fmt3(tRes), fmt3(tAss), fmt3(tFes), fmt3(tPer),
+                (nSup ? ((tSup > 0.0005 ? "+" : "") + fmt3(R2(tSup,3))) : dash),
+                tNgG + " / " + fmt3(tNgO)]);
+    doc.autoTable({
+      head: headA, body: bodyA, startY: 16, theme:"grid", margin:{ left:14, right:14, top:16, bottom:8 },
+      styles:{ fontSize:8.5, cellPadding:1.2, halign:"right", valign:"middle", lineColor:[200,200,200], lineWidth:0.1, overflow:"linebreak" },
+      headStyles:{ fillColor:[15,39,64], textColor:[255,255,255], fontSize:7.5, halign:"center", valign:"middle", fontStyle:"bold" },
+      columnStyles:{ 0:{ halign:"left", fontStyle:"bold", cellWidth:52 }, 6:{ fontStyle:"bold", fontSize:10 }, 7:{ halign:"center" } },
+      didParseCell: function(data){
+        if (data.section !== "body") return;
+        if (data.row.index === bodyA.length - 1){ data.cell.styles.fontStyle = "bold"; data.cell.styles.fillColor = [238,242,255]; }
+        if (data.column.index === 6){
+          const t = String(data.cell.raw || "").trim();
+          if (t.charAt(0) === "+") data.cell.styles.textColor = [185,28,28];          /* ore in piu' */
+          else if (t.charAt(0) === "-" || t.charAt(0) === "−") data.cell.styles.textColor = [13,148,136]; /* ore in meno */
+          else if (t !== dash) data.cell.styles.textColor = [21,128,61];               /* in pari */
+        }
+      }
+    });
+    let yy = doc.lastAutoTable.finalY + 6;
+    const ensureY = function(h){ if (yy + h > FONDO){ doc.addPage(); yy = 18; } };
+    if (!supEsiste){
+      ensureY(6); doc.setFontSize(8.5); doc.setTextColor(120,20,20); doc.setFont(undefined,"bold");
+      doc.text("Il supplementare non esiste per i mesi prima di ottobre 2026 (decorrenza della base mensile): per questo e' scritto «—».", 14, yy);
+      yy += 6; doc.setFont(undefined,"normal");
+    }
+    /* ---- la tabella dei GIORNI, voce per voce ---- */
+    const codeCols = CODICI.filter(function(c){
+      if (c.c === "--" || c.c === "AN") return false;
+      return righe.some(function(r){ return (r.am.cop.perCod[c.c] || r.am.nonRetr.perCod[c.c] || (c.c === "FESTNG" && r.am.festngCelle.gg)) > 0; });
+    }).map(function(c){ return c.c; });
+    ensureY(26);
+    doc.setFontSize(10); doc.setTextColor(15,39,64); doc.setFont(undefined,"bold");
+    doc.text("I giorni, voce per voce", 14, yy); yy += 2;
+    const headB = [["Dipendente","gg P","gg AN","Riposi (di cui dom.)"].concat(codeCols).concat(["gg non retrib."])];
+    const bodyB = righe.map(function(r){
+      const cells = [r.dp.nome, String(r.ggP), String(r.ggAN), r.am.riposi.gg + " (" + r.am.riposi.dom + ")"];
+      codeCols.forEach(function(c){
+        const n = (r.am.cop.perCod[c] || 0) + (r.am.nonRetr.perCod[c] || 0) + ((c === "FESTNG") ? r.am.festngCelle.gg : 0);
+        cells.push(n ? String(n) : "");
+      });
+      cells.push(r.am.nonRetr.gg ? String(r.am.nonRetr.gg) : "");
+      return cells;
+    });
+    doc.autoTable({
+      head: headB, body: bodyB, startY: yy + 2, theme:"grid", margin:{ left:14, right:14, bottom:8 },
+      styles:{ fontSize:8.5, cellPadding:1.2, halign:"center", valign:"middle", lineColor:[200,200,200], lineWidth:0.1, overflow:"linebreak" },
+      headStyles:{ fillColor:[15,39,64], textColor:[255,255,255], fontSize:7.5, valign:"middle", fontStyle:"bold" },
+      columnStyles:{ 0:{ halign:"left", fontStyle:"bold", cellWidth:52 } },
+      didParseCell: function(data){
+        if (data.section === "head" && data.column.index > 3 && data.column.index < 4 + codeCols.length){
+          const c = codeCols[data.column.index - 4];
+          if (CODE_SET[c]){ const hx = CODE_SET[c].bg.replace("#","");
+            data.cell.styles.fillColor = [parseInt(hx.slice(0,2),16), parseInt(hx.slice(2,4),16), parseInt(hx.slice(4,6),16)];
+            data.cell.styles.textColor = lumaText(CODE_SET[c].bg) === "#ffffff" ? [255,255,255] : [17,24,39]; }
+        }
+      }
+    });
+    yy = doc.lastAutoTable.finalY + 6;
+    /* ---- che cosa vuol dire, e i permessi da aggiungere ---- */
+    ensureY(16);
+    doc.setFontSize(8); doc.setTextColor(60,60,60); doc.setFont(undefined,"normal");
+    const spieg = [
+      "P = presente (ci sono ore scritte nel foglio)   ·   AN = giorno non lavorativo (part-time)   ·   R = riposo o domenica   ·   gli altri sono i codici di assenza.",
+      "Ass. retrib. (h) = giorni di assenza retribuita × quota giornaliera (ore dovute del mese ÷ 26). MAL 0h e CASSA sono retribuite; ASP 0h no, e finisce nelle ore in meno.",
+      "SUPPLEMENTARE = Risultato del mese del Tabellone: ore rese + assenze retribuite + permessi retribuiti + festività godute − ore dovute. Più = da pagare, meno = da trattenere, zero = in pari.",
+      "Fest. non godute = festivi che cadono di domenica, più il 4 novembre: sono retribuite ma NON coprono le ore dovute, quindi si pagano IN PIÙ del supplementare."
+    ];
+    spieg.forEach(function(t){ const ls = doc.splitTextToSize(t, 269); ls.forEach(function(l){ ensureY(3.8); doc.text(l, 14, yy); yy += 3.8; }); });
+    if (permMese.length > 0){
+      yy += 2; ensureY(5);
+      doc.setFontSize(8.5); doc.setTextColor(15,39,64); doc.setFont(undefined,"bold");
+      doc.text("Permessi orari (segnalati con ***, già compresi nel supplementare):", 14, yy); yy += 4; doc.setFont(undefined,"normal");
+      doc.setFontSize(8); doc.setTextColor(70,70,70);
+      permMese.forEach(function(pp){
+        const riga = pp.nome + " — giorno " + pp.giorno + ": Aggiungere " + fmt2(pp.ore) + " ore di permesso (" + pp.tipo + ")";
+        const ls = doc.splitTextToSize("•  " + riga, 269); ensureY(ls.length * 3.8); doc.text(ls, 14, yy); yy += ls.length * 3.8; });
+    }
+  });
+  if (first){ doc.setFontSize(12); doc.text("Nessun dato nel periodo selezionato", 14, 24); }
+  doc.save(fileName("pdf", "Presenze mensilizzati"));
+}
+
 /* ===================== IMPORT EXCEL ===================== */
 function importaExcel(file, state, onDone){
   const reader = new FileReader();
@@ -2101,14 +2416,45 @@ function EmployeeCard(props){
           if (Math.abs(diff) <= 0.01) return <span className="badge ok">✓ torna</span>;
           return <span className="badge ko">Δ {(diff>0?"+":"")}{fmt2(diff)} {diff<0?"(mancano ore)":"(ore in più)"}</span>;
         })()}
+        {/* ver152 (11/11/2026, richiesta di Christian: «devo vedere per ognuno sul tabellone ore
+             ordinarie effettivamente rese, ore di assenza retribuita (suddivise per voce), ore di
+             assenza non retribuita, riposi domenicali, supplementari»).
+             Le ore rese sono il TOT calcolato qui sopra e il supplementare è il Risultato del
+             mese nel riquadro qui sotto: qui si aggiungono i tre che mancavano, e il dettaglio
+             PER VOCE delle assenze retribuite, che prima era solo un totale.
+             ⚠️ Nessun calcolo nuovo: i giorni li conta `assMese`, la stessa funzione di
+             `coverAbsHours`, e le ore sono giorni × quota giornaliera (= ore dovute ÷ 26).
+             ⚠️ Diciture nuove, scritte da Claude. */}
+        {recHasData(rec) ? (function(){
+          const am = assMese(rec, dp, y, m);
+          const vociCop = Object.keys(am.cop.perCod).sort(function(a,b){ return am.cop.perCod[b]-am.cop.perCod[a] || a.localeCompare(b); });
+          const vociNon = Object.keys(am.nonRetr.perCod).sort();
+          return <div className="ass-line">
+            <span className="ass-lbl">Assenze retribuite:</span>
+            {vociCop.length === 0
+              ? <span className="cong-chip">nessuna</span>
+              : vociCop.map(function(c){ return <span key={c} className="cong-chip" title={CODE_SET[c] ? CODE_SET[c].l : c}>{c} <b>{am.cop.perCod[c]} gg</b> = <b>{fmt3(am.cop.perCod[c]*am.quota)} h</b></span>; })}
+            {vociCop.length > 1 ? <span className="cong-chip"><b>in tutto {am.cop.gg} gg = {fmt3(am.cop.ore)} h</b></span> : null}
+            <span className="ass-lbl">Non retribuite:</span>
+            {vociNon.length === 0
+              ? <span className="cong-chip">nessuna</span>
+              : vociNon.map(function(c){ return <span key={c} className="cong-chip" title={CODE_SET[c] ? CODE_SET[c].l : c}>{c} <b>{am.nonRetr.perCod[c]} gg</b> = <b>{fmt3(am.nonRetr.perCod[c]*am.quota)} h</b></span>; })}
+            {(am.festngCelle.gg > 0) ? <span className="cong-chip" title="Retribuita, ma non copre le ore dovute: si paga in più">FESTNG <b>{am.festngCelle.gg} gg</b> — si paga in più</span> : null}
+            <span className="ass-lbl">Riposi:</span>
+            <span className="cong-chip" title="Giorni di riposo: celle «--» più le domeniche senza dato"><b>{am.riposi.gg}</b> (di cui domeniche <b>{am.riposi.dom}</b>)</span>
+          </div>;
+        })() : null}
         {(function(){
           if ((y*100+m) < BM_DAL_YM) return null;                                    // base mensile attiva solo dai mesi >= ottobre 2026
           const base = monteFissoMese(dp,y,m);
           if (!base || base<=0) return null;
           if (!recHasData(rec)) return null;                                          // niente riquadro finché il mese non è compilato
           const quota = base/26;
-          let assDays=0; for(let dd=1; dd<=nd; dd++){ const cv=String(rec.giorni[dd]==null?"":rec.giorni[dd]).trim(); if(CODE_SET[cv] && cv!=="--" && cv!=="AN") assDays++; }
-          const assOre = assDays*quota;
+          /* ver151: un solo punto decide che cosa copre le ore dovute (`copreOre`), e il
+             conteggio arriva da `assMese`, lo stesso che usa `coverAbsHours`. */
+          const am = assMese(rec, dp, y, m);
+          const assDays = am.cop.gg;
+          const assOre = am.cop.ore;
           const rese = tot;
           /* ver93 (confermato da Christian con un numero il 05/11/2026): le ore di permesso
              RETRIBUITE contano come ore lavorate, esattamente come un giorno di ferie.
@@ -2119,7 +2465,11 @@ function EmployeeCard(props){
              effetti. Il numero arriva gia' fatto da fuori (serve il valore comune ggSett). */
           const festOre = Number(props.festOre) || 0;
           const festGG = Number(props.festGG) || 0;
-          const delta = R2((rese + assOre + perm.pagate + festOre - base),3);   // delta del mese (no accumulo)
+          /* ver151: il delta arriva da `bancaMeseA`, la STESSA funzione del totale dell'anno
+             e del blocco RECUPERO del Report: prima erano due somme diverse. Se il valore non
+             arriva non si disegna niente, invece di ricalcolarlo in un secondo modo. */
+          const delta = (props.banca == null) ? null : props.banca;
+          if (delta == null) return null;   // delta del mese (no accumulo)
           const bcls = delta > 0.0005 ? "warn" : (delta < -0.0005 ? "over" : "ok");
           const segno = delta>0.0005 ? "+" : "";
           const esito = delta>0.0005 ? "ore in più (straordinario)" : (delta<-0.0005 ? "ore in meno" : "in pari");
@@ -6831,6 +7181,8 @@ function App(){
         {canRestoreImport ? <button className="btn btn-ghost" onClick={onRestoreImport} title="Annulla l ultimo import e torna allo stato precedente">↩︎ Annulla import</button> : null}
         <button className="btn btn-ghost" onClick={function(){ setExportModal("Excel"); }}>📊 Excel</button>
         <button className="btn btn-ghost" onClick={function(){ setExportModal("PDF"); }}>🖨️ Report PDF A4</button>
+        {/* ver153: il report per l'ufficio paghe. Dicitura del pulsante SCELTA da Christian. */}
+        <button className="btn btn-ghost" onClick={function(){ setExportModal("PDF A4 mensilizz."); }}>🖨️ Report PDF A4 mensilizz.</button>
         {!FB_READY ? <button className="btn btn-ghost" onClick={changePin}>🔑 PIN</button> : null}
         {FB_READY ? <button className="btn btn-ghost" onClick={function(){ if (dirty && !window.confirm("Ci sono modifiche non salvate. Uscire comunque?")) return; firebase.auth().signOut(); }}>Esci</button> : null}
         <input ref={fileRef} type="file" accept=".xlsx,.xls,.json" className="hidden-file" onChange={onImportFile} />
@@ -6921,6 +7273,7 @@ function App(){
                   onDich={onDich} onSvuotaMese={onSvuotaMese} saldoPrec={saldoP} bancaPrec={bancaP} tettoConsumo={tettoC} onAzzeraSaldo={onAzzeraSaldo} onAnnullaAzzera={onAnnullaAzzera}
                   onSostAdd={onSostAdd} onSostChange={onSostChange} onSostDel={onSostDel} onOpenPerm={onOpenPerm}
                   festOre={festGoduteMese(state, dp, anno, mese, null).ore} festGG={festGoduteMese(state, dp, anno, mese, null).gg}
+                  banca={bancaMeseA(state, dp, anno, mese)}   /* ver151: un solo numero per il Risultato del mese */
                   onEditDip={apriScheda} onDelDip={askDelDip} onAvviso={showToast} />;
               })
             }
@@ -6939,7 +7292,7 @@ function App(){
 
       {quickFill ? <QuickFillModal dp={quickFill} rec={getRecFrom(state, anno, mese, quickFill.id)} anno={anno} mese={mese} fset={fset} onApply={onQuickFillApply} onClose={function(){ setQuickFill(null); }} /> : null}
       {exportModal ? <ExportModal kind={exportModal} anni={state.anni} annoCorrente={anno} meseCorrente={mese}
-        onGenera={function(pairs){ if (exportModal === "Excel") esportaExcel(state, pairs); else esportaPDF(state, pairs); setExportModal(null); }}
+        onGenera={function(pairs){ if (exportModal === "Excel") esportaExcel(state, pairs); else if (exportModal === "PDF A4 mensilizz.") esportaPDFMens(state, pairs); else esportaPDF(state, pairs); setExportModal(null); }}
         onClose={function(){ setExportModal(null); }} /> : null}
       {permModal ? (function(){
         const rc = getRecFrom(state, anno, mese, permModal.dipId);

@@ -18,7 +18,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver150 · 10nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver153 · 11nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -200,6 +200,9 @@ Banca ore, tetto annuo, contratti e export.
     ⚠️ **`coverAbsHours` NON è stato toccato**: lo **straordinario** (`bancaMeseA`) continua a
     contare **tutte** le assenze, come da regola del 31/10/2026. Verificato: il riquadro del
     conguaglio non si muove, il tetto cala di 5,010 h per ogni giornata spenta.
+    ⚠️ **Aggiornamento ver151 (11/11/2026)**: «tutte» è ora «tutte quelle che COPRONO le ore
+    dovute» — fuori **`ASP 0h`** (non retribuita) e **`FESTNG`** (si paga in più), per decisione
+    di Christian. Vedi la scheda 🖨️ delle ver151/152/153.
   - **Decisione di Christian (03/11/2026)**: niente secondo tipo di massimale «per servizio».
     Si usa il **Tetto annuo che c'era già**, per anno scolastico; i servizi si mescolano e a lui
     va bene. Cade così la dipendenza da Fogli ore, la collection nuova e i mensilizzati.
@@ -394,6 +397,134 @@ Banca ore, tetto annuo, contratti e export.
     «— ore» e «non calcolabile»; la stessa persona su «Teoriche» → 18,67 €/h; e il **foglio Excel
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
+
+- 🖨️ **IL REPORT PER L'UFFICIO PAGHE, E LE CINQUE COSE CHE MANCAVANO SUL TABELLONE**
+  (ver151 · ver152 · ver153, 11/11/2026, richiesta di Christian: «un pdf a4 report in dipendenti
+  che segnali giornalmente la presenza, AN oppure altra assenza retribuita indicando P … e a
+  parte il totale supplementare da dare all'ufficio paghe che elabora i cedolini mensilizzati»,
+  più «devo vedere per ognuno sul tabellone ore ordinarie effettivamente rese, ore di assenza
+  retribuita (suddivise per voce), ore di assenza non retribuita, riposi domenicali,
+  supplementari». Sue risposte: **«Il supplementare è quello che tu chiami nel tabellone
+  Risultato del mese, che in realtà può essere anche negativo o pari. Ci vanno dentro i
+  mensilizzati (da ottobre 26 sono tutti mensilizzati)»**, **«Mal 0h e cassa sono assenze
+  retribuite, asp 0h non è retribuita, festng è retribuita ma non rientra nel calcolo»**,
+  **«Mal 0h va tra i retribuiti, la dicitura lasciala perché mi ricorda che l'INPS non paga»**,
+  **«2a»** sul totale dell'anno, e **«Nu\* e main»**.)
+
+  - 🔑 **ver151 — CHI COPRE LE ORE DOVUTE E CHI NO.** Il campo `pay` dei `CODICI` esisteva dal
+    primo giorno ma **era letto in UN SOLO punto** (il conteggio dei Riepiloghi): `coverAbsHours`
+    contava **tutte** le celle con un codice, tranne `--` e `AN`. Quindi un `ASP 0h`
+    (**non** retribuita) e un `FESTNG` (retribuita ma **da pagare in più**) coprivano le ore
+    dovute come un giorno di ferie, e **il Risultato del mese risultava più alto del vero**.
+    - **Funzione nuova `copreOre(cv)`**, il punto **unico** che decide: fuori `--` e `AN` (ore non
+      dovute), fuori chi ha `pay:false` (**`ASP 0h`**), fuori **`FESTNG`** (si paga in più), dentro
+      tutto il resto.
+    - **Funzione nuova `assMese(rec,dp,y,m)`**, che in **una** passata torna tutto ciò che serve:
+      `cop` (giorni e ore che coprono, **per voce**), `nonRetr` (idem per le non retribuite),
+      `festngCelle`, `riposi` (`{gg, dom}`) e la `quota` del giorno.
+    - ⚠️ **`coverAbsHours` NON è stata riscritta: ora DELEGA** (`assMese(...).cop.ore`), così il
+      numero resta **lo stesso** per tutti i codici che coprivano già. È nell'elenco delle cose da
+      non toccare: è stata toccata **solo** sotto la sua istruzione esplicita dell'11/11/2026.
+    - 🏷️ **`MAL 0h` e `CASSA` passano a `pay:true`.** ⚠️ **La dicitura «Malattia non pagata»
+      RESTA**, per sua richiesta: «mi ricorda che l'INPS non paga». Non correggerla.
+    - ➕ **Punto 2a: anche il totale dell'ANNO conta i permessi orari.** `bancaMeseA` somma ora
+      `permOreMese(rec).pagate`, quindi la **Query → ⚡ Straordinario** e il blocco
+      **RECUPERO / ORE NUOVE** del Report dicono la stessa cosa del riquadro del Tabellone, che i
+      permessi li contava dalla **ver93**. Prima il mese e l'anno si contraddicevano.
+    - 🔴 **QUANTO CAMBIA, MISURATO SUI DATI VERI prima di toccare qualunque cosa**: `ASP 0h` **0
+      celle**, `MAL 0h` **27 celle (tutte ≤ settembre 2026)**, `FESTNG` **7 celle (tutte dicembre
+      2025)**, permessi orari **0**, mensilizzati **16 su 16 dal 01/10/2026**. Quindi:
+      `bancaMeseA` cambia in **7 casi, TUTTI in dicembre 2025**, e in **NESSUNO** di ottobre 2026,
+      cioè il mese che va in paga; il **totale dell'anno è identico per tutti e 16**; il riquadro
+      del Tabellone dice le stesse cose. Nei **Riepiloghi** i 27 giorni di `MAL 0h` passano da
+      **non retribuiti a retribuiti** (836 → 863 e 27 → 0): è esattamente ciò che ha chiesto.
+    - ⚠️ **Conseguenza dichiarata sul COSTO ORARIO**: `coverAbsHours` è usata anche da
+      `oreLavorabiliMese`/`oreSuppPeriodo`, quindi i periodi che **contengono dicembre 2025**
+      cambiano di poco. **Misurato in esecuzione** (`nr153.cjs`, ver150 contro ver153, due
+      periodi): gennaio → ottobre **2026** costo, ore e €/h **identici per tutti e 16**
+      (0 differenze); gennaio → dicembre **2025** **4 schede su 16** cambiano, e cambia **solo il
+      costo, non le ore**:
+      | scheda | ver150 | **ver153** |
+      |---|--:|--:|
+      | n.1 | 8.288,89 € · 17,84 €/h | **8.237,86 € · 17,73** |
+      | n.2 | 16.944,20 € · 18,32 €/h | **16.908,20 € · 18,28** |
+      | n.8 | 5.909,03 € · 6,63 €/h | **5.905,62 € · 6,63** |
+      | n.9 | 3.224,36 € · 21,35 €/h | **3.170,51 € · 21,00** |
+      ⚠️ **Il costo SCENDE**, ed è il verso giusto: un `FESTNG` non copre le ore dovute, quindi
+      le ore lavorabili salgono e le **ore aggiuntive al +27% scendono**. Sui periodi senza
+      `FESTNG`/`ASP 0h` non si muove un centesimo.
+
+  - 👁️ **ver152 — le cinque cose, sul Tabellone, sotto ogni scheda.** Di quelle che ha elencato
+    ce n'erano già due (le **ore rese** sono il «TOT calcolato», il **supplementare** è il
+    «Risultato del mese»); mancavano il **dettaglio per voce** delle assenze retribuite (c'era
+    solo il totale), le **non retribuite** e i **riposi**. Riga nuova `.ass-line` con le
+    pastiglie: «Assenze retribuite: FERIE **2 gg** = **6,012 h** · … · in tutto …»,
+    «Non retribuite: …», la pastiglia **FESTNG … — si paga in più** e «Riposi: **N** (di cui
+    domeniche **M**)».
+    - ⚠️ **Nessun calcolo nuovo**: i giorni li conta `assMese`, la stessa funzione di
+      `coverAbsHours`. ⚠️ **Diciture nuove, scritte da Claude.**
+    - 🐞 **UN MIO ERRORE TROVATO DALLA MISURA**: la prima stesura metteva `.ass-lbl` a **12px** e
+      le scritte sotto i 12,5px fuori dalle griglie passavano da **7 a 13**, contro il §10.6.
+      Portata a **12,5px**: misurato **7 → 7** a 390 · 1280 · 1700px, larghezza di pagina
+      identica, comandi sotto i 32px **140 → 140**.
+    - 🧹 Il riquadro del Risultato del mese ora riceve il numero **già fatto** da `bancaMeseA`
+      (prop `banca`) invece di ricalcolarlo per conto suo: era l'unico punto in cui lo stesso
+      conto esisteva in due copie. **Verificato in esecuzione**: ogni numero a video **è**
+      `bancaMeseA`.
+
+  - 🧾 **ver153 — «🖨️ Report PDF A4 mensilizz.»** (dicitura del pulsante **scelta da
+    Christian**), accanto al Report che c'era. Funzione nuova **`esportaPDFMens(state, pairs)`**;
+    ⚠️ **`esportaPDF` NON è stata toccata** (verificato: continua a stampare le ore in
+    *ore,minuti* e la riga «TOT ORE RESE»).
+    - **Pagina delle presenze**, giorni in riga e persone in colonna come il Report storico:
+      **`P`** dove ci sono ore scritte (verde, più grande), **`AN`**, **`R`** per riposi e
+      domeniche, e **il codice** per ogni assenza, col suo colore del Tabellone; in fondo la riga
+      **«gg P»**. I festivi restano la colonna rossa del giorno, e un permesso orario porta i
+      **`***`** con «+ aggiunta / come sotto \*\*\*», come nel Report storico.
+    - **Pagina per l'ufficio paghe**: una riga per persona con *Ore dovute · Ore rese · Ass.
+      retrib. (h) · Fest. godute (h) · Permessi (h) · **SUPPLEMENTARE** · Fest. non godute
+      (gg / h) da pagare in più*, più la riga **TOTALE**. Il supplementare porta **il segno**
+      (rosso se in più, verde acqua se in meno, verde se in pari: gli stessi colori della
+      **ver88**) perché «può essere anche negativo o pari».
+    - **Terza tabella «I giorni, voce per voce»**: `gg P`, `gg AN`, `Riposi (di cui dom.)`, una
+      colonna **per ogni voce usata in quel mese** (colorata come nel Tabellone) e `gg non
+      retrib.`
+    - 🚦 **Ci vanno SOLO i mensilizzati** (in forza **e** `mensilizzato` a quella data). Se in quel
+      mese non ce n'è nessuno il foglio **lo dice** invece di restare muto; chi non ha il mese
+      compilato porta «mese non compilato» al posto di uno zero; e nei mesi **prima di ottobre
+      2026** il supplementare è «**—**» con una riga che spiega perché (la base mensile parte da
+      `BM_DAL_YM`).
+    - 🎌 **Le festività non godute arrivano dal CALENDARIO**, non dalle celle: sua decisione —
+      «il 4 novembre per la legge «cade» la domenica dopo il primo novembre … Le festività non
+      godute sostanzialmente quindi io non le segnerò mai nel tabellone». Sono **retribuite** ma
+      **fuori** dal supplementare, e il foglio scrive «si pagano IN PIÙ del supplementare».
+      ⚠️ Qui la quota è quella delle **godute** (`oreSett/ggSett`), mentre il Costo orario usa
+      `monte/26` per la stessa voce: **1,3 centesimi di ora al giorno**, scostamento dichiarato e
+      **non** corretto.
+    - ⚠️ **Diciture nuove, scritte da Claude**, tutte tranne il nome del pulsante.
+    - **Provato in esecuzione** (`ver153.cjs`, **46 controlli su 46**, zero errori di pagina, con
+      il finto jsPDF che esegue davvero `didParseCell`/`didDrawCell`): i due pulsanti; la finestra
+      «Esporta PDF A4 mensilizz.»; su ottobre 2026 **36 P · 9 AN · 9 MAL · 44 R** e **nessun
+      numero di ore** nella griglia; le 8 colonne delle paghe e il TOTALE; **ogni supplementare
+      del PDF è esattamente `bancaMeseA`**; «mese non compilato»; la tabella dei giorni con le
+      voci usate; un caso costruito con `FERIE`, `ASP 0h`, `FESTNG` e un permesso (i `***` e la
+      riga «Aggiungere 2,00 ore di permesso (EXF)»); un mese **senza mensilizzati** che lo dice;
+      un mese **prima di ottobre 2026** con «—» su tutte le righe, sul TOTALE e con la sua riga di
+      spiegazione; e il **Report vecchio identico**.
+    - ⚠️ **NON verificabile da qui, e lo dico**: l'**impaginazione vera** del PDF (jsPDF non è
+      raggiungibile dal contenitore). Numeri e contenuto sono provati, il **foglio stampato va
+      guardato** da Christian.
+
+  - **Batteria rieseguita sulla ver153, confrontata con lo storico, ZERO falliti nuovi**:
+    `sc-dip-A` **38/3** · `sc-dip-B` **32/2** · `sc-dip-C` **106/1** · `sc-dip-D` **11/0** ·
+    `ver144` **14/0** · `ver145` **7/0** · `ver146` **27/1** · `ver147` **26/1** · `ver149`
+    **29/0** · `ver150` **31/0** · `ic-fodip-A` **19/1** · `ic-fodip-B` **20/1/1** · `ver151`
+    **27/0** · `ver152` **23/0** · `ver153` **46/0** · `nr153` **5/0**.
+    ⚠️ **Tutti i «falliti» sono gli STESSI di prima e sono attese sbagliate dei MIEI script**,
+    non difetti dell'app (verificato riga per riga contro le uscite salvate delle versioni
+    precedenti: identiche, stesso messaggio).
+    ⚠️ In **quattro** script l'attesa della targhetta era scritta a mano (`ver149`, `ver150`,
+    `ver151`, `ver152`): **aggiornata, non aggirata**.
 
 - 👥 **DUE PERSONE CON LO STESSO NOME NON SI FONDONO PIÙ IN SILENZIO** (ver150, 10/11/2026,
   punto **1** dell'elenco consegnato dopo il collaudo delle interconnessioni, risposta di
@@ -3028,6 +3159,9 @@ Banca ore, tetto annuo, contratti e export.
   Babel preset-react e fare `node --check` sull'output.
 - **Non toccare senza richiesta esplicita**: Banca ore, tetto annuo, `monteFissoMese`,
   `quotaGiorno`, `coverAbsHours`, gli export Excel/PDF, la generazione dei contratti.
+  ⚠️ `coverAbsHours` è stata toccata **una volta sola**, nella **ver151**, su istruzione
+  esplicita di Christian dell'11/11/2026, e ora **delega** ad `assMese`: chi deve sapere quali
+  giorni coprono le ore dovute passa da **`copreOre`**, non da un elenco scritto a mano.
 
 ## Chi non lavora alcuni mesi dell'anno (misurato il 05/11/2026 sulla ver108)
 
