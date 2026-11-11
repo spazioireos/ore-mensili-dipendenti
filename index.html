@@ -465,7 +465,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver153";
+const APP_VER = "ver154";
 const APP_DATA = "11nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -549,11 +549,14 @@ function cellaValoreFinale(t){            // alla fine: il codice vero, il numer
    ⚠️ I SEI dopo di loro sono quelli che Christian si era gia' messo da se' e che NON stavano
    nella palette (quindi nel riquadro «Colore della scheda» non risultavano selezionati per chi
    li aveva): ora ci sono, e si vedono come scelti.
-   ⚠️ Gli OTTO nuovi sono tinte chiare e spente, NESSUN verde brillante (sua richiesta). Il
-   `#CCFF66` in seconda posizione e' il verde brillante che c'era gia' ed e' in uso da due
-   persone: lasciato per non cambiare il loro colore. */
+   ⚠️ Gli OTTO nuovi sono tinte chiare e spente, NESSUN verde brillante (sua richiesta).
+   ⚠️ ver154 (11/11/2026, «10 togli»): il `#CCFF66` che stava in seconda posizione ERA il
+   verde brillante, rimasto li' perche' due persone ce l'avevano salvato. Ora quella posizione
+   porta `#8FA860` (oliva spento) e chi aveva il verde brillante ci passa al caricamento, in
+   memoria: vedi la normalizzazione piu' sotto. Le altre 23 tinte NON si sono mosse di posto,
+   quindi nessun altro cambia colore. */
 const PALETTE = [
-  "#00B0F0","#CCFF66","#FFC000","#FFDDFF","#B7A4D6","#9AD0C2","#F49AC2","#8FB9E0","#C3B091","#9CA3AF",
+  "#00B0F0","#8FA860","#FFC000","#FFDDFF","#B7A4D6","#9AD0C2","#F49AC2","#8FB9E0","#C3B091","#9CA3AF",
   "#5deeb7","#d494ff","#88adf7","#a4cb3a","#dbd51a","#4ddbb5",
   "#FFB38A","#FF9AA2","#D7A86E","#A3C4F3","#7FD1D1","#BFD8B8","#E6C3E8","#C9CBA3"
 ];
@@ -1341,6 +1344,12 @@ function migrate(obj){
   obj.anni.sort(function(a,b){ return a-b; });
   (obj.dipendenti || []).forEach(function(dp, idx){
     if (!dp.colore) dp.colore = PALETTE[idx % PALETTE.length];
+    /* ver154 (11/11/2026, risposta di Christian: «10 togli»). Il verde brillante #CCFF66 era
+       in seconda posizione nella palette e gliel'aveva assegnato l'APP, non lui. Tolto dalla
+       palette, chi ce l'aveva salvato resterebbe verde brillante per sempre e senza nessun
+       quadratino selezionato: qui passa al colore nuovo. ⚠️ Come tutto il resto, cambia solo
+       in memoria: nel documento ci finisce quando si preme 💾. */
+    if (String(dp.colore).toUpperCase() === "#CCFF66") dp.colore = PALETTE[1];
     if (dp.livello === undefined) dp.livello = "";
     if (dp.dataAssunzione === undefined) dp.dataAssunzione = "";
     if (dp.dataCessazione === undefined) dp.dataCessazione = "";
@@ -1882,7 +1891,10 @@ function esportaPDFMens(state, pairs){
     ? doc.internal.pageSize.getHeight() : 210;
   const FONDO = PG_H - 10;
   const dips = dipSorted(state);
-  const MAXCOL = 14;
+  /* ver154 (11/11/2026, Christian: «Un'unica tabella anche qui in unica pagina»): prima erano
+     blocchi da 14 colonne, cioè due pagine con 16 mensilizzati. Alzato a 24: su A4 orizzontale
+     269 mm / 26 colonne restano ~10 mm a colonna, che bastano per P / AN / R e i codici. */
+  const MAXCOL = 24;
   let first = true;
   pairs.forEach(function(pr){
     const anno = pr.y, m = pr.m;
@@ -1912,7 +1924,9 @@ function esportaPDFMens(state, pairs){
       const fg = festGoduteMese(state, dp, anno, m, null);
       const perm = permOreMese(rec);
       const nonGodGG = contaFestivita([{ y:anno, m:m }], dp).non;
-      const quotaFest = oreSettAt(dp, anno, m) / ggSettDi(state, dp);
+      /* ver154 (Christian: «2 uniforma su monte/26»): la quota delle festività NON GODUTE è ora
+         la stessa del Costo orario (J12 = H5/26). Le GODUTE restano a oreSett/ggSett (ver119). */
+      const quotaFest = quotaGiorno(dp, anno, m);
       let ggP = 0, ggAN = 0;
       for (let d=1; d<=nd; d++){
         const cv = String(rec.giorni[d] == null ? "" : rec.giorni[d]).trim();
@@ -1926,7 +1940,18 @@ function esportaPDFMens(state, pairs){
                nonGodGG: nonGodGG, nonGodOre: nonGodGG * quotaFest,
                compilato: recHasData(rec), sup: bancaMeseA(state, dp, anno, m) };
     });
-    /* ---- le pagine delle presenze, a blocchi di 14 ---- */
+    /* ---- le voci di assenza DAVVERO usate in questo mese, nell'ordine di CODICI ---- */
+    const vociCop = CODICI.filter(function(c){
+      if (c.c === "--" || c.c === "AN") return false;
+      if (!copreOre(c.c)) return false;
+      return righe.some(function(r){ return (r.am.cop.perCod[c.c] || 0) > 0; });
+    }).map(function(c){ return c.c; });
+    const vociNon = CODICI.filter(function(c){
+      if (c.c === "--" || c.c === "AN") return false;
+      if (copreOre(c.c)) return false;
+      return righe.some(function(r){ return (r.am.nonRetr.perCod[c.c] || 0) > 0 || (c.c === "FESTNG" && r.am.festngCelle.gg > 0); });
+    }).map(function(c){ return c.c; });
+    /* ---- la pagina delle presenze ---- */
     const chunks = []; for (let i=0; i<righe.length; i+=MAXCOL) chunks.push(righe.slice(i, i+MAXCOL));
     const permMese = [];
     const colW = Math.round((269 / (2 + Math.min(righe.length, MAXCOL))) * 100) / 100;
@@ -1958,7 +1983,20 @@ function esportaPDFMens(state, pairs){
         row.push(dayLabel);
         body.push(row);
       }
-      body.push(["gg P"].concat(chunk.map(function(r){ return String(r.ggP); })).concat(["gg P"]));
+      /* ver154 (Christian: «in calce scrivi oltre ai giorni di P anche tutti i totali dei giorni
+         di assenza retribuita e non retribuita, indicandoli dettagliatamente»): una riga per
+         voce, non più il solo «gg P». Stessa tabella, in calce. */
+      const totRighe = [];
+      totRighe.push({ lab:"gg P", get:function(r){ return r.ggP; } });
+      vociCop.forEach(function(c){ totRighe.push({ lab:"gg " + c, get:function(r){ return r.am.cop.perCod[c] || 0; } }); });
+      vociNon.forEach(function(c){ totRighe.push({ lab:"gg " + c, get:function(r){
+        return (c === "FESTNG") ? ((r.am.nonRetr.perCod[c] || 0) + r.am.festngCelle.gg) : (r.am.nonRetr.perCod[c] || 0); } }); });
+      totRighe.push({ lab:"gg AN", get:function(r){ return r.ggAN; } });
+      totRighe.push({ lab:"gg R", get:function(r){ return r.am.riposi.gg; } });
+      totRighe.forEach(function(tr){
+        body.push([tr.lab].concat(chunk.map(function(r){ const n = tr.get(r); return n ? String(n) : ""; })).concat([tr.lab]));
+      });
+      const nTot = totRighe.length;
       const lastIdx = chunk.length + 1;
       doc.autoTable({
         head: head, body: body, startY: 16, theme:"grid", margin:{ left:14, right:14, top:16, bottom:8 },
@@ -1974,8 +2012,14 @@ function esportaPDFMens(state, pairs){
           const ri = data.row.index;
           const raw = String(data.cell.raw || "").trim();
           const isPerm = raw.slice(-3) === "***";
-          if (!isDayCol && isPerm && ri !== nd){ data.cell.__perm3 = true; data.cell.text = [""]; data.cell.styles.minCellHeight = 10.5; }
-          if (ri === nd){ data.cell.styles.fontStyle = "bold"; data.cell.styles.fillColor = [238,242,255]; if (!isDayCol) data.cell.styles.fontSize = 9.5; return; }
+          if (!isDayCol && isPerm && ri < nd){ data.cell.__perm3 = true; data.cell.text = [""]; data.cell.styles.minCellHeight = 10.5; }
+          if (ri >= nd){                                   /* le righe dei totali in calce */
+            data.cell.styles.fontStyle = "bold";
+            data.cell.styles.fillColor = (ri === nd) ? [238,242,255] : [245,247,252];
+            if (isDayCol){ data.cell.styles.fontSize = 6.5; data.cell.styles.halign = "left"; }
+            else data.cell.styles.fontSize = 9;
+            return;
+          }
           const day = ri + 1;
           if (isDayCol){
             if (isRosso(fset, anno, m, day)){ data.cell.styles.fillColor = [178,34,34]; data.cell.styles.textColor = [255,255,255]; }
@@ -2011,37 +2055,84 @@ function esportaPDFMens(state, pairs){
         }
       });
     });
-    /* ---- la pagina per l'ufficio paghe ---- */
+    /* ---- la pagina per l'ufficio paghe: UNA SOLA tabella ---- */
     doc.addPage();
     doc.setFontSize(12); doc.setTextColor(15,39,64); doc.setFont(undefined,"bold");
     doc.text("Spazio Ireos — Per l'ufficio paghe   ·   " + MONTH_LABEL[m-1] + " " + anno, 14, 12);
     doc.setFont(undefined,"normal");
     const supEsiste = (ymP >= BM_DAL_YM);
     const dash = "—";
-    const headA = [["Dipendente","Ore dovute","Ore rese","Ass. retrib. (h)","Fest. godute (h)","Permessi (h)","SUPPLEMENTARE","Fest. non godute (gg / h) da pagare in più"]];
-    let tDov=0,tRes=0,tAss=0,tFes=0,tPer=0,tSup=0,tNgG=0,tNgO=0, nSup=0;
+    /* ver154 (Christian: «serve più precisione: ore rese, di cui assenze retribuite ferie x ore,
+       di cui permessi exf y ore, di cui malattia z ore etc.; poi festivi non goduti e
+       supplementari a parte, nonché AN ed equiparabili (asp 0h) e riposi. Tutto in un'unica
+       tabella»): le voci di assenza sono ora COLONNE IN ORE, una per codice usato nel mese, e la
+       tabella dei giorni non è più separata. */
+    const headA = [["Dipendente","Ore dovute","Ore rese"]
+      .concat(vociCop.map(function(c){ return c + " (h)"; }))
+      .concat(["Permessi (h)","Fest. godute (h)","SUPPLEMENTARE","Fest. non godute (gg / h) da pagare in più"])
+      .concat(vociNon.map(function(c){ return c + " (gg)"; }))
+      .concat(["AN (gg)","Riposi (gg · dom.)"])];
+    const iSup = 3 + vociCop.length + 2;
+    let tDov=0,tRes=0,tPer=0,tFes=0,tSup=0,tNgG=0,tNgO=0,tAN=0,tRip=0,tRipD=0, nSup=0;
+    const tCop={}, tNon={};
     const bodyA = righe.map(function(r){
-      if (!r.compilato) return [r.dp.nome, fmt3(r.dovute), "mese non compilato", dash, dash, dash, dash,
-                                 r.nonGodGG + " / " + fmt3(r.nonGodOre)];
-      tDov+=r.dovute; tRes+=r.rese; tAss+=r.am.cop.ore; tFes+=r.festOre; tPer+=r.permOre;
-      tNgG+=r.nonGodGG; tNgO+=r.nonGodOre;
+      const cells = [r.dp.nome, fmt3(r.dovute)];
+      if (!r.compilato){
+        cells.push("mese non compilato");
+        vociCop.forEach(function(){ cells.push(dash); });
+        cells.push(dash, dash, dash, r.nonGodGG + " / " + fmt3(r.nonGodOre));
+        vociNon.forEach(function(){ cells.push(dash); });
+        cells.push(dash, dash);
+        tNgG+=r.nonGodGG; tNgO+=r.nonGodOre;
+        return cells;
+      }
+      tDov+=r.dovute; tRes+=r.rese; tPer+=r.permOre; tFes+=r.festOre;
+      tNgG+=r.nonGodGG; tNgO+=r.nonGodOre; tAN+=r.ggAN; tRip+=r.am.riposi.gg; tRipD+=r.am.riposi.dom;
+      cells.push(fmt3(r.rese));
+      vociCop.forEach(function(c){
+        const gg = r.am.cop.perCod[c] || 0; const ore = gg * r.am.quota;
+        tCop[c] = (tCop[c] || 0) + ore;
+        cells.push(gg ? fmt3(ore) : "");
+      });
+      cells.push(fmt3(r.permOre), fmt3(r.festOre));
       let sup = dash;
       if (supEsiste && r.sup != null){ sup = (r.sup > 0.0005 ? "+" : "") + fmt3(r.sup); tSup+=r.sup; nSup++; }
-      return [r.dp.nome, fmt3(r.dovute), fmt3(r.rese), fmt3(r.am.cop.ore), fmt3(r.festOre), fmt3(r.permOre),
-              sup, r.nonGodGG + " / " + fmt3(r.nonGodOre)];
+      cells.push(sup, r.nonGodGG + " / " + fmt3(r.nonGodOre));
+      vociNon.forEach(function(c){
+        const gg = (c === "FESTNG") ? ((r.am.nonRetr.perCod[c] || 0) + r.am.festngCelle.gg) : (r.am.nonRetr.perCod[c] || 0);
+        tNon[c] = (tNon[c] || 0) + gg;
+        cells.push(gg ? String(gg) : "");
+      });
+      cells.push(r.ggAN ? String(r.ggAN) : "", r.am.riposi.gg + " · " + r.am.riposi.dom);
+      return cells;
     });
-    bodyA.push(["TOTALE", fmt3(tDov), fmt3(tRes), fmt3(tAss), fmt3(tFes), fmt3(tPer),
-                (nSup ? ((tSup > 0.0005 ? "+" : "") + fmt3(R2(tSup,3))) : dash),
-                tNgG + " / " + fmt3(tNgO)]);
+    const totRow = ["TOTALE", fmt3(tDov), fmt3(tRes)]
+      .concat(vociCop.map(function(c){ return tCop[c] ? fmt3(R2(tCop[c],3)) : ""; }))
+      .concat([fmt3(tPer), fmt3(tFes),
+               (nSup ? ((tSup > 0.0005 ? "+" : "") + fmt3(R2(tSup,3))) : dash),
+               tNgG + " / " + fmt3(R2(tNgO,3))])
+      .concat(vociNon.map(function(c){ return tNon[c] ? String(tNon[c]) : ""; }))
+      .concat([tAN ? String(tAN) : "", tRip + " · " + tRipD]);
+    bodyA.push(totRow);
     doc.autoTable({
       head: headA, body: bodyA, startY: 16, theme:"grid", margin:{ left:14, right:14, top:16, bottom:8 },
-      styles:{ fontSize:8.5, cellPadding:1.2, halign:"right", valign:"middle", lineColor:[200,200,200], lineWidth:0.1, overflow:"linebreak" },
-      headStyles:{ fillColor:[15,39,64], textColor:[255,255,255], fontSize:7.5, halign:"center", valign:"middle", fontStyle:"bold" },
-      columnStyles:{ 0:{ halign:"left", fontStyle:"bold", cellWidth:52 }, 6:{ fontStyle:"bold", fontSize:10 }, 7:{ halign:"center" } },
+      styles:{ fontSize:8, cellPadding:1, halign:"right", valign:"middle", lineColor:[200,200,200], lineWidth:0.1, overflow:"linebreak" },
+      headStyles:{ fillColor:[15,39,64], textColor:[255,255,255], fontSize:7, halign:"center", valign:"middle", fontStyle:"bold" },
+      columnStyles:(function(){ const cs={ 0:{ halign:"left", fontStyle:"bold", cellWidth:42 } };
+        cs[iSup] = { fontStyle:"bold", fontSize:9.5 };
+        cs[iSup+1] = { halign:"center" };
+        cs[headA[0].length-1] = { halign:"center" };
+        return cs; })(),
       didParseCell: function(data){
+        if (data.section === "head" && data.column.index >= 3 && data.column.index < 3 + vociCop.length){
+          const c = vociCop[data.column.index - 3];
+          if (CODE_SET[c]){ const hx = CODE_SET[c].bg.replace("#","");
+            data.cell.styles.fillColor = [parseInt(hx.slice(0,2),16), parseInt(hx.slice(2,4),16), parseInt(hx.slice(4,6),16)];
+            data.cell.styles.textColor = lumaText(CODE_SET[c].bg) === "#ffffff" ? [255,255,255] : [17,24,39]; }
+        }
         if (data.section !== "body") return;
         if (data.row.index === bodyA.length - 1){ data.cell.styles.fontStyle = "bold"; data.cell.styles.fillColor = [238,242,255]; }
-        if (data.column.index === 6){
+        if (data.column.index === iSup){
           const t = String(data.cell.raw || "").trim();
           if (t.charAt(0) === "+") data.cell.styles.textColor = [185,28,28];          /* ore in piu' */
           else if (t.charAt(0) === "-" || t.charAt(0) === "−") data.cell.styles.textColor = [13,148,136]; /* ore in meno */
@@ -2056,51 +2147,10 @@ function esportaPDFMens(state, pairs){
       doc.text("Il supplementare non esiste per i mesi prima di ottobre 2026 (decorrenza della base mensile): per questo e' scritto «—».", 14, yy);
       yy += 6; doc.setFont(undefined,"normal");
     }
-    /* ---- la tabella dei GIORNI, voce per voce ---- */
-    const codeCols = CODICI.filter(function(c){
-      if (c.c === "--" || c.c === "AN") return false;
-      return righe.some(function(r){ return (r.am.cop.perCod[c.c] || r.am.nonRetr.perCod[c.c] || (c.c === "FESTNG" && r.am.festngCelle.gg)) > 0; });
-    }).map(function(c){ return c.c; });
-    ensureY(26);
-    doc.setFontSize(10); doc.setTextColor(15,39,64); doc.setFont(undefined,"bold");
-    doc.text("I giorni, voce per voce", 14, yy); yy += 2;
-    const headB = [["Dipendente","gg P","gg AN","Riposi (di cui dom.)"].concat(codeCols).concat(["gg non retrib."])];
-    const bodyB = righe.map(function(r){
-      const cells = [r.dp.nome, String(r.ggP), String(r.ggAN), r.am.riposi.gg + " (" + r.am.riposi.dom + ")"];
-      codeCols.forEach(function(c){
-        const n = (r.am.cop.perCod[c] || 0) + (r.am.nonRetr.perCod[c] || 0) + ((c === "FESTNG") ? r.am.festngCelle.gg : 0);
-        cells.push(n ? String(n) : "");
-      });
-      cells.push(r.am.nonRetr.gg ? String(r.am.nonRetr.gg) : "");
-      return cells;
-    });
-    doc.autoTable({
-      head: headB, body: bodyB, startY: yy + 2, theme:"grid", margin:{ left:14, right:14, bottom:8 },
-      styles:{ fontSize:8.5, cellPadding:1.2, halign:"center", valign:"middle", lineColor:[200,200,200], lineWidth:0.1, overflow:"linebreak" },
-      headStyles:{ fillColor:[15,39,64], textColor:[255,255,255], fontSize:7.5, valign:"middle", fontStyle:"bold" },
-      columnStyles:{ 0:{ halign:"left", fontStyle:"bold", cellWidth:52 } },
-      didParseCell: function(data){
-        if (data.section === "head" && data.column.index > 3 && data.column.index < 4 + codeCols.length){
-          const c = codeCols[data.column.index - 4];
-          if (CODE_SET[c]){ const hx = CODE_SET[c].bg.replace("#","");
-            data.cell.styles.fillColor = [parseInt(hx.slice(0,2),16), parseInt(hx.slice(2,4),16), parseInt(hx.slice(4,6),16)];
-            data.cell.styles.textColor = lumaText(CODE_SET[c].bg) === "#ffffff" ? [255,255,255] : [17,24,39]; }
-        }
-      }
-    });
-    yy = doc.lastAutoTable.finalY + 6;
-    /* ---- che cosa vuol dire, e i permessi da aggiungere ---- */
-    ensureY(16);
-    doc.setFontSize(8); doc.setTextColor(60,60,60); doc.setFont(undefined,"normal");
-    const spieg = [
-      "P = presente (ci sono ore scritte nel foglio)   ·   AN = giorno non lavorativo (part-time)   ·   R = riposo o domenica   ·   gli altri sono i codici di assenza.",
-      "Ass. retrib. (h) = giorni di assenza retribuita × quota giornaliera (ore dovute del mese ÷ 26). MAL 0h e CASSA sono retribuite; ASP 0h no, e finisce nelle ore in meno.",
-      "SUPPLEMENTARE = Risultato del mese del Tabellone: ore rese + assenze retribuite + permessi retribuiti + festività godute − ore dovute. Più = da pagare, meno = da trattenere, zero = in pari.",
-      "Fest. non godute = festivi che cadono di domenica, più il 4 novembre: sono retribuite ma NON coprono le ore dovute, quindi si pagano IN PIÙ del supplementare."
-    ];
-    spieg.forEach(function(t){ const ls = doc.splitTextToSize(t, 269); ls.forEach(function(l){ ensureY(3.8); doc.text(l, 14, yy); yy += 3.8; }); });
+    /* ver154 (Christian, 11/11/2026: «NON METTERLA»): le quattro righe di legenda in calce sono
+       state TOLTE. Stessa scelta della ver95 sul Report storico: non rimetterle. */
     if (permMese.length > 0){
-      yy += 2; ensureY(5);
+      ensureY(5);
       doc.setFontSize(8.5); doc.setTextColor(15,39,64); doc.setFont(undefined,"bold");
       doc.text("Permessi orari (segnalati con ***, già compresi nel supplementare):", 14, yy); yy += 4; doc.setFont(undefined,"normal");
       doc.setFontSize(8); doc.setTextColor(70,70,70);
@@ -2112,6 +2162,7 @@ function esportaPDFMens(state, pairs){
   if (first){ doc.setFontSize(12); doc.text("Nessun dato nel periodo selezionato", 14, 24); }
   doc.save(fileName("pdf", "Presenze mensilizzati"));
 }
+
 
 /* ===================== IMPORT EXCEL ===================== */
 function importaExcel(file, state, onDone){

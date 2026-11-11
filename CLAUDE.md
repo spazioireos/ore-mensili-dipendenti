@@ -18,7 +18,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver153 · 11nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver154 · 11nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -398,6 +398,83 @@ Banca ore, tetto annuo, contratti e export.
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
 
+- 🧾 **IL REPORT DELLE PAGHE DIVENTA UNA TABELLA SOLA, CON LE ORE VOCE PER VOCE**
+  (ver154, 11/11/2026, quattro risposte di Christian nello stesso giorno).
+
+  - 🔢 **«serve più precisione: ore rese, di cui assenze retribuite ferie x ore, di cui assenze
+    retribuite permessi exf y ore, di cui malattia z ore etc.; poi ok indicare festivi non goduti
+    e supplementari a parte, nonché AN ed equiparabili (asp 0h) e riposi. Tutto in un'unica
+    tabella.»** La pagina per l'ufficio paghe aveva **due** tabelle (gli importi e «I giorni,
+    voce per voce», in giorni). Ora è **una sola**, e le assenze retribuite sono **colonne in
+    ORE**, una per ogni codice **davvero usato in quel mese**:
+    `Dipendente · Ore dovute · Ore rese · FERIE (h) · EXF (h) · MAL (h) · … · Permessi (h) ·
+    Fest. godute (h) · **SUPPLEMENTARE** · Fest. non godute (gg / h) da pagare in più ·
+    FESTNG (gg) · ASP 0h (gg) · AN (gg) · Riposi (gg · dom.)`, più la riga **TOTALE**.
+    - Le **retribuite** sono in **ore** (`giorni × quota giornaliera`), le **non retribuite**, gli
+      **AN** e i **riposi** in **giorni**: quelle ore non sono dovute, scriverle sarebbe un numero
+      che non esiste.
+    - L'intestazione di ogni voce porta **il colore del codice** come nel Tabellone.
+    - ⚠️ Le colonne **compaiono solo se quella voce è usata nel mese**: un mese senza malattie non
+      ha la colonna MAL. Serve a non allargare la tabella a vuoto.
+  - 📋 **«nella tabella Presenze mensilizzati, in calce scrivi oltre ai giorni di P anche tutti i
+    totali dei giorni di assenza retribuita e non retribuita, indicandoli dettagliatamente.
+    Un'unica tabella anche qui in unica pagina.»** In calce alla griglia non c'è più solo
+    «gg P»: c'è **una riga per ogni voce** — `gg P`, poi le retribuite, poi le non retribuite,
+    poi `gg AN` e `gg R` — con l'etichetta ripetuta anche a destra, come i giorni.
+    **MAXCOL da 14 a 24**, così i 16 mensilizzati stanno in **una pagina sola** invece di due.
+    ⚠️ Oltre 24 persone i blocchi tornano: 269 mm non bastano.
+  - 🧹 **«NON METTERLA»**: le **quattro righe di legenda** in calce (P / AN / R, «Ass. retrib.
+    (h) = …», «SUPPLEMENTARE = …», «Fest. non godute = …») sono state **TOLTE**. È la stessa
+    scelta della **ver95** sul Report storico: **non rimetterle.**
+    ⚠️ **Restano**: l'avviso «Il supplementare non esiste per i mesi prima di ottobre 2026» (è un
+    avviso, non una legenda) e l'elenco dei **permessi orari** (sono dati).
+    ⚠️ Per questo l'intestazione dice **«da pagare in più»** per esteso: senza legenda, la
+    colonna deve spiegarsi da sola.
+  - 📅 **«2 uniforma su monte/26»**: la quota delle **festività NON GODUTE** nel report passa da
+    `oreSett ÷ ggSett` a **`quotaGiorno` = ore dovute del mese ÷ 26**, la stessa che il Costo
+    orario usa per la gemella `J12`. **Misurato**: su novembre 2026 la colonna passa da
+    `2 / 6,000` a `2 / 6,012` (e 4,000 → 4,008, 9,667 → 9,686).
+    ⚠️ **Le festività GODUTE restano a `oreSett/ggSett`** — è la regola della **ver119**,
+    confermata da Christian con un numero: **le due quote sono diverse di proposito.**
+    ⚠️ Il **supplementare non si muove di un millesimo** (verificato): la quota delle non godute
+    non entra in `bancaMeseA`.
+  - 🎨 **«10 togli»**: il **verde brillante `#CCFF66`** non è più nella palette. In seconda
+    posizione c'è ora **`#8FA860`** (oliva spento) e **le altre 23 tinte non si sono mosse di
+    posto**, quindi nessun altro cambia colore. Chi aveva il verde brillante — glielo aveva
+    assegnato **l'app**, non Christian — ci passa alla normalizzazione del caricamento.
+    ⚠️ **Cambia solo in memoria**: nel documento ci finisce quando si preme **💾**
+    (verificato: senza 💾 l'archivio tiene ancora `#CCFF66`).
+  - **Provato in esecuzione** (`ver154.cjs`, **41 controlli su 41**, zero errori di pagina): la
+    tabella unica con le sue 14 colonne nell'ordine chiesto; `FERIE 2 gg = 2 × quota` in ore e
+    `EXF 1 gg = 1 × quota`; `ASP 0h` e `FESTNG` fra le non retribuite in giorni; i riposi
+    «4 · 4»; il TOTALE che somma anche le voci; **ogni SUPPLEMENTARE ancora identico a
+    `bancaMeseA`**; le **otto righe in calce** alle presenze (`gg P · gg FERIE · gg EXF · gg MAL ·
+    gg FESTNG · gg ASP 0h · gg AN · gg R`) coi numeri giusti; **nessuna delle quattro righe di
+    legenda**; i permessi orari ancora in calce; la quota delle non godute; la palette senza
+    verde brillante; e il **Report storico identico**.
+  - ⚠️ **NON verificabile da qui**: l'**impaginazione vera** del PDF. Che i 16 mensilizzati
+    stiano in una pagina è **calcolato** (31 righe + 8 di totale + intestazione ≈ 175 mm su 186
+    disponibili), **non visto**: va guardato su un foglio vero.
+  - **Batteria rieseguita sulla ver154, confrontata con lo storico, ZERO falliti nuovi**:
+    `sc-dip-A` **38/3** · `sc-dip-B` **32/2** · `sc-dip-C` **106/1** · `sc-dip-D` **11/0** ·
+    `ver144` **14/0** · `ver145` **7/0** · `ver146` **27/1** · `ver147` **26/1** · `ver149`
+    **29/0** · `ver150` **31/0** · `ic-fodip-A` **19/1** · `ic-fodip-B` **20/1/1** · `ver151`
+    **27/0** · `ver152` **23/0** · `ver153` **41/0** · `ver154` **41/0** · `nr153` **5/0**.
+    ⚠️ I «falliti» sono gli **STESSI di sempre**, attese sbagliate dei MIEI script.
+    ⚠️ In `ver153` tre attese erano invecchiate (le tre tabelle, la riga unica in calce, la
+    tabella dei giorni): **aggiornate, non aggirate**. E l'attesa della **targhetta**, che
+    invecchiava a ogni versione in cinque script, ora si confronta con l'`APP_VER` della pagina:
+    non invecchia più.
+
+- ✅ **GLI SCATTI CCNL: TABELLA UFFICIALE RICEVUTA, NESSUN VALORE DA CAMBIARE** (11/11/2026,
+  Christian: «6 allego scatti ufficiali»). La tabella che ha mandato (importo singolo scatto e
+  **valore massimo a 5 scatti**, per tutti e 13 i livelli) coincide **esattamente** con
+  `SCATTI_CCNL` già nel codice: A1 11,62 · A2 13,43 · B1 16,27 · C1 18,59 · C2 19,63 · C3 20,66 ·
+  D1 20,66 · D2 23,24 · D3 26,86 · E1 26,86 · E2 31,50 · F1 39,51 · F2 46,48. La colonna del
+  massimo (D1 **103,30** = 5 × 20,66) conferma anche **`SCATTI_MAX = 5`**.
+  🚫 **CHIUSA la questione dei 61,98 €**: quella fonte secondaria è **smentita** dalla tabella
+  ufficiale (61,98 sarebbe 3 scatti, e il massimo è 5 = 103,30). **Non riproporla.**
+
 - 🖨️ **IL REPORT PER L'UFFICIO PAGHE, E LE CINQUE COSE CHE MANCAVANO SUL TABELLONE**
   (ver151 · ver152 · ver153, 11/11/2026, richiesta di Christian: «un pdf a4 report in dipendenti
   che segnali giornalmente la presenza, AN oppure altra assenza retribuita indicando P … e a
@@ -489,6 +566,9 @@ Banca ore, tetto annuo, contratti e export.
     - **Terza tabella «I giorni, voce per voce»**: `gg P`, `gg AN`, `Riposi (di cui dom.)`, una
       colonna **per ogni voce usata in quel mese** (colorata come nel Tabellone) e `gg non
       retrib.`
+      ⚠️ **SUPERATA dalla ver154**: non esiste più come tabella a sé — è stata fusa nella
+      tabella delle paghe (le retribuite in ORE) e i conteggi in giorni sono finiti **in calce
+      alla griglia delle presenze**. Vedi la scheda 🧾 della ver154.
     - 🚦 **Ci vanno SOLO i mensilizzati** (in forza **e** `mensilizzato` a quella data). Se in quel
       mese non ce n'è nessuno il foglio **lo dice** invece di restare muto; chi non ha il mese
       compilato porta «mese non compilato» al posto di uno zero; e nei mesi **prima di ottobre
@@ -498,10 +578,12 @@ Banca ore, tetto annuo, contratti e export.
       «il 4 novembre per la legge «cade» la domenica dopo il primo novembre … Le festività non
       godute sostanzialmente quindi io non le segnerò mai nel tabellone». Sono **retribuite** ma
       **fuori** dal supplementare, e il foglio scrive «si pagano IN PIÙ del supplementare».
-      ⚠️ Qui la quota è quella delle **godute** (`oreSett/ggSett`), mentre il Costo orario usa
-      `monte/26` per la stessa voce: **1,3 centesimi di ora al giorno**, scostamento dichiarato e
-      **non** corretto.
+      ⚠️ In ver153 la quota era quella delle **godute** (`oreSett/ggSett`), diversa dal
+      `monte/26` del Costo orario. ✅ **CHIUSO nella ver154** («2 uniforma su monte/26»): ora
+      è `quotaGiorno`, la stessa del Costo orario.
     - ⚠️ **Diciture nuove, scritte da Claude**, tutte tranne il nome del pulsante.
+      ⚠️ **Le quattro righe di legenda in calce sono state TOLTE dalla ver154** (Christian:
+      «NON METTERLA»): non rimetterle.
     - **Provato in esecuzione** (`ver153.cjs`, **46 controlli su 46**, zero errori di pagina, con
       il finto jsPDF che esegue davvero `didParseCell`/`didDrawCell`): i due pulsanti; la finestra
       «Esporta PDF A4 mensilizz.»; su ottobre 2026 **36 P · 9 AN · 9 MAL · 44 R** e **nessun
