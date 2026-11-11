@@ -398,6 +398,45 @@ Banca ore, tetto annuo, contratti e export.
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
 
+- ✅ **COLLAUDO GENERALE DEL 11/11/2026 — DIPENDENTI NON HA ANOMALIE APERTE** (è l'unica delle
+  quattro app). **898 controlli superati** fra batteria, interconnessioni, regole Firestore e PDF
+  veri; gli **8 falliti sono gli STESSI di sempre** (attese sbagliate dei miei script:
+  `sc-dip-A` 3, `sc-dip-B` 2, `sc-dip-C` 1, `ver146` 1, `ver147` 1), verificati uno per uno.
+  - **Batteria**: `sc-dip-A` 38/3 · `sc-dip-B` 32/2 · `sc-dip-C` 106/1 · `sc-dip-D` 11/0 ·
+    `ver144` 14 · `ver145` 7 · `ver146` 27/1 · `ver147` 26/1 · `ver149` 29 · `ver150` 31 ·
+    `ver151` 27 · `ver152` 23 · `ver153` 41 · `ver154` 41 · `ver155` 18 · `ver156` 19 ·
+    `nr153` 5 · `graf155` 15 · `graf155b` 4 — **tutti ai numeri storici**.
+  - **Backup e import provati davvero** (`dip-backup.cjs`, **13/13**): il backup si scarica e
+    porta **`version: 4`** (§10.1 rispettato, ed è l'unica app insieme a Collaboratori ad
+    averlo); un file **corrotto** e un JSON **senza la struttura** vengono **rifiutati senza
+    toccare l'archivio**; prima di un import valido l'app **scarica da sé un backup di
+    sicurezza**; l'import entra **a video** ma **non in archivio finché non si preme 💾**; e
+    «Annulla import» **riporta tutto a prima**.
+  - **Integrità dei dati veri** (backup del 04/11, analisi statica): **6.020 celle piene**,
+    **zero** scritte non riconosciute, **zero** oltre le 13 ore, **zero** negative, **zero**
+    record orfani, **zero** nomi doppi. Restano **4 persone senza data di assunzione** e **5
+    senza livello**: sono dati da sistemare a mano, non difetti del codice (già noto).
+  - **Riservatezza**: cercati in **18 file** dei quattro repository i **31 pezzi di nome** dei
+    dipendenti veri → **14 occorrenze, tutte false** (l'elenco dei nomi comuni per
+    l'autocompletamento di Fogli ore, la tabella Belfiore dei comuni, una parola dentro
+    «segretariali» e una citazione di Christian). **Nessun dato personale nei repository.**
+  - **Prestazioni misurate** (banco locale, finta Firebase): Fogli ore 433 KB e **165 ms** per
+    la schermata · **Dipendenti 734 KB e ~3,9 s** · USOINT 269 KB e ~4,5 s · Collaboratori
+    226 KB · pagina integrata 8 KB. ⚠️ I ~4 secondi delle due app React sono il tempo che
+    **Babel** impiega a compilare il JSX **nel browser**: è il prezzo dell'architettura a file
+    unico, non un difetto, e sul computer di Christian il numero sarà diverso.
+  - 🐞 **DUE PROVE DI INTERCONNESSIONE ERANO VIZIATE, E NESSUNO L'AVEVA VISTO**: in
+    `ic-fodip-A` le prove sull'abbinamento per nome cambiavano **solo il campo `name`** di
+    Fogli ore, mentre `foNomeUtente` usa **prima `cognome`+`nome`** e ripiega su `name` solo se
+    mancano: il nome quindi **non cambiava mai**, e il «fallito storico» («ABBINATO A CASO»)
+    nasceva da lì. Corretto (ora cambia tutti e tre i campi): **20/0**, e con un nome davvero
+    diverso la riga **sparisce**, come deve. In `ic-fodip-B` il guasto in lettura era simulato
+    con `__fakefsFail`, che nella finta Firestore fa cadere **solo le scritture**: la prova non
+    provava niente. Corretto innestando il guasto sulla lettura: **21/0**.
+    ⚠️ Le schede delle ver149/ver150 liquidavano questi due come «attese sbagliate dei miei
+    script»: **era vero solo a metà** — gli script erano sbagliati, ma nessuno aveva verificato
+    il perché, e fino a oggi quei due pezzi di interconnessione **non erano davvero collaudati**.
+
 - 🖨️ **IL PDF ORA SI VEDE DAVVERO, E LE PRESENZE STANNO IN UNA PAGINA** (ver156, 11/11/2026,
   richiesta di Christian: «**i report pdf devono stare su una pagina il primo e va bene anche su
   due quello per l'ufficio paghe**»).
