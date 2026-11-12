@@ -444,6 +444,11 @@ input:focus,select:focus,textarea:focus{outline:3px solid #1d4ed8;outline-offset
      ⚠️ Il fondo resta GIALLINO: cambia solo il colore del bordo. */
   .ana-grid .field.itinere input,
   .ana-grid .field.itinere select { border-color:#c026d3 !important; }
+  /* ver160: la riga che spiega il fucsia e le didascalie sotto le caselle.
+     12,5px e' il minimo del §10.6 fuori dalle griglie dense. */
+  .ana-legenda { font-size:12.5px; color:#86198f; background:#fdf4ff; border:1px solid #f0abfc;
+                 border-radius:6px; padding:4px 7px; margin:0 0 5px; line-height:1.3; }
+  .ana-nota { display:block; font-size:12.5px; color:#475569; line-height:1.3; margin-top:2px; }
 
   /* ============== fine aggiunta ver134 ============== */
 
@@ -478,7 +483,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver159";
+const APP_VER = "ver160";
 const APP_DATA = "12nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -2894,6 +2899,17 @@ const LS_TEMPLATE = "spazioireos_contratto_template_v1";
    per sua risposta esplicita: «7 E 8 non sono accordi, si concede e stop».
    ⚠️ Cambia SOLO il bordo: il fondo resta giallino, perche' giallo vuol dire «qui si
    scrive» (§10.6) e il fucsia aggiunge «…e va tenuto aggiornato». */
+/* ver160 (12/11/2026). Le didascalie sotto le caselle dell'anagrafica: fino alla ver159 non
+   esistevano, e tre voci che si comportano in tre modi diversi sembravano la stessa cosa.
+   ⚠️ Le ETICHETTE non sono state toccate: si aggiunge soltanto una riga sotto.
+   ⚠️ Testi approvati da Christian il 12/11/2026, parola per parola. */
+const ANA_NOTA = {
+  premiTP: "importo al mese, riferito a 38 ore settimanali; per un part-time l'app lo riproporziona da s\u00e9. Entra nelle componenti, quindi muove anche l'importo orario, la tredicesima, la quattordicesima, il TFR e i contributi.",
+  premiMese: "importo al mese, cos\u00ec com'\u00e8: non viene riproporzionato al part-time. Paga i contributi, ma non entra nel TFR n\u00e9 nell'importo orario.",
+  kmMese: "\u00e8 esente, quindi non paga contributi e non entra in nessun imponibile: finisce solo nel costo totale. Con \u00abal mese\u00bb si moltiplica per i mesi del periodo, con \u00absecco\u00bb si conta una volta sola."
+};
+const ANA_NOTA_PERIODO = "vuote valgono sempre; scritte, la voce vale solo da quel mese a quel mese, compresi.";
+const ANA_CHIAVI_PERIODO = ["premiTPdal","premiTPal","premiMesedal","premiMeseal","kmMesedal","kmMeseal"];
 const ANA_ITINERE = ["premiTP","premiTPdal","premiTPal",
   "premiMese","premiMesedal","premiMeseal",
   "kmMese","kmTipo","kmMesedal","kmMeseal",
@@ -5577,6 +5593,12 @@ function CostoOrario(props){
 
 function Anagrafica(props){
   const state = props.state;
+  /* ver160: la data a cui si riferisce il residuo ferie degli anni precedenti. */
+  const anaFerieAl = (function(){
+    const pd = primoMeseDati(state); if (!pd) return "";
+    const y = (pd.m===1) ? (pd.y-1) : pd.y, m = (pd.m===1) ? 12 : (pd.m-1);
+    return pad2(daysInMonth(y,m)) + "/" + pad2(m) + "/" + y;
+  })();
   const dips = dipSorted(state);
   const [selId, setSelId] = useState((props.selInit && dips.some(function(x){ return x.id===props.selInit; })) ? props.selInit : (dips.length ? dips[0].id : null));
   const [msg, setMsg] = useState("");
@@ -5730,10 +5752,18 @@ function Anagrafica(props){
           {ANA_SECTIONS.map(function(sec){ return (
             <div key={sec.t} style={{ marginBottom:"8px" }}>
               <div style={{ fontSize:"12px", fontWeight:800, color:"#92400e", textTransform:"uppercase", letterSpacing:".4px", marginBottom:"4px", borderBottom:"1px solid #fde68a", paddingBottom:"2px" }}>{sec.t}</div>
+              {/* ver160: la riga che spiega il bordo fucsia. Testo approvato da Christian il 12/11/2026. */}
+              {sec.t==="Costo del lavoro" ? <div className="ana-legenda">⚠️ Le caselle col <b>bordo fucsia</b> non si firmano in contratto: vanno aggiornate quando cambiano, altrimenti il costo orario resta indietro.</div> : null}
               {sec.t==="Domicilio" ? <label style={{ display:"flex", alignItems:"center", gap:"6px", fontSize:"13px", marginBottom:"6px", cursor:"pointer" }}><input type="checkbox" checked={!!(dp.ana&&dp.ana.domUgualeRes)} onChange={function(e){ props.onAnaField(dp.id,"domUgualeRes",e.target.checked); }} /> Domicilio uguale alla residenza</label> : null}
               <div className="ana-grid" style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(230px, 1fr))", gap:"6px" }}>
                 {sec.f.map(function(fld){
-                  const key=fld[0], lbl=fld[1], kind=fld[2];
+                  const key=fld[0];
+                  /* ver160: l'etichetta delle ferie residue porta la DATA, come già fa la
+                     copia grigia nel Costo orario. La data la calcola l'app: è il giorno prima
+                     del primo mese che ha in archivio, quindi si aggiorna da sé. */
+                  const lbl = (key==="ferieResidue" && anaFerieAl) ? ("Giornate di ferie residue al " + anaFerieAl) : fld[1];
+                  const kind=fld[2];
+                  const nota = ANA_NOTA[key] || ((ANA_CHIAVI_PERIODO.indexOf(key)>=0) ? ANA_NOTA_PERIODO : "");   /* ver160 */
                   const cls = (ANA_ITINERE.indexOf(key)>=0) ? "field itinere" : "field";   /* ver159 */
                   if (kind==="auto") return <div key={key} className={cls} style={{margin:0}}><label>{lbl}</label><input value={anaTot(dp)} disabled style={{background:"#eef5fc",borderColor:"#b9d5f1",fontWeight:700}} /></div>;
                   if (kind==="tipo") return <div key={key} className={cls} style={{margin:0}}><label>{lbl}</label>
@@ -5806,7 +5836,8 @@ function Anagrafica(props){
                   if (kind==="mm"){ const mv=anaVal(dp,key);
                     return <div key={key} className={cls} style={{margin:0}}><label>{lbl}</label>
                       <input value={mv} maxLength={7} placeholder="mm/aaaa" inputMode="numeric"
-                        onChange={function(e){ props.onAnaField(dp.id,key,e.target.value.replace(/[^0-9/]/g,"").slice(0,7)); }} /></div>; }
+                        onChange={function(e){ props.onAnaField(dp.id,key,e.target.value.replace(/[^0-9/]/g,"").slice(0,7)); }} />
+                      {nota ? <span className="ana-nota">{nota}</span> : null}</div>; }   /* ver160 */
                   if (kind==="sino"){ const sv=anaVal(dp,key);
                     return <div key={key} className={cls} style={{margin:0}}><label>{lbl}</label>
                       <select value={sv} onChange={function(e){ props.onAnaField(dp.id,key,e.target.value); }}
@@ -5822,7 +5853,8 @@ function Anagrafica(props){
                         style={{ border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px", padding:"6px 8px", fontFamily:"inherit", fontSize:"13px", resize:"vertical", width:"100%" }} /></div>; }
                   const domLock = (sec.t==="Domicilio") && dp.ana && !!dp.ana.domUgualeRes;
                   return <div key={key} className={cls} style={{margin:0}}><label>{lbl}</label>
-                    <input value={anaVal(dp,key)} disabled={domLock} onChange={function(e){ props.onAnaField(dp.id,key,e.target.value); }} style={domLock?{background:"#f1f5f9",borderColor:"#cbd5e1",color:"#64748b"}:undefined} /></div>;
+                    <input value={anaVal(dp,key)} disabled={domLock} onChange={function(e){ props.onAnaField(dp.id,key,e.target.value); }} style={domLock?{background:"#f1f5f9",borderColor:"#cbd5e1",color:"#64748b"}:undefined} />
+                    {nota ? <span className="ana-nota">{nota}</span> : null}</div>;   /* ver160 */
                 })}
               </div>
             </div>

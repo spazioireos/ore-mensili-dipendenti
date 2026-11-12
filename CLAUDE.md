@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver159 · 12nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver160 · 12nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -398,6 +398,41 @@ Banca ore, tetto annuo, contratti e export.
     «— ore» e «non calcolabile»; la stessa persona su «Teoriche» → 18,67 €/h; e il **foglio Excel
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
+
+- 📝 **LE CASELLE DELL'ANAGRAFICA ADESSO SI SPIEGANO** (ver160, 12/11/2026, tre testi
+  approvati da Christian parola per parola).
+
+  Fino alla ver159 le caselle dell'anagrafica avevano soltanto l'etichetta, mentre nella scheda
+  del Costo orario ognuna ha sotto una riga che dice da dove arriva il numero. Il risultato era
+  che tre voci che si comportano in tre modi diversi sembravano la stessa cosa, e il bordo fucsia
+  della ver159 non era spiegato da nessuna parte.
+
+  - 🌸 **La riga che spiega il fucsia**, sotto il titolo della sezione *Costo del lavoro*,
+    in un riquadro rosa pallido della stessa famiglia del bordo (classe `.ana-legenda`): «⚠️ Le
+    caselle col **bordo fucsia** non si firmano in contratto: vanno aggiornate quando cambiano,
+    altrimenti il costo orario resta indietro.»
+  - 📌 **Tre didascalie**, nella mappa `ANA_NOTA`, sotto *Premi (tempo pieno) €*, *Premio
+    €/mese* e *Rimborso km €*; e una quarta, uguale per tutte e sei, sotto le caselle *dal mese*
+    e *al mese* (`ANA_NOTA_PERIODO`, chiavi in `ANA_CHIAVI_PERIODO`). Dicono le tre cose che
+    l'etichetta da sola non diceva: il **premio a tempo pieno** si riproporziona al part-time ed
+    entra nelle componenti; il **premio al mese** no, paga i contributi ma non entra nel TFR né
+    nell'importo orario; il **rimborso km** è esente e finisce solo nel costo totale.
+  - 📅 **L'etichetta delle ferie residue porta ora la DATA**: «Giornate di ferie residue **al
+    31/12/2024**», calcolata dall'app (il giorno prima del primo mese che ha in archivio), come
+    già faceva la copia grigia nel Costo orario. ⚠️ È **l'unica etichetta cambiata**, e cambia
+    perché era incompleta: la cella in cui il numero si scrive davvero non diceva a quando si
+    riferisse. Si aggiorna da sé se un domani si caricano mesi più vecchi.
+  - ⚠️ **Nessun'altra etichetta è stata toccata** (verificato in esecuzione sulle **72** della
+    scheda) e **nessun calcolo è cambiato**: si aggiunge soltanto una riga sotto le caselle.
+  - ⚠️ **Il posto dove scrivere una didascalia non esisteva**: i campi dell'anagrafica erano
+    `<label>` + `<input>` e basta. È stato aggiunto nei due rami che servono (quello generico e
+    quello `mm`), con la classe `.ana-nota` a **12,5px**, il minimo del §10.6.
+  - **Provato in esecuzione** (`ver160.cjs`, **27 controlli su 27**, zero errori di pagina): il
+    confronto diretto con la copia congelata della **ver159**, che non ha né le note né la riga
+    del fucsia né la data; i quattro testi confrontati **carattere per carattere** con quelli
+    approvati; le 15 celle fucsia ancora al loro posto; e la grafica a **390 · 1280 · 1700px**,
+    dove la larghezza di pagina resta **identica**, non c'è scorrimento laterale, nessuna scritta
+    scende sotto i 12,5px e nessuna casella sotto i 32px.
 
 - 🧮 **LE ORE SUPPLEMENTARI NON ENTRANO PIÙ NEL TFR, E LE CELLE «IN ITINERE» HANNO UN BORDO
   LORO** (ver159, 12/11/2026, tre risposte di Christian nella stessa giornata).
