@@ -1705,7 +1705,8 @@ Banca ore, tetto annuo, contratti e export.
     importo orario €*, *Importo orario totale €*, *Part / Full time*, *Giorni di lavoro nella
     settimana*, *Ruolo / qualifica* — **non sono lette da nessun calcolo**: finiscono in
     `dp.ana.*` e servono solo ai segnaposto della lettera .docx e all'export Excel. È la causa
-    del «su del mastro ho messo 0,500 orarie di scatti, ma non ho capito se poi si aggiorna»:
+    del «su [la scheda di una dipendente] ho messo 0,500 orarie di scatti, ma non ho capito
+    se poi si aggiorna»:
     quel numero non alimenta niente. **Verificato contando le letture nel file: zero.**
     Christian lo ha chiesto come correzione strutturale il 09/11/2026 (direttiva «LA SCHEDA
     ANAGRAFICA È IL MOTORE DEL SISTEMA»): **da fare, con le sue risposte alle domande aperte.**
