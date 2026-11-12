@@ -468,10 +468,12 @@ Banca ore, tetto annuo, contratti e export.
     - ⚠️ **Il resto del motore non è stato toccato**: `J18` (le ore aggiuntive, col 15% per i
       full-time e il 27% per i part-time) resta **dentro l'imponibile II**, quindi i contributi
       le pagano come prima. Cambia **solo** la base del **TFR**.
-    - 📜 **Un pezzo di storia da ricordare**: nel **foglio Excel di Christian** quella leva
-      c'era, ed era **per persona** — dei 5 casi con cui la **ver71** fu verificata, uno era
-      «TFR-supplementari **NO**». Qui invece è **unica per tutti**. Gli è stato scritto: se un
-      giorno dovesse dipendere dalla persona, va spostata in anagrafica.
+    - 🚫 **CHIUSA il 12/11/2026: «la scelta sulle supplementari è per tutti».** Nel
+      **foglio Excel di Christian** quella leva era **per persona** (dei 5 casi con cui la
+      **ver71** fu verificata, uno era «TFR-supplementari **NO**»), e gli era stato chiesto
+      se qui dovesse diventare un dato della singola scheda. Ha risposto di no: resta
+      **una sola scelta valida per tutti**, nei «valori comuni», dov'è adesso.
+      **Non riproporre** lo spostamento in anagrafica.
 
   - 🌸 **2 — «bordami in fucsia le celle dell'anagrafica che devo compilare non a inizio
     contratto, ma in itinere … che possono subire modifiche, ma non sono oggetto di firma di un
