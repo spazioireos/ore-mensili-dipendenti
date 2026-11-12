@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver160 · 12nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver161 · 12nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -398,6 +398,75 @@ Banca ore, tetto annuo, contratti e export.
     «— ore» e «non calcolabile»; la stessa persona su «Teoriche» → 18,67 €/h; e il **foglio Excel
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
+
+- 💰 **IL TFR ACCANTONATO SI SCRIVE ANNO PER ANNO, E L'ISTAT CON LUI** (ver161,
+  12/11/2026, idea di Christian: «e se io in dipendenti inserissi il tfr ogni anno (una cella per
+  ogni anno dal 31/12/24) così non modifico ogni volta?» → poi «**ok il TFR per anno con la
+  decisione sull'ISTAT**»).
+
+  - 🔑 **Non era solo comodità, era un numero sbagliato.** La rivalutazione si calcola sul fondo
+    accantonato al **31/12 dell'anno PRECEDENTE** al periodo. Con una casella sola, chiedendo il
+    costo di un anno passato l'app usava comunque il numero scritto: dalla **ver114** avvisava che
+    era «di un altro anno», ma **il risultato restava errato**. Ora l'anno giusto lo sceglie lei.
+  - **Come è fatto**: elenco **`dp.ana.tfrFondi`** = `[{id, anno, eur}]`, in ANAGRAFICA → *Costo
+    del lavoro*, con «**+ Aggiungi anno**» e la ✕ per riga (che **chiede conferma**, §10.1).
+    Funzioni nuove accanto a `datiCosto`: **`annoNum`**, **`tfrFondiList`**, **`tfrFondoAl`**,
+    **`istatAnniList`**, **`istatAl`**.
+  - 🔒 **La garanzia che non rompe niente**: `tfrFondoAl` torna **`null`** quando l'elenco è
+    vuoto, e allora vale **esattamente** la casella di prima. È lo stesso meccanismo della ver146
+    e della ver135. ⚠️ **Le due caselle vecchie NON sono state tolte** e restano scrivibili, così
+    nessun valore già inserito diventa irraggiungibile; quando l'elenco ha almeno una riga, sotto
+    di esse compare «**non più in uso: vale l'elenco per anno qui sotto**».
+  - ⚠️ **Se l'elenco c'è ma manca l'anno che serve**, `tfrFondoAl` torna **0** e il conto ricade
+    sulla **stima**: compare un avviso nuovo che lo dice. I **due avvisi della ver114** («manca
+    l'anno», «il fondo è di un altro anno») **non compaiono più** quando l'elenco è in uso:
+    l'anno lo sceglie l'app, non c'è più niente da sbagliare.
+  - 📉 **L'ISTAT ha preso la stessa strada**, e senza di essa il lavoro sarebbe stato a metà:
+    il tasso è `1,50% + 75% dell'ISTAT`, e con un solo ISTAT si sarebbe usato **il fondo giusto
+    con la percentuale sbagliata**. Elenco **`state.costoComune.istatAnni`** = `[{id, anno, pct}]`,
+    fra i valori comuni, sotto la casella che c'era. Si usa quello di **dicembre dello stesso anno
+    del fondo**; se quell'anno non c'è, vale il valore unico di prima.
+    ⚠️ Vive dentro `costoComune`, quindi **entra da sé nel backup JSON e nel cloud**; `costoComune(state)`
+    non lo vede (filtra per `COSTO_COMUNE_DEF`) ed è giusto così: si legge dallo stato grezzo.
+  - 🐞 **UN DIFETTO MIO, TROVATO DALLA PROVA E NON DALLA RILETTURA**: col periodo tagliato in
+    **pezzi** (ver84) — cioè quasi sempre, perché basta una proroga — la nota accanto alla voce
+    *Rivalutazione TFR* scriveva «ISTAT **0,00%**» mentre il conto usava la percentuale giusta.
+    La somma dei pezzi ricostruisce `res` dai soli **importi**, e una percentuale non è un importo:
+    va portata avanti a parte (`res.istatUsato = o.res.istatUsato`). ⚠️ **È lo STESSO errore della
+    ver136 con `divNonValidi`.** Da ricordare: *ogni valore che non è un importo si perde nella
+    somma dei pezzi.*
+  - ⚠️ **Il numero di schema del backup NON cambia** (resta `version: 4`): `tfrFondi` e `istatAnni`
+    sono due campi **facoltativi in più**. Un backup vecchio semplicemente non li ha e si comporta
+    come prima; uno nuovo letto da una versione vecchia li ignora.
+  - ⚠️ **Diciture nuove, scritte da Claude**: il titolo dell'elenco, quello dell'ISTAT, le due
+    righe di spiegazione, l'avviso dell'anno mancante e le due conferme di cancellazione.
+  - **Provato in esecuzione** (`ver161.cjs`, **28 controlli su 28**, zero errori di pagina):
+    | prova | esito |
+    |---|---|
+    | elenchi **vuoti** sui dipendenti veri | numeri **identici** alla ver160, al centesimo |
+    | periodo **2026** con fondi 2024 e 2025 | usa il fondo al **31/12/2025** (10.000,00) |
+    | periodo **2025** | usa il fondo al **31/12/2024** (8.000,00), rivalutazione **89,85** contro **225,83** |
+    | periodo **2027**, anno non in elenco | **lo dice** e ricade sulla **stima** |
+    | ISTAT di dicembre 2025 = 3,5% | il **2026** usa 3,50%, il **2025** il valore unico 1,011% |
+    | anagrafica | elenco presente, caselle **fucsia**, pulsante «+ Aggiungi anno», le due vecchie dichiarano di non valere più |
+    | grafica a **390 · 1280 · 1700px** | nessuno scorrimento laterale, **zero** scritte sotto i 12,5px, **zero** comandi sotto i 32px |
+    🐞 **Due attese erano MIE e sbagliate**: una cadeva perché il seme conosce solo il 2025 e
+    il 2026, quindi scegliere il 2027 non faceva niente; l'altra era la nota dell'ISTAT, che ha
+    fatto emergere il difetto vero qui sopra. **Corrette, non aggirate.**
+  - **Batteria rieseguita sulla ver161, ZERO falliti nuovi** (26 script, **659 controlli
+    superati**, 5 falliti, tutti e cinque **attese sbagliate dei MIEI script**, le stesse di
+    sempre): `sc-dip-A` **38/3** · `sc-dip-B` **35/0** · `sc-dip-C` **107/0** · `sc-dip-D`
+    **11/0** · `ver144` **14/0** · `ver145` **7/0** · `ver146` **27/1** · `ver147` **26/1** ·
+    `ver149` **29/0** · `ver150` **31/0** · `ver151` **27/0** · `ver152` **23/0** · `ver153`
+    **41/0** · `ver154` **41/0** · `ver155` **18/0** · `ver156` **19/0** · `ver157` **28/0** ·
+    `ver158` **24/0** · `ver159` **19/0** · `ver160` **27/0** · `ver161` **28/0** · `nr153`
+    **6/0** · `graf155` **15/0** · `graf155b` **4/0** · `ic-fodip-A` **20/0** · `ic-fodip-B`
+    **21/0** (1 non verificato, dichiarato).
+    🐞 **E la trappola del banco si è ripresentata**: il banco della **finta Firebase** (8202) e
+    quello dei **PDF veri** (8300) servivano ancora la **ver160**. Rigenerati **prima** che la
+    batteria li raggiungesse, quindi `ver149`, `ver150`, `ver156`, `ver158`, `ic-fodip-A` e
+    `ic-fodip-B` hanno misurato davvero la ver161. ⚠️ **I banchi vanno rigenerati dopo OGNI
+    modifica al file**, non solo riaccesi.
 
 - 📝 **LE CASELLE DELL'ANAGRAFICA ADESSO SI SPIEGANO** (ver160, 12/11/2026, tre testi
   approvati da Christian parola per parola).

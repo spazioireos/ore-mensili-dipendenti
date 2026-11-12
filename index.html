@@ -483,7 +483,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver160";
+const APP_VER = "ver161";
 const APP_DATA = "12nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -2864,6 +2864,7 @@ const ANA_SECTIONS = [
     ["kmMesedal","Rimborso — dal mese (mm/aaaa)","mm"],["kmMeseal","Rimborso — al mese (mm/aaaa)","mm"],
     ["sottoSoglia","Ore/mese sotto soglia perse"],
     ["tfrFondo","TFR accantonato al 31/12 €"],["tfrFondoAnno","TFR accantonato — anno"],
+    ["__tfrAnni","TFR accantonato al 31/12, anno per anno","tfranni"],
     ["ferieResidue","Giornate di ferie residue da anni precedenti"],
     ["mesiMater","Mesi di maternità"],
     ["ggSettCosto","Giorni settimanali (per il costo orario)"]
@@ -4217,10 +4218,13 @@ function calcCosto(o){
      ⚠️ `H6` = mesi in cui il RAPPORTO è in piedi, **non** i mesi pagati: il fondo si rivaluta
      anche nei mesi tutti «AN» (part-time verticale ciclico), perché il debito resta. */
   const H6 = (o.mesiRapporto!=null) ? o.mesiRapporto : H2;
-  const tassoRiv = 1.5/100 + c.istat/100*75/100;
+  /* ver161: se c'è una riga ISTAT per l'anno del fondo si usa quella, altrimenti resta
+     il valore unico dei valori comuni. */
+  const istatUsato = (o.istatUsato!=null && !isNaN(Number(o.istatUsato))) ? Number(o.istatUsato) : c.istat;
+  const tassoRiv = 1.5/100 + istatUsato/100*75/100;
   const J21 = (o.tfrFondo>0)
     ? o.tfrFondo*tassoRiv*(H6/12)
-    : (J19*c.anniTfr*1.5/100 + J19*c.anniTfr*c.istat/100*75/100);
+    : (J19*c.anniTfr*1.5/100 + J19*c.anniTfr*istatUsato/100*75/100);   /* ver161 */
   const J23 = H19*(c.prevCompl/100*c.prevComplPag)/100;
   const J25 = L18*(c.inps/100*c.inpsPag)/100;
   const J26 = L18*o.addizTD/100;                        // addizionale tempo determinato
@@ -4256,7 +4260,42 @@ function calcCosto(o){
            divNonValidi: [].concat(
              (isFinite(Q2) && Q2 > 0) ? [] : ["Giorni settimanali"],
              (isFinite(Number(c.tfrDiv)) && Number(c.tfrDiv) > 0) ? [] : ["Divisore TFR"]),
+           istatUsato: istatUsato,   /* ver161: la percentuale davvero usata */
            J35:J35,F38:F38,H38:H38, orario:(H38>0? J35/H38 : 0) };
+}
+
+/* ver161 (12/11/2026, Christian: «e se io in dipendenti inserissi il tfr ogni anno (una cella
+   per ogni anno dal 31/12/24) così non modifico ogni volta?» e poi «ok il TFR per anno con la
+   decisione sull'ISTAT»).
+   🔑 PERCHE' SERVIVA, e non era solo comodità: la rivalutazione si calcola sul fondo accantonato
+   al 31/12 dell'ANNO PRECEDENTE al periodo. Con una casella sola, chiedendo il costo di un anno
+   passato l'app usava comunque il numero scritto: avvisava che era di un altro anno (ver114), ma
+   il risultato restava sbagliato. Con una riga per anno sceglie da sé quella giusta, e l'avviso
+   non serve più.
+   ⚠️ Stesso schema dei massimali annui e delle tabelle CCNL: un elenco con la sua decorrenza.
+   ⚠️ L'ISTAT segue la stessa strada, altrimenti si userebbe il fondo giusto con la percentuale
+   sbagliata: il tasso è 1,50% + 75% dell'ISTAT di DICEMBRE di quello stesso anno. */
+function annoNum(x){ const n = parseInt(String(x==null?"":x).trim(), 10); return isNaN(n)?null:n; }
+function tfrFondiList(dp){ const a = dp && dp.ana && dp.ana.tfrFondi; return Array.isArray(a)?a:[]; }
+/* Torna il fondo di QUELL'anno. `null` = l'elenco non c'è, quindi vale la casella vecchia e non
+   cambia niente per chi non lo usa. `0` = l'elenco c'è ma quell'anno non è stato scritto: il
+   fondo è sconosciuto e si ricade sulla stima, dicendolo a video. */
+function tfrFondoAl(dp, anno){
+  const l = tfrFondiList(dp); if (!l.length) return null;
+  const a = annoNum(anno); if (a==null) return null;
+  for (let i=0;i<l.length;i++){ if (annoNum(l[i].anno)===a) return cNum(l[i].eur, 0); }
+  return 0;
+}
+function istatAnniList(state){
+  const a = state && state.costoComune && state.costoComune.istatAnni; return Array.isArray(a)?a:[];
+}
+/* La percentuale ISTAT di dicembre di QUELL'anno; se non c'è, il valore unico dei valori comuni. */
+function istatAl(state, anno, difetto){
+  const l = istatAnniList(state); const a = annoNum(anno);
+  if (a!=null) for (let i=0;i<l.length;i++){
+    if (annoNum(l[i].anno)===a){ const v = cNum(l[i].pct, NaN); if (!isNaN(v)) return v; }
+  }
+  return difetto;
 }
 
 // mette insieme i dati della scheda, i valori comuni e gli scostamenti della persona
@@ -4346,6 +4385,9 @@ function datiCosto(state, dp, pairs){
   const aKmMese    = voceAnaPeriodo(dp,"kmMese",pairs);
   const aSottoSog  = anaVoceNum(dp,"sottoSoglia");
   const aTfrFondo  = anaVoceNum(dp,"tfrFondo");
+  /* ver161: l'anno del fondo che serve a questo periodo e il fondo di quell'anno. */
+  const annoFondo  = pairs.length ? (pairs[0].y - 1) : null;
+  const fondoElenco = tfrFondoAl(dp, annoFondo);
   const aTfrAnno   = anaVoceTesto(dp,"tfrFondoAnno");
   const aFerieRes  = anaVoceNum(dp,"ferieResidue");
   const aMesiMater = anaVoceNum(dp,"mesiMater");
@@ -4380,9 +4422,13 @@ function datiCosto(state, dp, pairs){
     /* ver114: se i mesi sono scritti a mano, anche la rivalutazione segue quel numero. */
     mesiRapporto: (p.mesi!=null && p.mesi!=="") ? cNum(p.mesi, mesiAuto) : mesiRapportoAuto,
     mesiRapportoAuto: mesiRapportoAuto,
-    tfrFondo: (aTfrFondo!=null)? aTfrFondo : cNum(p.tfrFondo, 0),   /* ver146 */                  /* ver114: 0 o vuoto = si usa la stima di prima */
+    /* ver161: se c'è l'elenco per anno vince lui, e sceglie l'anno PRIMA del periodo. */
+    tfrFondo: (fondoElenco!=null) ? fondoElenco : ((aTfrFondo!=null)? aTfrFondo : cNum(p.tfrFondo, 0)),   /* ver146 */   /* ver114: 0 o vuoto = si usa la stima di prima */
+    tfrDaElenco: (fondoElenco!=null),
+    istatUsato: istatAl(state, annoFondo, c.istat),
+    istatDaElenco: (istatAl(state, annoFondo, null) != null),
     ferieResidue: (aFerieRes!=null)? aFerieRes : cNum(p.ferieResidue, 0),   /* ver146 */          /* ver125: giornate di ferie residue da anni precedenti */
-    tfrFondoAnno: (aTfrAnno!=null) ? aTfrAnno : ((p.tfrFondoAnno==null||String(p.tfrFondoAnno).trim()==="") ? "" : String(p.tfrFondoAnno).trim()),   /* ver146 */
+    tfrFondoAnno: (fondoElenco!=null) ? String(annoFondo) : ((aTfrAnno!=null) ? aTfrAnno : ((p.tfrFondoAnno==null||String(p.tfrFondoAnno).trim()==="") ? "" : String(p.tfrFondoAnno).trim())),   /* ver146 · ver161 */
     annoIniz: pairs.length ? pairs[0].y : null,
     mesiMater: (aMesiMater!=null)? aMesiMater : cNum(p.mesiMater, 0),   /* ver146 */
     minimo: minimoAuto,                            /* ver137: dalla tabella CCNL, non piu' a mano */
@@ -4571,6 +4617,12 @@ function datiCosto(state, dp, pairs){
          avanti, altrimenti con il periodo tagliato in pezzi l'avviso non compare mai (trovato
          in esecuzione: la prima stesura lo perdeva proprio nei casi più frequenti). */
       res.divNonValidi = o.res.divNonValidi || [];
+      /* ver161: anche la percentuale ISTAT davvero usata non è un importo da sommare.
+         Senza questa riga, col periodo tagliato in pezzi la nota a lato della voce
+         scriveva «ISTAT 0,00%» mentre il conto usava quella giusta: una bugia a video.
+         È lo STESSO errore già fatto nella ver136 con `divNonValidi`, e l'ha ritrovato
+         la prova in esecuzione, non la lettura del codice. */
+      res.istatUsato = o.res.istatUsato;
       const mesiTot = prep.reduce(function(a,x){ return a + x.ob.mesi; }, 0);
       ["E18","H5","J2","P2"].forEach(function(k){            /* valori "al mese": media pesata sui mesi */
         res[k] = mesiTot>0 ? prep.reduce(function(a,x){ return a + (Number(x.res[k])||0)*x.ob.mesi; }, 0)/mesiTot : 0;
@@ -4841,8 +4893,8 @@ function CostoOrario(props){
     /* ver114: due note diverse, perché sono due conti diversi. Col fondo scritto si vede il
        conto di legge; senza, resta la stima di prima. */
     J21: (d.tfrFondo>0)
-      ? ("fondo TFR" + (d.tfrFondoAnno ? (" al 31/12/" + d.tfrFondoAnno) : "") + " " + fmt2(d.tfrFondo) + " € × (1,50% + 75% dell'ISTAT " + pctTxt(c.istat) + " = " + pctTxt(R2(1.5 + c.istat*0.75, 5)) + ") × " + fmt2(d.mesiRapporto) + "/12 mesi di rapporto")
-      : ("stima: quota TFR del periodo × " + nTxt(c.anniTfr) + (Number(c.anniTfr)===1 ? " anno" : " anni") + " × (1,50% + 75% dell'ISTAT " + pctTxt(c.istat) + ")"),
+      ? ("fondo TFR" + (d.tfrFondoAnno ? (" al 31/12/" + d.tfrFondoAnno) : "") + " " + fmt2(d.tfrFondo) + " € × (1,50% + 75% dell'ISTAT " + pctTxt(r.istatUsato) + (d.istatDaElenco ? " di dicembre " + d.tfrFondoAnno : "") + " = " + pctTxt(R2(1.5 + r.istatUsato*0.75, 5)) + ") × " + fmt2(d.mesiRapporto) + "/12 mesi di rapporto")
+      : ("stima: quota TFR del periodo × " + nTxt(c.anniTfr) + (Number(c.anniTfr)===1 ? " anno" : " anni") + " × (1,50% + 75% dell'ISTAT " + pctTxt(r.istatUsato) + ")"),
     J23: pctTxt(c.prevCompl) + " su base TFR × quota a carico " + pctTxt(c.prevComplPag),
     J25: pctTxt(c.inps) + " × " + pctTxt(c.inpsPag) + " su imponibile II",
     J26: aPezzi ? "diversa in ogni pezzo: vedi «Come si divide il periodo»"
@@ -5030,6 +5082,37 @@ function CostoOrario(props){
             {campoNum("Divisore TFR", cMostra(sc.tfrDiv, COSTO_COMUNE_DEF.tfrDiv), function(v){ setComune("tfrDiv", v); }, "13,5")}
             {campoNum("Anni per rivalutazione TFR", cMostra(sc.anniTfr, COSTO_COMUNE_DEF.anniTfr), function(v){ setComune("anniTfr", v); }, anniTfrAttivo ? anniTfrNota : "", "", anniTfrAttivo ? false : anniTfrNota)}
             {campoNum("ISTAT anno prec. %", cMostra(sc.istat, numTxt(COSTO_COMUNE_DEF.istat)), function(v){ setComune("istat", v); })}
+            {/* ver161: l'ISTAT anno per anno. Senza, con i fondi per anno si userebbe il fondo
+                giusto e la percentuale sbagliata. ⚠️ Diciture nuove, scritte da Claude. */}
+            {(function(){
+              const lista = istatAnniList(state);
+              const scrivi = function(n){ setComune("istatAnni", n); };
+              const cellaIn = { border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px", padding:"7px 9px", fontFamily:"inherit", fontSize:"15px" };
+              return <label style={Object.assign({}, cella, { gridColumn:"1 / -1" })}>
+                <span style={etich}>ISTAT di dicembre, anno per anno</span>
+                <div style={{ display:"flex", flexDirection:"column", gap:"4px" }}>
+                  {lista.map(function(r,i){ return (
+                    <div key={r.id||("ist"+i)} style={{ display:"flex", gap:"6px", alignItems:"center" }}>
+                      <span style={{ fontSize:"12.5px", color:"#475569", whiteSpace:"nowrap" }}>dicembre</span>
+                      <input value={r.anno==null?"":r.anno} maxLength={4} inputMode="numeric" placeholder="aaaa"
+                        onChange={function(e){ const n=lista.slice(); n[i]=Object.assign({},r,{anno:e.target.value.replace(/[^0-9]/g,"").slice(0,4)}); scrivi(n); }}
+                        style={Object.assign({ width:"86px" }, cellaIn)} />
+                      <input value={r.pct==null?"":r.pct} inputMode="decimal" placeholder="%"
+                        onChange={function(e){ const n=lista.slice(); n[i]=Object.assign({},r,{pct:e.target.value.replace(/[^0-9.,]/g,"")}); scrivi(n); }}
+                        style={Object.assign({ flex:1, minWidth:0 }, cellaIn)} />
+                      <button type="button" className="btn btn-red" style={{ minHeight:"34px" }}
+                        onClick={function(){
+                          const pieno = String(r.anno||"").trim()!=="" || String(r.pct||"").trim()!=="";
+                          if (pieno && !window.confirm("Togliere la riga ISTAT di dicembre "+(r.anno||"?")+" ("+(r.pct||"vuota")+")?\n\nSi cancella solo questa riga. Serve il 💾 per salvare.")) return;
+                          scrivi(lista.filter(function(_,k){ return k!==i; }));
+                        }}>✕</button>
+                    </div>); })}
+                  <div><button type="button" className="btn" style={{ minHeight:"34px" }}
+                    onClick={function(){ scrivi(lista.concat([{ id:"i"+Date.now()+Math.round(Math.random()*1e6), anno:"", pct:"" }])); }}>+ Aggiungi anno</button></div>
+                </div>
+                <span style={{ display:"block", fontSize:"12.5px", color:"#475569", lineHeight:1.3, marginTop:"2px" }}>una riga per anno: si usa quella di <b>dicembre dell’anno prima</b> del periodo, la stessa del fondo TFR. Finché l’elenco è vuoto vale il valore unico qui sopra.</span>
+              </label>;
+            })()}
             {campoNum("Previdenza compl. %", cMostra(sc.prevCompl, COSTO_COMUNE_DEF.prevCompl), function(v){ setComune("prevCompl", v); })}
             {campoNum("Previdenza compl. — quota pagata %", cMostra(sc.prevComplPag, COSTO_COMUNE_DEF.prevComplPag), function(v){ setComune("prevComplPag", v); })}
             {campoNum("INPS %", cMostra(sc.inps, COSTO_COMUNE_DEF.inps), function(v){ setComune("inps", v); }, "26,40 netta")}
@@ -5245,8 +5328,18 @@ function CostoOrario(props){
                     /* ver114: il fondo è un numero che invecchia. Se l'anno scritto non è quello
                        prima del periodo guardato, l'app lo dice invece di usarlo in silenzio.
                        ⚠️ È solo un avviso: il conto si fa comunque con il numero scritto. */
-                    if (!(d.tfrFondo > 0)) return null;
                     const attesoAnno = d.annoIniz ? (d.annoIniz - 1) : null;
+                    /* ver161: con l'elenco per anno l'anno giusto lo sceglie l'app, quindi i due
+                       avvisi della ver114 non servono più. Resta un avviso nuovo: se per questo
+                       periodo l'anno non è stato scritto, il fondo è sconosciuto e si ricade
+                       sulla stima — ed è giusto dirlo invece di lasciare un numero muto. */
+                    if (d.tfrDaElenco){
+                      if (d.tfrFondo > 0) return null;
+                      return <div style={{ gridColumn:"1 / -1", background:"#FFF8E1", border:"1px solid #EAC87A", borderRadius:"8px", padding:"7px 10px", marginTop:"2px", fontSize:"13px", lineHeight:1.35, color:"#7c4a03" }}>
+                        ⚠️ <b>Nell’elenco manca il TFR al 31/12/{attesoAnno}</b>, che è l’anno che serve a questo periodo: la rivalutazione resta una <b>stima</b>. Scrivi quella riga in ANAGRAFICA → Costo del lavoro.
+                      </div>;
+                    }
+                    if (!(d.tfrFondo > 0)) return null;
                     if (!d.tfrFondoAnno) {
                       return <div style={{ gridColumn:"1 / -1", background:"#FFF8E1", border:"1px solid #EAC87A", borderRadius:"8px", padding:"7px 10px", marginTop:"2px", fontSize:"13px", lineHeight:1.35, color:"#7c4a03" }}>
                         ⚠️ <b>Manca l'anno del fondo TFR</b>: scrivilo, altrimenti fra un anno nessuno saprà se quel numero è ancora buono.{attesoAnno ? <span> Per il periodo che stai guardando serve il fondo al <b>31/12/{attesoAnno}</b>.</span> : null}
@@ -5764,6 +5857,10 @@ function Anagrafica(props){
                   const lbl = (key==="ferieResidue" && anaFerieAl) ? ("Giornate di ferie residue al " + anaFerieAl) : fld[1];
                   const kind=fld[2];
                   const nota = ANA_NOTA[key] || ((ANA_CHIAVI_PERIODO.indexOf(key)>=0) ? ANA_NOTA_PERIODO : "");   /* ver160 */
+                  /* ver161: quando l'elenco per anno c'è, le due caselle vecchie non valgono più. */
+                  const nota2 = ((key==="tfrFondo"||key==="tfrFondoAnno") && tfrFondiList(dp).length)
+                    ? "non più in uso: vale l’elenco per anno qui sotto"
+                    : nota;
                   const cls = (ANA_ITINERE.indexOf(key)>=0) ? "field itinere" : "field";   /* ver159 */
                   if (kind==="auto") return <div key={key} className={cls} style={{margin:0}}><label>{lbl}</label><input value={anaTot(dp)} disabled style={{background:"#eef5fc",borderColor:"#b9d5f1",fontWeight:700}} /></div>;
                   if (kind==="tipo") return <div key={key} className={cls} style={{margin:0}}><label>{lbl}</label>
@@ -5837,7 +5934,37 @@ function Anagrafica(props){
                     return <div key={key} className={cls} style={{margin:0}}><label>{lbl}</label>
                       <input value={mv} maxLength={7} placeholder="mm/aaaa" inputMode="numeric"
                         onChange={function(e){ props.onAnaField(dp.id,key,e.target.value.replace(/[^0-9/]/g,"").slice(0,7)); }} />
-                      {nota ? <span className="ana-nota">{nota}</span> : null}</div>; }   /* ver160 */
+                      {nota2 ? <span className="ana-nota">{nota2}</span> : null}</div>; }   /* ver160 */
+                  /* ver161: l'elenco del TFR accantonato, una riga per anno. Vive in
+                     `dp.ana.tfrFondi`; se è vuoto valgono le due caselle qui sopra e non
+                     cambia niente. ⚠️ Diciture nuove, scritte da Claude. */
+                  if (kind==="tfranni"){
+                    const lista = tfrFondiList(dp);
+                    const scrivi = function(nuova){ props.onAnaField(dp.id,"tfrFondi",nuova); };
+                    const cella = { border:"2px solid #c026d3", background:"#fffde7", borderRadius:"6px", padding:"7px 9px", fontFamily:"inherit", fontSize:"15px" };
+                    return <div key={key} className="field" style={{margin:0, gridColumn:"1 / -1"}}><label>{lbl}</label>
+                      <div style={{ display:"flex", flexDirection:"column", gap:"4px" }}>
+                        {lista.map(function(r,i){ return (
+                          <div key={r.id||("riga"+i)} style={{ display:"flex", gap:"6px", alignItems:"center" }}>
+                            <span style={{ fontSize:"12.5px", color:"#475569", whiteSpace:"nowrap" }}>al 31/12 del</span>
+                            <input value={r.anno==null?"":r.anno} maxLength={4} inputMode="numeric" placeholder="aaaa"
+                              onChange={function(e){ const n=lista.slice(); n[i]=Object.assign({},r,{anno:e.target.value.replace(/[^0-9]/g,"").slice(0,4)}); scrivi(n); }}
+                              style={Object.assign({ width:"86px" }, cella)} />
+                            <input value={r.eur==null?"":r.eur} inputMode="decimal" placeholder="importo €"
+                              onChange={function(e){ const n=lista.slice(); n[i]=Object.assign({},r,{eur:e.target.value.replace(/[^0-9.,]/g,"")}); scrivi(n); }}
+                              style={Object.assign({ flex:1, minWidth:0 }, cella)} />
+                            <button type="button" className="btn btn-red" style={{ minHeight:"34px" }}
+                              onClick={function(){
+                                const pieno = String(r.anno||"").trim()!=="" || String(r.eur||"").trim()!=="";
+                                if (pieno && !window.confirm("Togliere la riga del TFR al 31/12/"+(r.anno||"?")+" ("+(r.eur||"vuota")+")?\n\nSi cancella solo questa riga; le altre restano. Serve il 💾 per salvare.")) return;
+                                scrivi(lista.filter(function(_,k){ return k!==i; }));
+                              }}>✕</button>
+                          </div>); })}
+                        <div><button type="button" className="btn" style={{ minHeight:"34px" }}
+                          onClick={function(){ scrivi(lista.concat([{ id:"t"+Date.now()+Math.round(Math.random()*1e6), anno:"", eur:"" }])); }}>+ Aggiungi anno</button></div>
+                      </div>
+                      <span className="ana-nota">una riga per anno: l’app usa da sé quella dell’anno <b>prima</b> del periodo che stai calcolando. Finché l’elenco è vuoto valgono le due caselle qui sopra.</span>
+                    </div>; }
                   if (kind==="sino"){ const sv=anaVal(dp,key);
                     return <div key={key} className={cls} style={{margin:0}}><label>{lbl}</label>
                       <select value={sv} onChange={function(e){ props.onAnaField(dp.id,key,e.target.value); }}
@@ -5854,7 +5981,7 @@ function Anagrafica(props){
                   const domLock = (sec.t==="Domicilio") && dp.ana && !!dp.ana.domUgualeRes;
                   return <div key={key} className={cls} style={{margin:0}}><label>{lbl}</label>
                     <input value={anaVal(dp,key)} disabled={domLock} onChange={function(e){ props.onAnaField(dp.id,key,e.target.value); }} style={domLock?{background:"#f1f5f9",borderColor:"#cbd5e1",color:"#64748b"}:undefined} />
-                    {nota ? <span className="ana-nota">{nota}</span> : null}</div>;   /* ver160 */
+                    {nota2 ? <span className="ana-nota">{nota2}</span> : null}</div>;   /* ver160 */
                 })}
               </div>
             </div>
