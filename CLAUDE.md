@@ -518,8 +518,41 @@ Banca ore, tetto annuo, contratti e export.
     ambra, il fondo ancora giallino e la frase nuova a video.
     🐞 **Due attese erano MIE e sbagliate** nella prima stesura (avevo invertito la scheda
     full-time con quella senza supplementari): **corrette, non aggirate**.
-  - ⚠️ **Babel e `node --check` superati.** La **batteria storica** è stata rieseguita: i numeri
-    stanno nella riga qui sotto.
+  - ⚠️ **Babel e `node --check` superati.**
+  - **BATTERIA STORICA RIESEGUITA SULLA ver160** (25 script, **658 controlli superati**, 5 falliti,
+    tutti e cinque **attese sbagliate dei MIEI script**, verificate una per una):
+    `sc-dip-A` **38/3** · `sc-dip-B` **35/0** · `sc-dip-C` **107/0** · `sc-dip-D` **11/0** ·
+    `ver144` **14/0** · `ver145` **7/0** · `ver146` **27/1** · `ver147` **26/1** · `ver149`
+    **29/0** · `ver150` **31/0** · `ver151` **27/0** · `ver152` **23/0** · `ver153` **41/0** ·
+    `ver154` **41/0** · `ver155` **18/0** · `ver156` **19/0** · `ver157` **28/0** · `ver158`
+    **24/0** · `ver159` **19/0** · `ver160` **27/0** · `nr153` **6/0** · `graf155` **15/0** ·
+    `graf155b` **4/0** · `ic-fodip-A` **20/0** · `ic-fodip-B` **21/0**.
+    - 🔑 **`sc-dip-B` passa ora 35/0 invece del 32/2 storico**: i suoi due «falliti» di sempre
+      erano **due errori miei**, trovati e corretti qui. Il primo cercava il titolo di sezione
+      «Costo del lavoro» così com'è scritto nel codice, mentre `innerText` lo restituisce in
+      **MAIUSCOLO** per via del `text-transform`. Il secondo cercava la tendina «Educatore
+      (E.A.R.)» **dentro** la sua `<label>`, mentre nell'anagrafica è un **fratello**: tornava
+      sempre `null` e il controllo del colore leggeva «undefined / undefined».
+    - ⚠️ **Due attese sono state AGGIORNATE, non aggirate** (`sc-dip-B` e `nr153`): pretendevano
+      che il costo dei 16 dipendenti fosse **identico** a quello della ver140 e della ver150, e
+      fino alla ver158 era giusto. La **ver159 lo cambia di proposito**, quindi ora pretendono il
+      numero **preciso**: **10 schede su 16** che cambiano — quelle con ore supplementari in
+      quei mesi — e le altre **6 identiche al centesimo**. Una regressione vera continuerebbe a
+      farle cadere.
+    - ⚠️ Altre due attese erano invecchiate per colpa della **ver160** (l'etichetta delle ferie
+      residue, che ora porta la data, e la targhetta della versione): adesso leggono il valore
+      **dal file dell'app** e non invecchiano più.
+    - 🐞 **TRE SCRIPT NON ERANO PROPRIO PARTITI**, e non per colpa dell'app: i server del
+      **finto database** (8202), dei **PDF veri** (8300) e della **versione precedente** (8203)
+      erano spenti o fermi a una versione vecchia. ⚠️ **Da ricordare**: i banchi vanno riaccesi
+      **e rigenerati** a ogni sessione e dopo ogni modifica al file, altrimenti si misura la
+      versione di ieri o una pagina vuota — ed è la stessa trappola che il 11/11 aveva fatto
+      sembrare `sc-dip-C` pieno di regressioni (63/44) quando non ce n'era nessuna.
+    - ⚠️ **I cinque falliti che restano sono gli STESSI di sempre**: tre in `sc-dip-A` (una cella
+      letta mentre la si sta ancora digitando, un avviso a comparsa che è transitorio, il 🗑 che
+      sta nel Tabellone e non in Anagrafica), uno in `ver146` (il periodo era **già** diviso in 13
+      pezzi, quindi il taglio in più non si poteva vedere dal conteggio) e uno in `ver147` (il
+      valore di una casella letto da `innerText`, che non lo contiene).
 
 - 🔗 **IL CODICE OPERATORE: LE APP NON SI PARLANO PIÙ SOLO COL NOME** (ver157 e ver158,
   11/11/2026, richiesta di Christian dopo la riconciliazione delle urgenze — **TR-03**: «ok
