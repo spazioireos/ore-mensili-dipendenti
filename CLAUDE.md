@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver158 · 11nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver159 · 12nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -398,6 +398,93 @@ Banca ore, tetto annuo, contratti e export.
     «— ore» e «non calcolabile»; la stessa persona su «Teoriche» → 18,67 €/h; e il **foglio Excel
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
+
+- 🧮 **LE ORE SUPPLEMENTARI NON ENTRANO PIÙ NEL TFR, E LE CELLE «IN ITINERE» HANNO UN BORDO
+  LORO** (ver159, 12/11/2026, tre risposte di Christian nella stessa giornata).
+
+  - 💰 **1 — «nel costo orario dipendenti le ore supplementari non incidono sul tfr»**, e poi,
+    sulla domanda che la correzione obbligava a fargli: «**chi è a 38 h/sett. non si vede le
+    supplementari (che vanno al 15%) dentro il TFR**».
+    - 🔴 **Com'era, misurato prima di toccare niente**: la regola era **DOPPIA e incoerente**.
+      Chi è a **38 h/sett.** si vedeva le supplementari **sempre** dentro la base TFR,
+      **maggiorazione del 15% compresa**, e la sua tendina **«Supplementari nel TFR» non veniva
+      nemmeno letta**; chi è **part-time** seguiva la tendina, che di fabbrica era su **SI**, e
+      allora entravano **senza** maggiorazione (`E18*J2*H2`).
+    - **Ora** la tendina vale **per tutti** ed è su **NO** di fabbrica:
+      `H19 = (L15-J12) + ((c.tfrSupp==="SI")? ((O2>=38)? J18 : E18*J2*H2) : 0) + …`
+    - ⚠️ **La tendina NON è stata tolta**: è una dicitura di Christian, e rimettendola su **SI**
+      si torna **esattamente** al comportamento di prima, senza una versione nuova.
+      **Verificato in esecuzione**, e vale anche per il full-time, che prima la ignorava.
+    - ⚠️ **Nei dati veri `costoComune` è vuoto**, quindi il **NO** vale subito per tutti e 16
+      (verificato prima di scegliere).
+    - 🔴 **QUANTO PESA, misurato sui 16 dipendenti veri** (confronto diretto con la copia
+      congelata della ver158, 16 schede su 16 lette, zero errori di pagina):
+      | periodo | costo totale PRIMA → DOPO | differenza | schede che cambiano |
+      |---|--:|--:|--:|
+      | gen → ott 2026 | 154.906,45 → **154.348,48** | **−557,97 €** | 10 su 16 |
+      | gen → dic 2026 | 192.649,00 → **192.091,02** | **−557,98 €** | 10 su 16 |
+      | gen → dic 2025 | 140.697,40 → **140.015,18** | **−682,22 €** | 8 su 16 |
+      Il costo **scende**, ed è il verso giusto: la base TFR si sgonfia di tutte le supplementari.
+      La punta: una scheda passa da **14.286,15 a 14.142,20 €** (base TFR da 9.675,65 a
+      **7.775,24**); sul 2025 un'altra fa **−279,98 €** e il suo €/h va da **18,28 a 17,97**.
+      Il **full-time** a 38 h/sett. nel 2026 quasi non si muove (−0,62 €, non ha supplementari in
+      quei mesi), nel **2025** fa **−92,51 €**.
+    - ⚠️ **I costi orari calcolati finora erano quindi SOVRASTIMATI** di quella quota.
+    - ⚠️ **Il resto del motore non è stato toccato**: `J18` (le ore aggiuntive, col 15% per i
+      full-time e il 27% per i part-time) resta **dentro l'imponibile II**, quindi i contributi
+      le pagano come prima. Cambia **solo** la base del **TFR**.
+    - 📜 **Un pezzo di storia da ricordare**: nel **foglio Excel di Christian** quella leva
+      c'era, ed era **per persona** — dei 5 casi con cui la **ver71** fu verificata, uno era
+      «TFR-supplementari **NO**». Qui invece è **unica per tutti**. Gli è stato scritto: se un
+      giorno dovesse dipendere dalla persona, va spostata in anagrafica.
+
+  - 🌸 **2 — «bordami in fucsia le celle dell'anagrafica che devo compilare non a inizio
+    contratto, ma in itinere … che possono subire modifiche, ma non sono oggetto di firma di un
+    nuovo contratto o accordo, e che servono per avere il costo orario corretto»**, più la sua
+    risposta sui due dubbi: «**7 E 8 non sono accordi, si concede e stop**».
+    - Costante nuova **`ANA_ITINERE`** (15 chiavi) e una classe **`.itinere`** sul `div` del campo;
+      una regola CSS sola: `.ana-grid .field.itinere input, … select { border-color:#c026d3 }`.
+    - **Sono fucsia** tutte le caselle della sezione **«Costo del lavoro»**: *Premi (tempo pieno)*,
+      *Premio €/mese*, *Rimborso km* con il suo «come si conta», i **sei dal/al**, *Ore/mese sotto
+      soglia perse*, *TFR accantonato* e il suo anno, *Giornate di ferie residue*, *Mesi di
+      maternità*.
+    - ⚠️ **Restano AMBRA, di proposito e per sua decisione**: *Giorni settimanali (per il costo
+      orario)* — è un dato del **contratto** — e *Scatti riconosciuti all'**assunzione***. E resta
+      ambra tutta la sezione **«Economico»**, che dalla ver135/ver137 **non alimenta nessun
+      calcolo**: serve solo alla lettera .docx.
+    - ⚠️ **Il fondo resta GIALLINO**: cambia **solo il bordo**. Giallo continua a voler dire «qui
+      si scrive» (§10.6) e il fucsia aggiunge «…e va tenuto aggiornato». **Misurato**: fondo
+      `rgb(255,253,231)`, bordo `rgb(192,38,211)` sulle 15, `rgb(245,158,11)` su tutte le altre.
+    - 🟠 **NON fatta, in attesa del suo via libera**: la **riga di spiegazione** sotto il titolo
+      della sezione («le caselle col bordo fucsia non si firmano in contratto: vanno aggiornate
+      quando cambiano»). È una **dicitura nuova** e il §10.6 non me la fa scrivere da solo.
+      Finché non c'è, **il colore non si spiega da sé**.
+
+  - 📅 **3 — la didascalia del «Monte ore (anche temporaneo)» diceva una cosa falsa**, e
+    l'ha trovata lui: «No vale fino all'ultimo giorno del mese indicato, esempio 1 ottobre-30
+    novembre 2026».
+    - **Misurato prima di rispondergli** (`orartemp.cjs`, 5 controlli su 5, dati inventati): con
+      20 ore dal **01/10/2026 al 30/11/2026** su una persona a 38 h/sett., il Tabellone dice
+      **settembre 165 · ottobre 86,84 · novembre 86,84 · dicembre 165**. Quindi **il programma
+      faceva già la cosa giusta**: era la **frase** a essere sbagliata (diceva «al 1° del mese di
+      fine»), ed era una frase **scritta da Claude** nella ver62, non una dicitura di Christian.
+    - 🐞 **E la frase taceva una seconda cosa, misurata**: il **giorno non conta affatto**.
+      Scrivendo **15/10/2026 → 05/11/2026** si ottiene **lo stesso identico risultato**
+      (`orartempB.cjs`, 5/5): ottobre e novembre **interi**. Chi scrive «dal 15 ottobre» crede di
+      partire a metà mese, e invece parte dal 1°.
+    - La frase nuova lo dice per esteso, **con l'esempio suo**. ⚠️ **Approvata da Christian**
+      («ok la frase che proponi al posto di quella sbagliata») prima di scriverla nel file.
+    - ⚠️ **Nessun calcolo è stato toccato**: `valoriAt` e `orarioTempAt` lavorano sul **mese**
+      (`anno*100+mese`) e restano **identiche**.
+
+  - **Provato in esecuzione** (`ver159.cjs`): il confronto diretto con la ver158 sui casi veri, la
+    tendina rimessa su SI che riporta **esattamente** ai numeri di prima (part-time **e**
+    full-time), le 15 celle fucsia contate una per una col colore misurato, le altre rimaste
+    ambra, il fondo ancora giallino e la frase nuova a video.
+    🐞 **Due attese erano MIE e sbagliate** nella prima stesura (avevo invertito la scheda
+    full-time con quella senza supplementari): **corrette, non aggirate**.
+  - ⚠️ **Babel e `node --check` superati.** La **batteria storica** è stata rieseguita: i numeri
+    stanno nella riga qui sotto.
 
 - 🔗 **IL CODICE OPERATORE: LE APP NON SI PARLANO PIÙ SOLO COL NOME** (ver157 e ver158,
   11/11/2026, richiesta di Christian dopo la riconciliazione delle urgenze — **TR-03**: «ok

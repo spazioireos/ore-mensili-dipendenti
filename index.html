@@ -438,6 +438,13 @@ input:focus,select:focus,textarea:focus{outline:3px solid #1d4ed8;outline-offset
   [style*="padding: 7px 10px"]:not(table.cal *):not(.grid-wrap *):not(.co-scroll *)
     { padding:5px 8px !important; }
 
+  /* ============== ver159 (12/11/2026): le celle «in itinere» ==============
+     Bordo FUCSIA sulle caselle dell'anagrafica che non si firmano in contratto e che
+     vanno aggiornate quando cambiano (TFR accantonato, ferie residue, premi, rimborsi…).
+     ⚠️ Il fondo resta GIALLINO: cambia solo il colore del bordo. */
+  .ana-grid .field.itinere input,
+  .ana-grid .field.itinere select { border-color:#c026d3 !important; }
+
   /* ============== fine aggiunta ver134 ============== */
 
 </style>
@@ -471,8 +478,8 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver158";
-const APP_DATA = "11nov26";
+const APP_VER = "ver159";
+const APP_DATA = "12nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
 const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
@@ -2878,6 +2885,19 @@ function anaTot(dp){ const a=dp.ana||{}; return fmt2(anaNum(a.impBase)+anaNum(a.
 function anaVal(dp, key){ if (ANA_SHARED[key]) return dp[key]==null?"":dp[key]; return (dp.ana&&dp.ana[key]!=null)?dp.ana[key]:""; }
 
 const LS_TEMPLATE = "spazioireos_contratto_template_v1";
+/* ver159 (12/11/2026, Christian: «bordami in fucsia le celle dell'anagrafica che devo
+   compilare non a inizio contratto, ma in itinere, ad esempio il tfr maturato, cioe'
+   quelle celle che possono subire modifiche, ma non sono oggetto di firma di un nuovo
+   contratto o accordo, e che servono per avere il costo orario corretto»).
+   Sono tutte le caselle della sezione «Costo del lavoro» TRANNE «Giorni settimanali
+   (per il costo orario)», che e' un dato del contratto. Premi e rimborsi ci sono dentro
+   per sua risposta esplicita: «7 E 8 non sono accordi, si concede e stop».
+   ⚠️ Cambia SOLO il bordo: il fondo resta giallino, perche' giallo vuol dire «qui si
+   scrive» (§10.6) e il fucsia aggiunge «…e va tenuto aggiornato». */
+const ANA_ITINERE = ["premiTP","premiTPdal","premiTPal",
+  "premiMese","premiMesedal","premiMeseal",
+  "kmMese","kmTipo","kmMesedal","kmMeseal",
+  "sottoSoglia","tfrFondo","tfrFondoAnno","ferieResidue","mesiMater"];
 const MESI_LUNGHI = ["gennaio","febbraio","marzo","aprile","maggio","giugno","luglio","agosto","settembre","ottobre","novembre","dicembre"];
 function dlong(s){
   const m = String(s==null?"":s).match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
@@ -3369,7 +3389,7 @@ function SchedaContratto(props){
 
       <div style={box("#fff7ed","#fed7aa")}>
         <label style={titolo}>Monte ore (anche temporaneo)</label>
-        <div style={aiuto}>Il monte ore <b>normale</b> si scrive sopra, nel riquadro "Orario". Qui aggiungi i <b>periodi in cui lavora con un orario diverso</b> — per esempio 20 ore da marzo a giugno — e poi torna da solo al monte ore normale. Vale dal 1° del mese di inizio al 1° del mese di fine.</div>
+        <div style={aiuto}>Il monte ore <b>normale</b> si scrive sopra, nel riquadro "Orario". Qui aggiungi i <b>periodi in cui lavora con un orario diverso</b> — per esempio 20 ore da marzo a giugno — e poi torna da solo al monte ore normale. Vale <b>per mesi interi</b>: dal <b>1°</b> del mese di inizio all’<b>ultimo giorno</b> del mese di fine (1 ottobre → 30 novembre 2026 = ottobre e novembre <b>interi</b>). ⚠️ Il <b>giorno</b> che scrivi non conta: contano solo il mese e l’anno.</div>
         {orariTemp.length===0 ? <div style={{ fontSize:"12px", color:"#64748b", margin:"4px 0" }}>Nessun periodo con orario diverso.</div> :
           <div style={{ margin:"6px 0" }}>
             {orariTemp.map(function(w,i){ return (
@@ -3613,7 +3633,7 @@ const COSTO_COMUNE_DEF = {
      1,50% + 75% × 1,011% = 2,25825%. ⚠️ Valore DI PARTENZA: un numero già salvato nei valori
      comuni resta, va cambiato a mano nella casella. ⚠️ Da riscrivere ogni gennaio col dato
      di dicembre dell'anno prima. */
-  tfrSupp:"SI", tfrDiv:13.5, anniTfr:1, istat:1.011, prevCompl:1.5, prevComplPag:0,
+  tfrSupp:"NO", tfrDiv:13.5, anniTfr:1, istat:1.011, prevCompl:1.5, prevComplPag:0,   /* ver159: le supplementari NON entrano nel TFR */
   inps:26.90, inpsPag:100, fis:0.53333, fisPag:100, inail:0.4, inailPag:100,
   irap:3.9, irapPag:0, sanitaria:132, paghe:25, formazione:250, kmMese:0
 };
@@ -4157,7 +4177,17 @@ function calcCosto(o){
      ~2,4 €; se sono DENTRO, di ~24,2 €. Quindi sono DENTRO.
      ⚠️ J12 resta fuori: e' una cosa diversa (le domeniche e il 4 novembre), e nei cedolini
      non compare come voce a se'. */
-  const H19 = (L15-J12) + ((O2>=38)? J18 : ((c.tfrSupp==="SI")? E18*J2*H2 : 0)) + H5*I2*(100-c.integrMater)/100;
+  /* ver159 (12/11/2026, Christian: «nel costo orario dipendenti le ore supplementari non
+     incidono sul tfr» e poi «chi e' a 38 h/sett. non si vede le supplementari (che vanno
+     al 15%) dentro il TFR»). PRIMA la regola era DOPPIA e incoerente: chi e' a 38 h/sett.
+     se le vedeva SEMPRE dentro, maggiorazione compresa, e la tendina «Supplementari nel
+     TFR» NON veniva nemmeno letta; chi e' part-time seguiva la tendina, che di fabbrica
+     era su SI, e allora entravano SENZA maggiorazione.
+     ORA la tendina vale per TUTTI e di fabbrica e' su NO, quindi le supplementari sono
+     fuori dal TFR per chiunque. ⚠️ La tendina NON e' stata tolta: e' una dicitura di
+     Christian, e rimettendola su SI si torna al comportamento di prima (col 15% per i
+     full-time e senza maggiorazione per i part-time), senza una versione nuova. */
+  const H19 = (L15-J12) + ((c.tfrSupp==="SI")? ((O2>=38)? J18 : E18*J2*H2) : 0) + H5*I2*(100-c.integrMater)/100;
   /* ver79: dal TFR si toglie lo 0,50%, che e' una quota dei contributi dovuti all'INPS
      e si calcola sulla stessa base dei contributi (imponibile II). */
   const J20 = L18*0.005;                                // 0,50% a carico dei contributi
@@ -5704,21 +5734,22 @@ function Anagrafica(props){
               <div className="ana-grid" style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(230px, 1fr))", gap:"6px" }}>
                 {sec.f.map(function(fld){
                   const key=fld[0], lbl=fld[1], kind=fld[2];
-                  if (kind==="auto") return <div key={key} className="field" style={{margin:0}}><label>{lbl}</label><input value={anaTot(dp)} disabled style={{background:"#eef5fc",borderColor:"#b9d5f1",fontWeight:700}} /></div>;
-                  if (kind==="tipo") return <div key={key} className="field" style={{margin:0}}><label>{lbl}</label>
+                  const cls = (ANA_ITINERE.indexOf(key)>=0) ? "field itinere" : "field";   /* ver159 */
+                  if (kind==="auto") return <div key={key} className={cls} style={{margin:0}}><label>{lbl}</label><input value={anaTot(dp)} disabled style={{background:"#eef5fc",borderColor:"#b9d5f1",fontWeight:700}} /></div>;
+                  if (kind==="tipo") return <div key={key} className={cls} style={{margin:0}}><label>{lbl}</label>
                     <select value={anaVal(dp,"tipoContratto")||"indeterminato"} onChange={function(e){ props.onAnaField(dp.id,"tipoContratto",e.target.value); }}>
                       <option value="indeterminato">Indeterminato</option><option value="determinato">Determinato</option></select></div>;
-                  if (kind==="super") return <div key={key} className="field" style={{margin:0}}><label>{lbl}</label>
+                  if (kind==="super") return <div key={key} className={cls} style={{margin:0}}><label>{lbl}</label>
                     <select value={anaVal(dp,"tipoSuper")||""} onChange={function(e){ props.onAnaField(dp.id,"tipoSuper",e.target.value); }}>
                       <option value="">—</option><option value="ASSORBIBILE">Assorbibile</option><option value="NON ASSORBIBILE">Non assorbibile</option></select></div>;
-                  if (kind==="qual") return <div key={key} className="field" style={{margin:0}}><label>{lbl}</label>
+                  if (kind==="qual") return <div key={key} className={cls} style={{margin:0}}><label>{lbl}</label>
                     <select value={anaVal(dp,"qualifica")||""} onChange={function(e){ props.onAnaField(dp.id,"qualifica",e.target.value); }}>
                       <option value="">— seleziona —</option>{QUALIFICHE.map(function(q){ return <option key={q} value={q}>{q}</option>; })}</select></div>;
-                  if (kind==="luogo") return <div key={key} className="field" style={{margin:0}}><label>{lbl}</label>
+                  if (kind==="luogo") return <div key={key} className={cls} style={{margin:0}}><label>{lbl}</label>
                     <select value={anaVal(dp,"luogo")||""} onChange={function(e){ props.onAnaField(dp.id,"luogo",e.target.value); }}>
                       <option value="">— seleziona —</option>{LUOGHI_LAVORO.map(function(q){ return <option key={q} value={q}>{q}</option>; })}</select></div>;
                   if (kind==="cess"){ const manuale=!!dp.cessManuale; const ce=cessEffStr(dp);
-                    return <div key={key} className="field" style={{margin:0}}><label>{lbl}</label>
+                    return <div key={key} className={cls} style={{margin:0}}><label>{lbl}</label>
                       <div style={{ display:"flex", gap:"6px", alignItems:"center", flexWrap:"wrap" }}>
                         {manuale
                           ? <input value={dp.dataCessazione||""} maxLength={10} placeholder="gg/mm/aaaa" inputMode="numeric" onChange={function(e){ props.onAnaField(dp.id,"dataCessazione",maskDate(e.target.value)); }} style={{ flex:"1 1 120px", minWidth:0, border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px", padding:"6px 8px" }} />
@@ -5753,44 +5784,44 @@ function Anagrafica(props){
                               : which==="scattoDec" ? "Automatica: 24 mesi utili dall'assunzione (dal mese successivo se assunto dopo il giorno 1); un mese tutto AN non e' utile e fa slittare. Massimo 5 scatti. L'importo lo prende il Costo orario dalla tabella del livello in quel momento."
                               : which==="scattoN" ? "Automatico: quanti scatti risultano maturati a oggi, compresi quelli riconosciuti all'assunzione."
                               : "Automatica: ultima proroga registrata in fondo alla scheda, riquadro Trasformaz./proroghe.";
-                    return <div key={key} className="field" style={{margin:0}} title={tip}><label>{lbl}</label><input value={val} disabled placeholder={ph} style={{ background:"#f1f5f9", borderColor:"#cbd5e1", color:"#475569" }} /></div>; }
-                  if (kind==="roblock"){ return <div key={key} className="field" style={{margin:0}}><label>{lbl}</label><input value="" disabled placeholder="—" style={{ background:"#f1f5f9", borderColor:"#cbd5e1", color:"#94a3b8" }} /></div>; }
-                  if (kind==="sex") return <div key={key} className="field" style={{margin:0}}><label>{lbl}</label>
+                    return <div key={key} className={cls} style={{margin:0}} title={tip}><label>{lbl}</label><input value={val} disabled placeholder={ph} style={{ background:"#f1f5f9", borderColor:"#cbd5e1", color:"#475569" }} /></div>; }
+                  if (kind==="roblock"){ return <div key={key} className={cls} style={{margin:0}}><label>{lbl}</label><input value="" disabled placeholder="—" style={{ background:"#f1f5f9", borderColor:"#cbd5e1", color:"#94a3b8" }} /></div>; }
+                  if (kind==="sex") return <div key={key} className={cls} style={{margin:0}}><label>{lbl}</label>
                     <select value={anaVal(dp,"sesso")||""} onChange={function(e){ props.onAnaField(dp.id,"sesso",e.target.value); }}>
                       <option value="">—</option><option value="M">M</option><option value="F">F</option></select></div>;
                   if (kind==="cf"){ const cfv=anaVal(dp,"cf"); const okcf=cfv && cfValid(cfv);
-                    return <div key={key} className="field" style={{margin:0}}><label>{lbl}</label>
+                    return <div key={key} className={cls} style={{margin:0}}><label>{lbl}</label>
                       <div style={{ display:"flex", gap:"6px" }}>
                         <input value={cfv} onChange={function(e){ props.onAnaField(dp.id,"cf",e.target.value.toUpperCase()); }} style={{ flex:1, minWidth:0 }} />
                         <button type="button" className="btn" onClick={calcCF} title="Calcola il codice fiscale dai dati anagrafici" style={{ whiteSpace:"nowrap" }}>🧮 Calcola</button>
                       </div>
                       {cfv ? <div style={{ fontSize:"11px", marginTop:"2px", fontWeight:700, color: okcf?"#15803d":"#dc2626" }}>{okcf?"✓ CF formalmente valido":"⚠︎ carattere di controllo non coerente"}</div> : null}</div>; }
                   if (kind==="date"){ const dv=anaVal(dp,key); const bad=String(dv).trim()!=="" && !isRealDate(dv);
-                    return <div key={key} className="field" style={{margin:0}}><label>{lbl}</label>
+                    return <div key={key} className={cls} style={{margin:0}}><label>{lbl}</label>
                       <input value={dv} maxLength={10} placeholder="gg/mm/aaaa" inputMode="numeric" onChange={function(e){ props.onAnaField(dp.id,key,maskDate(e.target.value)); }} style={bad?{borderColor:"#dc2626",background:"#fef2f2"}:undefined} title={bad?"Data non valida: usa gg/mm/aaaa":""} />
                       {bad?<div style={{color:"#dc2626",fontSize:"11px",marginTop:"2px",fontWeight:700}}>Formato richiesto: gg/mm/aaaa</div>:null}</div>; }
                   /* ver141: tendina SI'/NO per «Educatore (E.A.R.)». E' un DATO che scrive
                      Christian, quindi giallina con cornice ocra (ver140). */
                   /* ver146: mese/anno, per i periodi delle voci ricorrenti */
                   if (kind==="mm"){ const mv=anaVal(dp,key);
-                    return <div key={key} className="field" style={{margin:0}}><label>{lbl}</label>
+                    return <div key={key} className={cls} style={{margin:0}}><label>{lbl}</label>
                       <input value={mv} maxLength={7} placeholder="mm/aaaa" inputMode="numeric"
                         onChange={function(e){ props.onAnaField(dp.id,key,e.target.value.replace(/[^0-9/]/g,"").slice(0,7)); }} /></div>; }
                   if (kind==="sino"){ const sv=anaVal(dp,key);
-                    return <div key={key} className="field" style={{margin:0}}><label>{lbl}</label>
+                    return <div key={key} className={cls} style={{margin:0}}><label>{lbl}</label>
                       <select value={sv} onChange={function(e){ props.onAnaField(dp.id,key,e.target.value); }}
                         style={{ border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px", padding:"7px 9px", fontFamily:"inherit", fontSize:"15px", width:"100%" }}>
                         <option value=""></option><option value="SÌ">SÌ</option><option value="NO">NO</option></select></div>; }
                   if (kind && kind.indexOf("list:")===0){ const lname=kind.slice(5); const lopts=ANA_DATALISTS[lname]||[]; const lid="dl_"+lname;
-                    return <div key={key} className="field" style={{margin:0}}><label>{lbl}</label>
+                    return <div key={key} className={cls} style={{margin:0}}><label>{lbl}</label>
                       <input value={anaVal(dp,key)} list={lid} onChange={function(e){ props.onAnaField(dp.id,key,e.target.value); }} />
                       <datalist id={lid}>{lopts.map(function(o){ return <option key={o} value={o} />; })}</datalist></div>; }
                   if (kind==="textarea"){ const tv=(dp.ana&&dp.ana[key]!==undefined)?dp.ana[key]:"";
-                    return <div key={key} className="field" style={{margin:0, gridColumn:"1 / -1"}}><label>{lbl}</label>
+                    return <div key={key} className={cls} style={{margin:0, gridColumn:"1 / -1"}}><label>{lbl}</label>
                       <textarea value={tv} rows={3} onChange={function(e){ props.onAnaField(dp.id,key,e.target.value); }}
                         style={{ border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px", padding:"6px 8px", fontFamily:"inherit", fontSize:"13px", resize:"vertical", width:"100%" }} /></div>; }
                   const domLock = (sec.t==="Domicilio") && dp.ana && !!dp.ana.domUgualeRes;
-                  return <div key={key} className="field" style={{margin:0}}><label>{lbl}</label>
+                  return <div key={key} className={cls} style={{margin:0}}><label>{lbl}</label>
                     <input value={anaVal(dp,key)} disabled={domLock} onChange={function(e){ props.onAnaField(dp.id,key,e.target.value); }} style={domLock?{background:"#f1f5f9",borderColor:"#cbd5e1",color:"#64748b"}:undefined} /></div>;
                 })}
               </div>
