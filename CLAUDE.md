@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver161 · 12nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver162 · 13nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -398,6 +398,54 @@ Banca ore, tetto annuo, contratti e export.
     «— ore» e «non calcolabile»; la stessa persona su «Teoriche» → 18,67 €/h; e il **foglio Excel
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
+
+- 🎨 **CORNICI AI BOX, TITOLI EVIDENZIATI, BORDO VERDE E LA TENDINA DEL RIMBORSO** (ver162,
+  13/11/2026, cinque richieste di Christian nella stessa giornata). **Intervento quasi tutto di
+  aspetto; una sola cosa tocca un calcolo** (il rimborso), dichiarata qui sotto.
+  - 🖼️ **Le sezioni dell'anagrafica hanno una CORNICE.** Prima erano separate solo da una riga
+    sotto il titolo e sembravano attaccate. Ora ogni sezione è un **riquadro**: quelle «dati» in
+    alto bianche con bordo grigio, i box azione in fondo (Trasformaz./proroghe, Monte ore,
+    Mensilizzazione, Massimali, Colore) con la **loro** tinta, bordo 1,5px e un'ombra leggera.
+    ⚠️ **I colori scelti da Christian NON sono stati cambiati**: cambia solo che adesso sono
+    incorniciati.
+  - 🔠 **I TITOLI dei box sono più grandi ed evidenziati** (richiesta: «aumenta pt carattere»):
+    **15,5px in grassetto su una banda colorata** (ambra per le sezioni «dati», la tinta del box
+    per quelli azione). I sotto-titoli interni (`etich` di `SchedaContratto`) passano da 11 a
+    **12,5px** e gli aiutini da 11,5 a 12,5px, così titolo > sotto-titolo > testo si distinguono
+    (gerarchia tipografica, e rientra nel minimo del §10.6).
+  - 🟢 **IL BORDO FUCSIA DIVENTA VERDE ELETTRICO `#47b82a`** (richiesta: prima «sostituisci le
+    cornici fucsia con il verde elettrico», poi il tono preciso «#47b82a»). Il bordo delle
+    caselle «in itinere» (ver159) e la legenda passano dal fucsia `#c026d3` al verde.
+    ⚠️ **La legenda ora dice «bordo verde»** (era «bordo fucsia»): è l'unica dicitura cambiata di
+    conseguenza. ⚠️ **Il `#c026d3` del TABELLONE (numeri del weekend) NON è stato toccato**: è
+    un'altra cosa. ⚠️ Nei test `ver159`, `ver160`, `ver161` l'attesa del colore fucsia e del
+    testo «bordo fucsia» è stata **aggiornata al verde, non aggirata**.
+  - 🔁 **LA TENDINA DEL RIMBORSO: Forfait / Mensile, e i mesi se Mensile** (richiesta:
+    «tendinizza … due voci: forfait / mensile. Se mensile, chiedi i mesi» → «ok facoltativa»).
+    «Rimborso: come si conta» non è più un campo a testo libero ma una **tendina vera** con due
+    voci: **Forfait** (una volta sola) e **Mensile** (al mese). Scegliendo **Mensile** compare la
+    casella nuova **«Rimborso — per quanti mesi»** (bordo verde, *facoltativa* per decisione di
+    Christian): scritta, l'importo si moltiplica per quei mesi; **vuota, vale per i mesi del
+    periodo** come faceva «al mese», così i dati già inseriti non cambiano.
+    - 🧮 **È l'unica modifica a un CALCOLO**: `J34`. `secco` → una volta sola; mensile con mesi
+      fissi → `importo × mesi` (una volta sola, non spalmato a blocchi); mensile vuoto →
+      `importo × mesi del periodo` come prima. Nel conto a blocchi (ver84) il forfait e il
+      mensile a mesi fissi si applicano **una volta sola** (`res.J34 = o.res.J34`).
+    - 🔑 **Compatibilità**: i vecchi valori «al mese» → **Mensile**, «secco (una volta sola)» →
+      **Forfait**; il mapping di `datiCosto` riconosce sia `forfait` sia il vecchio `secco`.
+      Campo nuovo **`dp.ana.kmMesi`**, in ANA_ITINERE (verde). **Numero di schema invariato.**
+    - **Misurato** (`ver162.cjs`, **11/11**): rimborso 100 €, periodo 10 mesi → Mensile vuoto
+      **1.000,00**, Forfait **100,00**, Mensile × 3 **300,00**, Mensile × 24 **2.400,00** (oltre
+      il periodo). Più il verde `rgb(71,184,42)`, le 13 cornici, il titolo 15,5px e la tendina
+      che mostra/nasconde i mesi.
+  - 📝 **Due didascalie più chiare** (richieste del 13/11): il box **«La retribuzione»** ora dice
+    che le uniche caselle scrivibili sono gli **scatti di anzianità** e il **superminimo**
+    (forzature a mano); e i **rimborsi** — «Rimborso km €» dice solo *cos'è*, e la tendina
+    «Rimborso: come si conta», prima muta, ora ha la sua didascalia. ⚠️ **Diciture nuove,
+    scritte da Claude**, su richiesta esplicita di Christian.
+  - **Ispezione visiva (Dipendenti)**: 5 viste × 390 e 1280px, **nessuno scroll laterale**,
+    nessuna nuova scritta sotto i 12,5px fuori dalle griglie (restano le eccezioni già dichiarate:
+    targhetta, «Modalità LOCALE», barra «Zoom vista»). Il verde ha buon contrasto sul giallino.
 
 - 💰 **IL TFR ACCANTONATO SI SCRIVE ANNO PER ANNO, E L'ISTAT CON LUI** (ver161,
   12/11/2026, idea di Christian: «e se io in dipendenti inserissi il tfr ogni anno (una cella per

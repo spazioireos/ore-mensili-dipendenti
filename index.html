@@ -443,10 +443,10 @@ input:focus,select:focus,textarea:focus{outline:3px solid #1d4ed8;outline-offset
      vanno aggiornate quando cambiano (TFR accantonato, ferie residue, premi, rimborsi…).
      ⚠️ Il fondo resta GIALLINO: cambia solo il colore del bordo. */
   .ana-grid .field.itinere input,
-  .ana-grid .field.itinere select { border-color:#c026d3 !important; }
+  .ana-grid .field.itinere select { border-color:#47b82a !important; }
   /* ver160: la riga che spiega il fucsia e le didascalie sotto le caselle.
      12,5px e' il minimo del §10.6 fuori dalle griglie dense. */
-  .ana-legenda { font-size:12.5px; color:#86198f; background:#fdf4ff; border:1px solid #f0abfc;
+  .ana-legenda { font-size:12.5px; color:#065f46; background:#ecfdf5; border:1px solid #6ee7b7;
                  border-radius:6px; padding:4px 7px; margin:0 0 5px; line-height:1.3; }
   .ana-nota { display:block; font-size:12.5px; color:#475569; line-height:1.3; margin-top:2px; }
 
@@ -483,8 +483,8 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver161";
-const APP_DATA = "12nov26";
+const APP_VER = "ver162";
+const APP_DATA = "13nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
 const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
@@ -2860,7 +2860,7 @@ const ANA_SECTIONS = [
   { t:"Costo del lavoro", f:[
     ["premiTP","Premi (tempo pieno) €"],["premiTPdal","Premi — dal mese (mm/aaaa)","mm"],["premiTPal","Premi — al mese (mm/aaaa)","mm"],
     ["premiMese","Premio €/mese"],["premiMesedal","Premio — dal mese (mm/aaaa)","mm"],["premiMeseal","Premio — al mese (mm/aaaa)","mm"],
-    ["kmMese","Rimborso km €"],["kmTipo","Rimborso: come si conta","list:kmTipo"],
+    ["kmMese","Rimborso km €"],["kmTipo","Rimborso: come si conta","kmtipo"],["kmMesi","Rimborso — per quanti mesi","kmmesi"],
     ["kmMesedal","Rimborso — dal mese (mm/aaaa)","mm"],["kmMeseal","Rimborso — al mese (mm/aaaa)","mm"],
     ["sottoSoglia","Ore/mese sotto soglia perse"],
     ["tfrFondo","TFR accantonato al 31/12 €"],["tfrFondoAnno","TFR accantonato — anno"],
@@ -2907,13 +2907,14 @@ const LS_TEMPLATE = "spazioireos_contratto_template_v1";
 const ANA_NOTA = {
   premiTP: "importo al mese, riferito a 38 ore settimanali; per un part-time l'app lo riproporziona da s\u00e9. Entra nelle componenti, quindi muove anche l'importo orario, la tredicesima, la quattordicesima, il TFR e i contributi.",
   premiMese: "importo al mese, cos\u00ec com'\u00e8: non viene riproporzionato al part-time. Paga i contributi, ma non entra nel TFR n\u00e9 nell'importo orario.",
-  kmMese: "\u00e8 esente, quindi non paga contributi e non entra in nessun imponibile: finisce solo nel costo totale. Con \u00abal mese\u00bb si moltiplica per i mesi del periodo, con \u00absecco\u00bb si conta una volta sola."
+  kmMese: "quanto rimborsi al mese — oppure in tutto, se qui sotto scegli «Forfait». È esente: non paga contributi e non entra in nessun imponibile, finisce solo nel costo totale.",
+  kmTipo: "«Mensile» = l'importo si moltiplica per i mesi (quelli che scrivi qui accanto, o i mesi del periodo se lasci vuoto); «Forfait» = si conta una volta sola."
 };
 const ANA_NOTA_PERIODO = "vuote valgono sempre; scritte, la voce vale solo da quel mese a quel mese, compresi.";
 const ANA_CHIAVI_PERIODO = ["premiTPdal","premiTPal","premiMesedal","premiMeseal","kmMesedal","kmMeseal"];
 const ANA_ITINERE = ["premiTP","premiTPdal","premiTPal",
   "premiMese","premiMesedal","premiMeseal",
-  "kmMese","kmTipo","kmMesedal","kmMeseal",
+  "kmMese","kmTipo","kmMesi","kmMesedal","kmMeseal",
   "sottoSoglia","tfrFondo","tfrFondoAnno","ferieResidue","mesiMater"];
 const MESI_LUNGHI = ["gennaio","febbraio","marzo","aprile","maggio","giugno","luglio","agosto","settembre","ottobre","novembre","dicembre"];
 function dlong(s){
@@ -3203,7 +3204,7 @@ function SchedaContratto(props){
   const [mensAnno, setMensAnno] = useState(String(Math.floor((_mdal||_mdef)/10000)));
 
   const giallo = { border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px", padding:"6px 8px", fontFamily:"inherit", fontSize:"13px" };
-  const etich = { fontSize:"11px", fontWeight:700, marginBottom:"2px" };
+  const etich = { fontSize:"12.5px", fontWeight:700, color:"#334155", marginBottom:"3px" };
   /* ver140: le tendine di questa scheda sono DATI scritti da Christian (mese e anno di una
      trasformazione, del monte ore temporaneo, della mensilizzazione, il periodo del massimale):
      quindi giallline con cornice ocra come le caselle, non il grigio del sistema operativo. */
@@ -3333,15 +3334,16 @@ function SchedaContratto(props){
   const chiudiTet = function(){ setApTet(false); setNtTettoAnno(""); setNtTettoOre(""); setNtVoci([]); setErrTet(""); };
   const delTetto = function(i){ patchTetti(tetti.filter(function(_,k){ return k!==i; })); };
 
-  const box = function(colore, bordo){ return { background:colore, border:"1px solid "+bordo, borderRadius:"10px", padding:"12px", marginBottom:"12px" }; };
+  const box = function(colore, bordo){ return { background:colore, border:"1.5px solid "+bordo, borderRadius:"10px", padding:"12px 14px", marginBottom:"12px", boxShadow:"0 1px 3px rgba(15,23,42,.08)" }; };
   const titolo = { fontWeight:800, fontSize:"14px", marginBottom:"6px", display:"block" };
-  const aiuto = { fontSize:"11.5px", color:"#64748b", lineHeight:1.5, margin:"0 0 8px" };
+  const titoloBox = function(bg, text){ return { display:"block", fontWeight:800, fontSize:"15.5px", letterSpacing:".2px", marginBottom:"9px", color:text, background:bg, borderRadius:"7px", padding:"6px 11px" }; };
+  const aiuto = { fontSize:"12.5px", color:"#64748b", lineHeight:1.45, margin:"0 0 8px" };
 
   return (
     <div style={{ marginTop:"14px" }}>
 
-      <div style={box("#faf5ff","#e9d5ff")}>
-        <label style={titolo}>Trasformaz./proroghe</label>
+      <div style={box("#faf5ff","#c4b5fd")}>
+        <label style={titoloBox("#ddd6fe","#5b21b6")}>Trasformaz./proroghe</label>
         <div style={aiuto}>Qui registri i <b>cambi di contratto</b> (nuovo livello, nuovo monte ore, passaggio a tempo indeterminato) e, per i contratti a termine, le <b>proroghe</b>. Ogni cambio parte <b>dal 1° del mese</b> che indichi: i mesi precedenti restano come prima, quelli successivi si adeguano da soli.</div>
 
         {determinato ?
@@ -3404,8 +3406,8 @@ function SchedaContratto(props){
         {errTra ? <div style={{ color:"#b91c1c", fontSize:"12.5px", fontWeight:700, marginTop:"4px" }}>{errTra}</div> : null}
       </div>
 
-      <div style={box("#fff7ed","#fed7aa")}>
-        <label style={titolo}>Monte ore (anche temporaneo)</label>
+      <div style={box("#fff7ed","#fdba74")}>
+        <label style={titoloBox("#fed7aa","#9a3412")}>Monte ore (anche temporaneo)</label>
         <div style={aiuto}>Il monte ore <b>normale</b> si scrive sopra, nel riquadro "Orario". Qui aggiungi i <b>periodi in cui lavora con un orario diverso</b> — per esempio 20 ore da marzo a giugno — e poi torna da solo al monte ore normale. Vale <b>per mesi interi</b>: dal <b>1°</b> del mese di inizio all’<b>ultimo giorno</b> del mese di fine (1 ottobre → 30 novembre 2026 = ottobre e novembre <b>interi</b>). ⚠️ Il <b>giorno</b> che scrivi non conta: contano solo il mese e l’anno.</div>
         {orariTemp.length===0 ? <div style={{ fontSize:"12px", color:"#64748b", margin:"4px 0" }}>Nessun periodo con orario diverso.</div> :
           <div style={{ margin:"6px 0" }}>
@@ -3437,8 +3439,8 @@ function SchedaContratto(props){
         {errOt ? <div style={{ color:"#b91c1c", fontSize:"12.5px", fontWeight:700, marginTop:"4px" }}>{errOt}</div> : null}
       </div>
 
-      <div style={box("#f0fdf4","#bbf7d0")}>
-        <label style={titolo}>Mensilizzazione</label>
+      <div style={box("#f0fdf4","#86efac")}>
+        <label style={titoloBox("#bbf7d0","#166534")}>Mensilizzazione</label>
         <div style={aiuto}>Spunta se questa persona ha lo <b>stipendio uguale ogni mese</b> invece che a ore. Cambia il modo di contare le ore del mese, a partire dal mese che indichi.</div>
         <label style={{ display:"flex", alignItems:"center", gap:"8px", fontSize:"13px", marginBottom:"6px" }}>
           <input type="checkbox" checked={!!dp.mensilizzato} onChange={function(e){ setMens(e.target.checked); }} /> Mensilizzato
@@ -3454,8 +3456,8 @@ function SchedaContratto(props){
           </div> : null}
       </div>
 
-      <div style={box("#eef6ff","#bfdbfe")}>
-        <label style={titolo}>Massimali annui</label>
+      <div style={box("#eef6ff","#93c5fd")}>
+        <label style={titoloBox("#bfdbfe","#1e40af")}>Massimali annui</label>
         <div style={aiuto}>È il <b>numero massimo di ore</b> che questa persona può fare in un anno. Nella scheda del mese compare una barra con <b>quante ne restano</b>. Se non ti serve, lascia la lista vuota. Il massimale <b>può cambiare di anno in anno</b>: scrivi un valore per ogni anno in cui cambia, e vale da lì in poi. Se lasci l'anno vuoto, quel valore vale <b>da sempre</b>.</div>
         <div style={{ marginBottom:"6px" }}>
           <div style={etich}>Periodo dell'anno</div>
@@ -3510,8 +3512,8 @@ function SchedaContratto(props){
         {errTet ? <div style={{ color:"#b91c1c", fontSize:"12.5px", fontWeight:700, marginTop:"4px" }}>{errTet}</div> : null}
       </div>
 
-      <div style={box("#f8fafc","#e2e8f0")}>
-        <label style={titolo}>Colore della scheda</label>
+      <div style={box("#f8fafc","#cbd5e1")}>
+        <label style={titoloBox("#e2e8f0","#334155")}>Colore della scheda</label>
         <div style={aiuto}>Serve a riconoscere la persona a colpo d'occhio nella griglia del mese.</div>
         <div style={{ display:"flex", gap:"8px", flexWrap:"wrap" }}>
           {PALETTE.map(function(c){
@@ -4247,7 +4249,10 @@ function calcCosto(o){
      ⚠️ Non entra in nessun imponibile: e' esente da imposte e contributi (confermato da
      Christian il 04/11/2026). Finisce solo nel totale J35. */
   const kmVal = (o.kmMese!=null?o.kmMese:c.kmMese);
-  const J34 = (o.kmTipo==="secco") ? kmVal : kmVal*(H2-(o.kmMesiTolti||0));
+  const kmMesiFissi = (o.kmTipo!=="secco") && (o.kmMesi!=null) && (o.kmMesi>0);
+  const J34 = (o.kmTipo==="secco") ? kmVal
+            : kmMesiFissi ? kmVal*o.kmMesi
+            : kmVal*(H2-(o.kmMesiTolti||0));
   const J35 = J5+J6+J8+J12+J13+J14+J17+J18+J19+J21+J23+J25+J26+J27+J28+J29+J30+J31+J32+J34;
   const F38 = O8 + P2*(c.suppPct/100)*H2 - O11*H2;      // ore teoriche rendicontabili
   const H38 = (G38>0)? G38 : F38;                       // ore usate nel calcolo
@@ -4440,7 +4445,8 @@ function datiCosto(state, dp, pairs){
     ggSett: (aGgSett!=null)? aGgSett : cNum(p.ggSett, c.ggSett),   /* ver146 */
     addizTD: addizAuto,                             /* ver137: dalle proroghe, non piu' a mano */
     kmMese: (aKmMese!=null)? aKmMese : ((p.kmMese==null||p.kmMese==="")? null : cNum(p.kmMese, c.kmMese)),   /* ver146 */
-    kmTipo: (aKmTipo!=null) ? (/secco/i.test(aKmTipo)?"secco":"mese") : ((p.kmTipo==="secco") ? "secco" : "mese"),   /* ver80; ver146: prima l'Anagrafica */
+    kmTipo: (aKmTipo!=null) ? ((/forfait|secco/i.test(aKmTipo))?"secco":"mese") : ((p.kmTipo==="secco") ? "secco" : "mese"),   /* ver80; ver146; ver162: forfait/mensile */
+    kmMesi: (function(){ var v=anaVoceNum(dp,"kmMesi"); return (v!=null && v>0)? v : null; })(),   /* ver162 */
     kmMesiTolti: cNum(p.kmMesiTolti, 0),
     premiMese: (aPremiMese!=null)? aPremiMese : cNum(p.premiMese, 0),   /* ver146 */
     premiMesiTolti: cNum(p.premiMesiTolti, 0),
@@ -4612,7 +4618,7 @@ function datiCosto(state, dp, pairs){
          due pezzi. È lo stesso caso della formazione, che era già gestito qui sopra: una spesa
          «una volta sola» non si somma fra i blocchi. ⚠️ Col rimborso «al mese» non cambia
          niente: lì ogni blocco deve davvero portare i suoi mesi. */
-      if (o.kmTipo === "secco") res.J34 = o.res.J34;         /* rimborso secco: una volta sola */
+      if (o.kmTipo === "secco" || (o.kmMesi!=null && o.kmMesi>0)) res.J34 = o.res.J34;   /* ver162: forfait o mensile a mesi fissi: una volta sola */
       /* ver136: la bandierina dei divisori non valídi non è un importo da sommare: va portata
          avanti, altrimenti con il periodo tagliato in pezzi l'avviso non compare mai (trovato
          in esecuzione: la prima stesura lo perdeva proprio nei casi più frequenti). */
@@ -4908,6 +4914,7 @@ function CostoOrario(props){
     J32: (function(){ const n = Math.max(1, Math.ceil(d.mesi/12));
           return fmt2(c.formazione) + " € × " + n + (n===1 ? " anno iniziato" : " anni iniziati"); })(),
     J34: (d.kmTipo==="secco") ? (fmt2(kmVal) + " € una volta sola")
+       : (d.kmMesi>0) ? (fmt2(kmVal) + " € × " + nTxt(d.kmMesi) + (Number(d.kmMesi)===1?" mese":" mesi"))
        : (fmt2(kmVal) + " € × " + mesiTxt(R2(d.mesi - d.kmMesiTolti, 3))),
     J35: "somma di tutte le voci qui sopra"
   };
@@ -4975,7 +4982,7 @@ function CostoOrario(props){
       </div>
 
       {apriCCNL ?
-        <div style={box("#eef6ff","#bfdbfe")}>
+        <div style={box("#eef6ff","#93c5fd")}>
           <label style={titolo}>AGGIORNA TABELLE CCNL</label>
           <div style={aiuto}>Qui si caricano le tabelle di un <b>rinnovo</b>. Le tabelle che ci sono già <b>non si toccano</b>: ognuna ha la sua data di decorrenza, e ogni mese usa quella che era in vigore allora. Così i calcoli degli anni passati <b>non cambiano</b>. Si carica <b>una volta sola</b> e tutte le schede la recepiscono da sé, ciascuna col proprio livello e i propri scatti.</div>
           <div style={{ overflowX:"auto" }}>
@@ -5056,7 +5063,7 @@ function CostoOrario(props){
       : null}
 
       {apriComuni ?
-        <div style={box("#eef6ff","#bfdbfe")}>
+        <div style={box("#eef6ff","#93c5fd")}>
           <label style={titolo}>Aliquote e costi fissi validi per tutti</label>
           <div style={aiuto}>Sono i numeri che non cambiano da persona a persona: contributi, festività, assenze presunte, voci fisse. Si scrivono <b>una volta sola</b> e valgono per tutte le schede. Dove serve, nella scheda della singola persona si può scrivere un valore diverso.</div>
           <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(190px, 1fr))", gap:"8px" }}>
@@ -5214,7 +5221,7 @@ function CostoOrario(props){
               <div style={blocco}>
                 {nomeQui(false)}
                 <div style={capo}>La retribuzione</div>
-                <div style={{ fontSize:"13px", color:"#475569", lineHeight:1.35 }}>Il livello arriva da <b>ANAGRAFICA → Contratto</b> e il minimo dalla tabella CCNL in vigore. Le caselle <b>giallino</b> si possono scrivere; quello che non è giallino lo calcola l'app.</div>
+                <div style={{ fontSize:"13px", color:"#475569", lineHeight:1.35 }}>Il livello arriva da <b>ANAGRAFICA → Contratto</b> e il minimo dalla tabella CCNL in vigore. Le <b>uniche caselle che puoi scrivere qui</b> sono le <b>giallino</b> — gli <b>scatti di anzianità</b> e il <b>superminimo</b>: servono a <b>forzare un importo a mano</b> quando quello calcolato non va bene, e allora l'app smette di aggiornarlo da sola (te lo dice con un avviso giallo). Tutto il resto lo calcola l'app o arriva dall'anagrafica.</div>
                 <div className="co-grid" style={grigliaCampi}>
                   {/* ver137: la tabella CCNL si ricava dalla DATA, e forzarla spegneva il taglio
                       del periodo al rinnovo senza dirlo. Ora è grigia e di sola lettura. */}
@@ -5303,7 +5310,7 @@ function CostoOrario(props){
                   {campoRO("Premio €/mese", fmt2(d.premiMese), notaAna("premiMese"), AIUTO_ANA)}
                   {campoRO("Rimborso km €", (d.kmMese==null? fmt2(c.kmMese) : fmt2(d.kmMese)), notaAna("kmMese", "comune: " + fmt2(c.kmMese)), AIUTO_ANA)}
                   {/* ver146 (A1): anche questa si sceglie in ANAGRAFICA → Costo del lavoro. */}
-                  {campoRO("Rimborso: come si conta", (d.kmTipo==="secco" ? "secco (una volta sola)" : "al mese (× i mesi del periodo)"), notaAna("kmTipo"), AIUTO_ANA)}
+                  {campoRO("Rimborso: come si conta", (d.kmTipo==="secco" ? "forfait (una volta sola)" : (d.kmMesi>0 ? ("mensile × " + nTxt(d.kmMesi) + (Number(d.kmMesi)===1?" mese":" mesi")) : "mensile (× i mesi del periodo)")), notaAna("kmTipo"), AIUTO_ANA)}
                   {campoRO("Ore/mese sotto soglia perse", fmt2(d.sottoSoglia), notaAna("sottoSoglia"), AIUTO_ANA)}
                   {campoRO("TFR accantonato al 31/12 €", (d.tfrFondo>0? fmt2(d.tfrFondo) : "—"), notaAna("tfrFondo", "vuoto = rivalutazione stimata con gli «Anni per rivalutazione TFR»"), AIUTO_ANA)}
                   {campoRO("TFR accantonato — anno", (d.tfrFondoAnno||"—"), notaAna("tfrFondoAnno", "l'anno a cui si riferisce il fondo, es. 2025"), AIUTO_ANA)}
@@ -5843,10 +5850,10 @@ function Anagrafica(props){
             </div>
           </div>
           {ANA_SECTIONS.map(function(sec){ return (
-            <div key={sec.t} style={{ marginBottom:"8px" }}>
-              <div style={{ fontSize:"12px", fontWeight:800, color:"#92400e", textTransform:"uppercase", letterSpacing:".4px", marginBottom:"4px", borderBottom:"1px solid #fde68a", paddingBottom:"2px" }}>{sec.t}</div>
+            <div key={sec.t} style={{ marginBottom:"10px", background:"#fff", border:"1.5px solid #cbd5e1", borderRadius:"10px", padding:"10px 12px", boxShadow:"0 1px 2px rgba(15,23,42,.05)" }}>
+              <div style={{ fontSize:"15.5px", fontWeight:800, color:"#7c2d12", textTransform:"uppercase", letterSpacing:".4px", marginBottom:"9px", background:"#fde68a", border:"1px solid #f59e0b", borderRadius:"7px", padding:"6px 11px" }}>{sec.t}</div>
               {/* ver160: la riga che spiega il bordo fucsia. Testo approvato da Christian il 12/11/2026. */}
-              {sec.t==="Costo del lavoro" ? <div className="ana-legenda">⚠️ Le caselle col <b>bordo fucsia</b> non si firmano in contratto: vanno aggiornate quando cambiano, altrimenti il costo orario resta indietro.</div> : null}
+              {sec.t==="Costo del lavoro" ? <div className="ana-legenda">⚠️ Le caselle col <b>bordo verde</b> non si firmano in contratto: vanno aggiornate quando cambiano, altrimenti il costo orario resta indietro.</div> : null}
               {sec.t==="Domicilio" ? <label style={{ display:"flex", alignItems:"center", gap:"6px", fontSize:"13px", marginBottom:"6px", cursor:"pointer" }}><input type="checkbox" checked={!!(dp.ana&&dp.ana.domUgualeRes)} onChange={function(e){ props.onAnaField(dp.id,"domUgualeRes",e.target.checked); }} /> Domicilio uguale alla residenza</label> : null}
               <div className="ana-grid" style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(230px, 1fr))", gap:"6px" }}>
                 {sec.f.map(function(fld){
@@ -5941,7 +5948,7 @@ function Anagrafica(props){
                   if (kind==="tfranni"){
                     const lista = tfrFondiList(dp);
                     const scrivi = function(nuova){ props.onAnaField(dp.id,"tfrFondi",nuova); };
-                    const cella = { border:"2px solid #c026d3", background:"#fffde7", borderRadius:"6px", padding:"7px 9px", fontFamily:"inherit", fontSize:"15px" };
+                    const cella = { border:"2px solid #47b82a", background:"#fffde7", borderRadius:"6px", padding:"7px 9px", fontFamily:"inherit", fontSize:"15px" };
                     return <div key={key} className="field" style={{margin:0, gridColumn:"1 / -1"}}><label>{lbl}</label>
                       <div style={{ display:"flex", flexDirection:"column", gap:"4px" }}>
                         {lista.map(function(r,i){ return (
@@ -5970,6 +5977,16 @@ function Anagrafica(props){
                       <select value={sv} onChange={function(e){ props.onAnaField(dp.id,key,e.target.value); }}
                         style={{ border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px", padding:"7px 9px", fontFamily:"inherit", fontSize:"15px", width:"100%" }}>
                         <option value=""></option><option value="SÌ">SÌ</option><option value="NO">NO</option></select></div>; }
+                  if (kind==="kmtipo"){ const raw=anaVal(dp,"kmTipo"); const v=(/forfait|secco/i.test(String(raw))?"forfait":"mensile");
+                    return <div key={key} className={cls} style={{margin:0}}><label>{lbl}</label>
+                      <select value={v} onChange={function(e){ props.onAnaField(dp.id,"kmTipo",e.target.value); }}>
+                        <option value="mensile">Mensile</option><option value="forfait">Forfait</option></select>
+                      {nota2 ? <span className="ana-nota">{nota2}</span> : null}</div>; }
+                  if (kind==="kmmesi"){ const raw=anaVal(dp,"kmTipo"); const mensile=!(/forfait|secco/i.test(String(raw)));
+                    if (!mensile) return null;
+                    return <div key={key} className={cls} style={{margin:0}}><label>{lbl}</label>
+                      <input value={anaVal(dp,"kmMesi")} inputMode="numeric" placeholder="vuoto = i mesi del periodo" onChange={function(e){ props.onAnaField(dp.id,"kmMesi",e.target.value); }} />
+                      <span className="ana-nota">quanti mesi contare, una volta sola. Vuoto = i mesi del periodo che stai guardando.</span></div>; }
                   if (kind && kind.indexOf("list:")===0){ const lname=kind.slice(5); const lopts=ANA_DATALISTS[lname]||[]; const lid="dl_"+lname;
                     return <div key={key} className={cls} style={{margin:0}}><label>{lbl}</label>
                       <input value={anaVal(dp,key)} list={lid} onChange={function(e){ props.onAnaField(dp.id,key,e.target.value); }} />
