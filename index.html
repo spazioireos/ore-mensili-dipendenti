@@ -483,8 +483,8 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver162";
-const APP_DATA = "13nov26";
+const APP_VER = "ver163";
+const APP_DATA = "14nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
 const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
@@ -2294,6 +2294,104 @@ function esportaPDFMens(state, pairs){
   if (first){ doc.setFontSize(12); doc.text("Nessun dato nel periodo selezionato", 14, 24); }
   doc.save(fileName("pdf", "Presenze mensilizzati"));
 }
+
+/* ===== ver163: REPORT A4 "ORDINARIO / EXTRA GIORNALIERO" per l'ufficio paghe ===============
+   Christian (14/11/2026): «un pdf a4 che ci dica giornalmente quanto è ordinario e quanto
+   extra. X deve fare 18 ore settimanali = 3 ore al giorno (6 giorni lavorativi). Se nel giorno
+   X fa 4 ore, scindi: 3 ordinarie e 1 extra, due colonne. Al termine il totale ore rese e le
+   altre cose (gg ferie etc.)».
+   - Quota giornaliera ORDINARIA = ore settimanali ÷ giorni a settimana (18/6 = 3), per persona.
+   - Per ogni giorno LAVORATO: ordinario = min(ore, quota) · extra = max(0, ore − quota).
+   - NESSUNA COMPENSAZIONE (scelta di Christian): l'extra è la somma dei singoli giorni, un
+     giorno sotto quota non toglie extra agli altri. ⚠️ Perciò il totale extra è DIVERSO (più
+     alto) dal «Risultato del mese» del Tabellone, che invece compensa: sono due cose per due
+     scopi diversi.
+   - TERZA colonna «Assenze / permessi» (scelta di Christian): i giorni di ferie/malattia/ecc.
+     col loro codice, e i PERMESSI ORARI (EXF…) con le loro ore. Non entrano in ordinario/extra,
+     che sono SOLO le ore davvero lavorate. In calce: ore rese (ord+extra), gg ferie e le altre
+     voci già chieste. ⚠️ Diciture nuove, scritte da Claude. */
+function esportaPDFOrdExtra(state, pairs){
+  const JsPDF = window.jspdf.jsPDF;
+  const doc = new JsPDF({ orientation:"portrait", unit:"mm", format:"a4" });
+  const dips = dipSorted(state);
+  const fh = function(x){ return fmt2(x); };
+  let first = true, prodotto = false;
+  pairs.forEach(function(pr){
+    const anno = pr.y, m = pr.m;
+    const fset = festivitaSet(anno);
+    const nd = daysInMonth(anno, m);
+    const ymP = anno*100 + m;
+    const inForzaMese = function(dp){ const aInt=assunzInt(dp); const aMon=aInt?Math.floor(aInt/100):0; const ceStr=cessEffStr(dp); const ceInt=ymdIt(ceStr); const ceMon=ceInt?Math.floor(ceInt/100):0; return (!aMon || ymP>=aMon) && (!ceMon || ymP<=ceMon); };
+    const dipsMese = dips.filter(inForzaMese);
+    dipsMese.forEach(function(dp){
+      const rec = getRecFrom(state, anno, m, dp.id);
+      if (!recHasData(rec)) return;   /* persona senza dati nel mese: nessun foglio */
+      const oreSett = oreSettAt(dp, anno, m), ggS = ggSettDi(state, dp);
+      const quota = (ggS > 0) ? oreSett/ggS : 0;
+      const body = [];
+      let totOrd = 0, totExtra = 0;
+      const rosseRows = [];
+      for (let d=1; d<=nd; d++){
+        const cv = String(rec.giorni[d] == null ? "" : rec.giorni[d]).trim();
+        const perm = (rec.permessi && rec.permessi[d] && Number(rec.permessi[d].ore) > 0) ? rec.permessi[d] : null;
+        const dom = weekdayOf(anno, m, d) === 0;
+        const rosso = isRosso(fset, anno, m, d);
+        const dayLabel = d + " " + WD[weekdayOf(anno, m, d)];
+        let ord = "", extra = "", ass = "";
+        if (cv === "--"){ ass = "R"; }
+        else if (cv === ""){ ass = dom ? "R" : (rosso ? "festivo" : ""); }
+        else if (CODE_SET[cv]){ ass = cv; }                                   /* assenza / AN / FEST col codice */
+        else { const h = parseHour(cv); if (h > 0){ const o = Math.min(h, quota); const e = R2(h - o, 3); ord = fh(o); if (e > 0.004) extra = fh(e); totOrd += o; totExtra += e; } }
+        if (perm){ const pt = String(perm.tipo || "").trim(); ass = (ass ? ass + " · " : "") + "perm " + fh(perm.ore) + " h" + (pt ? (" " + pt) : ""); }
+        if (rosso) rosseRows.push(body.length);
+        body.push([dayLabel, ord, extra, ass]);
+      }
+      const resE = R2(totOrd + totExtra, 2);
+      const am = assMese(rec, dp, anno, m);
+      const fg = festGoduteMese(state, dp, anno, m, null);
+      const perm = permOreMese(rec);
+      const nonGod = contaFestivita([{ y:anno, m:m }], dp).non;
+      if (!first) doc.addPage();
+      first = false; prodotto = true;
+      doc.setFontSize(13); doc.setFont(undefined,"bold"); doc.setTextColor(15,39,64);
+      doc.text("Spazio Ireos — Ore ordinarie ed extra (giornaliero)", 14, 14);
+      doc.setFontSize(11.5); doc.setFont(undefined,"normal"); doc.setTextColor(15,39,64);
+      doc.text(dp.nome + "   ·   " + MONTH_LABEL[m-1] + " " + anno, 14, 21);
+      doc.setFontSize(8.5); doc.setTextColor(90,90,90);
+      doc.text("Quota giornaliera ordinaria: " + fh(oreSett) + " h/sett ÷ " + ggS + " gg = " + fh(quota) + " h al giorno. L'extra è la somma dei singoli giorni (nessuna compensazione).", 14, 26);
+      doc.autoTable({
+        startY: 30,
+        head: [["Giorno","Ordinario (h)","Extra (h)","Assenze / permessi"]],
+        body: body,
+        foot: [["TOTALE", fh(totOrd), fh(totExtra), ""]],
+        styles:{ fontSize:8, cellPadding:1.1, valign:"middle", lineColor:[214,214,214], lineWidth:0.1 },
+        headStyles:{ fillColor:[15,39,64], textColor:[255,255,255], fontSize:8.5, fontStyle:"bold", halign:"center" },
+        footStyles:{ fillColor:[234,240,250], textColor:[15,39,64], fontStyle:"bold", halign:"center" },
+        columnStyles:{ 0:{ halign:"left", cellWidth:34 }, 1:{ halign:"center", cellWidth:30 }, 2:{ halign:"center", cellWidth:30 }, 3:{ halign:"left" } },
+        margin:{ left:14, right:14 },
+        didParseCell: function(data){
+          if (data.section === "body" && rosseRows.indexOf(data.row.index) !== -1) data.cell.styles.fillColor = [252,238,238];
+          if (data.section === "body" && data.column.index === 2 && data.cell.text && data.cell.text.join("").trim() !== "") data.cell.styles.textColor = [176,42,42];
+        }
+      });
+      let y = doc.lastAutoTable.finalY + 7;
+      if (y > 275){ doc.addPage(); y = 18; }
+      doc.setFontSize(10.5); doc.setFont(undefined,"bold"); doc.setTextColor(15,39,64);
+      doc.text("Ore effettivamente rese: " + fh(resE) + " h   (ordinario " + fh(totOrd) + " + extra " + fh(totExtra) + ")", 14, y);
+      y += 6; doc.setFont(undefined,"normal"); doc.setFontSize(9); doc.setTextColor(40,40,40);
+      const voci = [];
+      Object.keys(am.cop.perCod).forEach(function(c){ voci.push(c + " " + am.cop.perCod[c] + " gg"); });
+      Object.keys(am.nonRetr.perCod).forEach(function(c){ voci.push(c + " " + am.nonRetr.perCod[c] + " gg (non retrib.)"); });
+      if (am.festngCelle.gg > 0) voci.push("FESTNG " + am.festngCelle.gg + " gg");
+      doc.text("Assenze del mese: " + (voci.length ? voci.join("   ·   ") : "nessuna"), 14, y);
+      y += 5;
+      doc.text("Festività godute: " + fh(fg.ore) + " h (" + fg.gg + " gg)   ·   non godute: " + nonGod + " gg   ·   Riposi: " + am.riposi.gg + " (di cui domeniche " + am.riposi.dom + ")" + (perm.pagate > 0 ? ("   ·   Permessi orari retribuiti: " + fh(perm.pagate) + " h") : ""), 14, y);
+    });
+  });
+  if (!prodotto){ doc.setFontSize(12); doc.setTextColor(120,20,20); doc.text("Nessun dipendente in forza con dati nel periodo scelto.", 14, 20); }
+  doc.save(fileName("pdf", "Ordinario-extra giornaliero"));
+}
+
 
 
 /* ===================== IMPORT EXCEL ===================== */
@@ -7694,6 +7792,8 @@ function App(){
         <button className="btn btn-ghost" onClick={function(){ setExportModal("PDF"); }}>🖨️ Report PDF A4</button>
         {/* ver153: il report per l'ufficio paghe. Dicitura del pulsante SCELTA da Christian. */}
         <button className="btn btn-ghost" onClick={function(){ setExportModal("PDF A4 mensilizz."); }}>🖨️ Report PDF A4 mensilizz.</button>
+        {/* ver163: report giornaliero ordinario/extra per l'ufficio paghe. Dicitura nuova, scritta da Claude. */}
+        <button className="btn btn-ghost" onClick={function(){ setExportModal("PDF A4 ord/extra"); }}>🖨️ Report PDF A4 ord/extra</button>
         {!FB_READY ? <button className="btn btn-ghost" onClick={changePin}>🔑 PIN</button> : null}
         {FB_READY ? <button className="btn btn-ghost" onClick={function(){ if (dirty && !window.confirm("Ci sono modifiche non salvate. Uscire comunque?")) return; firebase.auth().signOut(); }}>Esci</button> : null}
         <input ref={fileRef} type="file" accept=".xlsx,.xls,.json" className="hidden-file" onChange={onImportFile} />
@@ -7809,7 +7909,7 @@ function App(){
 
       {quickFill ? <QuickFillModal dp={quickFill} rec={getRecFrom(state, anno, mese, quickFill.id)} anno={anno} mese={mese} fset={fset} onApply={onQuickFillApply} onClose={function(){ setQuickFill(null); }} /> : null}
       {exportModal ? <ExportModal kind={exportModal} anni={state.anni} annoCorrente={anno} meseCorrente={mese}
-        onGenera={function(pairs){ if (exportModal === "Excel") esportaExcel(state, pairs); else if (exportModal === "PDF A4 mensilizz.") esportaPDFMens(state, pairs); else esportaPDF(state, pairs); setExportModal(null); }}
+        onGenera={function(pairs){ if (exportModal === "Excel") esportaExcel(state, pairs); else if (exportModal === "PDF A4 mensilizz.") esportaPDFMens(state, pairs); else if (exportModal === "PDF A4 ord/extra") esportaPDFOrdExtra(state, pairs); else esportaPDF(state, pairs); setExportModal(null); }}
         onClose={function(){ setExportModal(null); }} /> : null}
       {permModal ? (function(){
         const rc = getRecFrom(state, anno, mese, permModal.dipId);

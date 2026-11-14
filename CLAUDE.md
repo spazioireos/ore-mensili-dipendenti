@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver162 · 13nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver163 · 14nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -398,6 +398,46 @@ Banca ore, tetto annuo, contratti e export.
     «— ore» e «non calcolabile»; la stessa persona su «Teoriche» → 18,67 €/h; e il **foglio Excel
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
+
+- 🧾 **TERZO REPORT A4 PER LE PAGHE: ORDINARIO / EXTRA GIORNALIERO** (ver163, 14/11/2026,
+  richiesta di Christian: «un pdf a4 che ci dica **giornalmente** quanto è ordinario e quanto
+  extra, due colonne per ogni dipendente. X deve fare 18 ore settimanali = 3 ore al giorno
+  (6 giorni lavorativi): se nel giorno fa 4 ore, 3 ordinarie e 1 extra. Al termine il totale ore
+  rese e le altre cose (gg ferie etc.)». Sue scelte: **nessuna compensazione**, **terza colonna
+  per le assenze/permessi**, **tutti i dipendenti in forza**, **A4 verticale, più fogli se
+  servono**).
+  - **Nuova funzione `esportaPDFOrdExtra(state, pairs)`** (accanto a `esportaPDFMens`), nuovo
+    pulsante **«🖨️ Report PDF A4 ord/extra»** e il ramo in `onGenera` dell'`ExportModal`. **Un
+    foglio A4 verticale per ogni dipendente** in forza nel mese con dati.
+  - **Quota giornaliera ordinaria = `oreSettAt(dp,y,m) / ggSettDi(state,dp)`** (18 ÷ 6 = 3, il
+    suo esempio — NON `quotaGiorno`=monte/26, che è la quota delle assenze). Per ogni giorno
+    **lavorato**: `ordinario = min(ore, quota)` · `extra = max(0, ore − quota)`.
+  - 🔑 **NESSUNA COMPENSAZIONE** (scelta di Christian): l'extra è la **somma dei singoli giorni**,
+    un giorno sotto quota non toglie extra agli altri. ⚠️ **Perciò il totale extra è DIVERSO (più
+    alto) dal «Risultato del mese»/`bancaMeseA` del Tabellone**, che invece compensa (rese +
+    assenze − monte, sul mese): sono **due numeri per due scopi diversi**. `bancaMeseA` NON è
+    stata toccata.
+  - **Tre colonne**: *Giorno · Ordinario (h) · Extra (h) · Assenze / permessi*. La terza porta il
+    **codice del giorno pieno** (FERIE, MAL, FEST, R, AN, «festivo»…) **e i PERMESSI ORARI** a
+    ore («perm 1,00 h EXF») — scelta di Christian: i permessi EXF a ore stanno **lì**, non in
+    ordinario/extra, perché sono ore **pagate ma non lavorate**. «Ore effettivamente rese» =
+    **solo** ordinario + extra. Domeniche/festivi: riga rosata con «R».
+  - **In calce** (dai motori esistenti, non toccati): *Ore effettivamente rese = ordinario +
+    extra*, *Assenze del mese* per voce (da `assMese().cop.perCod`/`nonRetr.perCod`/`festngCelle`),
+    *Festività godute* (`festGoduteMese`), *non godute* (`contaFestivita().non`), *Riposi*
+    (`assMese().riposi`), *Permessi orari retribuiti* (`permOreMese().pagate`).
+  - ⚠️ **Nessun calcolo esistente è stato toccato**: il report **legge** (`parseHour`, `assMese`,
+    `oreSettAt`, `ggSettDi`, `festGoduteMese`, `permOreMese`, `contaFestivita`) e disegna. I due
+    report PDF che c'erano (`esportaPDF` storico, `esportaPDFMens`) sono **invariati**.
+  - ⚠️ **Diciture nuove, scritte da Claude**, su autorizzazione esplicita di Christian: il nome del
+    pulsante, l'intestazione «Assenze / permessi», la riga della quota e quelle in calce.
+  - **Provato in esecuzione con jsPDF VERO** (`ordextra-test.cjs`, banco 8300, **14 controlli su
+    14**, zero errori di pagina): caso quota 3 h — giorno 4h → **3,00 ordinario + 1,00 extra**,
+    2h → 2,00 e niente extra, 6h → **3,00 + 3,00**; **FERIE** nella terza colonna, **permesso EXF
+    1,00 h** nella terza colonna; **TOTALE 8,00 / 4,00**; **ore rese 12,00 (ord 8,00 + extra
+    4,00)**; in calce FERIE 1 gg e Permessi orari 1,00 h; **una pagina per dipendente**.
+    ✅ **Non regressione misurata**: i due PDF esistenti (mensilizzati e storico) si generano
+    ancora, zero errori.
 
 - 🎨 **CORNICI AI BOX, TITOLI EVIDENZIATI, BORDO VERDE E LA TENDINA DEL RIMBORSO** (ver162,
   13/11/2026, cinque richieste di Christian nella stessa giornata). **Intervento quasi tutto di
