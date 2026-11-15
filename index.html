@@ -169,6 +169,8 @@
   .ced-tab tr.top td { font-size:15.5px; font-weight:800; color:#1f4e82; border-bottom:2px solid #b9d5f1; }
   .ced-tab tr.sub td.l { padding-left:22px; }
   .ced-tab td.d { color:#334155; font-size:13px; }
+  /* ver180: sul telefono la tabella del riquadro sporgeva di 9-18px oltre la scheda: scorre dentro il suo riquadro, come le altre tabelle */
+  @media (max-width:900px){ .ced-box { overflow-x:auto; } }
   .ced-note { font-size:13px; color:#334155; margin-top:5px; line-height:1.45; }
   .ced-rend { margin-top:6px; padding:6px 8px; background:#fff; border:1.5px solid #5a9ce2; border-radius:8px; font-size:14px; font-weight:700; color:#1f4e82; }
   .cong-plain { font-size:13.5px; line-height:1.5; font-weight:600; background:rgba(255,255,255,.65); border:1px dashed rgba(0,0,0,.2); border-radius:8px; padding:6px 10px; margin-bottom:6px; }
@@ -498,7 +500,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver179";
+const APP_VER = "ver180";
 const APP_DATA = "15nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -5648,7 +5650,7 @@ function CostoOrario(props){
             return (
               <button key={x.id} onClick={function(){ setSelId(x.id); }}
                 style={{ textAlign:"left", padding:"8px 10px", borderRadius:"8px", border:"1px solid " + (x.id===dp.id?"#2f6fae":"#e2e8f0"), borderLeft:"7px solid " + (x.colore || "#94a3b8"), background:(x.id===dp.id?"#2f6fae":"#fff"), color:(x.id===dp.id?"#fff":"#1f4e82"), fontWeight:700, fontSize:"14px", cursor:"pointer" }}>
-                {x.nome}<br/><span style={{ fontSize:"13px", fontWeight:400 }}>{fmt2(dd.res.orario)} €/h</span>
+                {x.nome}<br/><span style={{ fontSize:"13px", fontWeight:400 }}>{dd.oreMancanti ? "non calcolabile" : fmt2(dd.res.orario) + " €/h"}</span>{/* ver180: come il dettaglio e l'Excel (ver96): senza ore nel periodo non si inventa un €/h */}
               </button>
             );
           })}
@@ -8242,7 +8244,7 @@ function App(){
         {!FB_READY ? <button className="btn btn-ghost" onClick={changePin}>🔑 PIN</button> : null}
         {FB_READY ? <button className="btn btn-ghost" onClick={function(){ if (dirty && !window.confirm("Ci sono modifiche non salvate. Uscire comunque?")) return; firebase.auth().signOut(); }}>Esci</button> : null}
         <input ref={fileRef} type="file" accept=".xlsx,.xls,.json" className="hidden-file" onChange={onImportFile} />
-        <div className="monthstrip">{vista === "rep" ? "📊 Riepiloghi" : (vista === "ana" ? "📇 Anagrafica" : (vista === "costo" ? "💶 Costo orario" : (vista === "query" ? "🔎 Query personale" : ["📅 Tabellone " + MONTH_LABEL[mese-1] + " " + anno + (mLocked ? "  🔒 bloccato" : ""), React.createElement("span", { key:"gnd", style:{ marginLeft:"12px", background:"#fde047", color:"#12324f", borderRadius:"6px", padding:"2px 9px", fontSize:"15px", fontWeight:800 } }, giorniNonDomenica(anno, mese) + " giorni (no domeniche)")])))}</div>
+        <div className="monthstrip">{vista === "rep" ? "📊 Riepiloghi" : (vista === "ana" ? "📇 Anagrafica" : (vista === "costo" ? "💶 Costo orario" : (vista === "query" ? "🔎 Query personale" : ["📅 Tabellone " + MONTH_LABEL[mese-1] + " " + anno + (mLocked ? "  🔒 bloccato" : ""), React.createElement("span", { key:"gnd", style:{ marginLeft:"12px", whiteSpace:"nowrap", display:"inline-block", background:"#fde047", color:"#12324f", borderRadius:"6px", padding:"2px 9px", fontSize:"15px", fontWeight:800 } }, giorniNonDomenica(anno, mese) + " giorni (no domeniche)")])))}</div>
       </div>
 
       {!FB_READY ? <div className="banner">Modalità LOCALE (localStorage, accesso con PIN).</div> : null}

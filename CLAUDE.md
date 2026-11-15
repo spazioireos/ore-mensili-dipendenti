@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver179 · 15nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver180 · 15nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -405,6 +405,47 @@ Banca ore, tetto annuo, contratti e export.
     «— ore» e «non calcolabile»; la stessa persona su «Teoriche» → 18,67 €/h; e il **foglio Excel
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
+
+- 🔎 **SECONDO COLLAUDO APPROFONDITO DI DIPENDENTI (15/11/2026, sulla ver179) E CORREZIONE ver180**
+  (stessa richiesta di Christian del collaudo della ver177, ripetuta sulla ver179).
+  - 🔴 **Il difetto trovato e corretto: l'ELENCO a sinistra del Costo orario inventava un €/h.** Dalla
+    **ver71** ogni pulsante dell'elenco scrive `fmt2(dd.res.orario)` senza guardare `dd.oreMancanti`; la
+    **ver96** aveva corretto il **dettaglio** e l'**Excel** («non calcolabile» quando nel periodo non ci sono
+    ore) ma **non l'elenco**. **Misurato sulla ver179** (`coll178/lista179.cjs`, backup vero, 3 periodi): **25
+    pulsanti su 48** non combaciavano col dettaglio — «0,00 €/h» e, guardando solo ottobre 2026, numeri come
+    **21,72 · 23,83 · 19,34 €/h** calcolati su ore teoriche mentre il dettaglio dice «non calcolabile». Ora
+    l'elenco scrive **«non calcolabile»** (la dicitura della ver96, nessuna parola nuova). **ver180: 48 su 48
+    coerenti.** ⚠️ **Nessun calcolo toccato**: cambia solo che cosa si scrive nell'elenco.
+  - 📐 **Due difetti di aspetto a 390px, corretti**: il riquadro «🧾 DA INSERIRE A CEDOLINO» (ver175)
+    **sporgeva di 9-18px** oltre la cornice della scheda (la tabella non entra: «SUPPLEMENTARI», «FESTIVITÀ»
+    in neretto non si spezzano) → sotto i 900px il riquadro ha `overflow-x:auto` e la tabella scorre dentro,
+    come le altre tabelle dell'app; la targhetta gialla **«27 giorni (no domeniche)»** (ver165) **andava a
+    capo a metà** → `whiteSpace:nowrap` + `inline-block`, ora passa intera alla riga sotto. **Misurato**: a 390
+    riquadro a 14px da entrambi i lati, targhetta alta 21px; a 768 · 1280 · 1700px **identici** alla ver179.
+  - ✅ **Che cosa il collaudo ha provato, oltre alla correzione**: batteria di **55 script** sulla ver179
+    (44 a zero falliti); **i falliti di 11 script sono tutti attese invecchiate**, e lo dimostra la misura nuova
+    `coll178/attrib.cjs`: il costo dei 16 veri cambia **solo** fra ver158→159 (TFR), 159→166 e 166→175
+    (ore corrette da dare, AN, ASP) e 175→177 (trattenute ver176), e **zero schede fra ver177 e ver179**, su
+    gen→ott 2026 e gen→dic 2025. Prove nuove: **export Excel** (`exp179`, 24/0: vero .xlsx, autore «Christian
+    Canonica», nessun NaN, il totale di ogni persona di ottobre ritrovato nel foglio, il €/h del Costo orario
+    uguale a video e nel file, «non calcolabile» nel file, archivio intatto); **Query personale** (`qry179`,
+    20/0: Totale su intervallo di ORE e FERIE su tre intervalli **ricalcolato da zero dal backup, 16 su 16
+    righe** e totale complessivo identico, data impossibile in rosso, intervallo rovesciato senza totali né
+    export, lettere che non entrano, «In forza» con totale = determinati + indeterminati = righe e le 4 schede
+    senza data segnalate a parte); **testi a video** delle 5 viste: **zero** accenti con l'apostrofo, valori
+    tecnici o spazi prima della punteggiatura; **126 titoli su 126 in grassetto**.
+  - 🔢 **Arrotondamenti rimasti alla vecchia maniera** (`Math.round(x*100)/100`, 5 punti: `totOfRec`,
+    `saldoPrec`, `numTxt`, il permesso orario, `foAggregaMese`): **misurato sui dati veri, zero differenze**
+    con `R2` su 206 schede-mese (le celle hanno al massimo 2 decimali, e la sola cella storica a 4 decimali non
+    cade sul mezzo centesimo). **Non toccati**: teorici, e `totOfRec` passa per tutti i calcoli.
+  - 🟠 **Segnalati e NON toccati** (gli export Excel/PDF e i contratti sono fra le cose da non toccare senza
+    richiesta): l'Excel dell'**Anagrafica** si chiama «… - 15nov26 - 18.07.xlsx», **senza la versione**; i tre
+    Excel della **Query personale** si chiamano «Query - Movimenti 2026.xlsx», senza «Spazio Ireos», data,
+    versione e ora, e uno ha un **trattino basso** («01-01-2026_31-10-2026»); il **Riepiloghi** e l'**Excel del
+    mese** si chiamano tutti e due «Report Ore mensile»; i tre **.docx** dei contratti hanno la data ma non
+    versione e ora. ⚠️ L'Excel dell'Anagrafica ha oggi **70 colonne**, non 50: nascono da `ANA_SECTIONS`, e le
+    sezioni aggiunte dalla ver135 in poi le hanno allungate (la riga «le 50 colonne restano quelle» qui sotto è
+    vecchia).
 
 - ☁️ **UN SALVATAGGIO RIMASTO SOLO NEL BROWSER NON SI PERDE PIÙ AL RIENTRO, E TRE TESTI SISTEMATI**
   (ver179, 15/11/2026, risposte di Christian al collaudo: «**1 correggi, 2 ok, 3 porta**»).
