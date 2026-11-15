@@ -500,7 +500,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver180";
+const APP_VER = "ver181";
 const APP_DATA = "15nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -1421,7 +1421,7 @@ function inForceAt(dp, D){ const a=assunzInt(dp); if(!a) return false; if(a>D) r
 function intToIt(n){ if(!n) return ""; const y=Math.floor(n/10000), m=Math.floor((n%10000)/100), d=n%100; return pad2(d)+"/"+pad2(m)+"/"+y; }
 function cellCode(v){ const s=String(v==null?"":v).trim().toUpperCase(); if(s==="") return ""; if(isNumeric(v)) return ""; return s.split(/\s+/)[0]; }
 function sumOverRange(state, dipId, fromInt, toInt, what){ let total=0; let y=Math.floor(fromInt/10000), m=Math.floor((fromInt%10000)/100); const ty=Math.floor(toInt/10000), tm=Math.floor((toInt%10000)/100); while(y<ty || (y===ty && m<=tm)){ const rec=getRecFrom(state,y,m,dipId); if(rec && rec.giorni){ const dim=daysInMonth(y,m); for(let d=1; d<=dim; d++){ const di=y*10000+m*100+d; if(di<fromInt||di>toInt) continue; const v=rec.giorni[d]; if(v==null||v==="") continue; if(what==="ORE") total+=parseHour(v); else if(cellCode(v)===what) total+=1; } } m++; if(m>12){m=1;y++;} } return total; }
-function qExport(nome, aoa){ const wb=XLSX.utils.book_new(); wb.Props={ Title:"Query personale", Author:"Christian Canonica", Company:"Spazio Ireos Societa' Cooperativa Sociale", CreatedDate:new Date() }; const ws=XLSX.utils.aoa_to_sheet(aoa); XLSX.utils.book_append_sheet(wb, ws, "Query"); XLSX.writeFile(wb, nome); }
+function qExport(nome, aoa){ const wb=XLSX.utils.book_new(); wb.Props={ Title:"Query personale", Author:"Christian Canonica", Company:"Spazio Ireos Societa' Cooperativa Sociale", CreatedDate:new Date() }; const ws=XLSX.utils.aoa_to_sheet(aoa); XLSX.utils.book_append_sheet(wb, ws, "Query"); /* ver181: nome secondo la convenzione (Spazio Ireos … - ggmmmaa - verN - HH.MM), senza trattino basso */ XLSX.writeFile(wb, fileName("xlsx", String(nome).replace(/\.xlsx$/,"").replace(/_/g," al "))); }
 function cfClean(s){ return String(s==null?"":s).toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^A-Z]/g,""); }
 function cfCons(s){ return s.replace(/[AEIOU]/g,""); }
 function cfVow(s){ return s.replace(/[^AEIOU]/g,""); }
@@ -3416,7 +3416,7 @@ function generaContratto(dp, onErr){
   }).then(function(blob){
     const nome=String(dp.nome||"contratto").replace(/[^A-Za-z0-9 ]/g," ").replace(/\s+/g," ").trim();
     const ora=new Date(); const p2=function(n){ return (n<10?"0":"")+n; };
-    const fn="Contratto - "+nome+" - "+p2(ora.getDate())+MESE_ABBR_FILE[ora.getMonth()]+String(ora.getFullYear()).slice(2)+".docx";
+    const fn="Contratto - "+nome+" - "+p2(ora.getDate())+MESE_ABBR_FILE[ora.getMonth()]+String(ora.getFullYear()).slice(2)+" - "+APP_VER+" - "+p2(ora.getHours())+"."+p2(ora.getMinutes())+".docx";   /* ver181: versione e ora */
     const url=URL.createObjectURL(blob); const link=document.createElement("a");
     link.href=url; link.download=fn; document.body.appendChild(link); link.click();
     setTimeout(function(){ URL.revokeObjectURL(url); link.remove(); }, 1500);
@@ -3504,7 +3504,7 @@ function generaProroga(dp, onErr){
   }).then(function(blob){
     const nome=String(dp.nome||"proroga").replace(/[^A-Za-z0-9 ]/g," ").replace(/\s+/g," ").trim();
     const ora=new Date(); const p2=function(n){ return (n<10?"0":"")+n; };
-    const fn="Proroga - "+nome+" - "+p2(ora.getDate())+MESE_ABBR_FILE[ora.getMonth()]+String(ora.getFullYear()).slice(2)+".docx";
+    const fn="Proroga - "+nome+" - "+p2(ora.getDate())+MESE_ABBR_FILE[ora.getMonth()]+String(ora.getFullYear()).slice(2)+" - "+APP_VER+" - "+p2(ora.getHours())+"."+p2(ora.getMinutes())+".docx";   /* ver181: versione e ora */
     const url=URL.createObjectURL(blob); const link=document.createElement("a");
     link.href=url; link.download=fn; document.body.appendChild(link); link.click();
     setTimeout(function(){ URL.revokeObjectURL(url); link.remove(); }, 1500);
@@ -3542,7 +3542,7 @@ function generaTrasformazione(dp, onErr){
   }).then(function(blob){
     const nome=String(dp.nome||"trasformazione").replace(/[^A-Za-z0-9 ]/g," ").replace(/\s+/g," ").trim();
     const ora=new Date(); const p2=function(n){ return (n<10?"0":"")+n; };
-    const fn="Trasformazione - "+nome+" - "+p2(ora.getDate())+MESE_ABBR_FILE[ora.getMonth()]+String(ora.getFullYear()).slice(2)+".docx";
+    const fn="Trasformazione - "+nome+" - "+p2(ora.getDate())+MESE_ABBR_FILE[ora.getMonth()]+String(ora.getFullYear()).slice(2)+" - "+APP_VER+" - "+p2(ora.getHours())+"."+p2(ora.getMinutes())+".docx";   /* ver181: versione e ora */
     const url=URL.createObjectURL(blob); const link=document.createElement("a");
     link.href=url; link.download=fn; document.body.appendChild(link); link.click();
     setTimeout(function(){ URL.revokeObjectURL(url); link.remove(); }, 1500);
@@ -7104,7 +7104,7 @@ function Riepiloghi(props){
     const aVoci=[["DIPENDENTE","MESE"].concat(CAT_NOTE.map(function(c){ return c.c; })).concat(["TOT VOCI"])];
     tabVoci.forEach(function(r){ aVoci.push([r.dp, r.mese].concat(CAT_NOTE.map(function(c){ return r.counts[c.c]; })).concat([r.tot])); });
     aVoci.push(["TOTALE",""].concat(CAT_NOTE.map(function(c){ return totVoci[c.c]; })).concat([CAT_NOTE.reduce(function(a,c){ return a+totVoci[c.c]; },0)])); mkSheet("Voci note", aVoci);
-    XLSX.writeFile(wb, fileName("xlsx"));
+    XLSX.writeFile(wb, fileName("xlsx", "Riepiloghi"));   /* ver181: non piu' lo stesso nome dell'Excel del mese */
   };
 
   const mOpts = MONTH_LABEL.map(function(l,i){ return <option key={i} value={i+1}>{l}</option>; });
@@ -7799,7 +7799,7 @@ function App(){
     ws["!cols"] = cols.map(function(){ return { wch:20 }; });
     XLSX.utils.book_append_sheet(wb, ws, "Anagrafica");
     const ora = new Date(); const p2=function(n){ return (n<10?"0":"")+n; };
-    XLSX.writeFile(wb, "Spazio Ireos Anagrafica dipendenti - " + p2(ora.getDate()) + MESE_ABBR_FILE[ora.getMonth()] + String(ora.getFullYear()).slice(2) + " - " + p2(ora.getHours()) + "." + p2(ora.getMinutes()) + ".xlsx");
+    XLSX.writeFile(wb, fileName("xlsx", "Anagrafica dipendenti"));   /* ver181: ora porta anche la versione */
   };
   const onFestConfirm = function(dipId, d, value){
     setConfirm({

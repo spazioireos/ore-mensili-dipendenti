@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver180 · 15nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver181 · 15nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -406,6 +406,22 @@ Banca ore, tetto annuo, contratti e export.
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
 
+- 🏷️ **I NOMI DEI FILE ESPORTATI SEGUONO TUTTI LA CONVENZIONE** (ver181, 15/11/2026, Christian: «**1,
+  sistema**» sul rilievo del secondo collaudo). Convenzione: «[descrizione] - ggmmmaa - verN - HH.MM.ext».
+  - **Query personale** (`qExport`): da «Query - Movimenti 2026.xlsx» a «**Spazio Ireos Query - Movimenti 2026 -
+    15nov26 - ver181 - 18.27.xlsx**»; il trattino basso dei due intervalli diventa « al » («01-01-2026 al
+    31-10-2026»). Passa da `fileName(ext, desc)`, la stessa funzione dei report.
+  - **Anagrafica**: ora porta anche la **versione** (`fileName("xlsx","Anagrafica dipendenti")`).
+  - **Riepiloghi**: «Spazio Ireos **Riepiloghi** - …» invece di «Report Ore mensile», che resta il nome
+    dell'Excel del mese: i due file non si chiamano più allo stesso modo.
+  - **Contratto / Proroga / Trasformazione .docx**: alla data si aggiungono versione e ora («Contratto - ROSSI
+    MARIO - 15nov26 - ver181 - 09.05.docx»). ⚠️ Cambia **solo il nome del file**: modello, segnaposti e
+    contenuto delle lettere **non sono stati toccati**.
+  - ⚠️ **Nessun contenuto degli export è cambiato**: titoli dei fogli, colonne, autore nei metadati identici.
+  - **Provato**: `coll178/exp179.cjs` **27/0** (i cinque export Excel, nomi compresi), `coll178/qry179.cjs` **22/0**
+    (i tre della Query, con « al »), `coll178/docx181.cjs` **4/0** (l'espressione vera del nome dei tre .docx
+    estratta dal file e valutata: il modello Word vero non c'è, quindi il **.docx non è stato generato**).
+
 - 🔎 **SECONDO COLLAUDO APPROFONDITO DI DIPENDENTI (15/11/2026, sulla ver179) E CORREZIONE ver180**
   (stessa richiesta di Christian del collaudo della ver177, ripetuta sulla ver179).
   - 🔴 **Il difetto trovato e corretto: l'ELENCO a sinistra del Costo orario inventava un €/h.** Dalla
@@ -438,8 +454,8 @@ Banca ore, tetto annuo, contratti e export.
     `saldoPrec`, `numTxt`, il permesso orario, `foAggregaMese`): **misurato sui dati veri, zero differenze**
     con `R2` su 206 schede-mese (le celle hanno al massimo 2 decimali, e la sola cella storica a 4 decimali non
     cade sul mezzo centesimo). **Non toccati**: teorici, e `totOfRec` passa per tutti i calcoli.
-  - 🟠 **Segnalati e NON toccati** (gli export Excel/PDF e i contratti sono fra le cose da non toccare senza
-    richiesta): l'Excel dell'**Anagrafica** si chiama «… - 15nov26 - 18.07.xlsx», **senza la versione**; i tre
+  - ✅ **Segnalati e poi CORRETTI dalla ver181** (Christian: «1, sistema»; prima non toccati perché gli
+    export e i contratti sono fra le cose da non toccare senza richiesta): l'Excel dell'**Anagrafica** si chiama «… - 15nov26 - 18.07.xlsx», **senza la versione**; i tre
     Excel della **Query personale** si chiamano «Query - Movimenti 2026.xlsx», senza «Spazio Ireos», data,
     versione e ora, e uno ha un **trattino basso** («01-01-2026_31-10-2026»); il **Riepiloghi** e l'**Excel del
     mese** si chiamano tutti e due «Report Ore mensile»; i tre **.docx** dei contratti hanno la data ma non
