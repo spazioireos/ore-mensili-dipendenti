@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver171 · 15nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver172 · 15nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -405,6 +405,36 @@ Banca ore, tetto annuo, contratti e export.
     «— ore» e «non calcolabile»; la stessa persona su «Teoriche» → 18,67 €/h; e il **foglio Excel
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
+
+- 🎌 **LA QUOTA DELLA FESTIVITÀ GODUTA SI LEGGE SOTTO IL GIORNO ROSSO** (ver172, 15/11/2026,
+  Christian: «**scrivi sempre le ore in piccolo sotto le assenze retribuite perché concorrono a
+  formare le ore dovute mensili**», dopo aver notato che sotto l'8 dicembre non c'era niente).
+  - **Com'era**: il numerino sotto la cella (`.teor-abs`, ver77) compare **solo** sotto una cella
+    con un **codice** di assenza. Un **festivo rosso** non ha codice (dalla ver77 non si compila),
+    quindi la festività goduta — che dalla ver121 **entra** nel Risultato del mese e nel Costo
+    orario — a video **non si vedeva da nessuna parte sotto il giorno**: solo nella pastiglia
+    «Festività godute: N gg = X h». Misurato prima di toccare: i numerini della ver171 erano
+    **identici** a quelli della ver166 (nessuna regressione), mancava proprio quello dei festivi.
+  - **Ora**: sotto il giorno **rosso non domenicale, col contratto in piedi, senza un codice che
+    lo copra già**, compare in piccolo la sua quota (`.teor-fest`, 9px dentro la griglia, blu
+    `#1f4e82`): **`oreSett ÷ ggSett`**, la **stessa** quota di `festGoduteMese` (ver119: 38/6 =
+    6,333; **non** monte/26), passata da `App` come prop `festQuota`. Suggerimento: «Festività
+    goduta: vale X h … e concorre alle ore dovute del mese. Non erode il Tetto annuo.»
+  - ⚠️ **NON è cliccabile, di proposito**: il numerino delle assenze è il contrassegno
+    erosiva/non erosiva del Tetto, e le festività godute **per decisione di Christian del
+    06/11/2026 non erodono** («Lascia com'è»). Qui è solo informazione.
+  - ⚠️ **Niente doppio**: se il festivo porta già un codice (dati storici con `FEST`/`FERIE`
+    sull'8 dicembre 2025) resta il numerino erosivo di prima e la quota festiva **non** compare —
+    stessa esclusione di `festGoduteMese` (ver122). Chi **non ha la data di assunzione** non la
+    vede (`inForceAt` falso), come già non entra in `festGoduteMese`: coerente, e sono le 4
+    schede già segnalate.
+  - **Provato in esecuzione** (`fest172`, **11/0**, banchi rigenerati): dicembre 2026 a 18 h/6 gg →
+    quota **3,000** sotto 7·8·25·26 e pastiglia «4 gg = 12,000 h»; la FERIE del 14 tiene il suo
+    3,006 erosivo; a 19 h con `FEST` scritto sull'8 → erosivo sull'8 e quota festiva **solo** su
+    7·25·26 (3 gg = 9,500, coerente); senza data di assunzione → niente; **tabella del mese 2283px
+    identica** alla ver171 congelata; zero errori di pagina. Non regressione: `collaudo171-tab`
+    226/1 (lo 0,003 h noto), `tab168` 13/0 · `tab169` 9/0 · `graf155` 15/0 · `graf171` 18/0 ·
+    `ver155` 18/0 · `verifica-ore` 10/10. Babel + `node --check`.
 
 - 🔎 **COLLAUDO APPROFONDITO DEL CONTEGGIO DELLE ORE — 15/11/2026, sulla ver171, DATI VERI (backup
   del 04/11): NESSUN ERRORE DI CONTEGGIO** (richiesta di Christian: «collaudo approfondito …

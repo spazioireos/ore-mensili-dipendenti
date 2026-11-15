@@ -123,6 +123,8 @@
               white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:66px; }
   .perm-lbl:hover { background:#ddd6fe; }
   .teor-abs:hover { background:#fde68a; }
+  /* ver172: quota della FESTIVITÀ GODUTA sotto il giorno rosso (solo informazione, non cliccabile: le festività non erodono il Tetto) */
+  .teor-fest { font-size:9px; font-weight:800; color:#1f4e82; text-align:center; line-height:1.1; margin-top:1px; }
   .teor-abs.no-ero { color:#94a3b8; text-decoration:line-through; }
   .teor-abs.no-ero:hover { background:#e2e8f0; }
   .provv-lbl { display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:700; color:#92400e; background:#fffbeb; border:1px solid #fcd34d; border-radius:6px; padding:3px 8px; cursor:pointer; }
@@ -483,7 +485,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver171";
+const APP_VER = "ver172";
 const APP_DATA = "15nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -2772,6 +2774,15 @@ function EmployeeCard(props){
                       onKeyDown={function(e){ if(!blocked && (e.key==="Enter"||e.key===" ")){ e.preventDefault(); props.onEro(dp.id, d, !ero); } }}
                       >{fmt3(quotaDay)}</div>;
                   })() : null}
+                  {/* ver172 (15/11/2026, Christian: «scrivi sempre le ore in piccolo sotto le assenze retribuite perché
+                      concorrono a formare le ore dovute mensili»): anche la FESTIVITÀ GODUTA — giorno rosso non domenicale,
+                      col contratto in piedi, senza un codice che la copra già — mostra la sua quota (oreSett ÷ ggSett,
+                      la stessa di festGoduteMese). Solo informazione: NON è cliccabile, perché per sua decisione del
+                      06/11/2026 le festività godute non erodono il Tetto annuo. */}
+                  {(!isCovAbs && rosso && weekdayOf(y, m, d) !== 0 && isFestivo(fset, m, d) && inForceAt(dp, y*10000 + m*100 + d)
+                    && !(CODE_SET[svalC] && svalC !== "--" && svalC !== "AN") && props.festQuota > 0)
+                    ? <div className="teor-fest" title={"Festività goduta: vale " + fmt3(props.festQuota) + " h (ore settimanali ÷ giorni a settimana) e concorre alle ore dovute del mese. Non erode il Tetto annuo."}>{fmt3(props.festQuota)}</div>
+                    : null}
                 </td>
               );
             })}
@@ -8021,6 +8032,7 @@ function App(){
                   onDich={onDich} onSvuotaMese={onSvuotaMese} saldoPrec={saldoP} bancaPrec={bancaP} tettoConsumo={tettoC} onAzzeraSaldo={onAzzeraSaldo} onAnnullaAzzera={onAnnullaAzzera}
                   onSostAdd={onSostAdd} onSostChange={onSostChange} onSostDel={onSostDel} onOpenPerm={onOpenPerm}
                   festOre={festGoduteMese(state, dp, anno, mese, null).ore} festGG={festGoduteMese(state, dp, anno, mese, null).gg}
+                  festQuota={R2(oreSettAt(dp, anno, mese) / ggSettDi(state, dp), 4)}   /* ver172: quota della singola festività goduta */
                   banca={bancaMeseA(state, dp, anno, mese)}   /* ver151: un solo numero per il Risultato del mese */
                   onEditDip={apriScheda} onDelDip={askDelDip} onAvviso={showToast} />;
               })
