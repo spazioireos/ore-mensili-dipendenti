@@ -463,7 +463,7 @@ Banca ore, tetto annuo, contratti e export.
     156,00; zero errori di pagina; e la **ver170 congelata** che divideva per 101,5 (169,85 €/h <
     175,33). Batteria: `co170` 10/0 · `tab168` 13/0 · `tab169` 9/0 · `ordextra-test` 46/0 ·
     `verifica-ore` 10/10 · `ver160` 27/0 · `ver162` 11/0 · `graf155` 15/0 · `sc-dip-A` 38/3
-    (storici) · `nr153` **6/0** dopo l'aggiornamento dell'attesa. Babel + `node --check`.
+    (storici) · `nr153` **7/0** dopo l'aggiornamento dell'attesa. Babel + `node --check`.
     ⚠️ **`nr153` aggiornato, non aggirato**: pretendeva ore e €/h identici fuori dalle 10 schede
     della ver159; ora pretende il **costo** identico fuori da quelle 10 e **ore diverse** in almeno
     10 schede (il cambio voluto). Tre attese del **mio** `co171` erano sbagliate (avevo contato 72 ore
