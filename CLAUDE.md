@@ -446,6 +446,12 @@ Banca ore, tetto annuo, contratti e export.
       Riepiloghi** (quello vero); «a mano» e «teoriche» restano sulla formula a settimane (stime),
       non toccati. ⚠️ Era nell'elenco delle cose da non toccare: fatto **solo** su sua richiesta
       esplicita del 15/11.
+    - 🟢 **Pastiglia «costo orario rispecchiante l'effettivo»** (dicitura di Christian, 15/11) sotto
+      il €/h nella scheda del Costo orario: compare **solo** con le ore «dai Riepiloghi» (dati veri
+      del Tabellone), sparisce con «a mano»/«Teoriche». Christian ha confermato: con dati reali a
+      Tabellone il Costo orario deve **rispecchiare** (soglia = ore corrette da dare), non il monte
+      fisso — sul lungo periodo le due basi quasi coincidono, sul breve «rispecchiante» è più
+      corretto. Misurato: presente con Riepiloghi, assente con Teoriche, zero errori.
   - 🔴 **CONSEGUENZA DICHIARATA, e misurata dal vivo**: lo straordinario di uno stesso lavoro
     **cambia col numero di giorni del mese**. Persona 19h/sett, **90 h rese, nessuna assenza**:
     | | VECCHIO (monte fisso 82,5) | NUOVO (ore corrette da dare) |

@@ -5685,6 +5685,13 @@ function CostoOrario(props){
                   <div>
                     <div style={{ textAlign:"center", fontSize:"34px", fontWeight:800, color:"#1f4e82", lineHeight:1.1, ...cifre }}>{fmt2(r.orario)}</div>
                     <div style={{ textAlign:"center", fontSize:"15px", fontWeight:700, color:"#1f4e82" }}>euro all'ora</div>
+                    {/* ver166 (15/11/2026, Christian: «evidenzialo: costo orario rispecchiante l'effettivo»):
+                        con le ore «dai Riepiloghi» il costo rispecchia i dati veri del Tabellone
+                        (ore rese, ferie, permessi) e la soglia dello straordinario sono le «ore corrette
+                        da dare». Dicitura di Christian. */}
+                    {d.fonte === "riepiloghi"
+                      ? <div style={{ textAlign:"center", marginTop:"7px" }}><span style={{ background:"#15803d", color:"#fff", borderRadius:"999px", padding:"3px 12px", fontSize:"13px", fontWeight:800 }}>costo orario rispecchiante l'effettivo</span></div>
+                      : null}
                   </div>
                 )}
               </div>
