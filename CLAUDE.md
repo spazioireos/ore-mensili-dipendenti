@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver178 · 15nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver179 · 15nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -406,6 +406,50 @@ Banca ore, tetto annuo, contratti e export.
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
 
+- ☁️ **UN SALVATAGGIO RIMASTO SOLO NEL BROWSER NON SI PERDE PIÙ AL RIENTRO, E TRE TESTI SISTEMATI**
+  (ver179, 15/11/2026, risposte di Christian al collaudo: «**1 correggi, 2 ok, 3 porta**»).
+  - 🔴 **1 — il cloud caduto al 💾.** Fino alla ver178, se la scrittura nel cloud falliva, l'app
+    salvava solo nel browser («Cloud non raggiungibile — salvato in locale») e spegneva il 💾; al
+    rientro però **leggeva il cloud**, che aveva il dato vecchio, e la modifica **spariva** senza
+    avviso. **Misurato sulla ver178: 3 cicli su 3 persi.**
+    - **Ora**: il salvataggio rimasto solo nel browser si **segna** nella chiave
+      **`LS_CLOUD_SOSPESO`** (`<LS_KEY>__cloudSospeso`, `{uid, quando}`), funzioni
+      **`cloudSospesoLeggi/Segna/Togli`**. Al rientro **dello stesso account** l'app **rimanda nel
+      cloud il dato del browser PRIMA di leggerlo** e usa quello; riuscito, toglie il segno e lo
+      dice («Le modifiche rimaste solo nel browser sono state mandate nel cloud»). Se il cloud
+      **non risponde ancora**, l'app lavora sui dati del browser, **accende il 💾** e lo dice in
+      **arancione** («Il cloud non risponde ancora: stai lavorando sui dati salvati in questo
+      browser. Premi 💾 quando torna la linea»). Ogni 💾 riuscito toglie il segno.
+    - ⚠️ La chiave sta **fuori dai dati**: il backup JSON e il documento **non cambiano**.
+    - ⚠️ **Un segno di un altro account si ignora** (si legge il cloud come prima): su un browser
+      usato da due account i dati dell'uno non finiscono nel cloud dell'altro.
+    - ⚠️ **Conseguenza dichiarata**, la stessa di USOINT ver129: se nel frattempo **un altro
+      computer** ha salvato nel cloud, al rientro il dato rimasto in questo browser **vince** su
+      quello. ⚠️ Con Firestore vero una linea caduta di solito non fa fallire la scrittura (resta
+      in attesa): il caso riguarda soprattutto permessi o quote. È lo stesso difetto chiuso in
+      USOINT con la ver129.
+    - ⚠️ **Diciture nuove, scritte da Claude** (i due avvisi del rientro).
+  - 📝 **2 — testi**: gli accenti scritti con l'apostrofo nei suggerimenti e nelle scritte a video
+    («e'», «piu'», «li'», «finche'», «gia'», «anzianita'», «FESTIVITA'») sono ora **è, più, lì,
+    finché, già, anzianità, FESTIVITÀ** (15 punti, compresa una riga del Report mensilizzati e un
+    avviso); la legenda dice «Festività nazionale e domeniche» **senza** «(crimson #B22222)»; il
+    suggerimento di «ORE MESE» **non nomina più la Banca ore**. ⚠️ **NON toccati, di proposito**:
+    i valori **salvati nei dati** «DA LUNEDI' A SABATO» / «DA LUNEDI' A VENERDI'» (cambiarli
+    altererebbe le schede e le lettere), l'intestazione Excel «ORE IN PIU' (STRAORDINARIO)» e il
+    campo «Company» dei metadati Excel.
+  - 📐 **La fascia scura del titolo della vista arriva al bordo destro**: finiva 28px prima
+    (difetto preesistente dalla ver134: i margini negativi non allargano una `flex-basis:100%`).
+    Ora `flex-basis:calc(100% + 28px)`. Misurato a 390 · 1280 · 1700px: da bordo a bordo, nessuno
+    scorrimento laterale.
+  - **Provato in esecuzione**: `coll178/cloud179.cjs` **25/25** (confronto diretto con la ver178
+    congelata: tre cicli persi là, tre salvati qui e rimandati nel cloud; cloud ancora giù al
+    rientro → dati del browser, avviso arancione, 💾 acceso, e il 💾 successivo li manda; segno di
+    un altro account ignorato; senza segno tutto come prima; salvataggio normale senza segno);
+    `coll178/testi179.cjs` **9/9**; zero errori di pagina. **Batteria rieseguita sulla ver179, 40 script, ZERO
+    falliti nuovi** (`cicli` passa ora **25/0**: il suo fallito era proprio il difetto chiuso qui); restano i soliti
+    `sc-dip-A` 3 e `collaudo171-tab` 1 (lo 0,003 h).
+  - 📤 **3 — «porta»**: ver175 → ver179 e USOINT ver138 portate su `main` il 15/11/2026.
+
 - 🔎 **COLLAUDO APPROFONDITO DI DIPENDENTI DEL 15/11/2026 (sulla ver177) E CORREZIONE ver178**
   (richiesta di Christian: «collaudo approfondito della seguente parte del gestionale: Dipendenti»).
   - 🔴 **Il difetto trovato e corretto: il SEGNO MENO entrava in molte caselle numeriche**, contro la
@@ -458,13 +502,13 @@ Banca ore, tetto annuo, contratti e export.
     ver146; le loro funzioni sono coperte dagli script nuovi. `scatti139` 27/2: uno è un'attesa
     invecchiata, l'altro legge male la tabella dei pezzi (ha una colonna in più) — **rifatto a
     mano: la somma dei pezzi più i 250 € di formazione torna esatta al costo totale**.
-  - 🟠 **TROVATO E NON CORRETTO, serve la decisione di Christian**: se la scrittura nel **cloud
+  - ✅ **CHIUSO dalla ver179** («1 correggi»). Era: 🟠 **trovato e non corretto**: se la scrittura nel **cloud
     fallisce**, l'app salva solo nel browser, dice «Cloud non raggiungibile — salvato in locale» e
     **spegne il 💾**; al rientro però **legge il cloud**, che ha il dato vecchio, e la modifica
     sparisce dalla pagina senza nessun avviso (dimostrato con la finta Firebase). ⚠️ Con Firestore
     vero una linea caduta di solito **non** fa fallire la scrittura (resta in attesa): il caso
     riguarda soprattutto permessi o quote. È lo stesso difetto chiuso in USOINT con la ver129.
-  - 🟡 **Segnalati e non toccati (testi)**: otto suggerimenti al passaggio del mouse scrivono
+  - ✅ **CHIUSI dalla ver179** («2 ok»). Erano: 🟡 **segnalati e non toccati (testi)**: otto suggerimenti al passaggio del mouse scrivono
     gli accenti con l'apostrofo («e'», «piu'», «li'», «finche'», «anzianita'», «FESTIVITA'»); la
     legenda dice «Festività nazionale e domeniche (crimson #B22222)», cioè un codice colore e una
     parola inglese; il suggerimento di «ORE MESE» nomina la «Banca ore», che Spazio Ireos non usa;

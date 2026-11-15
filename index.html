@@ -376,7 +376,7 @@ input:focus,select:focus,textarea:focus{outline:3px solid #1d4ed8;outline-offset
   .tabs { padding:6px 12px 0; }
   .zoombar { padding:4px 12px; }
   .yearbar { padding:2px 5px; }
-  .monthstrip { margin:6px -14px -8px; padding:5px 14px; }
+  .monthstrip { margin:6px -14px -8px; padding:5px 14px; flex-basis:calc(100% + 28px); }   /* ver179: arriva fino al bordo destro (prima finiva 28px prima: i margini negativi non allargano una flex-basis del 100%) */
 
   /* --- b) l'area di lavoro e le schede delle persone --- */
   .content { padding:10px; }
@@ -498,7 +498,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver178";
+const APP_VER = "ver179";
 const APP_DATA = "15nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -1656,6 +1656,16 @@ function respubScrivi(valori){
   try { localStorage.setItem(LS_RESPUB, JSON.stringify(o)); } catch (e){}
   return o;
 }
+/* ver179 (collaudo del 15/11/2026, Christian: «1 correggi»). Se la scrittura nel CLOUD fallisce,
+   il 💾 salva solo nel browser; al rientro però l'app leggeva il cloud, che ha il dato vecchio, e la
+   modifica spariva dalla pagina senza un avviso. Ora il salvataggio rimasto solo nel browser si
+   SEGNA qui (chiave sua, fuori dai dati: il backup non cambia) con l'uid di chi l'ha fatto; al
+   rientro dello STESSO account l'app lo rimanda nel cloud PRIMA di leggerlo, e usa quello.
+   È lo stesso difetto chiuso in USOINT con la ver129. */
+const LS_CLOUD_SOSPESO = LS_KEY + "__cloudSospeso";
+function cloudSospesoLeggi(){ try { const o = JSON.parse(localStorage.getItem(LS_CLOUD_SOSPESO) || "null"); return (o && o.uid) ? o : null; } catch (e) { return null; } }
+function cloudSospesoSegna(uid){ try { localStorage.setItem(LS_CLOUD_SOSPESO, JSON.stringify({ uid: uid, quando: Date.now() })); } catch (e) {} }
+function cloudSospesoTogli(){ try { localStorage.removeItem(LS_CLOUD_SOSPESO); } catch (e) {} }
 function timbroCorrente(){ try { return localStorage.getItem(LS_TIMBRO) || ""; } catch (e) { return ""; } }
 function timbroNuovo(){ return String(Date.now()) + "-" + Math.random().toString(36).slice(2, 8); }
 function saveLocal(state){
@@ -2509,7 +2519,7 @@ function esportaPDFMens(state, pairs){
     const ensureY = function(h){ if (yy + h > FONDO){ doc.addPage(); yy = 18; } };
     if (!supEsiste){
       ensureY(6); doc.setFontSize(8.5); doc.setTextColor(120,20,20); doc.setFont(undefined,"bold");
-      doc.text("Il supplementare non esiste per i mesi prima di ottobre 2026 (decorrenza della base mensile): per questo e' scritto «—».", 14, yy);
+      doc.text("Il supplementare non esiste per i mesi prima di ottobre 2026 (decorrenza della base mensile): per questo è scritto «—».", 14, yy);
       yy += 6; doc.setFont(undefined,"normal");
     }
     /* ver154 (Christian, 11/11/2026: «NON METTERLA»): le quattro righe di legenda in calce sono
@@ -2830,7 +2840,7 @@ function EmployeeCard(props){
   const permPag  = useMemo(function(){ return permOreEroseMese(rec); }, [rec]);   /* ver99: solo le giornate erosive */
   const festErose = Number(props.festErose) || 0;                    /* ver173: festività godute EROSIVE, da App (festOreEroseMese) */
   const totTeor = R2(tot + oreErose + permPag + festErose, 3);      /* ver98: dentro anche i permessi retribuiti; ver173: e le festività godute erosive */
-  const TEOR_TITLE = "Totale teorico = ore effettive + ore delle giornate di assenza EROSIVE (ferie, malattia e simili non barrate col clic) + ore delle FESTIVITA' GODUTE erosive (non barrate col clic) + ore di permesso retribuito (i cinque tipi della tendina). Fino a settembre 2026, o per chi non è mensilizzato, è lo stesso numero che consuma il Tetto annuo; per i mensilizzati da ottobre 2026 il Tetto scende invece delle ore pagate a cedolino (vedi il riquadro del Tetto annuo). I permessi con il tipo scritto a mano non sono compresi.";
+  const TEOR_TITLE = "Totale teorico = ore effettive + ore delle giornate di assenza EROSIVE (ferie, malattia e simili non barrate col clic) + ore delle FESTIVITÀ GODUTE erosive (non barrate col clic) + ore di permesso retribuito (i cinque tipi della tendina). Fino a settembre 2026, o per chi non è mensilizzato, è lo stesso numero che consuma il Tetto annuo; per i mensilizzati da ottobre 2026 il Tetto scende invece delle ore pagate a cedolino (vedi il riquadro del Tetto annuo). I permessi con il tipo scritto a mano non sono compresi.";
 
   const mLocked = props.mLocked;
   const cellStyle = function(val, festivo, blocked){
@@ -2859,7 +2869,7 @@ function EmployeeCard(props){
         <span className="nome" style={{ color:"#08344a" }}>{dp.nome}</span>
         {livelloAt(dp,y,m) ? <span className="pill">Liv. {livelloAt(dp,y,m)}</span> : null}
         <span className="pill">ORE SETT: {hoursDisp(oreSettAt(dp,y,m))}</span>
-        <span className="pill" title="Monte ore mensile: 165 h per chi fa 38 h/settimana, in proporzione per gli altri (stessa base usata dalla Banca ore)">ORE MESE: {hoursDisp(monteFissoMese(dp,y,m))}</span>
+        <span className="pill" title="Monte ore mensile: 165 h per chi fa 38 h/settimana, in proporzione per gli altri">ORE MESE: {hoursDisp(monteFissoMese(dp,y,m))}</span>
         <span className="pill" style={{ background:"#fde047", color:"#12324f", fontWeight:800 }} title={"Ore corrette da dare nel mese = monte ÷ 26 × giorni non domenicali in forza (" + giorniRetribuibiliInForza(dp,y,m,rec) + "). È la soglia: lo straordinario è solo ciò che la supera."}>ORE CORRETTE DA DARE: {hoursDisp(oreRetribuibili(dp,y,m,rec))}</span>
         <span className="pill">{contrLabelAt(dp,y,m)}</span>
         {orarioTempAt(dp,y,m)!=null ? <span className="pill" style={{ background:"#fde68a", color:"#78350f" }}>⏱ orario temp. {hoursDisp(orarioTempAt(dp,y,m))}h</span> : null}
@@ -3014,7 +3024,7 @@ function EmployeeCard(props){
         <span className="foot-teor" title={TEOR_TITLE}>TOT teorico (assenze e festività godute erosive + permessi retribuiti): <b>{fmt3(totTeor)}</b></span>
         <label>Ore dichiarate (uso interno):</label>
         <input className="dich-in" value={rec.dich || ""} placeholder="—" disabled={mLocked}
-          onChange={function(e){ props.onDich(dp.id, e.target.value); }} title="Ore dichiarate dal lavoratore. Se sono diverse dal totale calcolato, la differenza resta nel Conguaglio ore e te la ritrovi nei mesi dopo, finche' non la sistemi." />
+          onChange={function(e){ props.onDich(dp.id, e.target.value); }} title="Ore dichiarate dal lavoratore. Se sono diverse dal totale calcolato, la differenza resta nel Conguaglio ore e te la ritrovi nei mesi dopo, finché non la sistemi." />
         {(function(){
           const s = String(rec.dich === undefined ? "" : rec.dich).trim();
           if (s === "") return null;
@@ -5319,7 +5329,7 @@ function CostoOrario(props){
   if (simSettP) simForz.push("le settimane del periodo");
   if (simSettL) simForz.push("le settimane davvero lavorabili");
   if (simOre)   simForz.push("le ore scritte a mano");
-  if (d.scattiAMano) simForz.push("gli scatti di anzianita'");
+  if (d.scattiAMano) simForz.push("gli scatti di anzianità");
   if (d.supermAMano) simForz.push("il superminimo");
   /* Una casella giallina della simulazione: vuota resta VUOTA (con il valore calcolato come
      segnaposto), perche' stamparci dentro il calcolato farebbe credere che sia scritto, ed e'
@@ -5685,7 +5695,7 @@ function CostoOrario(props){
                     (simMesi
                       ? ("⚠️ scritti a mano nel riquadro «🧪 Simulazione» — dal periodo risulterebbero " + fmt2(d.mesiAuto))
                       : ("proposti: " + fmt2(d.mesiAuto) + " (giorni veri) · ferie, 13ª e 14ª su " + d.mesiRateiAuto)),
-                    "Automatico: i mesi in cui il contratto e' in piedi nel periodo scelto. Per simulare un periodo diverso si scrive nel riquadro «🧪 Simulazione».")}
+                    "Automatico: i mesi in cui il contratto è in piedi nel periodo scelto. Per simulare un periodo diverso si scrive nel riquadro «🧪 Simulazione».")}
                   {campoRO("Mesi di maternità", fmt2(d.mesiMater), notaAna("mesiMater"), AIUTO_ANA)}
                   {/* ver137: queste due arrivano dall'ANAGRAFICA e dalle proroghe registrate, e
                       scriverle a mano spegneva il taglio del periodo in pezzi SENZA dirlo.
@@ -6296,18 +6306,18 @@ function Anagrafica(props){
       </div>
       <div style={{ display:"flex", gap:"8px", alignItems:"center", flexWrap:"wrap", marginBottom:"10px" }}>
         <span style={{ fontSize:"11px", fontWeight:800, color:"#64748b", textTransform:"uppercase", letterSpacing:".4px" }}>Azioni su tutti:</span>
-        <button className="btn btn-gray" onClick={function(){ setMtOpen(!mtOpen); setMsg(""); }} title="Imposta la mensilizzazione su piu' persone in una sola volta">📅 Mensilizza tutti dal mese…</button>
+        <button className="btn btn-gray" onClick={function(){ setMtOpen(!mtOpen); setMsg(""); }} title="Imposta la mensilizzazione su più persone in una sola volta">📅 Mensilizza tutti dal mese…</button>
         {/* ver157 (TR-03): il codice operatore, assegnato a chi non ce l'ha. */}
         <button className="btn btn-gray" title="Assegna il codice operatore (3 lettere del cognome + una cifra) a chi non ce l'ha ancora" onClick={function(){
           const r = props.onSigle ? props.onSigle() : null;
           if (r && r.n) setMsg("🔖 Codice assegnato a " + r.n + (r.n===1?" persona":" persone") + ". Premi 💾 per salvare.");
         }}>🔖 Assegna i codici mancanti</button>
         {/* ver158 (TR-03): l'aggancio all'account di Fogli ore, fatto una volta sola. */}
-        <button className="btn btn-gray" title="Collega una volta per tutte ogni persona al suo account di Fogli ore: da li' in poi il legame non dipende piu' dal nome" onClick={function(){ if (props.onAgganciaFO) props.onAgganciaFO(function(t){ setMsg(t); }); }}>🔗 Aggancia gli account di Fogli ore</button>
+        <button className="btn btn-gray" title="Collega una volta per tutte ogni persona al suo account di Fogli ore: da lì in poi il legame non dipende più dal nome" onClick={function(){ if (props.onAgganciaFO) props.onAgganciaFO(function(t){ setMsg(t); }); }}>🔗 Aggancia gli account di Fogli ore</button>
       </div>
       {mtOpen ?
         <div style={{ background:"#ecfdf5", border:"2px solid #6ee7b7", borderRadius:"10px", padding:"12px 14px", marginBottom:"12px" }}>
-          <div style={{ fontSize:"14px", fontWeight:800, color:"#065f46", marginBottom:"6px" }}>Mensilizza piu' persone in una volta</div>
+          <div style={{ fontSize:"14px", fontWeight:800, color:"#065f46", marginBottom:"6px" }}>Mensilizza più persone in una volta</div>
           <div style={{ fontSize:"12.5px", color:"#065f46", lineHeight:1.5, marginBottom:"8px" }}>Mette la spunta <b>Mensilizzato</b> a tutte le persone selezionate, con decorrenza <b>dal 1° del mese</b> che scegli. Togli la spunta a chi <b>non</b> deve esserlo. Chi è già mensilizzato da quella stessa data non viene toccato. Prima di scrivere ti chiedo conferma; poi premi <b>💾 Salva</b>.</div>
           <div style={{ display:"flex", gap:"10px", alignItems:"flex-end", flexWrap:"wrap", marginBottom:"8px" }}>
             <div><div style={{ fontSize:"12px", fontWeight:700, color:"#374151", marginBottom:"2px" }}>Dal mese</div>
@@ -6422,10 +6432,10 @@ function Anagrafica(props){
                       : which==="scattoDec" ? (sst.senzaAssunzione ? "(serve la data di assunzione)" : (sst.nOggi>=SCATTI_MAX ? ("(ha già il massimo: " + SCATTI_MAX + ")") : "(non calcolabile)"))
                       : which==="scattoN" ? "(serve la data di assunzione)"
                       : "(nessuna proroga)";
-                    const tip = which==="sigla" ? "Il codice con cui le altre app riconoscono questa persona: 3 lettere del cognome piu' una cifra. Si assegna dal pulsante «Assegna i codici mancanti» in cima alla schermata, e poi non cambia piu'."
+                    const tip = which==="sigla" ? "Il codice con cui le altre app riconoscono questa persona: 3 lettere del cognome più una cifra. Si assegna dal pulsante «Assegna i codici mancanti» in cima alla schermata, e poi non cambia più."
                               : which==="proroAvvio" ? "Automatica: giorno dopo la scadenza precedente. La data che conta si registra in fondo alla scheda, riquadro Trasformaz./proroghe."
                               : which==="trasfAvvio" ? "Automatica: decorrenza dell'ultima trasformazione registrata in fondo alla scheda, riquadro Trasformaz./proroghe."
-                              : which==="scattoDec" ? "Automatica: 24 mesi utili dall'assunzione (dal mese successivo se assunto dopo il giorno 1); un mese tutto AN non e' utile e fa slittare. Massimo 5 scatti. L'importo lo prende il Costo orario dalla tabella del livello in quel momento."
+                              : which==="scattoDec" ? "Automatica: 24 mesi utili dall'assunzione (dal mese successivo se assunto dopo il giorno 1); un mese tutto AN non è utile e fa slittare. Massimo 5 scatti. L'importo lo prende il Costo orario dalla tabella del livello in quel momento."
                               : which==="scattoN" ? "Automatico: quanti scatti risultano maturati a oggi, compresi quelli riconosciuti all'assunzione."
                               : "Automatica: ultima proroga registrata in fondo alla scheda, riquadro Trasformaz./proroghe.";
                     return <div key={key} className={cls} style={{margin:0}} title={tip}><label>{lbl}</label><input value={val} disabled placeholder={ph} style={{ background:"#f1f5f9", borderColor:"#cbd5e1", color:"#475569" }} /></div>; }
@@ -7498,6 +7508,17 @@ function App(){
       if (user){
         if (!isAdminEmail(user.email)){ setDenied(user.email || ""); firebase.auth().signOut(); return; }
         setDenied(""); uidRef.current = user.uid; setAuthState("in");
+        /* ver179: un salvataggio rimasto solo nel browser, fatto da QUESTO account, va prima rimandato nel cloud. */
+        const sosp = cloudSospesoLeggi(); const locSosp = (sosp && sosp.uid === user.uid) ? loadLocal() : null;
+        if (locSosp){
+          const stL = migrate(locSosp);
+          setState(stL); if (stL.anni && stL.anni.length) setAnno(stL.anni[stL.anni.length-1]);
+          dbRef.current.collection(FB_COLLECTION).doc(user.uid).set(withTemplatesForCloud(stL)).then(function(){
+            cloudSospesoTogli(); showToast("Le modifiche rimaste solo nel browser sono state mandate nel cloud");
+          }).catch(function(e){ console.error(e); setDirty(true);
+            showToast("Il cloud non risponde ancora: stai lavorando sui dati salvati in questo browser. Premi 💾 quando torna la linea", true); });
+          return;
+        }
         dbRef.current.collection(FB_COLLECTION).doc(user.uid).get().then(function(snap){
           let st; if (snap.exists){ const _raw = snap.data(); if (_raw && _raw.modelli){ applyTemplates(_raw.modelli); delete _raw.modelli; } st = migrate(_raw); } else st = migrate(loadLocal() || emptyState());
           setState(st); if (st.anni && st.anni.length) setAnno(st.anni[st.anni.length-1]);
@@ -7606,7 +7627,7 @@ function App(){
       const ambFo = foOmonimiUtenti(utenti), ambDip = dipOmonimi(state);
       const nuovi = [], gia = [], senza = [], ambigui = [];
       dipSorted(state).forEach(function(dp){
-        if (dp.foUid){ gia.push(dp.nome + "  \u2192  " + (utenti[dp.foUid] || "(account non piu' in elenco)")); return; }
+        if (dp.foUid){ gia.push(dp.nome + "  \u2192  " + (utenti[dp.foUid] || "(account non più in elenco)")); return; }
         const k = foChiave(dp.nome);
         if (ambFo[k] || ambDip[k]){ ambigui.push(dp.nome + (ambFo[k] ? (" \u2014 " + ambFo[k].length + " account con questo nome") : "") + (ambDip[k] ? (" \u2014 " + ambDip[k].length + " schede con questo nome") : "")); return; }
         const uid = perNome[k];
@@ -7670,7 +7691,7 @@ function App(){
     const sel = (state.dipendenti||[]).filter(function(d){ return ids.indexOf(d.id)>=0; });
     if (sel.length===0){ window.alert("Non hai selezionato nessuna persona."); return null; }
     const daCambiare = sel.filter(function(d){ return !(d.mensilizzato && d.mensilizzatoDal===dal); });
-    if (daCambiare.length===0){ window.alert("Nessuna persona da cambiare: quelle selezionate sono gia' mensilizzate dal " + dal + "."); return null; }
+    if (daCambiare.length===0){ window.alert("Nessuna persona da cambiare: quelle selezionate sono già mensilizzate dal " + dal + "."); return null; }
     const nomi = daCambiare.map(function(d){ return d.nome; }).join("\n\u00b7 ");
     const quante = daCambiare.length + (daCambiare.length===1 ? " persona" : " persone");
     if (!window.confirm("Imposto la mensilizzazione dal " + dal + " su " + quante + ":\n\n\u00b7 " + nomi + "\n\nProcedo?")) return null;
@@ -7919,8 +7940,8 @@ function App(){
     const okLocal = saveLocal(stSalva);
     if (okLocal) timbroMio.current = okLocal;          /* ver144: da ora il timbro buono e' il mio */
     if (FB_READY && uidRef.current && dbRef.current){
-      dbRef.current.collection(FB_COLLECTION).doc(uidRef.current).set(withTemplatesForCloud(stSalva)).then(function(){ setDirty(false); showToast("Salvato (cloud + locale)"); })
-      .catch(function(e){ console.error(e); showToast(okLocal ? "Cloud non raggiungibile — salvato in locale" : "Salvataggio non riuscito"); if (okLocal) setDirty(false); });
+      dbRef.current.collection(FB_COLLECTION).doc(uidRef.current).set(withTemplatesForCloud(stSalva)).then(function(){ cloudSospesoTogli(); setDirty(false); showToast("Salvato (cloud + locale)"); })
+      .catch(function(e){ console.error(e); if (okLocal) cloudSospesoSegna(uidRef.current); showToast(okLocal ? "Cloud non raggiungibile — salvato in locale" : "Salvataggio non riuscito"); if (okLocal) setDirty(false); });
     } else { if (okLocal){ setDirty(false); showToast("Salvato in locale"); } else showToast("Salvataggio non riuscito"); }
   };
   /* ver144: prima di scrivere, controlla se qualcun altro ha salvato dopo di te. */
@@ -8326,7 +8347,7 @@ function App(){
               <div className="legend-grid">
                 {CODICI.map(function(x){ return <div key={x.c} className="legend-item">
                   <span className="legend-code" style={{ background:x.bg, color:lumaText(x.bg) }}>{x.c}</span><span>{x.l}</span></div>; })}
-                <div className="legend-item"><span className="legend-code" style={{ background:CRIMSON, color:"#fff" }}>festivo</span><span>Festività nazionale e domeniche (crimson #B22222)</span></div>
+                <div className="legend-item"><span className="legend-code" style={{ background:CRIMSON, color:"#fff" }}>festivo</span><span>Festività nazionale e domeniche</span></div>
                 <div className="legend-item"><span className="legend-code" style={{ background:"#7c3aed", color:"#fff" }}>● perm.</span><span>Pallino viola in cella = permesso orario (clic per impostarlo)</span></div>
               </div>
             </div>
