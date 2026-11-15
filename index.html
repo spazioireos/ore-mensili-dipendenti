@@ -483,8 +483,8 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver163";
-const APP_DATA = "14nov26";
+const APP_VER = "ver166";
+const APP_DATA = "15nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
 const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
@@ -598,6 +598,9 @@ function uid(){ return "d" + Date.now().toString(36) + Math.random().toString(36
 function pad2(x){ return (x<10?"0":"") + x; }
 function monthKey(y, m){ return y + "-" + pad2(m); }
 function daysInMonth(y, m){ return new Date(y, m, 0).getDate(); }
+/* ver165 (14/11/2026, richiesta di Christian): giornate totali del mese TOLTE LE DOMENICHE
+   (i festivi infrasettimanali SI contano). Ott 2026 -> 27, nov 2026 -> 25. */
+function giorniNonDomenica(y, m){ let n=0, nd=daysInMonth(y,m); for(let d=1; d<=nd; d++){ if(weekdayOf(y,m,d)!==0) n++; } return n; }
 function monthsBetween(fy, fm, ty, tm){
   if (fy > ty || (fy === ty && fm > tm)){ const ty2=fy, tm2=fm; fy=ty; fm=tm; ty=ty2; tm=tm2; }
   const out = []; let y = fy, m = fm; let guard = 0;
@@ -758,6 +761,16 @@ const SETT_FULLTIME = 38;           // orario settimanale full-time di riferimen
 const MONTE_MESE_FULLTIME = 165;    // monte ore mensile fisso del full-time (riproporzionato per gli altri)
 function monteFissoMese(dp,y,m){ return MONTE_MESE_FULLTIME * oreSettAt(dp,y,m) / SETT_FULLTIME; } // fisso mensile = 165 h a 38 h/sett, riproporzionato
 function quotaGiorno(dp,y,m){ return monteFissoMese(dp,y,m)/26; }           // quota giornaliera allineata al mese = monte ÷ 26
+/* ver165 (14/11/2026, Christian): «giorni RETRIBUIBILI» = i giorni del mese riempibili con
+   qualcosa che non sia il riposo domenicale (i festivi infrasettimanali SI contano), limitati
+   al periodo in cui il contratto è in piedi. «ORE RETRIBUIBILI» = monte ÷ 26 × giorni
+   retribuibili (es. monte 82,5 su 26 gg, mese da 27 gg → 82,5/26×27 = 85,67). È la soglia
+   dell'ordinario del mese: lo straordinario è solo ciò che la supera. */
+/* conta i giorni retribuibili (non domenica, in forza) ESCLUDENDO i giorni segnati AN
+   (part-time: giorno non lavorativo) e -- (riposo): non sono ore dovute. Se `rec` non è dato,
+   conta solo per calendario (nessuna esclusione). */
+function giorniRetribuibiliInForza(dp,y,m,rec){ let n=0, nd=daysInMonth(y,m); const a=assunzInt(dp), e=effEndInt(dp); const g=(rec&&rec.giorni)?rec.giorni:{}; for(let d=1; d<=nd; d++){ if(weekdayOf(y,m,d)===0) continue; const cv=String(g[d]==null?"":g[d]).trim(); if(cv==="AN"||cv==="--") continue; const D=y*10000+m*100+d; if((!a||a<=D)&&(!e||e>=D)) n++; } return n; }
+function oreRetribuibili(dp,y,m,rec){ return R2(quotaGiorno(dp,y,m)*giorniRetribuibiliInForza(dp,y,m,rec),2); }
 function mensDalYM(dp){ const v=ymdIt(dp && dp.mensilizzatoDal); return v?Math.floor(v/100):0; } // YM di decorrenza mensilizzazione (0 = da sempre)
 /* ===== ver151 (11/11/2026) — CHE COSA COPRE LE ORE DOVUTE DEL MESE ===========
    Regole date da Christian l'11/11/2026:
@@ -863,7 +876,12 @@ function bancaMeseA(state,dp,y,m){                                          // b
      piu' divergere. ⚠️ Misurato: nei dati veri non c'e' nessun permesso orario, quindi oggi
      nessun numero cambia. */
   const eff=rese + coverAbsHours(rec,dp,y,m) + festOreMese(state,dp,y,m) + permOreMese(rec).pagate;
-  return R2((eff - monteFissoMese(dp,y,m)),3);
+  /* ver166 (14/11/2026, Christian: «lo straordinario = solo le ore eccedenti le retribuibili»,
+     applicato OVUNQUE): la soglia non è più il monte fisso ma le ORE RETRIBUIBILI del mese
+     (monte ÷ 26 × giorni non domenicali in forza). Nei mesi da 26 giorni non domenicali coincide
+     col monte; nei mesi più lunghi/corti scala con i giorni. ⚠️ Cambia lo straordinario di
+     Tabellone, Query e Riepiloghi nei mesi con ≠26 giorni non domenicali. */
+  return R2((eff - oreRetribuibili(dp,y,m,rec)),3);
 }
 function bancaPrecA(state,dp,anno,mese){                                    // banca cumulata dei mesi PRECEDENTI (dopo l'ultimo azzeramento, dalla decorrenza mensilizzazione)
   const dal=mensDalYM(dp);
@@ -2295,21 +2313,31 @@ function esportaPDFMens(state, pairs){
   doc.save(fileName("pdf", "Presenze mensilizzati"));
 }
 
-/* ===== ver163: REPORT A4 "ORDINARIO / EXTRA GIORNALIERO" per l'ufficio paghe ===============
+/* ===== ver164: REPORT A4 "ORDINARIO / EXTRA GIORNALIERO" per l'ufficio paghe ===============
    Christian (14/11/2026): «un pdf a4 che ci dica giornalmente quanto è ordinario e quanto
    extra. X deve fare 18 ore settimanali = 3 ore al giorno (6 giorni lavorativi). Se nel giorno
    X fa 4 ore, scindi: 3 ordinarie e 1 extra, due colonne. Al termine il totale ore rese e le
-   altre cose (gg ferie etc.)».
+   altre cose (gg ferie etc.)». Poi la correzione decisiva (ver164): «Le ordinarie devono dare
+   il totale mensile contrattuale, quindi quello va sempre raggiunto, a meno che il dipendente
+   non abbia lavorato meno», e «contribuisce a formare il totale contrattuale anche l'assenza
+   retribuita giornaliera o in forma di permesso orario».
    - Quota giornaliera ORDINARIA = ore settimanali ÷ giorni a settimana (18/6 = 3), per persona.
-   - Per ogni giorno LAVORATO: ordinario = min(ore, quota) · extra = max(0, ore − quota).
-   - NESSUNA COMPENSAZIONE (scelta di Christian): l'extra è la somma dei singoli giorni, un
-     giorno sotto quota non toglie extra agli altri. ⚠️ Perciò il totale extra è DIVERSO (più
-     alto) dal «Risultato del mese» del Tabellone, che invece compensa: sono due cose per due
-     scopi diversi.
-   - TERZA colonna «Assenze / permessi» (scelta di Christian): i giorni di ferie/malattia/ecc.
-     col loro codice, e i PERMESSI ORARI (EXF…) con le loro ore. Non entrano in ordinario/extra,
-     che sono SOLO le ore davvero lavorate. In calce: ore rese (ord+extra), gg ferie e le altre
-     voci già chieste. ⚠️ Diciture nuove, scritte da Claude. */
+   - Per ogni giorno LAVORATO: la quota riempita dalle ore (fino a quota), poi l'EXTRA = ciò che
+     eccede la quota. NESSUNA COMPENSAZIONE: l'extra è la somma dei singoli giorni, un giorno
+     sotto quota non toglie extra agli altri. ⚠️ Perciò il totale extra è DIVERSO (più alto) dal
+     «Risultato del mese» del Tabellone, che invece compensa: due cose per due scopi.
+   - L'ORDINARIO del mese DÀ IL MONTE CONTRATTUALE (monteFissoMese). La quota di ogni giorno è
+     riempita, oltre che dalle ore lavorate, dalle ASSENZE RETRIBUITE (copreOre: FERIE, MAL,
+     MAL 0h, CASSA…), dalle FESTIVITÀ GODUTE e dai PERMESSI ORARI retribuiti (EXF…). Così
+     l'ordinario raggiunge sempre il monte, e scende sotto SOLO se un giorno lavorativo non è né
+     lavorato né coperto («ha lavorato meno»): allora l'ordinario = monte − il non coperto.
+     ⚠️ Quadratura al centesimo come in contabilità: il totale ordinario è il monte (meno il non
+     coperto) e il residuo di arrotondamento va sull'ultimo giorno coperto, così la colonna somma
+     al totale mostrato. ⚠️ AN e `--` sono giorni NON lavorativi (non fanno scendere il monte);
+     ASP 0h è un giorno lavorativo NON coperto (fa scendere il monte: è la trattenuta).
+   - TERZA colonna «Assenze / permessi»: i giorni col loro codice e i permessi orari con le ore.
+   - In calce: ore ordinarie (= monte) · ore EXTRA · ore effettivamente RESE (= solo lavorate),
+     gg ferie e le altre voci. ⚠️ Diciture nuove, scritte da Claude. */
 function esportaPDFOrdExtra(state, pairs){
   const JsPDF = window.jspdf.jsPDF;
   const doc = new JsPDF({ orientation:"portrait", unit:"mm", format:"a4" });
@@ -2326,27 +2354,67 @@ function esportaPDFOrdExtra(state, pairs){
     dipsMese.forEach(function(dp){
       const rec = getRecFrom(state, anno, m, dp.id);
       if (!recHasData(rec)) return;   /* persona senza dati nel mese: nessun foglio */
-      const oreSett = oreSettAt(dp, anno, m), ggS = ggSettDi(state, dp);
-      const quota = (ggS > 0) ? oreSett/ggS : 0;
-      const body = [];
-      let totOrd = 0, totExtra = 0;
+      const monte = monteFissoMese(dp, anno, m);
+      const quota = quotaGiorno(dp, anno, m);                                 /* quota giornaliera = monte ÷ 26 */
+      const retrib = oreRetribuibili(dp, anno, m, rec);                           /* soglia dell'ordinario = monte÷26 × giorni retribuibili in forza */
+      const rows = [];
+      let totExtra = 0, totWorked = 0, shortfall = 0, sumOrd = 0;
+      let lastFullIdx = -1, lastOrdIdx = -1;
       const rosseRows = [];
       for (let d=1; d<=nd; d++){
         const cv = String(rec.giorni[d] == null ? "" : rec.giorni[d]).trim();
-        const perm = (rec.permessi && rec.permessi[d] && Number(rec.permessi[d].ore) > 0) ? rec.permessi[d] : null;
+        const pObj = (rec.permessi && rec.permessi[d] && Number(rec.permessi[d].ore) > 0) ? rec.permessi[d] : null;
         const dom = weekdayOf(anno, m, d) === 0;
-        const rosso = isRosso(fset, anno, m, d);
+        const festivo = isFestivo(fset, m, d);
+        const rosso = festivo || dom;
+        /* in forza nel giorno: con la data di assunzione si rispetta; SENZA (4 schede vere non
+           l'hanno) il mese è già stato filtrato come «in forza», quindi il giorno vale. Così
+           non si crede pieno un mese di chi non ha la data e non si scarica il monte su un giorno. */
+        const _Dn = anno*10000 + m*100 + d, _aInt = assunzInt(dp), _eInt = effEndInt(dp);
+        const inForce = (!_aInt || _aInt <= _Dn) && (!_eInt || _eInt >= _Dn);
         const dayLabel = d + " " + WD[weekdayOf(anno, m, d)];
-        let ord = "", extra = "", ass = "";
+        const isCode = CODE_SET[cv] !== undefined;
+        /* le ore/assenze/permessi valgono SOLO nei giorni in cui il contratto è in piedi: ore
+           scritte prima dell'assunzione o dopo la cessazione non si contano. */
+        const permPag = (inForce && pObj && PERM_CODES.indexOf(String(pObj.tipo||"").trim().toUpperCase()) !== -1) ? Number(pObj.ore) : 0;
+        const worked = (inForce && !isCode && cv !== "") ? (parseHour(cv) > 0 ? parseHour(cv) : 0) : 0;
+        const wOrd = Math.min(worked, quota);
+        const ext = R2(Math.max(0, worked - quota), 3);
+        const absCover = inForce && copreOre(cv);                             /* assenza retribuita che copre */
+        const festGod = (!absCover && festivo && !dom && inForce && !(isCode && cv !== "--" && cv !== "AN"));
+        let ordDay, covered;
+        if (festGod || absCover){ ordDay = quota; covered = true; }           /* la quota è coperta dall'assenza/festività */
+        else {
+          const cov = wOrd + permPag;                                         /* le ore + i permessi orari riempiono la quota */
+          ordDay = Math.min(quota, cov);
+          const scheduled = inForce && !dom && !festivo && cv !== "AN" && cv !== "--";
+          if (scheduled) shortfall += Math.max(0, quota - cov);              /* giorno lavorativo non coperto -> monte scende */
+          covered = (cov >= quota - 0.0005);
+        }
+        let ass = "";
         if (cv === "--"){ ass = "R"; }
-        else if (cv === ""){ ass = dom ? "R" : (rosso ? "festivo" : ""); }
-        else if (CODE_SET[cv]){ ass = cv; }                                   /* assenza / AN / FEST col codice */
-        else { const h = parseHour(cv); if (h > 0){ const o = Math.min(h, quota); const e = R2(h - o, 3); ord = fh(o); if (e > 0.004) extra = fh(e); totOrd += o; totExtra += e; } }
-        if (perm){ const pt = String(perm.tipo || "").trim(); ass = (ass ? ass + " · " : "") + "perm " + fh(perm.ore) + " h" + (pt ? (" " + pt) : ""); }
-        if (rosso) rosseRows.push(body.length);
-        body.push([dayLabel, ord, extra, ass]);
+        else if (cv === ""){ ass = dom ? "R" : (festivo ? "festivo" : ""); }
+        else if (isCode){ ass = cv; }                                         /* assenza / AN / FEST col codice */
+        if (pObj){ const pt = String(pObj.tipo || "").trim(); ass = (ass ? ass + " · " : "") + "perm " + fh(pObj.ore) + " h" + (pt ? (" " + pt) : ""); }
+        totExtra += ext; totWorked += worked; sumOrd += ordDay;
+        if (ordDay > 0.0005){ lastOrdIdx = rows.length; if (covered) lastFullIdx = rows.length; }
+        if (rosso) rosseRows.push(rows.length);
+        rows.push({ label: dayLabel, ord: ordDay, extra: ext, ass: ass });
       }
-      const resE = R2(totOrd + totExtra, 2);
+      /* l'ordinario del mese = ORE RETRIBUIBILI (monte÷26 × giorni retribuibili in forza) meno il
+         non coperto; mai sotto zero. Le ore che la copertura porta oltre le retribuibili si
+         ASSORBONO (le retribuibili sono il tetto dell'ordinario); l'extra resta SOLO l'eccedenza
+         della quota giornaliera. ver166, scelta di Christian del 14/11/2026. */
+      let totOrd = R2(Math.max(0, retrib - shortfall), 2);
+      const foldIdx = (lastFullIdx !== -1) ? lastFullIdx : lastOrdIdx;
+      if (foldIdx !== -1){                                                    /* quadratura: la colonna ordinario somma alle retribuibili */
+        const residuo = R2(totOrd - R2(sumOrd, 2), 2);
+        rows[foldIdx].ord = R2(rows[foldIdx].ord + residuo, 2);
+      } else { totOrd = R2(sumOrd, 2); }
+      const body = rows.map(function(r){ return [ r.label, (r.ord > 0.0005 ? fh(r.ord) : ""), (r.extra > 0.004 ? fh(r.extra) : ""), r.ass ]; });
+      const resLav = R2(totWorked, 2);
+      const parziale = giorniRetribuibiliInForza(dp, anno, m) < giorniNonDomenica(anno, m);  /* mese non interamente in forza */
+      const sottoMonte = (retrib - totOrd) > 0.005;
       const am = assMese(rec, dp, anno, m);
       const fg = festGoduteMese(state, dp, anno, m, null);
       const perm = permOreMese(rec);
@@ -2358,9 +2426,9 @@ function esportaPDFOrdExtra(state, pairs){
       doc.setFontSize(11.5); doc.setFont(undefined,"normal"); doc.setTextColor(15,39,64);
       doc.text(dp.nome + "   ·   " + MONTH_LABEL[m-1] + " " + anno, 14, 21);
       doc.setFontSize(8.5); doc.setTextColor(90,90,90);
-      doc.text("Quota giornaliera ordinaria: " + fh(oreSett) + " h/sett ÷ " + ggS + " gg = " + fh(quota) + " h al giorno. L'extra è la somma dei singoli giorni (nessuna compensazione).", 14, 26);
+      doc.text("Quota giornaliera: monte " + fh(monte) + " h ÷ 26 = " + fh(quota) + " h al giorno. L'ordinario raggiunge le ore CORRETTE DA DARE del mese (" + fh(retrib) + " h = quota × " + giorniRetribuibiliInForza(dp, anno, m, rec) + " giorni non domenicali): le assenze retribuite, le festività godute e i permessi orari riempiono la quota. L'extra è la somma dei singoli giorni oltre la quota (nessuna compensazione).", 14, 26, { maxWidth: 182 });
       doc.autoTable({
-        startY: 30,
+        startY: 36,
         head: [["Giorno","Ordinario (h)","Extra (h)","Assenze / permessi"]],
         body: body,
         foot: [["TOTALE", fh(totOrd), fh(totExtra), ""]],
@@ -2375,9 +2443,11 @@ function esportaPDFOrdExtra(state, pairs){
         }
       });
       let y = doc.lastAutoTable.finalY + 7;
-      if (y > 275){ doc.addPage(); y = 18; }
+      if (y > 272){ doc.addPage(); y = 18; }
       doc.setFontSize(10.5); doc.setFont(undefined,"bold"); doc.setTextColor(15,39,64);
-      doc.text("Ore effettivamente rese: " + fh(resE) + " h   (ordinario " + fh(totOrd) + " + extra " + fh(totExtra) + ")", 14, y);
+      doc.text("Ore ordinarie del mese: " + fh(totOrd) + " h   ·   ore corrette da dare" + (parziale ? " (in forza)" : "") + ": " + fh(retrib) + " h" + (sottoMonte ? ("   —   mancano " + fh(R2(retrib - totOrd, 2)) + " h (ha lavorato meno)") : ""), 14, y, { maxWidth: 182 });
+      y += 6;
+      doc.text("Ore EXTRA del mese: " + fh(totExtra) + " h   ·   ore effettivamente rese (lavorate): " + fh(resLav) + " h", 14, y);
       y += 6; doc.setFont(undefined,"normal"); doc.setFontSize(9); doc.setTextColor(40,40,40);
       const voci = [];
       Object.keys(am.cop.perCod).forEach(function(c){ voci.push(c + " " + am.cop.perCod[c] + " gg"); });
@@ -2571,6 +2641,7 @@ function EmployeeCard(props){
         {livelloAt(dp,y,m) ? <span className="pill">Liv. {livelloAt(dp,y,m)}</span> : null}
         <span className="pill">ORE SETT: {hoursDisp(oreSettAt(dp,y,m))}</span>
         <span className="pill" title="Monte ore mensile: 165 h per chi fa 38 h/settimana, in proporzione per gli altri (stessa base usata dalla Banca ore)">ORE MESE: {hoursDisp(monteFissoMese(dp,y,m))}</span>
+        <span className="pill" style={{ background:"#fde047", color:"#12324f", fontWeight:800 }} title={"Ore corrette da dare nel mese = monte ÷ 26 × giorni non domenicali in forza (" + giorniRetribuibiliInForza(dp,y,m,rec) + "). È la soglia: lo straordinario è solo ciò che la supera."}>ORE CORRETTE DA DARE: {hoursDisp(oreRetribuibili(dp,y,m,rec))}</span>
         <span className="pill">{contrLabelAt(dp,y,m)}</span>
         {orarioTempAt(dp,y,m)!=null ? <span className="pill" style={{ background:"#fde68a", color:"#78350f" }}>⏱ orario temp. {hoursDisp(orarioTempAt(dp,y,m))}h</span> : null}
         {(function(){ const ce=cessEffStr(dp); if(!ce) return null; const now=new Date(); const tInt=now.getFullYear()*10000+(now.getMonth()+1)*100+now.getDate(); const ceInt=ymdIt(ce); return (ceInt && ceInt < tInt) ? <span className="pill cess">CESSATO {ce}</span> : <span className="pill" style={{ background:"#fbe0ec", color:"#8A2358" }}>fino al {ce}</span>; })()}
@@ -3913,7 +3984,11 @@ function oreLavorabiliMese(state, dp, c, y, m, escludi){
   /* ver122: la stessa funzione del Tabellone, cosi' i due non possono scostarsi e una
      festivita' gia' scritta in cella non viene contata due volte. */
   const fest = festGoduteMese(state, dp, y, m, escludi).ore;
-  return Math.max(0, monteFissoMese(dp,y,m)*fr - ass - perm - fest);
+  /* ver166 (14/11/2026, Christian: «correggi il costo orario»): la soglia delle ore ordinarie
+     del mese è le ORE RETRIBUIBILI (monte÷26 × giorni non domenicali in forza), come lo
+     straordinario del Tabellone — non più il monte fisso riproporzionato a giorni di calendario.
+     Così supplementari del Costo orario e Risultato del mese del Tabellone usano la STESSA soglia. */
+  return Math.max(0, oreRetribuibili(dp,y,m,rec) - ass - perm - fest);
 }
 /* somma, mese per mese, di max(0, ore rese - ore lavorabili): nessuna compensazione */
 function oreSuppPeriodo(state, dp, pairs, c, escludi, sottoSoglia){
@@ -7797,7 +7872,7 @@ function App(){
         {!FB_READY ? <button className="btn btn-ghost" onClick={changePin}>🔑 PIN</button> : null}
         {FB_READY ? <button className="btn btn-ghost" onClick={function(){ if (dirty && !window.confirm("Ci sono modifiche non salvate. Uscire comunque?")) return; firebase.auth().signOut(); }}>Esci</button> : null}
         <input ref={fileRef} type="file" accept=".xlsx,.xls,.json" className="hidden-file" onChange={onImportFile} />
-        <div className="monthstrip">{vista === "rep" ? "📊 Riepiloghi" : (vista === "ana" ? "📇 Anagrafica" : (vista === "costo" ? "💶 Costo orario" : (vista === "query" ? "🔎 Query personale" : ("📅 Tabellone " + MONTH_LABEL[mese-1] + " " + anno + (mLocked ? "  🔒 bloccato" : "")))))}</div>
+        <div className="monthstrip">{vista === "rep" ? "📊 Riepiloghi" : (vista === "ana" ? "📇 Anagrafica" : (vista === "costo" ? "💶 Costo orario" : (vista === "query" ? "🔎 Query personale" : ["📅 Tabellone " + MONTH_LABEL[mese-1] + " " + anno + (mLocked ? "  🔒 bloccato" : ""), React.createElement("span", { key:"gnd", style:{ marginLeft:"12px", background:"#fde047", color:"#12324f", borderRadius:"6px", padding:"2px 9px", fontSize:"15px", fontWeight:800 } }, giorniNonDomenica(anno, mese) + " giorni (no domeniche)")])))}</div>
       </div>
 
       {!FB_READY ? <div className="banner">Modalità LOCALE (localStorage, accesso con PIN).</div> : null}

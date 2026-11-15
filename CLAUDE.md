@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver163 · 14nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver166 · 15nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -37,8 +37,15 @@ Banca ore, tetto annuo, contratti e export.
   Corretto anche un difetto **preesistente** che la nuova navigazione rendeva visibile: nella
   testata, in vista Anagrafica, compariva "📅 undefined 2026" (perché `mese` è `null` fuori dalle
   viste mensili); ora mostra "📇 Anagrafica".
+- 🔺 **AGGIORNATO ver166 (15/11/2026): la soglia NON è più il monte fisso, ma le «ORE CORRETTE
+  DA DARE» = `monte/26 × giorni non domenicali in forza` (`oreRetribuibili`).** Vedi la scheda
+  🟨 in cima. La formula qui sotto resta vera **salvo l'ultimo termine**: ora
+  `delta del mese = eff − oreRetribuibili(dp,y,m,rec)` (non `− monte`). Gli esempi 12,69 e 19,6666
+  valgono **solo nei mesi da 26 giorni non domenicali**; negli altri lo straordinario scala coi
+  giorni. Il resto della regola (cosa entra in `eff`) è invariato.
 - **Straordinario / "Ore in più / in meno"** — **regola definitiva, confermata con un numero da
-  Christian il 31/10/2026 e ampliata il 06/11/2026**: `delta del mese = ore rese + ore di assenza
+  Christian il 31/10/2026 e ampliata il 06/11/2026** (⚠️ soglia aggiornata in ver166, vedi sopra):
+  `delta del mese = ore rese + ore di assenza
   retribuita + ore di PERMESSO retribuito (ver93) + ore delle FESTIVITÀ GODUTE (ver121) − monte
   del mese`. Le assenze retribuite **contano come ore lavorate** e concorrono a raggiungere il monte
   ore contrattuale; lo straordinario si paga su quanto eccede il contrattualizzato e le ore non
@@ -398,6 +405,73 @@ Banca ore, tetto annuo, contratti e export.
     «— ore» e «non calcolabile»; la stessa persona su «Teoriche» → 18,67 €/h; e il **foglio Excel
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
+
+- 🟨 **«ORE CORRETTE DA DARE» = LA SOGLIA DELLO STRAORDINARIO, APPLICATA OVUNQUE** (ver165 e
+  ver166, 14-15/11/2026, catena di richieste di Christian). **È il cambio più importante del
+  motore dopo mesi.**
+  - 🔑 **La regola nuova, con parole sue**: le ore che un dipendente deve davvero rendere in un
+    mese non sono il monte fisso, ma **monte ÷ 26 × (giorni del mese NON domenicali)**. Esempio
+    suo: monte 82,5 h (inteso su 26 gg), mese da 27 gg → 82,5/26×27 = **85,67**. Le chiama
+    **«ore corrette da dare»** (dicitura SUA, 15/11). Lo **straordinario** è **solo** ciò che
+    supera questa soglia: «se faccio 84 ore a ottobre non c'è straordinario; se ne faccio 87 ce
+    ne sono 1,33» (confermato da lui).
+  - 🧮 **In pratica la quota giornaliera passa da `oreSett/ggSett` a `monte/26`** (cioè
+    **`quotaGiorno`**, la stessa già usata per le assenze), così **quota × giorni non domenicali
+    = ore corrette da dare** esatto, e sparisce lo "scarto" dei mesi lunghi.
+  - **ver165 — a video, nel Tabellone** (richieste: «dammi i giorni del mese non domenicali, ott
+    27 nov 25» e «indicami per ogni dipendente le ore corrette da dare»):
+    - **badge giallo** nella fascia del Tabellone: **«N giorni (no domeniche)»** = giorni del
+      mese tolte **solo** le domeniche (i festivi infrasettimanali SI contano). Funzione
+      **`giorniNonDomenica(y,m)`**. Ott **27**, nov **25**. Misurato: 15px, nessuna sovrapposizione.
+    - **pillola per dipendente** accanto a «ORE MESE»: **«ORE CORRETTE DA DARE: 85,67»** (gialla,
+      12,5px). Funzioni **`giorniRetribuibiliInForza(dp,y,m,rec)`** (non domenica, in forza,
+      **esclusi AN e `--`** — part-time verticale) e **`oreRetribuibili(dp,y,m,rec)`** = quotaGiorno
+      × quei giorni. ⚠️ Nel codice la funzione si chiama ancora `oreRetribuibili` (interno); la
+      **dicitura a video** è «ore corrette da dare».
+    - Così il Tabellone mostra per ognuno le **tre** cose: **ORE MESE** (ore da pagare fisse =
+      monte), **ORE CORRETTE DA DARE** (la soglia), **Risultato del mese** (lo straordinario).
+  - **ver166 — il motore, OVUNQUE** (sue risposte: «ovunque, anche Tabellone e Riepiloghi» e
+    «correggi il costo orario»):
+    - 🔴 **`bancaMeseA`** (il «Risultato del mese», e con lui Query→Straordinario, Riepiloghi,
+      colonna SUPPLEMENTARE del report mensilizzati): la soglia **non è più `monteFissoMese` ma
+      `oreRetribuibili`**. Una riga: `return R2(eff - oreRetribuibili(dp,y,m,rec),3)`.
+      `eff = rese + coverAbsHours + festOreMese + permOreMese.pagate`, **invariato**.
+    - 🔴 **Report ord/extra** (`esportaPDFOrdExtra`): quota = `quotaGiorno`, soglia dell'ordinario
+      = `oreRetribuibili`; l'ordinario raggiunge le «ore corrette da dare», lo straordinario è solo
+      l'eccedenza della quota del giorno (senza compensazione). Tolto il vecchio pro-rata a giorni
+      di calendario.
+    - 🔴 **Costo orario** (`oreLavorabiliMese`): `Math.max(0, oreRetribuibili(dp,y,m,rec) - ass -
+      perm - fest)` invece di `monteFissoMese*fr - ...`. Così le **supplementari del Costo orario**
+      usano la **stessa soglia** dello straordinario del Tabellone. ⚠️ Solo il percorso **dai
+      Riepiloghi** (quello vero); «a mano» e «teoriche» restano sulla formula a settimane (stime),
+      non toccati. ⚠️ Era nell'elenco delle cose da non toccare: fatto **solo** su sua richiesta
+      esplicita del 15/11.
+  - 🔴 **CONSEGUENZA DICHIARATA, e misurata dal vivo**: lo straordinario di uno stesso lavoro
+    **cambia col numero di giorni del mese**. Persona 19h/sett, **90 h rese, nessuna assenza**:
+    | | VECCHIO (monte fisso 82,5) | NUOVO (ore corrette da dare) |
+    |---|--:|--:|
+    | Ottobre (27 gg) | +7,50 | **+4,33** (90 − 85,67) |
+    | Novembre (25 gg) | +7,50 | **+10,67** (90 − 79,33) |
+    ⚠️ L'esempio del 06/11 («165, 172 rese, 2 festività → **19,6666**») resta vero **solo nei mesi
+    da 26 giorni non domenicali**; negli altri cambia. È voluto.
+  - ⚠️ **Nei mesi lunghi (27 gg) chi è presente ogni giorno e scrive ore "tonde" (3,00) risulta
+    0,16 h SOTTO** la soglia, perché la quota è `monte/26` (es. 3,006), non 3,00 tondo. È corretto,
+    ma spiega i piccoli «mancano 0,16 h» in quei mesi.
+  - 🐞 **Due difetti preesistenti chiusi nel report al passaggio**: senza data di assunzione il
+    monte era creduto pieno (ora i giorni fuori contratto non contano); assunzione/cessazione a
+    metà mese ora riproporziona (le ore scritte fuori dal periodo di contratto non contano).
+  - **Provato in esecuzione**: report ord/extra **23/23 jsPDF vero**; **riconteggio indipendente
+    7/7** al centesimo (seconda implementazione scritta da zero, confronto sul PDF vero) su casi
+    pieno/parziale/ferie+malattia/festività/ASP/assunzione a metà/cessazione a metà; `bancaMeseA`
+    misurato dal vivo (ott +4,33, nov +10,67); Costo orario supp **8,65 = 180 − 171,35**, identico
+    allo straordinario del Tabellone per lo stesso caso; grafica badge/pillola **0 scritte sotto
+    12,5px**.
+  - ⚠️ **Batteria**: i falliti di `ver151` (9), `ver152` (1), `ver156` (1), `ver146`, `ver147`,
+    `nr153` sono **tutti il cambio-straordinario/costo ATTESO** (confrontavano col monte fisso di
+    ver150); **vanno aggiornati ai nuovi valori verificati, non aggirati**. `sc-dip-A` resta 3/3
+    storici; `sc-dip-C` richiede il banco di confronto sulla **8201** (fragilità del banco).
+  - ⚠️ **Il Costo orario resta su una soglia diversa SOLO nei percorsi "a mano" e "teoriche"**:
+    se un giorno li vuoi allineati, serve rifare la formula a settimane (O8).
 
 - 🧾 **TERZO REPORT A4 PER LE PAGHE: ORDINARIO / EXTRA GIORNALIERO** (ver163, 14/11/2026,
   richiesta di Christian: «un pdf a4 che ci dica **giornalmente** quanto è ordinario e quanto
