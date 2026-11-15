@@ -406,6 +406,52 @@ Banca ore, tetto annuo, contratti e export.
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
 
+- 🔎 **COLLAUDO APPROFONDITO DEL CONTEGGIO DELLE ORE — 15/11/2026, sulla ver171, DATI VERI (backup
+  del 04/11): NESSUN ERRORE DI CONTEGGIO** (richiesta di Christian: «collaudo approfondito …
+  riconteggio indipendente per ogni dipendente»). Script nello scratchpad della sessione:
+  `ric171.cjs` (seconda implementazione del motore, scritta da zero, **non** riusa il codice
+  dell'app), `collaudo171-tab.cjs`, `collaudo171-co.cjs`, `collaudo171-pdf.cjs`, `graf171.cjs`.
+  - **Tabellone dal vivo, 16 dipendenti × tutti i mesi con dati (205 schede-mese, gen 2025 → ott
+    2026)**: per ciascuna, somma delle celle a video = TOT calcolato = riconteggio; ORE MESE,
+    ORE CORRETTE DA DARE e TOT teorico = riconteggio; badge dei giorni non domenicali giusto in
+    tutti i 22 mesi; **Risultato del mese** (ottobre 2026, i 2 compilati) = riconteggio al
+    millesimo. **226 controlli superati, 1 scostamento di 0,003 h**: una scheda di agosto 2026 con
+    una cella storica a 4 decimali («1.6666»): il TOT calcolato arrotonda a 2 decimali e il TOT
+    teorico parte da lì. **Preesistente, immateriale, non toccato.**
+  - **Costo orario «dai Riepiloghi», gen→ott 2026, 16 su 16**: «ore retribuite a cedolino ammesse»
+    = Σ mese per mese del riconteggio (ordinarie a cedolino + supplementari), al centesimo; le
+    quattro schede senza contratto nel periodo dicono «non calcolabile» (giusto).
+  - **I due report A4 di ottobre 2026 con jsPDF vero**: mensilizzati — «Ore dovute», «Ore rese» e
+    **SUPPLEMENTARE** = riconteggio per tutti, griglia P/AN/MAL = celle (36/9/9), 2 pagine, nessuna
+    legenda; ord/extra — ordinario, ore corrette da dare, extra e rese = riconteggio per tutti.
+    **13/13.**
+  - **Grafica** (`graf171`, 390·1280·1700, Tabellone e Costo orario contro la ver170 congelata):
+    nessuno scorrimento laterale, scritte <12,5px fuori dalle griglie identiche (solo «Modalità
+    LOCALE», eccezione dichiarata), comandi <32px identici. **18/18.**
+  - **Batteria storica (30 script) rieseguita sulla ver171, banchi rigenerati**: tutto ai numeri
+    storici (`sc-dip-C` **107/0** sul banco 8201 con la ver170 congelata, `ic-fodip-A` 20/0 ·
+    `ic-fodip-B` 21/0, `dip-backup` 13/0, `ver136us` 17/0 e `ver137us` 12/0 per l'import di USOINT).
+    ⚠️ **Attese invecchiate, NON regressioni, verificate una per una**: `ver156` (1: la colonna
+    SUPPLEMENTARE del report paghe segue la soglia della ver166 — confrontati i due PDF riga per
+    riga, cambiano **solo** i tre supplementari), `ver159` (3) e `ver161` (1) (confrontano col
+    costo/€/h congelato delle ver158/160, cambiato di proposito da ver166 e ver171), `sc-dip-B`
+    (2: ver170 contro ver171, **costo identico in 16 su 16**, cambia solo il €/h di 4 schede =
+    il denominatore della ver171). `sc-dip-A` 38/3 storici. **Da riallineare, non aggirare.**
+  - 🟠 **Tre cose trovate e NON toccate (servono decisioni o dati di Christian)**:
+    1. nel report paghe la colonna **«Ore dovute» è il monte fisso** (82,50) mentre il
+       **SUPPLEMENTARE** è calcolato sulle **ore corrette da dare** (85,67): chi rifà il conto
+       «rese + assenze − dovute» non ritrova il supplementare. Dicitura sua: **da decidere** se
+       aggiungere la colonna «Ore corrette da dare» o rinominare;
+    2. **conseguenza della regola ver166 misurata sui dati veri**: nel **febbraio 2026 (24 giorni
+       non domenicali)** una full-time a 38 h che ha reso le 165 ore risulta con **+12,71 h** di
+       supplementare (soglia 152,31); è la regola che ha dato lui, ma va **confermata**;
+    3. **dati**: una scheda assunta il 15/09/2025 ha **590,8 h scritte da gennaio a giugno 2025**
+       (fuori contratto: la soglia lì è 0 e le ore a cedolino 0 — già segnalato in ver129); una
+       scheda assunta il 22/09/2026 ha **64 h in 8 giorni** su 15 h/sett (+43,96 h di
+       supplementare nel Costo orario): o la data o le celle sono da controllare.
+  - **Non verificato da qui**: Firebase vero (le prove girano con la finta Firestore / modalità
+    locale) e il cedolino vero dell'ufficio paghe (fuori dall'app).
+
 - 📌 **PROMEMORIA APERTO (Christian, 15/11/2026, «ricordami»)**: ora **il problema è far costruire
   il cedolino all'ufficio paghe**, perché **è il cedolino che ha le ore che servono per il
   rendiconto** (le ore retribuite ammesse: ordinarie − assenze pagate + supplementari, come definite
