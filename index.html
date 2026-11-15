@@ -483,7 +483,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver167";
+const APP_VER = "ver168";
 const APP_DATA = "15nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -518,6 +518,7 @@ const CODICI = [
   { c:"MAT-FC", l:"Maternità facoltativa",              pay:true,  bg:"#FF66CC" },
   { c:"MAT-ANT",l:"Maternità anticipata",               pay:true,  bg:"#FF66CC" },
   { c:"ASP 0h", l:"Aspettativa non pagata",             pay:false, bg:"#FF0066" },
+  { c:"ASS.ING",l:"Assenza ingiustificata",             pay:false, bg:"#F4B183" },  /* ver168 (Christian 15/11/2026): non retribuita, come ASP 0h */
   { c:"CASSA",  l:"Cassa integrazione o simili",        pay:true,  bg:"#CC3300" }   /* ver151: retribuita (Christian) */
 ];
 const CODE_SET = {};
@@ -795,7 +796,7 @@ function copreOre(cv){
   const c = CODE_SET[cv];
   if (!c) return false;
   if (cv === "--" || cv === "AN") return false;   /* riposo e giorno non lavorativo: ore non dovute */
-  if (c.pay === false) return false;              /* non retribuita (ASP 0h) */
+  if (c.pay === false) return false;              /* non retribuita (ASP 0h, ASS.ING) */
   if (cv === "FESTNG") return false;              /* retribuita, ma si paga IN PIU' */
   return true;
 }

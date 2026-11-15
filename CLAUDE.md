@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver167 · 15nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver168 · 15nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -405,6 +405,44 @@ Banca ore, tetto annuo, contratti e export.
     «— ore» e «non calcolabile»; la stessa persona su «Teoriche» → 18,67 €/h; e il **foglio Excel
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
+
+- 🟧 **CODICE NUOVO `ASS.ING` — ASSENZA INGIUSTIFICATA, NON RETRIBUITA** (ver168, 15/11/2026,
+  domanda di Christian: «se c'è veramente un giorno in cui non ha voluto lavorare e non ha chiesto
+  ferie?» → sua risposta «**Ok Ass ing, Nu\***»).
+  - **Perché serviva**: l'app non aveva un codice per l'assenza ingiustificata. Le due vie possibili
+    erano la **cella vuota** (indistinguibile da «non ancora compilato», e invisibile nei report) e
+    **`ASP 0h`** (che vuol dire un'altra cosa: aspettativa). Sigla e dicitura **scelte da Christian**.
+  - **Che cos'è nel codice**: una riga in `CODICI`, `{ c:"ASS.ING", l:"Assenza ingiustificata",
+    pay:false, bg:"#F4B183" }`, dopo `ASP 0h`. **Niente altro è stato toccato**: `CODE_SET`,
+    `CODE_UP`, `CODE_PREFIX` (si batte anche «ass.ing» minuscolo), la tendina della cella, «Compila
+    veloce», `copreOre` (`pay:false` → **non copre**), `assMese` (finisce fra le **Non retribuite**),
+    le colonne in giorni del report paghe e la terza colonna del report ord/extra derivano **tutti**
+    da `CODICI`. ⚠️ Il colore `#F4B183` (arancio chiaro) l'ha scelto Claude: è l'unica cosa non sua.
+  - 🔑 **Come si comporta, e perché è la risposta alla domanda**: il giorno con `ASS.ING` è un giorno
+    **dovuto e non coperto**. La soglia delle ore corrette da dare **non cambia** (85,67: il giorno
+    era dovuto, a differenza del sabato AN), ma **niente copre la quota**: nel Tabellone il Risultato
+    del mese scende delle ore che quel giorno avrebbe dato (**+41,215 → +33,715** sul caso vero con
+    il lunedì 12 da 7,5 h), e se a fine mese si finisce sotto la soglia il Risultato diventa negativo
+    = ore da **trattenere**. Nel report ord/extra: nessun ordinario quel giorno, «ASS.ING» nella
+    terza colonna, ordinario del mese **82,50** e «**mancano 3,17 h (ha lavorato meno)**», in calce
+    «ASS.ING 1 gg (non retrib.)». È la stessa trattenuta che l'app fa già per `ASP 0h`.
+  - ⚠️ **Da sapere, PREESISTENTE e non toccato**: `isAbsCell` (ver77) considera **erosiva** ogni
+    cella con un codice tranne `--` e `AN`, quindi `ASS.ING` — come già `ASP 0h` — **consuma il Tetto
+    annuo** e alza il TOT teorico (misurato: 122,558). Se Christian vuole che le non retribuite non
+    erodano il massimale, è una decisione sua e tocca anche `ASP 0h`: **da chiedergli**, non fatto.
+  - **Provato in esecuzione** (banchi rigenerati DOPO la modifica): `tab168` **13/0** dal vivo
+    (battendo «ass.ing» la cella diventa `ASS.ING` col colore `rgb(244,177,131)`; Risultato
+    +41,215 → **+33,715**; soglia **85,67** invariata; «Non retribuite: ASS.ING 1 gg = 3,173 h»; TOT
+    94,00; nessuna fascia «scritte non riconosciute»; «Compila veloce» lo accetta; zero errori di
+    pagina; e nella **ver167 congelata** «ass.ing» **non entra**); `ordextra-test` **46/0** jsPDF
+    vero (nuovo scenario **D**: lunedì 12 ASS.ING → «12 lun ASS.ING», ordinario 82,50, mancano 3,17,
+    extra 49,58, rese 94,00, calce «ASS.ING 1 gg (non retrib.)»); `verifica-ore` **10/10 SUPERATO**
+    (nuovo **S10**, al centesimo); `ver153` **41/0** · `ver154` **41/0** (report paghe) · `graf155`
+    **15/0** · `ver160` **27/0** · `nr153` **6/0**. Babel + `node --check` superati.
+  - 🔢 **Il numero di schema del backup NON cambia**: è un valore in più ammesso nelle celle, la
+    forma dei dati è identica. Un backup vecchio letto da questa versione non ne ha; uno nuovo letto
+    da una versione vecchia mostrerebbe quelle celle in **rosso** come «scritta non riconosciuta»
+    (ver101), senza perderle.
 
 - 🔵 **I SABATI «AN» CONTANO FRA I GIORNI NON DOMENICALI DELLE ORE CORRETTE DA DARE** (ver167,
   15/11/2026, decisione di Christian prima del «main», con parole sue: «**I sabati AN contano fra i
