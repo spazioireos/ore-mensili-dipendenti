@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver168 · 15nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver169 · 15nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -406,6 +406,30 @@ Banca ore, tetto annuo, contratti e export.
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
 
+- 🎯 **LE ASSENZE NON RETRIBUITE NON ERODONO PIÙ IL MASSIMALE** (ver169, 15/11/2026, decisione di
+  Christian con parole sue: «**l'assenza non retribuita AN o ASS ING non deve erodere il massimale:
+  la correzione tocca anche ASP 0h**»).
+  - **Com'era**: `isAbsCell` (ver77) diceva «erosiva» per **ogni** codice tranne `--` e `AN`, quindi
+    `ASP 0h` (dal 2026) e `ASS.ING` (ver168) consumavano il Tetto annuo e alzavano il TOT teorico,
+    e sotto la cella c'era il numerino cliccabile erosiva/non erosiva.
+  - **Ora**: `isAbsCell` esclude anche i codici **`pay:false`** (una condizione in più), e il
+    numerino sotto la cella (`isCovAbs`) **usa la stessa funzione**: era una copia della condizione,
+    ora c'è un **punto unico**. Erode **solo l'assenza retribuita** (ferie, malattia, permessi…).
+    `AN` e `--` erano già fuori. **Nessun altro calcolo toccato**: `copreOre`, `assMese`,
+    `bancaMeseA`, il Costo orario e i report non passano da `isAbsCell`.
+  - ⚠️ **Sui dati veri non cambia niente oggi**: nel backup del 04/11 non c'è **nessuna** cella
+    `ASP 0h` (già misurato in ver151) e `ASS.ING` è nato ieri.
+  - **Provato in esecuzione** (`tab169`, **9/0**, banchi rigenerati): su un mese con `ASS.ING`,
+    `ASP 0h`, `FERIE` e 8 `MAL` — **nessun numerino** sotto ASS.ING e ASP 0h, numerino **presente**
+    sotto FERIE e MAL; TOT teorico **108,558** = 80 rese + 9 giornate retribuite × 3,1731; Tetto
+    annuo «Già usate» **108,558**; zero errori di pagina; e la **ver168 congelata** che dava
+    numerini su tutte e due e **114,904**. Batteria: `ordextra-test` 46/0 · `verifica-ore` 10/10 ·
+    `tab167` 11/0 · `tab168` 13/0 · `ver153` 41/0 · `ver154` 41/0 · `graf155` 15/0 · `nr153` 6/0 ·
+    `sc-dip-A` 38/3 (storici). Babel + `node --check`.
+    ⚠️ In `tab168` il controllo T9 **documentava il comportamento chiuso oggi** (teorico 122,558):
+    ora pretende **119,385**. E in `tab167`/`tab168` la targhetta era scritta a mano: ora si legge
+    da `APP_VER`. **Aggiornate, non aggirate.**
+
 - 🟧 **CODICE NUOVO `ASS.ING` — ASSENZA INGIUSTIFICATA, NON RETRIBUITA** (ver168, 15/11/2026,
   domanda di Christian: «se c'è veramente un giorno in cui non ha voluto lavorare e non ha chiesto
   ferie?» → sua risposta «**Ok Ass ing, Nu\***»).
@@ -426,10 +450,9 @@ Banca ore, tetto annuo, contratti e export.
     = ore da **trattenere**. Nel report ord/extra: nessun ordinario quel giorno, «ASS.ING» nella
     terza colonna, ordinario del mese **82,50** e «**mancano 3,17 h (ha lavorato meno)**», in calce
     «ASS.ING 1 gg (non retrib.)». È la stessa trattenuta che l'app fa già per `ASP 0h`.
-  - ⚠️ **Da sapere, PREESISTENTE e non toccato**: `isAbsCell` (ver77) considera **erosiva** ogni
-    cella con un codice tranne `--` e `AN`, quindi `ASS.ING` — come già `ASP 0h` — **consuma il Tetto
-    annuo** e alza il TOT teorico (misurato: 122,558). Se Christian vuole che le non retribuite non
-    erodano il massimale, è una decisione sua e tocca anche `ASP 0h`: **da chiedergli**, non fatto.
+  - ✅ **CHIUSO dalla ver169** (era segnalato come preesistente): `isAbsCell` (ver77) considerava
+    **erosiva** ogni cella con un codice tranne `--` e `AN`, quindi `ASS.ING` — come già `ASP 0h` —
+    consumava il Tetto annuo (misurato: 122,558). Vedi la scheda 🎯 qui sotto.
   - **Provato in esecuzione** (banchi rigenerati DOPO la modifica): `tab168` **13/0** dal vivo
     (battendo «ass.ing» la cella diventa `ASS.ING` col colore `rgb(244,177,131)`; Risultato
     +41,215 → **+33,715**; soglia **85,67** invariata; «Non retribuite: ASS.ING 1 gg = 3,173 h»; TOT

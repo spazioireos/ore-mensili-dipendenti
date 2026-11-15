@@ -483,7 +483,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver168";
+const APP_VER = "ver169";
 const APP_DATA = "15nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -967,7 +967,10 @@ function celleIgnoteMese(rec, y, m){
   return out;
 }
 function eroOn(rec,d){ return !(rec && rec.ero && rec.ero[d] === false); }   // predefinito: erosiva
-function isAbsCell(v){ const c=String(v==null?"":v).trim(); return !!(CODE_SET[c] && c!=="--" && c!=="AN"); }
+/* ver169 (Christian, 15/11/2026): «l'assenza non retribuita AN o ASS.ING non deve erodere il massimale:
+   la correzione tocca anche ASP 0h». Erode solo l'assenza RETRIBUITA (pay:true): -- e AN erano già fuori,
+   ora anche ogni codice pay:false (ASP 0h, ASS.ING). È il punto unico: lo usa anche il numerino cliccabile. */
+function isAbsCell(v){ const c=String(v==null?"":v).trim(); const k=CODE_SET[c]; return !!(k && c!=="--" && c!=="AN" && k.pay!==false); }
 /* ver99 (05/11/2026, Christian: «potrebbe essere di un giorno durante le vacanze natalizie in
    luogo del giorno di ferie, quindi e' erosivo o non erosivo anche esso»): ore di permesso
    RETRIBUITO delle sole giornate EROSIVE. Il contrassegno e' quello del GIORNO (`rec.ero[d]`),
@@ -2724,7 +2727,7 @@ function EmployeeCard(props){
               const nonScriv = blocked || rosso;
               const perm = (rec.permessi && rec.permessi[d]) ? rec.permessi[d] : null;
               const svalC = String(val).trim();
-              const isCovAbs = (CODE_SET[svalC] && svalC!=="--" && svalC!=="AN");
+              const isCovAbs = isAbsCell(svalC);   /* ver169: punto unico (le non retribuite non erodono) */
               const quotaDay = quotaGiorno(dp,y,m);
               return (
                 <td key={"c"+d} style={{ padding:"1px", verticalAlign:"top" }}>
