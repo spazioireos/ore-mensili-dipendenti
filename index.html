@@ -766,9 +766,7 @@ function quotaGiorno(dp,y,m){ return monteFissoMese(dp,y,m)/26; }           // q
    al periodo in cui il contratto è in piedi. «ORE RETRIBUIBILI» = monte ÷ 26 × giorni
    retribuibili (es. monte 82,5 su 26 gg, mese da 27 gg → 82,5/26×27 = 85,67). È la soglia
    dell'ordinario del mese: lo straordinario è solo ciò che la supera. */
-/* conta i giorni retribuibili (non domenica, in forza) ESCLUDENDO i giorni segnati AN
-   (part-time: giorno non lavorativo) e -- (riposo): non sono ore dovute. Se `rec` non è dato,
-   conta solo per calendario (nessuna esclusione). */
+/* conta i giorni non domenicali in forza = i giorni delle «ore corrette da dare» (ver165). */
 /* ver167 (Christian, 15/11/2026): «I sabati AN contano fra i giorni non domenicali delle ore corrette da
    dare. Il sabato è lavorativo anche se nell'effetto si fanno 0 ore». Quindi si contano TUTTI i giorni
    non domenicali in forza, qualunque codice portino (AN e -- compresi): la soglia non dipende più da
