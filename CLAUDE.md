@@ -406,6 +406,14 @@ Banca ore, tetto annuo, contratti e export.
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
 
+- 📌 **PROMEMORIA APERTO (Christian, 15/11/2026, «ricordami»)**: ora **il problema è far costruire
+  il cedolino all'ufficio paghe**, perché **è il cedolino che ha le ore che servono per il
+  rendiconto** (le ore retribuite ammesse: ordinarie − assenze pagate + supplementari, come definite
+  nella ver171). L'app oggi gli dà il **Report PDF A4 mensilizz.** (presenze + SUPPLEMENTARE per
+  persona) e il **Report ord/extra giornaliero**; se l'ufficio paghe avrà bisogno di un altro
+  tracciato o di altre voci, va deciso **con Christian**. **Da tirare fuori al momento giusto**, non
+  prima.
+
 - 🧾 **IL COSTO ORARIO SI DIVIDE PER LE ORE A CEDOLINO, MESE PER MESE** (ver171, 15/11/2026,
   richiesta di Christian con parole sue: «noi incassiamo le ore che risultano retribuite a
   cedolino, quindi il costo va definito in base a quelle, mese per mese … il cedolino uscito
