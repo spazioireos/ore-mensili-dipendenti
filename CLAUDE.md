@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver166 · 15nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver167 · 15nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -406,6 +406,47 @@ Banca ore, tetto annuo, contratti e export.
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
 
+- 🔵 **I SABATI «AN» CONTANO FRA I GIORNI NON DOMENICALI DELLE ORE CORRETTE DA DARE** (ver167,
+  15/11/2026, decisione di Christian prima del «main», con parole sue: «**I sabati AN contano fra i
+  "giorni non domenicali" delle ore corrette da dare. Il sabato è lavorativo anche se nell'effetto
+  si fanno 0 ore**»).
+  - 🔴 **Il difetto, trovato guardando il VERO di una dipendente a ottobre 2026** (part-time 19 h su
+    **5 giorni**, sabati segnati `AN`, 8 MAL, 101,5 h rese): la ver166 **escludeva** dai giorni non
+    domenicali le celle `AN` e `--`, quindi per lei contava **23-24 giorni** invece di 27 e la soglia
+    scendeva a **72,98 / 76,15 h**, cioè **sotto il monte fisso (82,50)**: lo straordinario risultava
+    **+53,90 h** solo perché i sabati liberi erano segnati come tali. Con la definizione di Christian
+    («82,5/26×27») la soglia è **85,67** e lo straordinario **+41,21** (= 101,5 + 8 × 3,1731 − 85,67).
+    ⚠️ Il difetto non toccava chi lavora su 6 giorni (nessun AN): per quelli ver166 e ver167 danno
+    gli **stessi numeri** (verificato: scenari S1-S7 e A/B identici).
+  - **La correzione, una riga**: `giorniRetribuibiliInForza` conta **tutti** i giorni non domenicali
+    in forza, qualunque codice portino. ⚠️ Il parametro `rec` resta nella firma per non toccare le
+    chiamate, ma **non viene più letto**: la soglia **non dipende più da cosa c'è scritto nel mese**
+    (misurato: con il sabato 3 `MAL` o `AN` la soglia è identica, 85,67 — S8 e S9).
+  - **Nel report ord/extra** il giorno `AN` (o un riposo `--` infrasettimanale) in forza è ora un
+    giorno **lavorativo a 0 ore**: copre la sua quota come un'assenza retribuita (`ripAN`), così la
+    colonna Ordinario somma esatta alle ore corrette da dare (**85,67**), senza scaricare nessun
+    residuo sull'ultimo giorno e **senza** il falso «mancano 12,69 h (ha lavorato meno)» che la
+    ver166 avrebbe scritto. A video: «3 sab · 3,17 · · AN».
+  - **Provato in esecuzione, tutto sui banchi rigenerati DOPO la modifica**: `ordextra-test`
+    **38/0** (jsPDF vero; nuovo scenario **C** coi sabati AN: soglia 85,67 su 27 giorni, sabato AN
+    3,17 + «AN», ordinario 85,67, nessun «mancano», rese 101,50, nessun residuo scaricato);
+    `verifica-ore` (riconteggio indipendente) **9/9 SUPERATO**, con i nuovi **S8** (sabati AN) e
+    **S9** (sabato 3 MAL: soglia identica); `tab167` **11/0** dal vivo: badge 27, pillola **85,67**,
+    Risultato del mese **+41,215**, TOT 101,50, MAL 8 gg = 25,385 h, Costo orario **41,22 h**
+    aggiuntive (stessa soglia), pastiglia «rispecchiante» presente, e il **confronto diretto con la
+    ver166 congelata** che dava 72,98 / +53,905. Grafica: pillola 12,5px, badge 15px, zero scritte
+    sotto i 12,5px fuori dalle griglie. Babel + `node --check` superati.
+    ⚠️ Nel report l'extra dello scenario C è **53,91** contro i 53,90 del riconteggio: è la somma
+    per giorno arrotondata a **3 decimali** (ver163), mezzo centesimo, **preesistente** e dichiarato.
+  - **Batteria**: `graf155` 15/0 · `ver160` 27/0 · `ver162` 11/0 · `nr153` 6/0 · `sc-dip-A` 38/3
+    (i tre storici). ⚠️ **`ver161` passa a 27/1**: il controllo «con gli elenchi vuoti il costo è
+    identico alla ver160» **non è più vero dalla ver166/167**, perché il Costo orario «dai
+    Riepiloghi» usa la soglia delle ore corrette da dare e nei mesi da 25 o 27 giorni le
+    supplementari cambiano di poco (es. 14.369,00 → 14.340,35 €): è il cambio **voluto**, da
+    **riallineare, non aggirare**, insieme a `ver151`/`ver152`/`ver156`/`ver146`/`ver147`.
+  - ⚠️ Il vero di quella dipendente **non è nel repository**: il backup del 04/11 sta solo nello
+    scratchpad della sessione; lo scenario S8/C è **anonimizzato** («PROVA SABATIAN»).
+
 - 🟨 **«ORE CORRETTE DA DARE» = LA SOGLIA DELLO STRAORDINARIO, APPLICATA OVUNQUE** (ver165 e
   ver166, 14-15/11/2026, catena di richieste di Christian). **È il cambio più importante del
   motore dopo mesi.**
@@ -424,9 +465,9 @@ Banca ore, tetto annuo, contratti e export.
       mese tolte **solo** le domeniche (i festivi infrasettimanali SI contano). Funzione
       **`giorniNonDomenica(y,m)`**. Ott **27**, nov **25**. Misurato: 15px, nessuna sovrapposizione.
     - **pillola per dipendente** accanto a «ORE MESE»: **«ORE CORRETTE DA DARE: 85,67»** (gialla,
-      12,5px). Funzioni **`giorniRetribuibiliInForza(dp,y,m,rec)`** (non domenica, in forza,
-      **esclusi AN e `--`** — part-time verticale) e **`oreRetribuibili(dp,y,m,rec)`** = quotaGiorno
-      × quei giorni. ⚠️ Nel codice la funzione si chiama ancora `oreRetribuibili` (interno); la
+      12,5px). Funzioni **`giorniRetribuibiliInForza(dp,y,m,rec)`** (non domenica, in forza;
+      ⚠️ in ver165/166 escludeva **AN e `--`**, **dalla ver167 li CONTA** — vedi la scheda 🔵 qui
+      sotto) e **`oreRetribuibili(dp,y,m,rec)`** = quotaGiorno × quei giorni. ⚠️ Nel codice la funzione si chiama ancora `oreRetribuibili` (interno); la
       **dicitura a video** è «ore corrette da dare».
     - Così il Tabellone mostra per ognuno le **tre** cose: **ORE MESE** (ore da pagare fisse =
       monte), **ORE CORRETTE DA DARE** (la soglia), **Risultato del mese** (lo straordinario).

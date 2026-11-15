@@ -483,7 +483,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver166";
+const APP_VER = "ver167";
 const APP_DATA = "15nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -769,7 +769,11 @@ function quotaGiorno(dp,y,m){ return monteFissoMese(dp,y,m)/26; }           // q
 /* conta i giorni retribuibili (non domenica, in forza) ESCLUDENDO i giorni segnati AN
    (part-time: giorno non lavorativo) e -- (riposo): non sono ore dovute. Se `rec` non è dato,
    conta solo per calendario (nessuna esclusione). */
-function giorniRetribuibiliInForza(dp,y,m,rec){ let n=0, nd=daysInMonth(y,m); const a=assunzInt(dp), e=effEndInt(dp); const g=(rec&&rec.giorni)?rec.giorni:{}; for(let d=1; d<=nd; d++){ if(weekdayOf(y,m,d)===0) continue; const cv=String(g[d]==null?"":g[d]).trim(); if(cv==="AN"||cv==="--") continue; const D=y*10000+m*100+d; if((!a||a<=D)&&(!e||e>=D)) n++; } return n; }
+/* ver167 (Christian, 15/11/2026): «I sabati AN contano fra i giorni non domenicali delle ore corrette da
+   dare. Il sabato è lavorativo anche se nell'effetto si fanno 0 ore». Quindi si contano TUTTI i giorni
+   non domenicali in forza, qualunque codice portino (AN e -- compresi): la soglia non dipende più da
+   cosa c'è scritto nel mese. Il parametro rec resta per non toccare le chiamate, ma non viene letto. */
+function giorniRetribuibiliInForza(dp,y,m,rec){ let n=0, nd=daysInMonth(y,m); const a=assunzInt(dp), e=effEndInt(dp); for(let d=1; d<=nd; d++){ if(weekdayOf(y,m,d)===0) continue; const D=y*10000+m*100+d; if((!a||a<=D)&&(!e||e>=D)) n++; } return n; }
 function oreRetribuibili(dp,y,m,rec){ return R2(quotaGiorno(dp,y,m)*giorniRetribuibiliInForza(dp,y,m,rec),2); }
 function mensDalYM(dp){ const v=ymdIt(dp && dp.mensilizzatoDal); return v?Math.floor(v/100):0; } // YM di decorrenza mensilizzazione (0 = da sempre)
 /* ===== ver151 (11/11/2026) — CHE COSA COPRE LE ORE DOVUTE DEL MESE ===========
@@ -2382,12 +2386,15 @@ function esportaPDFOrdExtra(state, pairs){
         const ext = R2(Math.max(0, worked - quota), 3);
         const absCover = inForce && copreOre(cv);                             /* assenza retribuita che copre */
         const festGod = (!absCover && festivo && !dom && inForce && !(isCode && cv !== "--" && cv !== "AN"));
+        /* ver167: il sabato AN (o un riposo -- infrasettimanale) è un giorno lavorativo a 0 ore: entra nelle
+           ore corrette da dare e quindi copre la sua quota, come un'assenza retribuita (Christian 15/11/2026). */
+        const ripAN = inForce && !dom && (cv === "AN" || cv === "--");
         let ordDay, covered;
-        if (festGod || absCover){ ordDay = quota; covered = true; }           /* la quota è coperta dall'assenza/festività */
+        if (festGod || absCover || ripAN){ ordDay = quota; covered = true; }  /* la quota è coperta dall'assenza/festività/AN */
         else {
           const cov = wOrd + permPag;                                         /* le ore + i permessi orari riempiono la quota */
           ordDay = Math.min(quota, cov);
-          const scheduled = inForce && !dom && !festivo && cv !== "AN" && cv !== "--";
+          const scheduled = inForce && !dom && !festivo;                       /* AN e -- non arrivano qui (ver167) */
           if (scheduled) shortfall += Math.max(0, quota - cov);              /* giorno lavorativo non coperto -> monte scende */
           covered = (cov >= quota - 0.0005);
         }
