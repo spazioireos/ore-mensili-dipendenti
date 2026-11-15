@@ -160,6 +160,17 @@
   .cong-bar { height:9px; background:rgba(0,0,0,.08); border-radius:999px; overflow:hidden; margin:2px 0 6px; }
   .cong-bar-fill { height:100%; background:currentColor; border-radius:999px; transition:width .2s; }
   .cong-res { font-size:12.5px; line-height:1.45; }
+  /* ver175: box «Da inserire a cedolino» (solo mensilizzati, da ottobre 2026) */
+  .ced-box { margin-top:8px; border:2px solid #5a9ce2; background:#eef5fc; border-radius:10px; padding:8px 10px; color:#0f172a; }
+  .ced-head { font-size:16px; font-weight:800; color:#1f4e82; margin-bottom:4px; }
+  .ced-tab { width:100%; border-collapse:collapse; font-size:14px; }
+  .ced-tab td { padding:2px 4px; vertical-align:top; border-bottom:1px solid #d6e6f7; }
+  .ced-tab td.n { text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; font-weight:700; }
+  .ced-tab tr.top td { font-size:15.5px; font-weight:800; color:#1f4e82; border-bottom:2px solid #b9d5f1; }
+  .ced-tab tr.sub td.l { padding-left:22px; }
+  .ced-tab td.d { color:#334155; font-size:13px; }
+  .ced-note { font-size:13px; color:#334155; margin-top:5px; line-height:1.45; }
+  .ced-rend { margin-top:6px; padding:6px 8px; background:#fff; border:1.5px solid #5a9ce2; border-radius:8px; font-size:14px; font-weight:700; color:#1f4e82; }
   .cong-plain { font-size:13.5px; line-height:1.5; font-weight:600; background:rgba(255,255,255,.65); border:1px dashed rgba(0,0,0,.2); border-radius:8px; padding:6px 10px; margin-bottom:6px; }
   .cong-status { display:inline-flex; align-items:center; gap:6px; font-size:14px; font-weight:800; text-transform:uppercase; letter-spacing:.3px; padding:5px 14px; border-radius:8px; color:#fff; box-shadow:0 1px 4px rgba(0,0,0,.2); }
   .cong-status b { font-size:17px; font-weight:900; }
@@ -487,7 +498,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver174";
+const APP_VER = "ver175";
 const APP_DATA = "15nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -1068,6 +1079,70 @@ function prodottoMese(rec,dp,y,m,state){                                   // or
      ore fatte: resta il conto di prima. */
   if (state && meseCedolinoTetto(dp, y, m)) return consumoCedolinoMese(state, rec, dp, y, m);
   return totOfRec(rec,y,m) + oreEroseMese(rec,dp,y,m) + permOreEroseMese(rec) + (state ? festOreEroseMese(state,dp,y,m) : 0);   /* ver173 */
+}
+/* ver175 (15/11/2026, Christian: «in tabellone, per ogni dip, in un box dedicato, voglio ben visibili:
+   ore da far inserire a cedolino secondo mensilizzazione (le c.d. Ore mese), di cui ore ferie e ore
+   altre assenze retribuite (suddivise per erosive e non erosive), nonché le festività non godute (che
+   viaggiano a sé) e le ore supplementari, altre note se disponibili» → «le parole vanno bene, più puoi
+   dettagliare meglio è»). Solo LEGGE: ogni numero viene dalle funzioni che già fanno i conti (ver151,
+   ver171, ver173/174). null quando il box non ha senso (non mensilizzato, prima di ottobre 2026, mese
+   vuoto). Le ore si scrivono al centesimo partendo dal valore pieno, come sul cedolino. */
+function cedolinoBox(state, dp, y, m){
+  if (!meseCedolinoTetto(dp, y, m)) return null;
+  const rec = getRecFrom(state, y, m, dp.id);
+  if (!rec || !recHasData(rec)) return null;
+  const r = oreSuppPeriodo(state, dp, [{ y:y, m:m }], null, null, 0).righe[0];
+  if (!r) return null;
+  const q = quotaGiorno(dp, y, m), qF = oreSettAt(dp, y, m) / ggSettDi(state, dp), nd = daysInMonth(y, m);
+  const fr = meseFrazione(dp, y, m);
+  const g = rec.giorni || {};
+  const ferie = { gg:0, ggE:0 }, altre = {};          /* altre: cod -> {gg, ggE} */
+  const nonRetr = {}; let an = 0, festng = 0;
+  for (let d = 1; d <= nd; d++){
+    const cv = String(g[d]==null ? "" : g[d]).trim();
+    if (cv === "AN"){ an++; continue; }
+    if (cv === "FESTNG"){ festng++; continue; }
+    if (!CODE_SET[cv] || cv === "--") continue;
+    if (copreOre(cv)){
+      const e = eroOn(rec, d);
+      if (cv === "FERIE"){ ferie.gg++; if (e) ferie.ggE++; }
+      else { const t = altre[cv] || (altre[cv] = { gg:0, ggE:0 }); t.gg++; if (e) t.ggE++; }
+    } else { nonRetr[cv] = (nonRetr[cv]||0) + 1; }
+  }
+  /* festività godute del mese (stesso perimetro di festGoduteMese) e quali sono erosive */
+  const f = festivitaSet(y); const festGod = []; const tuttoNR = meseTuttoAN(state, dp, y, m);
+  const festNon = [];
+  for (let d = 1; d <= nd; d++){
+    if (!isFestivo(f, m, d)) continue;
+    if (!inForceAt(dp, y*10000 + m*100 + d)) continue;
+    if (weekdayOf(y, m, d) === 0){ festNon.push(d); continue; }
+    const cv = String(g[d]==null ? "" : g[d]).trim();
+    if (CODE_SET[cv] && cv !== "--" && cv !== "AN") continue;
+    festGod.push({ d:d, ero: !tuttoNR && eroOn(rec, d) });
+  }
+  FEST_NON_GOD_FISSE.forEach(function(x){ if (x[0] === m && inForceAt(dp, y*10000 + m*100 + x[1])) festNon.push(x[1]); });
+  festNon.sort(function(a,b){ return a-b; });
+  const pm = permOreMese(rec), permE = permOreEroseMese(rec);
+  const inMeno = Math.min(0, R2(r.rese - r.lav, 3));
+  const altreGG = Object.keys(altre).reduce(function(a,k){ return a + altre[k].gg; }, 0);
+  const altreGGE = Object.keys(altre).reduce(function(a,k){ return a + altre[k].ggE; }, 0);
+  const festGGE = festGod.filter(function(x){ return x.ero; }).length;
+  const ordC = R2(r.ordCed, 2), supp = R2(r.supp, 2);
+  const eroTot = R2(ferie.ggE*q + altreGGE*q + festGGE*qF + permE, 2);
+  const ced = R2(ordC + supp, 2);
+  return {
+    monte: R2(r.monteP, 2), parziale: fr < 0.9999, fr: fr, q: q, qF: qF,
+    ferie: { gg:ferie.gg, ore:R2(ferie.gg*q,2), ggE:ferie.ggE, oreE:R2(ferie.ggE*q,2), oreNE:R2((ferie.gg-ferie.ggE)*q,2) },
+    altre: Object.keys(altre).sort().map(function(k){ const t = altre[k]; return { cod:k, gg:t.gg, ggE:t.ggE, ore:R2(t.gg*q,2), oreE:R2(t.ggE*q,2), oreNE:R2((t.gg-t.ggE)*q,2) }; }),
+    altreTot: { gg:altreGG, ore:R2(altreGG*q,2), oreE:R2(altreGGE*q,2), oreNE:R2((altreGG-altreGGE)*q,2) },
+    fest: { gg:festGod.length, ore:R2(festGod.length*qF,2), giorni:festGod.map(function(x){ return x.d; }), ggE:festGGE, oreE:R2(festGGE*qF,2), oreNE:R2((festGod.length-festGGE)*qF,2) },
+    perm: { ore:R2(pm.pagate,2), oreE:R2(permE,2), oreNE:R2(pm.pagate-permE,2), altre:R2(pm.altre,2) },
+    ordC: ordC, tratt: R2(-inMeno, 2), supp: supp, risultato: (r.supp > 0.0005) ? R2(r.supp,3) : R2(inMeno,3),
+    nonGod: { gg:festNon.length, ore:R2(festNon.length*q,2), giorni:festNon },
+    nonRetr: Object.keys(nonRetr).sort().map(function(k){ return { cod:k, gg:nonRetr[k], ore:R2(nonRetr[k]*q,2) }; }),
+    an: an, festng: festng, note: vociLines(rec),
+    ced: ced, eroTot: eroTot, rend: R2(ced + eroTot, 2)
+  };
 }
 /* ver174: il mese consuma il massimale «come il cedolino»? (mensilizzato a quella data e base mensile attiva) */
 function meseCedolinoTetto(dp, y, m){
@@ -2949,6 +3024,35 @@ function EmployeeCard(props){
               Ogni mese fa storia a sé: le <b>ore in più</b> si pagano maggiorate (straordinario), le <b>ore in meno</b> si tolgono. <b>Niente si riporta</b> al mese dopo. Il totale annuo per persona è nella <b>Query personale → ⚡ Straordinario</b>.
               <div style={{ fontSize:"11px", color:"#9a3412", marginTop:"2px" }}>Base = 165 h per chi fa 38 h/settimana, in proporzione per gli altri. Numeri a 3 decimali.</div>
             </div>
+          </div>;
+        })()}
+        {(function(){
+          /* ver175: box «Da inserire a cedolino» (solo mensilizzati, da ottobre 2026). Solo lettura. */
+          const B = props.cedBox; if (!B) return null;
+          const h = function(v){ return fmt2(v) + " h"; };
+          const ene = function(e, ne){ return "erosive " + fmt2(e) + " · non erosive " + fmt2(ne); };
+          const gl = function(arr){ return arr.length ? (arr.length === 1 ? "il " : "i giorni ") + arr.join(", ") : ""; };
+          const MESE = MONTH_LABEL[m-1] + " " + y;
+          return <div className="ced-box">
+            <div className="ced-head">🧾 DA INSERIRE A CEDOLINO — {MESE}</div>
+            <table className="ced-tab"><tbody>
+              <tr className="top"><td className="l">ORE MESE{B.parziale ? " (mese parziale)" : ""}</td><td className="n">{h(B.monte)}</td><td className="d">{B.parziale ? "contratto in piedi per " + fmt2(B.fr*100) + "% del mese" : "le ore fisse della mensilizzazione"}</td></tr>
+              <tr className="sub"><td className="l">di cui ferie</td><td className="n">{h(B.ferie.ore)}</td><td className="d">{B.ferie.gg} gg × {fmt3(B.q)} h — {ene(B.ferie.oreE, B.ferie.oreNE)}</td></tr>
+              <tr className="sub"><td className="l">di cui altre assenze retribuite</td><td className="n">{h(B.altreTot.ore)}</td><td className="d">{B.altre.length ? B.altre.map(function(a){ return a.cod + " " + a.gg + " gg (erosive " + fmt2(a.oreE) + " · non erosive " + fmt2(a.oreNE) + ")"; }).join(" · ") : "nessuna"}{B.altre.length > 1 ? " — in tutto " + ene(B.altreTot.oreE, B.altreTot.oreNE) : ""}</td></tr>
+              <tr className="sub"><td className="l">di cui festività godute</td><td className="n">{h(B.fest.ore)}</td><td className="d">{B.fest.gg ? B.fest.gg + " gg × " + fmt3(B.qF) + " h (" + gl(B.fest.giorni) + ") — " + ene(B.fest.oreE, B.fest.oreNE) : "nessuna"}</td></tr>
+              <tr className="sub"><td className="l">di cui permessi retribuiti</td><td className="n">{h(B.perm.ore)}</td><td className="d">{B.perm.ore > 0.004 ? ene(B.perm.oreE, B.perm.oreNE) : "nessuno"}</td></tr>
+              <tr className="sub"><td className="l">di cui ore lavorate ordinarie</td><td className="n">{h(B.ordC)}</td><td className="d">ore mese meno le assenze pagate{B.tratt > 0.004 ? " e le ore non fatte" : ""}</td></tr>
+              {B.tratt > 0.004 ? <tr className="sub"><td className="l">di cui ore non fatte, da trattenere</td><td className="n">{h(B.tratt)}</td><td className="d">il Risultato del mese è negativo</td></tr> : null}
+              <tr className="top"><td className="l">ORE SUPPLEMENTARI (Risultato del mese)</td><td className="n">{B.supp > 0.004 ? "+" + h(B.supp) : h(0)}</td><td className="d">{B.supp > 0.004 ? "da pagare in più, maggiorate" : (B.tratt > 0.004 ? "nessuna: mancano " + h(B.tratt) + ", già tolte sopra" : "in pari")}</td></tr>
+              <tr className="top"><td className="l">FESTIVITÀ NON GODUTE, a sé</td><td className="n">{h(B.nonGod.ore)}</td><td className="d">{B.nonGod.gg ? B.nonGod.gg + " gg × " + fmt3(B.q) + " h (" + gl(B.nonGod.giorni) + ") — da pagare in più" : "nessuna"}</td></tr>
+            </tbody></table>
+            <div className="ced-note"><b>Note:</b> {[
+              B.an ? "AN " + B.an + " gg" : null,
+              B.nonRetr.length ? "non retribuite: " + B.nonRetr.map(function(x){ return x.cod + " " + x.gg + " gg = " + fmt2(x.ore) + " h"; }).join(" · ") : null,
+              B.festng ? "FESTNG " + B.festng + " gg (si paga in più)" : null,
+              B.perm.altre > 0.004 ? "permessi scritti a mano " + h(B.perm.altre) + " (non contati)" : null
+            ].concat(B.note).filter(Boolean).join(" · ") || "nessuna"}</div>
+            <div className="ced-rend">Per il rendiconto: ore a cedolino ordinarie e supplementari {fmt2(B.ced)} + ore retribuite erosive {fmt2(B.eroTot)} = {fmt2(B.rend)} tolte dal massimale e per il finanziatore che paga le erosive.</div>
           </div>;
         })()}
         {(function(){
@@ -8101,6 +8205,7 @@ function App(){
                   festOre={festGoduteMese(state, dp, anno, mese, null).ore} festGG={festGoduteMese(state, dp, anno, mese, null).gg}
                   festQuota={R2(oreSettAt(dp, anno, mese) / ggSettDi(state, dp), 4)}   /* ver172: quota della singola festività goduta */
                   festErose={festOreEroseMese(state, dp, anno, mese)}   /* ver173: festività godute erosive (consumano il Tetto) */
+                  cedBox={cedolinoBox(state, dp, anno, mese)}   /* ver175: box «Da inserire a cedolino» */
                   banca={bancaMeseA(state, dp, anno, mese)}   /* ver151: un solo numero per il Risultato del mese */
                   onEditDip={apriScheda} onDelDip={askDelDip} onAvviso={showToast} />;
               })

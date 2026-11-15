@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver174 · 15nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver175 · 15nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -405,6 +405,40 @@ Banca ore, tetto annuo, contratti e export.
     «— ore» e «non calcolabile»; la stessa persona su «Teoriche» → 18,67 €/h; e il **foglio Excel
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
+
+- 🧾 **IL BOX «DA INSERIRE A CEDOLINO» NEL TABELLONE** (ver175, 15/11/2026, richiesta di Christian:
+  «in tabellone, per ogni dip, in un box dedicato, voglio ben visibili: ore da far inserire a cedolino
+  secondo mensilizzazione (le c.d. Ore mese), di cui ore ferie e ore altre assenze retribuite
+  (suddivise per erosive e non erosive), nonché le festività non godute (che viaggiano a sé) e le ore
+  supplementari, altre note» → «le parole del box vanno bene, più puoi dettagliare meglio è», e la
+  frase del rendiconto **scritta da lui**).
+  - **Dove**: in ogni scheda del Tabellone, **subito sotto il riquadro del Risultato del mese**,
+    classe `.ced-box` (blu della palette, cornice `#5a9ce2`, scritte da 13 a 16px). Compare **solo
+    per i mensilizzati da ottobre 2026** (`meseCedolinoTetto`) e solo se il mese ha dati.
+  - **Righe**: ORE MESE (pro-rata se il mese è parziale) · di cui ferie · di cui altre assenze
+    retribuite (codice per codice) · di cui festività godute (con i giorni) · di cui permessi
+    retribuiti — ognuna **erosive / non erosive** — · di cui ore lavorate ordinarie · di cui ore non
+    fatte da trattenere (solo se il Risultato è negativo) · ORE SUPPLEMENTARI (Risultato del mese) ·
+    FESTIVITÀ NON GODUTE a sé (con i giorni, quota `monte/26` come il report paghe) · Note (AN,
+    non retribuite, FESTNG, permessi scritti a mano, note del mese) · e in fondo la riga di
+    Christian: «Per il rendiconto: ore a cedolino ordinarie e supplementari X + ore retribuite
+    erosive Y = Z tolte dal massimale e per il finanziatore che paga le erosive.»
+  - **Nessun calcolo nuovo**: `cedolinoBox(state,dp,y,m)` (accanto a `consumoCedolinoMese`) legge
+    `oreSuppPeriodo` (ver171), `copreOre`, `eroOn`, `permOreMese`/`permOreEroseMese` e lo stesso
+    perimetro di `festGoduteMese`; `App` lo passa a `EmployeeCard` come prop `cedBox`. Le ore si
+    scrivono **al centesimo partendo dal valore pieno** (così 8 MAL = 25,38 e non 25,39), quindi
+    possono differire di mezzo centesimo dai numeri a 3 decimali del Tetto (123,72 contro 123,715).
+  - ⚠️ **Diciture nuove, scritte da Claude** e approvate da Christian («le parole del box vanno
+    bene»); la riga del rendiconto è **sua, parola per parola**.
+  - **Provato in esecuzione** (`box175`, **20/0**): ottobre anonimo (19 h su 5 gg, 8 MAL, 101,5 rese)
+    → 82,50 · MAL 25,38 erosive · ordinarie 57,12 · supplementari +41,22 · non godute 1 gg il 4 =
+    3,17 · AN 5 gg · rendiconto **98,34 + 25,38 = 123,72**; dicembre 18 h/6 gg con una ferie
+    erosiva e una no, festività dell'8 spenta, EXF 1 h, ASS.ING e una nota → i «di cui» **sommano
+    a 78,16**, da trattenere 5,14; nessun box per chi non è mensilizzato e prima di ottobre; zero
+    scritte sotto i 12,5px nel box; a 390px la pagina resta larga 390 come la ver174; zero errori.
+    Batteria: `tetto174` 10/0 · `fest173` 13/0 · `fest172` 11/0 · `tab169` 9/0 · `tab168` 13/0 ·
+    `co170` 10/0 · `co171` 13/0 · `graf171` 18/0 · `ver155` 18/0 · `ver149` 29/0. Babel +
+    `node --check`.
 
 - 🧾 **IL MASSIMALE SCENDE DI QUELLO CHE PAGA IL FINANZIATORE** (ver174, 15/11/2026, decisione di
   Christian: «**il massimale deve scendere di quello che paga il finanziatore. Quando vado a
