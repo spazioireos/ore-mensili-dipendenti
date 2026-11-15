@@ -124,7 +124,9 @@
   .perm-lbl:hover { background:#ddd6fe; }
   .teor-abs:hover { background:#fde68a; }
   /* ver172: quota della FESTIVITÀ GODUTA sotto il giorno rosso (solo informazione, non cliccabile: le festività non erodono il Tetto) */
-  .teor-fest { font-size:9px; font-weight:800; color:#1f4e82; text-align:center; line-height:1.1; margin-top:1px; }
+  .teor-fest { font-size:9px; font-weight:800; color:#1f4e82; text-align:center; line-height:1.1; margin-top:1px; cursor:pointer; border-radius:3px; }
+  .teor-fest:hover { background:#dbeafe; }
+  .teor-fest.no-ero { color:#94a3b8; text-decoration:line-through; }
   .teor-abs.no-ero { color:#94a3b8; text-decoration:line-through; }
   .teor-abs.no-ero:hover { background:#e2e8f0; }
   .provv-lbl { display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:700; color:#92400e; background:#fffbeb; border:1px solid #fcd34d; border-radius:6px; padding:3px 8px; cursor:pointer; }
@@ -485,7 +487,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver172";
+const APP_VER = "ver173";
 const APP_DATA = "15nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -1018,7 +1020,32 @@ function svcCapAttivo(c,y,m){                                             // il 
 }
 
 /* ===== Tetto annuo (attribuzione) — progetto unico, periodo scolastico o civile ===== */
-function prodottoMese(rec,dp,y,m){                                         // ore che consumano il tetto: ore rese + assenze EROSIVE + permessi retribuiti
+/* ver173 (15/11/2026, Christian: «le festività godute erodono il massimale se erosive, come le ferie e i
+   permessi se te lo segnalo»). Supera la decisione del 06/11 («Lascia com'è»). Stesso perimetro di
+   festGoduteMese (festivo non domenicale, contratto in piedi, senza un codice che lo copra già) e lo
+   stesso contrassegno del GIORNO delle assenze (rec.ero[d] === false = servizio chiuso = non erode).
+   Quota = oreSett ÷ ggSett, la stessa della festività nel Risultato del mese. */
+function festGoduteErosiveGiorni(state, dp, y, m){
+  const rec = getRecFrom(state, y, m, dp.id); const f = festivitaSet(y), nd = daysInMonth(y, m); const out = [];
+  for (let d = 1; d <= nd; d++){
+    if (!isFestivo(f, m, d)) continue;
+    if (weekdayOf(y, m, d) === 0) continue;
+    if (!inForceAt(dp, y*10000 + m*100 + d)) continue;
+    const cv = String((rec && rec.giorni && rec.giorni[d] != null) ? rec.giorni[d] : "").trim();
+    if (CODE_SET[cv] && cv !== "--" && cv !== "AN") continue;   /* gia' contata come assenza (numerino suo) */
+    if (!eroOn(rec, d)) continue;                                 /* spenta col clic: servizio chiuso */
+    out.push(d);
+  }
+  return out;
+}
+function festOreEroseMese(state, dp, y, m){
+  /* un mese SENZA dati vale 0, come per prodottoMese: cosi' il TOT teorico a video e il Tetto dicono lo stesso numero */
+  if (!recHasData(getRecFrom(state, y, m, dp.id))) return 0;
+  /* un mese tutto NON retribuito (ASP 0h / ASS.ING / AN, ver170) non ha busta paga: la festività non e' pagata e non erode */
+  if (meseTuttoAN(state, dp, y, m)) return 0;
+  return R2(festGoduteErosiveGiorni(state, dp, y, m).length * (oreSettAt(dp, y, m) / ggSettDi(state, dp)), 3);
+}
+function prodottoMese(rec,dp,y,m,state){                                   // ore che consumano il tetto: ore rese + assenze EROSIVE + festività godute EROSIVE (ver173) + permessi retribuiti
   if(!rec || !recHasData(rec)) return null;
   /* ver77: le giornate spente con il clic (servizio chiuso) NON consumano piu' il tetto.
      Il predefinito resta "erosiva", quindi finche' non si spegne nulla il numero e' identico a prima.
@@ -1031,7 +1058,7 @@ function prodottoMese(rec,dp,y,m){                                         // or
      erosiva. I permessi con il tipo scritto a mano NON contano: non si sa se sono retribuiti,
      stessa regola del Risultato del mese (ver93).
      ⚠️ coverAbsHours e bancaMeseA (lo straordinario) restano INVARIATI. */
-  return totOfRec(rec,y,m) + oreEroseMese(rec,dp,y,m) + permOreEroseMese(rec);
+  return totOfRec(rec,y,m) + oreEroseMese(rec,dp,y,m) + permOreEroseMese(rec) + (state ? festOreEroseMese(state,dp,y,m) : 0);   /* ver173 */
 }
 function tettoWindow(periodo,y,m){                                         // finestra YM (incluso) del periodo che contiene (y,m)
   if(periodo==="civile") return { fromYM:y*100+1, toYM:y*100+12 };
@@ -1041,7 +1068,7 @@ function tettoWindow(periodo,y,m){                                         // fi
 function consumoTetto(state,dp,anno,mese){                                 // somma del prodotto sui mesi del periodo
   const per=(dp.tettoPeriodo==="civile")?"civile":"scolastico";
   const w=tettoWindow(per,anno,mese); let s=0;
-  Object.keys(state.dati||{}).forEach(function(k){ const mm=k.match(/^(\d{4})-(\d{1,2})$/); if(!mm) return; const y=parseInt(mm[1],10), mo=parseInt(mm[2],10); const ym=y*100+mo; if(ym<w.fromYM||ym>w.toYM) return; const rec=state.dati[k][dp.id]; if(!rec) return; const p=prodottoMese(rec,dp,y,mo); if(p!=null) s+=p; });
+  Object.keys(state.dati||{}).forEach(function(k){ const mm=k.match(/^(\d{4})-(\d{1,2})$/); if(!mm) return; const y=parseInt(mm[1],10), mo=parseInt(mm[2],10); const ym=y*100+mo; if(ym<w.fromYM||ym>w.toYM) return; const rec=state.dati[k][dp.id]; if(!rec) return; const p=prodottoMese(rec,dp,y,mo,state); if(p!=null) s+=p; });   /* ver173: con state, per le festività godute erosive */
   return R2(s,3);
 }
 /* ===== Base mensile (ore in più / in meno del mese, no accumulo) — per tutti dal 01/10/2026 ===== */
@@ -2621,8 +2648,9 @@ function EmployeeCard(props){
      scritto a mano NON contano, come nel Risultato del mese (ver93). */
   const oreErose = useMemo(function(){ return oreEroseMese(rec, dp, y, m); }, [rec, dp, y, m]);
   const permPag  = useMemo(function(){ return permOreEroseMese(rec); }, [rec]);   /* ver99: solo le giornate erosive */
-  const totTeor = R2(tot + oreErose + permPag, 3);                  /* ver98: dentro anche i permessi retribuiti */
-  const TEOR_TITLE = "Totale teorico = ore effettive + ore delle giornate di assenza EROSIVE (ferie, malattia e simili non barrate col clic) + ore di permesso retribuito (i cinque tipi della tendina). E' lo stesso numero che consuma il Tetto annuo. I permessi con il tipo scritto a mano non sono compresi.";
+  const festErose = Number(props.festErose) || 0;                    /* ver173: festività godute EROSIVE, da App (festOreEroseMese) */
+  const totTeor = R2(tot + oreErose + permPag + festErose, 3);      /* ver98: dentro anche i permessi retribuiti; ver173: e le festività godute erosive */
+  const TEOR_TITLE = "Totale teorico = ore effettive + ore delle giornate di assenza EROSIVE (ferie, malattia e simili non barrate col clic) + ore delle FESTIVITA' GODUTE erosive (non barrate col clic) + ore di permesso retribuito (i cinque tipi della tendina). E' lo stesso numero che consuma il Tetto annuo. I permessi con il tipo scritto a mano non sono compresi.";
 
   const mLocked = props.mLocked;
   const cellStyle = function(val, festivo, blocked){
@@ -2777,11 +2805,22 @@ function EmployeeCard(props){
                   {/* ver172 (15/11/2026, Christian: «scrivi sempre le ore in piccolo sotto le assenze retribuite perché
                       concorrono a formare le ore dovute mensili»): anche la FESTIVITÀ GODUTA — giorno rosso non domenicale,
                       col contratto in piedi, senza un codice che la copra già — mostra la sua quota (oreSett ÷ ggSett,
-                      la stessa di festGoduteMese). Solo informazione: NON è cliccabile, perché per sua decisione del
-                      06/11/2026 le festività godute non erodono il Tetto annuo. */}
+                      la stessa di festGoduteMese).
+                      ver173 (stesso giorno, Christian: «le festività godute erodono il massimale se erosive, come le ferie e i
+                      permessi se te lo segnalo»): il numerino è CLICCABILE come quello delle assenze e usa lo stesso
+                      contrassegno del giorno (rec.ero[d]); da erosiva consuma il Tetto annuo (festOreEroseMese). */}
                   {(!isCovAbs && rosso && weekdayOf(y, m, d) !== 0 && isFestivo(fset, m, d) && inForceAt(dp, y*10000 + m*100 + d)
                     && !(CODE_SET[svalC] && svalC !== "--" && svalC !== "AN") && props.festQuota > 0)
-                    ? <div className="teor-fest" title={"Festività goduta: vale " + fmt3(props.festQuota) + " h (ore settimanali ÷ giorni a settimana) e concorre alle ore dovute del mese. Non erode il Tetto annuo."}>{fmt3(props.festQuota)}</div>
+                    ? (function(){
+                        const ero = eroOn(rec, d);
+                        return <div className={"teor-fest" + (ero ? "" : " no-ero")} role="button" tabIndex={0}
+                          title={ero
+                            ? ("Festività goduta EROSIVA: vale " + fmt3(props.festQuota) + " h (ore settimanali ÷ giorni a settimana), concorre alle ore dovute del mese e brucia " + fmt3(props.festQuota) + " h dal Tetto annuo. Clic se quel giorno il servizio era CHIUSO.")
+                            : ("Festività goduta NON erosiva (servizio chiuso): concorre alle ore dovute del mese ma non brucia niente dal Tetto annuo. Clic per rimetterla erosiva.")}
+                          onClick={function(){ if(!blocked) props.onEro(dp.id, d, !ero); }}
+                          onKeyDown={function(e){ if(!blocked && (e.key==="Enter"||e.key===" ")){ e.preventDefault(); props.onEro(dp.id, d, !ero); } }}
+                          >{fmt3(props.festQuota)}</div>;
+                      })()
                     : null}
                 </td>
               );
@@ -2792,7 +2831,7 @@ function EmployeeCard(props){
       </div>
       <div className="foot-line">
         <span className="foot-tot">TOT calcolato: <b>{fmt2(tot)}</b></span>
-        <span className="foot-teor" title={TEOR_TITLE}>TOT teorico (assenze erosive + permessi retribuiti): <b>{fmt3(totTeor)}</b></span>
+        <span className="foot-teor" title={TEOR_TITLE}>TOT teorico (assenze e festività godute erosive + permessi retribuiti): <b>{fmt3(totTeor)}</b></span>
         <label>Ore dichiarate (uso interno):</label>
         <input className="dich-in" value={rec.dich || ""} placeholder="—" disabled={mLocked}
           onChange={function(e){ props.onDich(dp.id, e.target.value); }} title="Ore dichiarate dal lavoratore. Se sono diverse dal totale calcolato, la differenza resta nel Conguaglio ore e te la ritrovi nei mesi dopo, finche' non la sistemi." />
@@ -2971,7 +3010,7 @@ function EmployeeCard(props){
                 <span style={{ color:"#64748b" }}> — è l'assegnazione; le ore consumate sono complessive.</span>
               </div>;
             })()}
-            <div className="cong-res">Si consuma con le <b>ore fatte</b> (dal foglio), con <b>ferie e malattia</b> e con i <b>permessi retribuiti</b>. Periodo: {per}. Le giornate di assenza <b>spente col clic</b> (servizio chiuso) non consumano. <span style={{ fontSize:"11px", color:"#9a3412" }}>Numeri a 3 decimali.</span></div>
+            <div className="cong-res">Si consuma con le <b>ore fatte</b> (dal foglio), con <b>ferie e malattia</b>, con le <b>festività godute</b> e con i <b>permessi retribuiti</b>. Periodo: {per}. Le giornate di assenza o festività <b>spente col clic</b> (servizio chiuso) non consumano. <span style={{ fontSize:"11px", color:"#9a3412" }}>Numeri a 3 decimali.</span></div>
           </div>;
         })()}
       </div>
@@ -8033,6 +8072,7 @@ function App(){
                   onSostAdd={onSostAdd} onSostChange={onSostChange} onSostDel={onSostDel} onOpenPerm={onOpenPerm}
                   festOre={festGoduteMese(state, dp, anno, mese, null).ore} festGG={festGoduteMese(state, dp, anno, mese, null).gg}
                   festQuota={R2(oreSettAt(dp, anno, mese) / ggSettDi(state, dp), 4)}   /* ver172: quota della singola festività goduta */
+                  festErose={festOreEroseMese(state, dp, anno, mese)}   /* ver173: festività godute erosive (consumano il Tetto) */
                   banca={bancaMeseA(state, dp, anno, mese)}   /* ver151: un solo numero per il Risultato del mese */
                   onEditDip={apriScheda} onDelDip={askDelDip} onAvviso={showToast} />;
               })

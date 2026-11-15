@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver172 · 15nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver173 · 15nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -406,6 +406,49 @@ Banca ore, tetto annuo, contratti e export.
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
 
+- 🎯 **LE FESTIVITÀ GODUTE ERODONO IL TETTO ANNUO, SE EROSIVE** (ver173, 15/11/2026, decisione di
+  Christian con parole sue: «**le festività godute erodono il massimale se erosive, come le ferie e i
+  permessi se te lo segnalo**»). **Rovescia la sua decisione del 06/11/2026** («Lascia com'è», scheda
+  ver121): da oggi vale questa. Gli era stato chiesto perché il Tetto (rese + assenze erosive +
+  permessi erosi) e le ore a cedolino non coincidono; la risposta **1** è questa.
+  - **Che cosa cambia**: `prodottoMese(rec,dp,y,m,state)` — il **solo** motore del Tetto annuo e di
+    **📤 Pubblica i residui** (via `consumoTetto`) — somma ora anche **`festOreEroseMese`**: le
+    festività godute del mese **non spente col clic**, a quota **`oreSett ÷ ggSett`** (la stessa del
+    Risultato del mese, ver119; **non** monte/26). Il quinto parametro `state` è **facoltativo**:
+    senza, la funzione fa esattamente quello di prima.
+    - **Stesso perimetro di `festGoduteMese`** (`festGoduteErosiveGiorni`): festivo **non
+      domenicale**, contratto **in piedi** (`inForceAt`), **senza un codice** che lo copra già
+      (niente doppio con i `FEST`/`FERIE` storici, che hanno il numerino loro). **Stesso
+      contrassegno del GIORNO** delle assenze: `rec.ero[d] === false` = servizio chiuso = non erode.
+    - ⚠️ **Mese senza dati = 0** (come `prodottoMese`, che per quel mese non conta niente) e **mese
+      tutto non retribuito** (`meseTuttoAN`, ver170: ASP 0h / ASS.ING / AN) **= 0**, perché senza
+      busta la festività non è pagata. **Tutte e due trovate dalla misura sui dati veri**: senza
+      la prima il TOT teorico di dicembre 2026 (mese vuoto) diceva 12,000 mentre il Tetto no; senza
+      la seconda i **cinque mesi veri tutti AN** si prendevano il 15 agosto (3,167 h).
+  - **A video**: il numerino `.teor-fest` della ver172 è **cliccabile** come `.teor-abs` (stesso
+    `onEro`, stesso `no-ero` barrato e grigio, hover azzurro); il **TOT teorico** della scheda somma
+    `festErose` (prop nuova da `App`, `festOreEroseMese`) e la riga in fondo dice «TOT teorico
+    (assenze e festività godute erosive + permessi retribuiti)»; il riquadro 🎯 dice «con le
+    **festività godute**» e che anche le festività **spente col clic** non consumano. ⚠️ Due frasi
+    **scritte da Claude** (ver98 e ver172) aggiornate perché sarebbero diventate false; **nessuna
+    dicitura di Christian toccata**.
+  - ⚠️ **Il Risultato del mese NON cambia** (misurato, −0,154 prima e dopo il clic): la festività
+    resta nelle ore dovute qualunque sia il contrassegno; il clic agisce **solo sul Tetto**.
+  - 🔴 **Sui dati veri (backup del 04/11, 61 schede-mese con dati nel 2026) cambia UNA scheda-mese**
+    (`fest173-veri`): agosto 2026 di una dipendente, TOT teorico **28,020 → 30,520** (il 15 agosto a
+    2,5 h). Nessun Tetto si muove, perché nessuno dei due massimali in corso tocca quel mese. ⚠️
+    **I residui pubblicati vanno rifatti** quando ci saranno festività nei mesi del tetto (dicembre).
+  - **Provato in esecuzione** (`fest173`, **13/0**, banchi rigenerati): dicembre 2026 a 18 h/6 gg,
+    22 gg × 3 h + 1 FERIE + 4 festività → TOT teorico **81,006** = Tetto «Già usate» **81,006**;
+    clic sull'8 → barrato, **78,006** tutti e due, Risultato identico, **niente scritto in
+    archivio** senza 💾; secondo clic → 81,006; zero errori di pagina; e la **ver172 congelata**
+    che dà 69,006 con numerini non cliccabili. ⚠️ **Tre attese MIE erano sbagliate** (avevo
+    contato 23 giorni invece di 22): corrette, non aggirate. Non regressione: `fest172` **11/0**
+    (T3 aggiornata: ora pretende il cursore pointer), `tab169` 9/0 · `tab168` 13/0 · `co170` 10/0
+    · `ordextra-test` 46/0 · `verifica-ore` 10/10 · `ver155` 18/0 · `graf171` 18/0 ·
+    `collaudo171-tab` **226/1** (lo 0,003 noto) con `ric171` che ora conta anche le festività
+    erosive **con le stesse due esclusioni**. Babel + `node --check`.
+
 - 🎌 **LA QUOTA DELLA FESTIVITÀ GODUTA SI LEGGE SOTTO IL GIORNO ROSSO** (ver172, 15/11/2026,
   Christian: «**scrivi sempre le ore in piccolo sotto le assenze retribuite perché concorrono a
   formare le ore dovute mensili**», dopo aver notato che sotto l'8 dicembre non c'era niente).
@@ -420,9 +463,9 @@ Banca ore, tetto annuo, contratti e export.
     `#1f4e82`): **`oreSett ÷ ggSett`**, la **stessa** quota di `festGoduteMese` (ver119: 38/6 =
     6,333; **non** monte/26), passata da `App` come prop `festQuota`. Suggerimento: «Festività
     goduta: vale X h … e concorre alle ore dovute del mese. Non erode il Tetto annuo.»
-  - ⚠️ **NON è cliccabile, di proposito**: il numerino delle assenze è il contrassegno
-    erosiva/non erosiva del Tetto, e le festività godute **per decisione di Christian del
-    06/11/2026 non erodono** («Lascia com'è»). Qui è solo informazione.
+  - ⚠️ ~~**NON è cliccabile, di proposito**~~ — **SUPERATO dalla ver173 lo stesso giorno**:
+    Christian ha deciso che le festività godute **erodono** il Tetto se erosive, quindi il
+    numerino ora **è cliccabile** come quello delle assenze. Vedi la scheda 🎯 qui sopra.
   - ⚠️ **Niente doppio**: se il festivo porta già un codice (dati storici con `FEST`/`FERIE`
     sull'8 dicembre 2025) resta il numerino erosivo di prima e la quota festiva **non** compare —
     stessa esclusione di `festGoduteMese` (ver122). Chi **non ha la data di assunzione** non la
@@ -2956,8 +2999,11 @@ Banca ore, tetto annuo, contratti e export.
     dentro il **Costo orario le conterebbe due volte**, perché le somma già per conto suo.
   - ⚠️ **Le festività NON godute restano fuori** (domeniche e il 4 novembre): «sono un'eccezione
     che non rientra nel calcolo». Restano una voce di costo a parte nel Costo orario (`J12`).
-  - 🚫 **IL TETTO ANNUO RESTA COM'È — deciso da Christian il 06/11/2026 («Lascia com'è»),
-    dopo che gli era stato chiesto con i numeri. NON RIPROPORLO.** `prodottoMese` continua a
+  - ✅ **DECISIONE CAMBIATA DA CHRISTIAN IL 15/11/2026 (ver173)**: «le festività godute erodono il
+    massimale se erosive, come le ferie e i permessi se te lo segnalo». Il paragrafo qui sotto
+    è la **storia** della decisione del 06/11 e **non vale più**: vedi la scheda 🎯 della ver173.
+  - ~~🚫 **IL TETTO ANNUO RESTA COM'È — deciso da Christian il 06/11/2026 («Lascia com'è»),
+    dopo che gli era stato chiesto con i numeri. NON RIPROPORLO.**~~ `prodottoMese` continuava a
     contare ore rese + assenze **erosive** + permessi erosi: le **festività godute non erodono
     il massimale**. È la sua stessa regola del 03/11/2026 («se stai a casa durante l'anno
     scolastico io ti pago e le ore incidono; **se stai in ferie a Natale no**»): in una
