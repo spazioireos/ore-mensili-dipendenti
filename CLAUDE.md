@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver176 · 15nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver177 · 15nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -405,6 +405,32 @@ Banca ore, tetto annuo, contratti e export.
     «— ore» e «non calcolabile»; la stessa persona su «Teoriche» → 18,67 €/h; e il **foglio Excel
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
+
+- 🖨️ **«🖨️ REPORT PDF A4 PAGHE E LUL»** (ver177, 15/11/2026, Christian: «per l'ufficio paghe
+  dobbiamo indicare le ore per giornata perché deve inserirle nel lul, ma dobbiamo facilitarlo» →
+  «1, ok, come report storico»).
+  - **Come è fatto**: è il **Report storico** con un terzo parametro facoltativo,
+    `esportaPDF(state, pairs, { lul:true })`. ⚠️ **Senza `opz` il Report storico è identico**:
+    misurato, il testo del PDF di ottobre è **lo stesso della ver155 congelata** (2.959 caratteri).
+  - **Nella griglia** (giorni × persone, ore in *ore,minuti* come lo storico): le assenze che
+    coprono le ore portano accanto al codice le loro ore («MAL 3,10» = 3,1731 h) e si colorano come
+    il codice; la festività goduta (rosso non domenicale, in forza, cella vuota) si scrive
+    «FEST 3,00» (quota `oreSett/ggSett`). Titolo «Spazio Ireos — Per le paghe e il LUL · ‹mese›».
+  - **In fondo**, pagina «PER LE PAGHE — DA INSERIRE A CEDOLINO»: una tabellina per ogni persona
+    con il box della ver175 (`cedolinoBox`) — ORE MESE, di cui ferie / altre assenze / festività
+    godute / permessi / ordinarie lavorate / da trattenere, SUPPLEMENTARI, FESTIVITÀ NON GODUTE a
+    sé, note — **senza le erosive** (sono affare del finanziatore, non delle paghe). Ore in
+    centesimi, come il totale dello storico. Solo per chi ha il box (mensilizzati da ottobre 2026).
+  - Pulsante nuovo accanto agli altri report; file «Spazio Ireos Report paghe e LUL - …pdf».
+    ⚠️ **Diciture nuove, scritte da Claude** (il nome l'ha approvato Christian, «1, ok»).
+  - **Provato con jsPDF vero** (`lul177`, **19/0**, `pdfinfo`/`pdftotext`): ottobre (19 h su 5 gg,
+    8 MAL, 101,5 rese) → griglia con «MAL 3,10» e «10,30», riepilogo 82,50 · MAL 25,38 · ordinarie
+    57,12 · +41,22 · non goduta il 4 = 3,17 · AN 5 gg, **2 pagine**, nessuna «erosiv», niente
+    riepilogo per chi non è mensilizzato; dicembre con «FEST 3,00», ferie, festività, trattenuta e
+    ASS.ING nelle note; zero errori. Non regressione: `ordextra-test` 46/0 · `graf171` 18/0 ·
+    `box175` 20/0 · `ced176` 17/0 · `ver156` 18/1 (l'attesa invecchiata già nota dalla ver166).
+    ⚠️ `ccnl138` 26/2 ed `ear141` 22/1: i falliti sono **attese invecchiate** (confrontano il costo
+    dei 16 con una versione congelata di prima della ver159; un nome con lo spazio nello script).
 
 - ✂️ **LE ORE TRATTENUTE ESCONO ANCHE DAL COSTO, E USOINT LEGGE LE ORE A CEDOLINO** (ver176,
   15/11/2026, tre risposte di Christian: «**deve essere 79,33 ovunque perché alle 82,5 ne togliamo

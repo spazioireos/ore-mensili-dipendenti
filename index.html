@@ -498,7 +498,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver176";
+const APP_VER = "ver177";
 const APP_DATA = "15nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -1882,7 +1882,14 @@ function pdfHM(v){
   if (mm === 60){ h += 1; mm = 0; }
   return (neg ? "-" : "") + h + "," + (mm < 10 ? "0" : "") + mm;
 }
-function esportaPDF(state, pairs){
+function esportaPDF(state, pairs, opz){
+  /* ver177 (15/11/2026, Christian: «dobbiamo indicare le ore per giornata perché deve inserirle nel lul,
+     ma dobbiamo facilitarlo» → «1, ok, come report storico»). Con opz.lul lo STESSO report diventa
+     «Per le paghe e il LUL»: le assenze retribuite portano accanto al codice le loro ore, le festività
+     godute si scrivono «FEST» con le ore, e in fondo c'è, per ogni mensilizzato, il riepilogo da
+     inserire a cedolino (le righe del box ver175, SENZA le erosive). Senza opz il Report storico è
+     IDENTICO a prima. */
+  const LUL = !!(opz && opz.lul);
   const JsPDF = window.jspdf.jsPDF;
   const doc = new JsPDF({ orientation:"landscape", unit:"mm", format:"a4" });
   /* ver93: il Report e' A4 ORIZZONTALE, quindi la pagina e' alta 210mm. Fino alla ver92 i
@@ -1919,7 +1926,7 @@ function esportaPDF(state, pairs){
       if (!first) doc.addPage();
       first = false;
       doc.setFontSize(12); doc.setTextColor(15,39,64); doc.setFont(undefined,"bold");
-      let titolo = "Spazio Ireos — Report Ore   ·   " + MONTH_LABEL[m-1] + " " + anno;
+      let titolo = (LUL ? "Spazio Ireos — Per le paghe e il LUL   ·   " : "Spazio Ireos — Report Ore   ·   ") + MONTH_LABEL[m-1] + " " + anno;
       if (chunks.length > 1) titolo += "   (dipendenti " + (ci*MAXCOL+1) + "–" + (ci*MAXCOL+chunk.length) + " di " + dipsMese.length + " · pag. " + (ci+1) + "/" + chunks.length + ")";
       doc.text(titolo, 14, 12);
       doc.setFont(undefined,"normal");
@@ -1942,8 +1949,10 @@ function esportaPDF(state, pairs){
           else if (sv === "") txt = isDom ? "R" : (rosso ? "–" : "");       // domenica senza dato -> riposo (per tutti)
           /* ver87: anche per i mensilizzati si scrivono le ORE, non piu' la "P" di presenza
              (richiesta di Christian del 04/11/2026). */
-          else if (CODE_SET[sv]) txt = sv;
+          else if (CODE_SET[sv]) txt = (LUL && copreOre(sv)) ? (sv + " " + pdfHM(quotaGiorno(dp, anno, m))) : sv;   /* ver177: nel LUL l'assenza pagata porta le sue ore */
           else txt = pdfHM(v);
+          /* ver177: nel LUL la festività goduta (giorno rosso non domenicale, contratto in piedi, cella vuota) si scrive «FEST» con le ore */
+          if (LUL && sv === "" && rosso && !isDom && inForceAt(dp, anno*10000 + m*100 + d)) txt = "FEST " + pdfHM(oreSettAt(dp, anno, m) / ggSettDi(state, dp));
           /* ver91: nel Report il permesso si segnala con TRE asterischi grossi (richiesta di
              Christian del 05/11/2026) e in calce si scrive quante ore vanno aggiunte. */
           if (perm){ txt = (txt === "" ? "***" : txt + "***"); permMese.push({ nome:dp.nome, giorno:d, ore:perm.ore, tipo:perm.tipo }); }
@@ -1985,7 +1994,8 @@ function esportaPDF(state, pairs){
             if (isRosso(fset, anno, m, day)){ data.cell.styles.fillColor = [178,34,34]; data.cell.styles.textColor = [255,255,255]; }
           } else {
             if (isNum) data.cell.styles.fontSize = 9; // ver93: le ore si leggono senza occhiali
-            const txt = raw.replace(/\*$/, "");
+            let txt = raw.replace(/\*$/, "");
+            if (LUL && !CODE_SET[txt] && CODE_SET[txt.split(" ")[0]]) txt = txt.split(" ")[0];   /* ver177: «MAL 3,10» si colora come MAL */
             if (txt === "R"){ data.cell.styles.textColor = [178,34,34]; data.cell.styles.fontStyle = "bold"; } // riposo: R in rosso
             else if (CODE_SET[txt]){
               const hx = CODE_SET[txt].bg.replace("#","");
@@ -2112,11 +2122,56 @@ function esportaPDF(state, pairs){
           doc.setFontSize(8); doc.setFont(undefined,"normal"); doc.setTextColor(120,20,20);
           lines.forEach(function(line){ ensureY(4.2); doc.text(line, 18, yy); yy += 4.2; });
         }
+        /* ver177: il riepilogo da inserire a cedolino, una tabellina per mensilizzato (niente erosive) */
+        if (LUL){
+          const boxes = dipsMese.map(function(dp){ return { dp:dp, B:cedolinoBox(state, dp, anno, m) }; }).filter(function(x){ return !!x.B; });
+          if (boxes.length){
+            doc.addPage();
+            doc.setFontSize(12); doc.setTextColor(15,39,64); doc.setFont(undefined,"bold");
+            doc.text("PER LE PAGHE — DA INSERIRE A CEDOLINO   ·   " + MONTH_LABEL[m-1] + " " + anno, 14, 12);
+            doc.setFont(undefined,"normal");
+            let yT = 16;
+            const h = function(v){ return fmt2(v) + " h"; };
+            const gl = function(arr){ return arr.length ? (arr.length === 1 ? "il " : "i giorni ") + arr.join(", ") : ""; };
+            boxes.forEach(function(x){
+              const B = x.B;
+              const body = [
+                ["ORE MESE" + (B.parziale ? " (mese parziale)" : ""), h(B.monte), B.parziale ? "contratto in piedi per " + fmt2(B.fr*100) + "% del mese" : "le ore fisse della mensilizzazione"],
+                ["   di cui ferie", h(B.ferie.ore), B.ferie.gg + " gg × " + fmt3(B.q) + " h"],
+                ["   di cui altre assenze retribuite", h(B.altreTot.ore), B.altre.length ? B.altre.map(function(a){ return a.cod + " " + a.gg + " gg = " + fmt2(a.ore) + " h"; }).join(" · ") : "nessuna"],
+                ["   di cui festività godute", h(B.fest.ore), B.fest.gg ? B.fest.gg + " gg × " + fmt3(B.qF) + " h (" + gl(B.fest.giorni) + ")" : "nessuna"],
+                ["   di cui permessi retribuiti", h(B.perm.ore), B.perm.ore > 0.004 ? "" : "nessuno"],
+                ["   di cui ore lavorate ordinarie", h(B.ordC), "ore mese meno le assenze pagate" + (B.tratt > 0.004 ? " e le ore non fatte" : "")]
+              ];
+              if (B.tratt > 0.004) body.push(["   di cui ore non fatte, da trattenere", h(B.tratt), "il Risultato del mese è negativo"]);
+              body.push(["ORE SUPPLEMENTARI (Risultato del mese)", B.supp > 0.004 ? "+" + h(B.supp) : h(0), B.supp > 0.004 ? "da pagare in più, maggiorate" : (B.tratt > 0.004 ? "nessuna: mancano " + h(B.tratt) + ", già tolte sopra" : "in pari")]);
+              body.push(["FESTIVITÀ NON GODUTE, a sé", h(B.nonGod.ore), B.nonGod.gg ? B.nonGod.gg + " gg × " + fmt3(B.q) + " h (" + gl(B.nonGod.giorni) + ") — da pagare in più" : "nessuna"]);
+              const note = [B.an ? "AN " + B.an + " gg" : null,
+                B.nonRetr.length ? "non retribuite: " + B.nonRetr.map(function(z){ return z.cod + " " + z.gg + " gg = " + fmt2(z.ore) + " h"; }).join(" · ") : null,
+                B.festng ? "FESTNG " + B.festng + " gg (si paga in più)" : null,
+                B.perm.altre > 0.004 ? "permessi scritti a mano " + h(B.perm.altre) + " (non contati)" : null].concat(B.note).filter(Boolean).join(" · ");
+              body.push(["Note", "", note || "nessuna"]);
+              doc.autoTable({
+                head: [[x.dp.nome, "Ore", "Dettaglio"]], body: body, startY: yT, theme:"grid",
+                margin:{ left:14, right:14, top:16, bottom:10 }, tableWidth: 269,
+                styles:{ fontSize:9, cellPadding:1.1, valign:"middle", lineColor:[200,210,225], lineWidth:0.1, overflow:"linebreak" },
+                headStyles:{ fillColor:[31,78,130], textColor:[255,255,255], fontSize:10, fontStyle:"bold" },
+                columnStyles:{ 0:{ cellWidth:78, fontStyle:"bold" }, 1:{ cellWidth:26, halign:"right", fontStyle:"bold" }, 2:{ cellWidth:165 } },
+                didParseCell: function(data){
+                  if (data.section !== "body") return;
+                  const lbl = String(data.row.raw[0] || "");
+                  if (/^(ORE MESE|ORE SUPPLEMENTARI|FESTIVITÀ NON GODUTE)/.test(lbl)){ data.cell.styles.fillColor = [238,245,252]; data.cell.styles.textColor = [31,78,130]; data.cell.styles.fontStyle = "bold"; }
+                }
+              });
+              yT = doc.lastAutoTable.finalY + 5;
+            });
+          }
+        }
       }
     });
   });
   if (first){ doc.setFontSize(12); doc.text("Nessun dato nel periodo selezionato", 14, 24); }
-  doc.save(fileName("pdf"));
+  doc.save(LUL ? fileName("pdf", "Report paghe e LUL") : fileName("pdf"));
 }
 
 /* ===== ver153 (11/11/2026) — REPORT PDF A4 MENSILIZZ. =========================
@@ -8143,6 +8198,7 @@ function App(){
         <button className="btn btn-ghost" onClick={function(){ setExportModal("PDF"); }}>🖨️ Report PDF A4</button>
         {/* ver153: il report per l'ufficio paghe. Dicitura del pulsante SCELTA da Christian. */}
         <button className="btn btn-ghost" onClick={function(){ setExportModal("PDF A4 mensilizz."); }}>🖨️ Report PDF A4 mensilizz.</button>
+        <button className="btn btn-ghost" onClick={function(){ setExportModal("PDF A4 paghe e LUL"); }}>🖨️ Report PDF A4 paghe e LUL</button>
         {/* ver163: report giornaliero ordinario/extra per l'ufficio paghe. Dicitura nuova, scritta da Claude. */}
         <button className="btn btn-ghost" onClick={function(){ setExportModal("PDF A4 ord/extra"); }}>🖨️ Report PDF A4 ord/extra</button>
         {!FB_READY ? <button className="btn btn-ghost" onClick={changePin}>🔑 PIN</button> : null}
@@ -8263,7 +8319,7 @@ function App(){
 
       {quickFill ? <QuickFillModal dp={quickFill} rec={getRecFrom(state, anno, mese, quickFill.id)} anno={anno} mese={mese} fset={fset} onApply={onQuickFillApply} onClose={function(){ setQuickFill(null); }} /> : null}
       {exportModal ? <ExportModal kind={exportModal} anni={state.anni} annoCorrente={anno} meseCorrente={mese}
-        onGenera={function(pairs){ if (exportModal === "Excel") esportaExcel(state, pairs); else if (exportModal === "PDF A4 mensilizz.") esportaPDFMens(state, pairs); else if (exportModal === "PDF A4 ord/extra") esportaPDFOrdExtra(state, pairs); else esportaPDF(state, pairs); setExportModal(null); }}
+        onGenera={function(pairs){ if (exportModal === "Excel") esportaExcel(state, pairs); else if (exportModal === "PDF A4 mensilizz.") esportaPDFMens(state, pairs); else if (exportModal === "PDF A4 ord/extra") esportaPDFOrdExtra(state, pairs); else if (exportModal === "PDF A4 paghe e LUL") esportaPDF(state, pairs, { lul:true }); else esportaPDF(state, pairs); setExportModal(null); }}
         onClose={function(){ setExportModal(null); }} /> : null}
       {permModal ? (function(){
         const rc = getRecFrom(state, anno, mese, permModal.dipId);
