@@ -487,7 +487,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver173";
+const APP_VER = "ver174";
 const APP_DATA = "15nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -1058,7 +1058,35 @@ function prodottoMese(rec,dp,y,m,state){                                   // or
      erosiva. I permessi con il tipo scritto a mano NON contano: non si sa se sono retribuiti,
      stessa regola del Risultato del mese (ver93).
      ⚠️ coverAbsHours e bancaMeseA (lo straordinario) restano INVARIATI. */
+  /* ver174 (15/11/2026, Christian: «il massimale deve scendere di quello che paga il finanziatore.
+     Quando vado a rendicontare prendo in mano il cedolino e copio, da lì»). Per i MENSILIZZATI, dai
+     mesi della base mensile (BM_DAL_YM, ottobre 2026), il massimale scende delle ORE A CEDOLINO
+     AMMESSE (ver171: ordinarie a cedolino + supplementari) PIU' le parti EROSIVE di ciò che il
+     cedolino paga senza lavoro (assenze che coprono le ore, festività godute, permessi retribuiti).
+     Esempio suo: 26 h di monte, mese da 27 gg, 29 h rese + 2 gg di ferie erosive → 24 + 4 + 2 = 30
+     (non più 29 + 2 = 31). Prima di ottobre 2026, o per chi non è mensilizzato, il cedolino pagava le
+     ore fatte: resta il conto di prima. */
+  if (state && meseCedolinoTetto(dp, y, m)) return consumoCedolinoMese(state, rec, dp, y, m);
   return totOfRec(rec,y,m) + oreEroseMese(rec,dp,y,m) + permOreEroseMese(rec) + (state ? festOreEroseMese(state,dp,y,m) : 0);   /* ver173 */
+}
+/* ver174: il mese consuma il massimale «come il cedolino»? (mensilizzato a quella data e base mensile attiva) */
+function meseCedolinoTetto(dp, y, m){
+  const ym = y*100 + m;
+  if (ym < BM_DAL_YM) return false;
+  return !!dp.mensilizzato && (mensDalYM(dp) === 0 || ym >= mensDalYM(dp));
+}
+/* ver174: ore a cedolino ammesse del mese + le parti EROSIVE di ciò che sta dentro le ore mese senza lavoro.
+   Le assenze erosive si contano sullo stesso perimetro che le toglie dalle ordinarie (copreOre), così
+   un'assenza NON erosiva esce davvero e una erosiva rientra esattamente per quanto era stata tolta. */
+function consumoCedolinoMese(state, rec, dp, y, m){
+  const r = oreSuppPeriodo(state, dp, [{ y:y, m:m }], null, null, 0).righe[0];
+  if (!r) return 0;
+  let assEro = 0;
+  if (rec && rec.giorni){
+    const q = quotaGiorno(dp, y, m), nd = daysInMonth(y, m);
+    for (let d = 1; d <= nd; d++){ const cv = String(rec.giorni[d]==null ? "" : rec.giorni[d]).trim(); if (copreOre(cv) && eroOn(rec, d)) assEro += q; }
+  }
+  return R2(r.ordCed + r.supp + assEro + permOreEroseMese(rec) + festOreEroseMese(state, dp, y, m), 3);
 }
 function tettoWindow(periodo,y,m){                                         // finestra YM (incluso) del periodo che contiene (y,m)
   if(periodo==="civile") return { fromYM:y*100+1, toYM:y*100+12 };
@@ -2650,7 +2678,7 @@ function EmployeeCard(props){
   const permPag  = useMemo(function(){ return permOreEroseMese(rec); }, [rec]);   /* ver99: solo le giornate erosive */
   const festErose = Number(props.festErose) || 0;                    /* ver173: festività godute EROSIVE, da App (festOreEroseMese) */
   const totTeor = R2(tot + oreErose + permPag + festErose, 3);      /* ver98: dentro anche i permessi retribuiti; ver173: e le festività godute erosive */
-  const TEOR_TITLE = "Totale teorico = ore effettive + ore delle giornate di assenza EROSIVE (ferie, malattia e simili non barrate col clic) + ore delle FESTIVITA' GODUTE erosive (non barrate col clic) + ore di permesso retribuito (i cinque tipi della tendina). E' lo stesso numero che consuma il Tetto annuo. I permessi con il tipo scritto a mano non sono compresi.";
+  const TEOR_TITLE = "Totale teorico = ore effettive + ore delle giornate di assenza EROSIVE (ferie, malattia e simili non barrate col clic) + ore delle FESTIVITA' GODUTE erosive (non barrate col clic) + ore di permesso retribuito (i cinque tipi della tendina). Fino a settembre 2026, o per chi non è mensilizzato, è lo stesso numero che consuma il Tetto annuo; per i mensilizzati da ottobre 2026 il Tetto scende invece delle ore pagate a cedolino (vedi il riquadro del Tetto annuo). I permessi con il tipo scritto a mano non sono compresi.";
 
   const mLocked = props.mLocked;
   const cellStyle = function(val, festivo, blocked){
@@ -3010,7 +3038,7 @@ function EmployeeCard(props){
                 <span style={{ color:"#64748b" }}> — è l'assegnazione; le ore consumate sono complessive.</span>
               </div>;
             })()}
-            <div className="cong-res">Si consuma con le <b>ore fatte</b> (dal foglio), con <b>ferie e malattia</b>, con le <b>festività godute</b> e con i <b>permessi retribuiti</b>. Periodo: {per}. Le giornate di assenza o festività <b>spente col clic</b> (servizio chiuso) non consumano. <span style={{ fontSize:"11px", color:"#9a3412" }}>Numeri a 3 decimali.</span></div>
+            <div className="cong-res">Si consuma con le <b>ore pagate a cedolino</b> (per i mensilizzati da ottobre 2026: ore mese meno le assenze pagate, più o meno il Risultato del mese; prima, le <b>ore fatte</b> dal foglio), con <b>ferie e malattia</b>, con le <b>festività godute</b> e con i <b>permessi retribuiti</b>. Periodo: {per}. Le giornate di assenza o festività <b>spente col clic</b> (servizio chiuso) non consumano. <span style={{ fontSize:"11px", color:"#9a3412" }}>Numeri a 3 decimali.</span></div>
           </div>;
         })()}
       </div>

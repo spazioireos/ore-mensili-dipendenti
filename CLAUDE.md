@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver173 · 15nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver174 · 15nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -405,6 +405,41 @@ Banca ore, tetto annuo, contratti e export.
     «— ore» e «non calcolabile»; la stessa persona su «Teoriche» → 18,67 €/h; e il **foglio Excel
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
+
+- 🧾 **IL MASSIMALE SCENDE DI QUELLO CHE PAGA IL FINANZIATORE** (ver174, 15/11/2026, decisione di
+  Christian: «**il massimale deve scendere di quello che paga il finanziatore. Quando vado a
+  rendicontare prendo in mano il cedolino e copio, da lì**»). Il finanziatore paga le ore a
+  cedolino (lavorate retribuite + assenze retribuite + supplementari), e il finanziamento è anche
+  sull'erosivo.
+  - **Esempio suo, a numeri tondi**: monte 26 h, mese da 27 giorni, 29 h rese + 2 gg di ferie
+    erosive → ore a cedolino ammesse 24 + 4 = **28**, più le 2 erosive = **30**. La ver173 toglieva
+    29 + 2 = **31** (l'ora del 27° giorno è lavorata ma la busta non la paga a parte).
+  - **Nel codice**: `prodottoMese` (unico motore del Tetto annuo e di 📤 Pubblica i residui) per i
+    mesi in cui **`meseCedolinoTetto(dp,y,m)`** è vero — **mensilizzato a quella data e mese ≥
+    `BM_DAL_YM` (ottobre 2026)** — usa **`consumoCedolinoMese`** = `ordCed + supp` della riga di
+    `oreSuppPeriodo` (ver171) **+ le parti EROSIVE** di ciò che la busta paga senza lavoro: assenze
+    che coprono le ore (`copreOre`, lo stesso perimetro che le toglie dalle ordinarie) non spente
+    col clic, `permOreEroseMese`, `festOreEroseMese`. Un'assenza **non erosiva** resta fuori.
+  - ⚠️ **Prima di ottobre 2026, o per chi non è mensilizzato, il conto è quello di prima** (rese +
+    erosive): allora il cedolino pagava le ore fatte (criterio orario). È una scelta di Claude
+    dichiarata a Christian.
+  - ⚠️ **Il TOT teorico del Tabellone NON cambia** (resta rese + erosive): per i mensilizzati da
+    ottobre 2026 non coincide più col Tetto, e il suo suggerimento lo dice. Il riquadro 🎯 dice
+    «Si consuma con le **ore pagate a cedolino** (per i mensilizzati da ottobre 2026: ore mese meno
+    le assenze pagate, più o meno il Risultato del mese; prima, le ore fatte dal foglio)…». Frasi
+    **scritte da Claude** (ver97/ver98) adattate perché sarebbero diventate false.
+  - ⚠️ **Il Risultato del mese, il Costo orario e i report NON cambiano.** `sottoSoglia` qui vale 0.
+  - **Sui dati veri (backup del 04/11)** cambia **un solo massimale**: ottobre 2026 di una
+    dipendente, «Già usate» **215,616 → 212,446** (−3,17 = la quota del 27° giorno). ⚠️ **I residui
+    pubblicati vanno rifatti** con 📤.
+  - **Provato in esecuzione** (`tetto174`, **10/0**): caso anonimo di ottobre 2026 (19 h su 5 gg,
+    sabati AN, 8 MAL, 101,5 rese) → Tetto **123,715 = 57,115 + 41,215 + 25,385**, TOT teorico
+    invariato 126,885, stessa scheda **non** mensilizzata ancora 126,885, Risultato +41,215
+    invariato, una MAL spenta col clic toglie 3,173 da tutti e due, settembre col conto vecchio,
+    zero errori di pagina, e la ver173 congelata che dava 193,231. Batteria: `fest173` 13/0 e
+    `tab169` 9/0 **con attese aggiornate e ricalcolate a mano** (78,004 / 75,004 e 105,388: erano i
+    numeri del conto vecchio), `fest172` 11/0 · `tab168` 13/0 · `co170` 10/0 · `co171` 13/0 ·
+    `ordextra-test` 46/0 · `graf171` 18/0 · `ver155` 18/0. Babel + `node --check`.
 
 - 🎯 **LE FESTIVITÀ GODUTE ERODONO IL TETTO ANNUO, SE EROSIVE** (ver173, 15/11/2026, decisione di
   Christian con parole sue: «**le festività godute erodono il massimale se erosive, come le ferie e i
