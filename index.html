@@ -498,7 +498,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver177";
+const APP_VER = "ver178";
 const APP_DATA = "15nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -3349,6 +3349,9 @@ const ANA_NOTA = {
 };
 const ANA_NOTA_PERIODO = "vuote valgono sempre; scritte, la voce vale solo da quel mese a quel mese, compresi.";
 const ANA_CHIAVI_PERIODO = ["premiTPdal","premiTPal","premiMesedal","premiMeseal","kmMesedal","kmMeseal"];
+/* ver178: le caselle NUMERICHE dell'anagrafica, in cui il segno meno non entra (vedi onAnaField). */
+const ANA_NO_NEG = ["oreSett","giorniProva","scattiAss","impBase","impSuper","scatti","impAltro",
+  "premiTP","premiMese","kmMese","kmMesi","sottoSoglia","tfrFondo","tfrFondoAnno","ferieResidue","mesiMater","ggSettCosto"];
 const ANA_ITINERE = ["premiTP","premiTPdal","premiTPal",
   "premiMese","premiMesedal","premiMeseal",
   "kmMese","kmTipo","kmMesi","kmMesedal","kmMeseal",
@@ -5201,7 +5204,9 @@ function CostoOrario(props){
   const anniTfrNota = anniTfrAttivo
     ? ("serve solo a chi non ha il fondo TFR scritto: " + senzaFondo + (senzaFondo===1 ? " persona" : " persone") + " su " + dips.length)
     : "non in uso: tutti hanno il fondo TFR scritto nella scheda";
-  const setComune = function(campo, val){ if (props.onCostoComune) props.onCostoComune(campo, val); };
+  /* ver178: niente segno meno nei valori comuni, TRANNE l'ISTAT, che può essere davvero negativo
+     (deflazione): il tasso del TFR è 1,50% + 75% dell'ISTAT anche quando l'ISTAT scende. */
+  const setComune = function(campo, val){ if (props.onCostoComune) props.onCostoComune(campo, (campo === "istat" || typeof val !== "string") ? val : val.replace(/[-\u2212]/g, "")); };
   /* ver138 — legge l'incollaggio «LIVELLO IMPORTO», una riga per livello. Accetta sia
      «D1 1.637,57» sia «D1  1637.57» sia «D1 = 1.637,57»; salta le righe vuote e quelle che non
      cominciano con un livello noto. Torna {valori, ignorate}. */
@@ -5256,7 +5261,12 @@ function CostoOrario(props){
     if (!window.confirm("Elimino la tabella CCNL che vale dal " + dal + "?\n\nI calcoli dei periodi che la usavano torneranno alla tabella precedente.\nDopo questo serve 💾 per salvare.")) return;
     if (props.onCCNLDel) props.onCCNLDel(dal);
   };
-  const setPar = function(campo, val){ if (dp && props.onCostoPatch) props.onCostoPatch(dp.id, campo, val); };
+  /* ver178 (collaudo del 15/11/2026): anche qui il segno meno non entra (regola A4 di Christian,
+     «vieta sempre i negativi nelle celle compilabili da me»). Misurato prima: «Mesi di contratto»
+     a -7 nella Simulazione dava un costo di -864,01 € (-1,22 €/h); scatti o superminimo a -50
+     toglievano 398,31 € in silenzio. ⚠️ «fonteOre» è una scelta, non un numero: non si tocca. */
+  const senzaMeno = function(val){ return (typeof val === "string") ? val.replace(/[-\u2212]/g, "") : val; };
+  const setPar = function(campo, val){ if (dp && props.onCostoPatch) props.onCostoPatch(dp.id, campo, (campo === "fonteOre") ? val : senzaMeno(val)); };
   /* ver107: due campi insieme, in una sola copia dello stato (vedi onCostoPatchMulti). */
   const setParMulti = function(campi){ if (dp && props.onCostoPatchMulti) props.onCostoPatchMulti(dp.id, campi); };
 
@@ -7552,6 +7562,12 @@ function App(){
     if (!dp.ana) dp.ana = {};
     if (field==="domUgualeRes"){ dp.ana.domUgualeRes = !!value; if (value){ dp.ana.indDom=dp.ana.indRes||""; dp.ana.capDom=dp.ana.capRes||""; dp.ana.luogoDom=dp.ana.luogoRes||""; } touch(next); return; }
     if ((field==="indRes"||field==="capRes"||field==="luogoRes") && dp.ana.domUgualeRes){ dp.ana[field]=value; const _mp={indRes:"indDom",capRes:"capDom",luogoRes:"luogoDom"}; dp.ana[_mp[field]]=value; touch(next); return; }
+    /* ver178 (collaudo del 15/11/2026): nelle caselle NUMERICHE dell'anagrafica il segno meno non
+       entra, né battuto né incollato — è la regola di Christian «vieta sempre i negativi nelle celle
+       compilabili da me» (A4), già applicata a «Compila veloce» nella ver148. Misurato prima: un
+       «-100» incollato nel Rimborso km toglieva 1.000 € al costo, nei Premi 796,63 €, e «-19» nel
+       Monte ore settimanali 3.166 €, senza nessun avviso. ⚠️ I valori già in archivio non si toccano. */
+    if (ANA_NO_NEG.indexOf(field) >= 0) value = String(value == null ? "" : value).replace(/[-\u2212]/g, "");
     if (ANA_SHARED[field]){ dp[field] = (field==="oreSett") ? (Number(String(value).replace(",","."))||0) : value; }
     else if (field==="cognome" || field==="nome"){ dp.ana[field]=value; const nn=((dp.ana.cognome||"")+" "+(dp.ana.nome||"")).trim().toUpperCase(); if (nn!=="") dp.nome=nn; }
     else dp.ana[field]=value;
@@ -7835,7 +7851,8 @@ function App(){
     touch(next); setPermModal(null); showToast("Permesso orario salvato");
   };
   const onPermDelete = function(dipId, day){ const next = JSON.parse(JSON.stringify(state)); const rec = ensureRec(next, dipId); if (rec.permessi) delete rec.permessi[day]; touch(next); setPermModal(null); showToast("Permesso orario rimosso"); };
-  const onDich = function(dipId, value){ const next = JSON.parse(JSON.stringify(state)); ensureRec(next, dipId).dich = value; touch(next); };
+  /* ver178: niente segno meno nelle «Ore dichiarate» (regola A4 di Christian). */
+  const onDich = function(dipId, value){ const next = JSON.parse(JSON.stringify(state)); ensureRec(next, dipId).dich = String(value == null ? "" : value).replace(/[-\u2212]/g, ""); touch(next); };
   const onAzzeraSaldo = function(dipId){
     const dp = state.dipendenti.find(function(x){ return x.id===dipId; });
     const nome = dp ? dp.nome : "";

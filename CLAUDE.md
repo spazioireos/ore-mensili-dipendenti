@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver177 · 15nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver178 · 15nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -405,6 +405,71 @@ Banca ore, tetto annuo, contratti e export.
     «— ore» e «non calcolabile»; la stessa persona su «Teoriche» → 18,67 €/h; e il **foglio Excel
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
+
+- 🔎 **COLLAUDO APPROFONDITO DI DIPENDENTI DEL 15/11/2026 (sulla ver177) E CORREZIONE ver178**
+  (richiesta di Christian: «collaudo approfondito della seguente parte del gestionale: Dipendenti»).
+  - 🔴 **Il difetto trovato e corretto: il SEGNO MENO entrava in molte caselle numeriche**, contro la
+    regola di Christian «vieta sempre i negativi nelle celle compilabili da me» (A4, già applicata a
+    «Compila veloce» nella ver148). **Misurato sulla ver177**, senza nessun avviso a video:
+    | casella | effetto sul costo (gen→ott 2026, una scheda vera) |
+    |---|---|
+    | Anagrafica → «Rimborso km €» a −100 | **−1.000,00 €** |
+    | Anagrafica → «Premi (tempo pieno) €» a −100 | **−796,63 €** |
+    | Anagrafica → «Monte ore settimanali» a −19 (incollato) | **−3.166,78 €** |
+    | Costo orario → «Scatti di anzianità €» o «Superminimo €» a −50 | **−398,31 €** |
+    | Costo orario → 🧪 «Mesi di contratto» a −7 | costo **−864,01 €**, **−1,22 €/h** |
+    Accettavano il meno anche le altre caselle numeriche dell'Anagrafica (12 su 12), i **28 valori
+    comuni** e le «Ore dichiarate (uso interno)».
+  - **La correzione, in quattro punti e senza toccare nessun calcolo**: costante nuova
+    **`ANA_NO_NEG`** (le 17 chiavi numeriche dell'anagrafica) letta in **`onAnaField`**; nel Costo
+    orario **`senzaMeno`** dentro **`setPar`** (tranne `fonteOre`, che è una scelta) e dentro
+    **`setComune`**; e **`onDich`**. Il meno si toglie sia battuto sia incollato (anche il «−»
+    tipografico).
+    - ⚠️ **L'ISTAT resta l'unica casella che accetta il meno**, di proposito: con la deflazione è
+      negativo davvero, e il tasso del TFR resta 1,50% + 75% dell'ISTAT.
+    - ⚠️ **I valori negativi già in archivio NON vengono toccati**: si impedisce solo di scriverne.
+    - ⚠️ **Nessuna dicitura nuova** e nessun avviso: il carattere semplicemente non entra, come
+      nella ver148.
+  - **Provato in esecuzione** (`coll178/neg178.cjs` **8/0**, `negcom.cjs`): confronto diretto con
+    la ver177 congelata (12 + 5 caselle con il meno, «-12» nelle ore dichiarate) contro la ver178
+    (**zero**, e 1 su 28 nei valori comuni: l'ISTAT); «12,5» entra come prima; **costo e ore
+    identici sui 16 dipendenti veri** su gen→ott 2026 e gen→dic 2025 (**0 differenze su 32**);
+    zero errori di pagina.
+  - **Che cosa il collaudo ha provato, oltre alla correzione**: tre cicli indipendenti di
+    scrittura → 💾 → ricarica in **modalità cloud** (4,5 / 7 / FERIE: a video e nel database,
+    e prima del 💾 il database non cambia) con **ripristino**; tre doppi clic sul 💾 (una sola
+    scrittura, dato giusto); il **box «Da inserire a cedolino» uguale al `cedOre`** che legge
+    USOINT nei tre cicli; titoli in **grassetto** in tutte e cinque le viste (126 su 126); nessuno
+    scorrimento laterale a 390 e 1280px; scritte sotto i 12,5px fuori dalle griglie **identiche
+    alla ver175** (solo «Modalità LOCALE», eccezione dichiarata); la data impossibile
+    «31/02/2026» segnata in rosso con «Formato richiesto: gg/mm/aaaa»; le lettere che non entrano
+    nelle date. **Batteria rieseguita sulla ver178: 43 script, ZERO falliti nuovi** (`box175` 20/0
+    · `ced176` 17/0 · `lul177` 19/0 · `tetto174` 10/0 · `fest172` 11/0 · `fest173` 13/0 · `tab167`
+    11/0 · `tab168` 13/0 · `tab169` 9/0 · `co170` 10/0 · `co171` 13/0 · `ordextra-test` 46/0 ·
+    `verifica-ore` 10/10 · `graf171` 18/0 · `graf155` 15/0 · `collaudo171-co` 16/0 ·
+    `collaudo171-pdf` 13/0 · `dip-backup` 13/0 · `sc-dip-B` **35/0** · `sc-dip-C` 107/0 ·
+    `sc-dip-D` 11/0 · `ic-fodip-A` 20/0 · `ic-fodip-B` 21/0 · `ver144`…`ver162` ai numeri storici).
+    ⚠️ I falliti rimasti sono **gli stessi di sempre, attese invecchiate**: `sc-dip-A` 3,
+    `collaudo171-tab` 1 (lo 0,003 h), `ver146` 1, `ver147` 1, `ver161` 1, `ccnl138` 2, `ear141` 1
+    (confrontano costi congelati prima delle ver159/166/167/176, che li hanno cambiati di
+    proposito: misurato che i numeri si muovono **esattamente** in quelle versioni).
+    ⚠️ **Script vecchi non più eseguibili** (`vm-A`…`vm-D`, `colori`, `azz140`, `super131`,
+    `ferie129`, `pasqua124`, `liq127`, `dif136`, `ro137`): cercano porte o schermate di prima della
+    ver146; le loro funzioni sono coperte dagli script nuovi. `scatti139` 27/2: uno è un'attesa
+    invecchiata, l'altro legge male la tabella dei pezzi (ha una colonna in più) — **rifatto a
+    mano: la somma dei pezzi più i 250 € di formazione torna esatta al costo totale**.
+  - 🟠 **TROVATO E NON CORRETTO, serve la decisione di Christian**: se la scrittura nel **cloud
+    fallisce**, l'app salva solo nel browser, dice «Cloud non raggiungibile — salvato in locale» e
+    **spegne il 💾**; al rientro però **legge il cloud**, che ha il dato vecchio, e la modifica
+    sparisce dalla pagina senza nessun avviso (dimostrato con la finta Firebase). ⚠️ Con Firestore
+    vero una linea caduta di solito **non** fa fallire la scrittura (resta in attesa): il caso
+    riguarda soprattutto permessi o quote. È lo stesso difetto chiuso in USOINT con la ver129.
+  - 🟡 **Segnalati e non toccati (testi)**: otto suggerimenti al passaggio del mouse scrivono
+    gli accenti con l'apostrofo («e'», «piu'», «li'», «finche'», «anzianita'», «FESTIVITA'»); la
+    legenda dice «Festività nazionale e domeniche (crimson #B22222)», cioè un codice colore e una
+    parola inglese; il suggerimento di «ORE MESE» nomina la «Banca ore», che Spazio Ireos non usa;
+    la fascia scura del titolo della vista finisce 28px prima del bordo destro (identica dalla
+    ver150).
 
 - 🖨️ **«🖨️ REPORT PDF A4 PAGHE E LUL»** (ver177, 15/11/2026, Christian: «per l'ufficio paghe
   dobbiamo indicare le ore per giornata perché deve inserirle nel lul, ma dobbiamo facilitarlo» →
