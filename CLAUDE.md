@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver170 · 15nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver171 · 15nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -405,6 +405,73 @@ Banca ore, tetto annuo, contratti e export.
     «— ore» e «non calcolabile»; la stessa persona su «Teoriche» → 18,67 €/h; e il **foglio Excel
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
+
+- 🧾 **IL COSTO ORARIO SI DIVIDE PER LE ORE A CEDOLINO, MESE PER MESE** (ver171, 15/11/2026,
+  richiesta di Christian con parole sue: «noi incassiamo le ore che risultano retribuite a
+  cedolino, quindi il costo va definito in base a quelle, mese per mese … il cedolino uscito
+  potrebbe non dire l'effettivo reso, vedi il caso di ottobre 2026 che ha 27 giorni, ma il cedolino
+  riporta il lavoro di 26». E la definizione, sua: «**le ore retribuite a cedolino ammesse in
+  rendicontazione sono solo quelle ordinarie e supplementari scritte a cedolino: ordinarie 82,50
+  (i 26 giorni) MENO la malattia e le altre assenze pagate dentro quegli 82,5, PIÙ le supplementari
+  (il Risultato del mese)**»).
+  - 🔑 **Il DENOMINATORE del Costo orario «dai Riepiloghi» non è più le ore RESE ma le ore A
+    CEDOLINO**, calcolate **mese per mese** e sommate:
+    **ordinarie a cedolino** = ore da pagare fisse del mese (il monte, pro-rata se il mese è parziale)
+    − assenze retribuite − permessi retribuiti − festività godute − le eventuali **ore in meno**
+    trattenute; **a cedolino** = ordinarie a cedolino + **supplementari** (le «in più» del mese).
+    Algebricamente = ore rese − (ore corrette da dare − monte): in un mese da **26** giorni coincide
+    con le ore rese, in uno da **27** vale una quota di giorno **in meno**, in uno da **25** una quota
+    **in più**. È esattamente lo scarto che Christian vede fra Tabellone e cedolino.
+  - **Il NUMERATORE non cambia**: il costo del mese comprendeva già le supplementari al +27% e i
+    contributi su tutto; `oreSuppPeriodo` e `calcCosto` sono **invariati** nel conto. **«A mano»** e
+    **«Teoriche»** **non sono toccate**.
+  - **Nel codice**: `oreSuppPeriodo` aggiunge a ogni riga `monteP`, `ordCed`, `ced`; funzione nuova
+    **`oreCedolinoPeriodo(state,dp,pairs,escludi,sottoSoglia)`** → `{ore, ord, supp}`, usata in
+    `datiCosto` (`o.oreCed`, `o.oreManuali = o.oreCed.ore`) e **nei pezzi** (ver84). `oreRendPeriodo`
+    (le ore rese) resta e si vede ancora a video (`o.oreDaRiep`). L'**export Excel** del Costo orario
+    scrive in «ORE RENDICONTATE» il nuovo denominatore (legge `H38`), senza toccare il codice.
+    ⚠️ Un mese **senza dati** nel Tabellone vale **0** ore a cedolino (come valeva 0 di ore rese).
+    ⚠️ **Arrotondamento coerente**: ordinarie e supplementari di ogni mese si arrotondano al
+    centesimo **prima** di sommarle, così la riga del mese, il totale della tabella e la frase
+    «ordinarie + supplementari» tornano fra loro (sul caso vero: 57,12 + 41,22 = **98,34**; il
+    Tabellone dice 41,215 → è mezzo centesimo, dichiarato).
+  - **A video** (dicitura presa dalle parole di Christian): nella riga «Dai Riepiloghi…» compare
+    «**ore retribuite a cedolino ammesse in rendicontazione: 98,34 h** (ordinarie a cedolino 57,12 +
+    supplementari 41,22): sono queste le ore che dividono il costo»; la tabella «Le ore in più, mese
+    per mese» ha **due colonne nuove**, «Ordinarie a cedolino» e «A cedolino», con i totali, e una
+    riga di spiegazione sotto. ⚠️ **La pastiglia «costo orario rispecchiante l'effettivo» NON è stata
+    toccata** (è una dicitura di Christian): ora rispecchia le ore **a cedolino**, non più le ore
+    rese — **da chiedergli** se tenerla, cambiarla o toglierla.
+  - 🔴 **CONSEGUENZE SUI DATI VERI, misurate con `nr153` (16 dipendenti, ver150 contro oggi)**:
+    il **costo** cambia **solo** nelle 10 schede della ver159 (TFR), come prima; le **ore** e il
+    **€/h** cambiano quasi ovunque, **di proposito** e di poco nei casi normali (706,75 → 706,76 ·
+    439,50 → 442,68 · 347,50 → 341,32). E **due cose storte si sono raddrizzate da sole**, perché le
+    ore a cedolino si contano **solo nei mesi in cui il contratto è in piedi** (`meseFrazione`),
+    mentre le ore rese contavano **qualunque cella** del periodo:
+    1. la scheda con «dati su 10 mesi del 2025 ma assunta da 4» (incoerenza **già segnalata** nella
+       ver129) passava da **891,33 h → 6,63 €/h** (un numero assurdo) a **296,91 h → 19,78 €/h**;
+    2. quattro schede che nel 2025 **non erano in forza** ma avevano celle scritte davano
+       «250 € / 1,40 €/h» (la sola formazione divisa per ore fuori contratto): ora dicono
+       «**non calcolabile**» (ver96), che è la verità.
+    ⚠️ Sono **dati da sistemare a mano** (date della scheda), già noti: il codice non li ha toccati.
+  - **Provato in esecuzione** (banchi rigenerati DOPO la modifica): `co171` **13/0** dal vivo — caso
+    vero di ottobre (19 h, 8 MAL, sabati AN, 101,5 rese): ore rese ancora **101,50** a video, ore a
+    cedolino **98,34 = 57,12 + 41,22**, **€/h = costo ÷ 98,34** al centesimo (17.240,09 ÷ 98,34 =
+    175,33), riga di ottobre «41,22 · 57,12 · 98,34», intestazioni e spiegazione presenti; caso a 6
+    giorni (18 h, 3 h/gg): ottobre 27 gg → rese 81, a cedolino **78,00** (−3,01); novembre 25 gg →
+    rese 75, a cedolino **78,01** (+3,01: 26 giorni pagati − 0,15 in meno), totale 156,01 contro
+    156,00; zero errori di pagina; e la **ver170 congelata** che divideva per 101,5 (169,85 €/h <
+    175,33). Batteria: `co170` 10/0 · `tab168` 13/0 · `tab169` 9/0 · `ordextra-test` 46/0 ·
+    `verifica-ore` 10/10 · `ver160` 27/0 · `ver162` 11/0 · `graf155` 15/0 · `sc-dip-A` 38/3
+    (storici) · `nr153` **6/0** dopo l'aggiornamento dell'attesa. Babel + `node --check`.
+    ⚠️ **`nr153` aggiornato, non aggirato**: pretendeva ore e €/h identici fuori dalle 10 schede
+    della ver159; ora pretende il **costo** identico fuori da quelle 10 e **ore diverse** in almeno
+    10 schede (il cambio voluto). Tre attese del **mio** `co171` erano sbagliate (avevo contato 72 ore
+    a novembre invece di 75, e la riga della tabella letta con `innerText` si spezzava): corrette.
+  - ⚠️ **Limite da ricordare**: il €/h su un **mese solo** resta sovrastimato (ferie non godute,
+    scheda ⚖️ del 05/11) e resta **non modellata** la trattenuta dei giorni singoli non retribuiti
+    (ver170). La definizione di «ore a cedolino» è quella data da Christian: se il cedolino vero
+    dovesse scrivere le ore in un altro modo, va corretta **con lui**.
 
 - 🧊 **IL MESE NON PAGATO SI SCRIVE `ASP 0h`, E IL COSTO ORARIO LO RICONOSCE** (ver170, 15/11/2026,
   catena di Christian: «AN è il sabato o un giorno in cui non ha lavorato recuperando l'assenza

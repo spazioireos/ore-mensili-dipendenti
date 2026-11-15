@@ -483,7 +483,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver170";
+const APP_VER = "ver171";
 const APP_DATA = "15nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -4020,6 +4020,18 @@ function oreSuppPeriodo(state, dp, pairs, c, escludi, sottoSoglia){
     const fg   = festGoduteMese(state, dp, pr.y, pr.m, escludi);     /* ver124: a video, a parte */
     const supp = R2(Math.max(0, rese + (Number(sottoSoglia)||0) - lav), 3);
     tot += supp;
+    /* ver171 (15/11/2026, Christian): «le ore retribuite a cedolino ammesse in rendicontazione sono
+       solo quelle ordinarie e supplementari scritte a cedolino: ordinarie 82,50 (i 26 giorni) MENO la
+       malattia e le altre assenze pagate dentro quegli 82,5, PIU' le supplementari (il Risultato del
+       mese)». Ordinarie a cedolino = monte del mese (pro-rata se parziale) − assenze retribuite −
+       permessi − festività godute, meno le eventuali ore in meno trattenute; ore a cedolino =
+       ordinarie a cedolino + supplementari. In un mese da 26 giorni coincide con le ore rese; nei
+       mesi da 25/27 giorni se ne discosta della quota di un giorno: è lo scarto Tabellone/cedolino. */
+    const monteP = R2(monteFissoMese(dp, pr.y, pr.m) * meseFrazione(dp, pr.y, pr.m), 3);
+    const inMeno = Math.min(0, R2(rese + (Number(sottoSoglia)||0) - lav, 3));      /* ore trattenute (≤ 0) */
+    /* un mese SENZA dati nel Tabellone non sa niente del cedolino: vale 0, come le ore rese di prima */
+    const ordCed = recHasData(rec) ? R2(Math.max(0, monteP - ass - fg.ore + inMeno), 3) : 0;
+    const ced    = R2(R2(ordCed, 2) + R2(supp, 2), 2);   /* somma dei due addendi gia' al centesimo: a video torna */
     /* ver124 (06/11/2026, Christian: «spacchettami bene le assenze indicandone le voci che le
        compongono»): quante giornate per ciascun codice, piu' le ore di permesso retribuito.
        ⚠️ Solo per farlo vedere: i numeri del conto restano quelli di `coverAbsHours`. */
@@ -4034,9 +4046,18 @@ function oreSuppPeriodo(state, dp, pairs, c, escludi, sottoSoglia){
       det.sort(function(a,b){ return b.ore - a.ore; });
     }
     righe.push({ y:pr.y, m:pr.m, lav:lav, rese:rese, ass:ass, perm:perm,
-                 fest:fg.ore, festGG:fg.gg, det:det, supp:supp });
+                 fest:fg.ore, festGG:fg.gg, det:det, supp:supp, monteP:monteP, ordCed:ordCed, ced:ced });
   });
   return { ore: R2(tot,3), righe: righe };
+}
+/* ver171: ore retribuite a cedolino ammesse in rendicontazione, sommate sui mesi del periodo
+   (ordinarie a cedolino + supplementari). E' il DENOMINATORE del costo orario «dai Riepiloghi». */
+function oreCedolinoPeriodo(state, dp, pairs, escludi, sottoSoglia){
+  const r = oreSuppPeriodo(state, dp, pairs, null, escludi, sottoSoglia).righe;
+  /* ogni mese entra gia' al centesimo (ordinarie e supplementari arrotondate, poi sommate): cosi'
+     la riga del mese, il totale della tabella e «ordinarie + supplementari» tornano fra loro */
+  let ord=0, sup=0, tot=0; r.forEach(function(x){ ord += R2(x.ordCed, 2); sup += R2(x.supp, 2); tot += x.ced; });
+  return { ore: R2(tot, 2), ord: R2(ord, 2), supp: R2(sup, 2) };
 }
 /* ===== ver120: LE FERIE NON GODUTE SONO UN DEBITO ===========================
    Christian (06/11/2026): «ho timore a utilizzare le vere ore del tabellone: se uno non fa mai
@@ -4649,7 +4670,12 @@ function datiCosto(state, dp, pairs){
   o.fonte = (p.fonteOre==="teoriche" || p.fonteOre==="mano") ? p.fonteOre : "riepiloghi";
   o.oreAMano = cNum(p.oreManuali, 0);
   if (o.fonte === "mano") o.oreManuali = o.oreAMano;
-  else if (o.fonte === "riepiloghi") o.oreManuali = oreDaRiep;
+  else if (o.fonte === "riepiloghi"){
+    /* ver171: NON piu' le ore rese (oreDaRiep, che resta a video), ma le ore a cedolino ammesse in
+       rendicontazione: ordinarie a cedolino + supplementari, mese per mese. */
+    o.oreCed = oreCedolinoPeriodo(state, dp, pairs, senzaRapp, o.sottoSoglia);
+    o.oreManuali = o.oreCed.ore;
+  }
   /* ver96 (05/11/2026, difetto segnalato da Christian): se si sceglie "dai Riepiloghi" (o "a
      mano") e in quel periodo NON ci sono ore, H38 = (G38>0)? G38 : F38 ricadeva in silenzio
      sulle ore TEORICHE e mostrava un costo orario calcolato su ore che non esistono.
@@ -4789,7 +4815,7 @@ function datiCosto(state, dp, pairs){
       /* le ore di ogni blocco, secondo la fonte scelta */
       const sommaO8 = prep.reduce(function(a,x){ return a + (x.res0.O8||0); }, 0);
       prep.forEach(function(x){
-        if (o.fonte === "riepiloghi") x.ob.oreManuali = oreRendPeriodo(state, dp, x.b.pairs);
+        if (o.fonte === "riepiloghi") x.ob.oreManuali = oreCedolinoPeriodo(state, dp, x.b.pairs, senzaRapp, o.sottoSoglia).ore;   /* ver171 */
         else if (o.fonte === "mano")  x.ob.oreManuali = (sommaO8>0) ? R2(o.oreAMano * (x.res0.O8/sommaO8), 3) : 0;
         else x.ob.oreManuali = 0;                 /* teoriche: le calcola il blocco */
         x.res = calcCosto(x.ob);
@@ -5573,7 +5599,7 @@ function CostoOrario(props){
                 <div style={{ display:"flex", flexDirection:"column", gap:"6px", fontSize:"14.5px" }}>
                   <label style={{ display:"flex", alignItems:"center", gap:"8px", cursor:"pointer" }}>
                     <input type="radio" name={"fonte-"+dp.id} checked={d.fonte==="riepiloghi"} onChange={function(){ setPar("fonteOre","riepiloghi"); }} />
-                    <span>Dai <b>Riepiloghi</b>, ore inserite nei mesi del periodo: <b style={cifre}>{fmt2(d.oreDaRiep)} h</b>{d.oreDaRiep===0 ? <span style={{ color:"#b91c1c", fontWeight:700 }}> — in questo periodo non hai inserito nessuna ora</span> : null}</span>
+                    <span>Dai <b>Riepiloghi</b>, ore inserite nei mesi del periodo: <b style={cifre}>{fmt2(d.oreDaRiep)} h</b>{d.oreDaRiep===0 ? <span style={{ color:"#b91c1c", fontWeight:700 }}> — in questo periodo non hai inserito nessuna ora</span> : null}{(d.fonte==="riepiloghi" && d.oreCed) ? <span> · <b>ore retribuite a cedolino ammesse in rendicontazione: <span style={cifre}>{fmt2(d.oreCed.ore)} h</span></b> <span style={{ color:"#475569" }}>(ordinarie a cedolino <span style={cifre}>{fmt2(d.oreCed.ord)}</span> + supplementari <span style={cifre}>{fmt2(d.oreCed.supp)}</span>): sono queste le ore che dividono il costo</span></span> : null}</span>
                   </label>
                   <label style={{ display:"flex", alignItems:"center", gap:"8px", flexWrap:"wrap", cursor:"pointer" }}>
                     <input type="radio" name={"fonte-"+dp.id} checked={d.fonte==="mano"} onChange={function(){ setPar("fonteOre","mano"); }} />
@@ -5795,7 +5821,9 @@ function CostoOrario(props){
                           <td style={{ padding:"1px 6px", textAlign:"right" }}>Festività</td>
                           <td style={{ padding:"1px 6px", textAlign:"right" }}>Lavorabili</td>
                           <td style={{ padding:"1px 6px", textAlign:"right" }}>Rese</td>
-                          <td style={{ padding:"1px 0", textAlign:"right" }}>In più</td>
+                          <td style={{ padding:"1px 6px", textAlign:"right" }}>In più</td>
+                          <td style={{ padding:"1px 6px", textAlign:"right" }}>Ordinarie a cedolino</td>
+                          <td style={{ padding:"1px 0", textAlign:"right" }}>A cedolino</td>
                         </tr>
                         {d.suppRighe.map(function(rr){
                           return (
@@ -5815,7 +5843,9 @@ function CostoOrario(props){
                               </td>
                               <td style={Object.assign({ padding:"1px 6px", textAlign:"right", verticalAlign:"top" }, cifre)}>{fmt2(rr.lav)}</td>
                               <td style={Object.assign({ padding:"1px 6px", textAlign:"right", verticalAlign:"top" }, cifre)}>{fmt2(rr.rese)}</td>
-                              <td style={Object.assign({ padding:"1px 0", textAlign:"right", verticalAlign:"top", fontWeight: rr.supp > 0 ? 800 : 400, color: rr.supp > 0 ? "#b45309" : "#64748b" }, cifre)}>{fmt2(rr.supp)}</td>
+                              <td style={Object.assign({ padding:"1px 6px", textAlign:"right", verticalAlign:"top", fontWeight: rr.supp > 0 ? 800 : 400, color: rr.supp > 0 ? "#b45309" : "#64748b" }, cifre)}>{fmt2(rr.supp)}</td>
+                              <td style={Object.assign({ padding:"1px 6px", textAlign:"right", verticalAlign:"top", color:"#64748b" }, cifre)}>{fmt2(rr.ordCed)}</td>
+                              <td style={Object.assign({ padding:"1px 0", textAlign:"right", verticalAlign:"top", fontWeight:800, color:"#1f4e82" }, cifre)}>{fmt2(rr.ced)}</td>
                             </tr>
                           );
                         })}
@@ -5825,10 +5855,13 @@ function CostoOrario(props){
                           <td style={Object.assign({ padding:"2px 6px", textAlign:"right", color:"#64748b" }, cifre)}>{fmt2(d.suppRighe.reduce(function(a,x){ return a + (x.fest||0); }, 0))}</td>
                           <td style={Object.assign({ padding:"2px 6px", textAlign:"right" }, cifre)}>{fmt2(d.suppRighe.reduce(function(a,x){ return a + x.lav; }, 0))}</td>
                           <td style={Object.assign({ padding:"2px 6px", textAlign:"right" }, cifre)}>{fmt2(d.suppRighe.reduce(function(a,x){ return a + x.rese; }, 0))}</td>
-                          <td style={Object.assign({ padding:"2px 0", textAlign:"right" }, cifre)}>{fmt2(d.suppMensileOre)}</td>
+                          <td style={Object.assign({ padding:"2px 6px", textAlign:"right" }, cifre)}>{fmt2(d.suppMensileOre)}</td>
+                          <td style={Object.assign({ padding:"2px 6px", textAlign:"right", color:"#64748b" }, cifre)}>{fmt2(d.suppRighe.reduce(function(a,x){ return a + (x.ordCed||0); }, 0))}</td>
+                          <td style={Object.assign({ padding:"2px 0", textAlign:"right", color:"#1f4e82" }, cifre)}>{fmt2(d.suppRighe.reduce(function(a,x){ return a + (x.ced||0); }, 0))}</td>
                         </tr>
                       </tbody></table>
                       </div>
+                      <div style={{ fontSize:"12.5px", color:"#475569", lineHeight:1.3, marginTop:"4px" }}><b>Ordinarie a cedolino</b> = ore da pagare fisse del mese (i 26 giorni) meno le assenze, i permessi e le festività pagate lì dentro, meno le eventuali ore in meno trattenute; <b>A cedolino</b> = ordinarie a cedolino + in più. Sono le <b>ore retribuite a cedolino ammesse in rendicontazione</b>, e dividono il costo del periodo. Nei mesi da 25 o 27 giorni si discostano dalle ore rese della quota di un giorno: è lo scarto fra Tabellone e cedolino.</div>
                       {(!d.blocchi && d.suppVecchio != null) ? <div style={{ fontSize:"12.5px", color:"#475569", lineHeight:1.3, marginTop:"4px" }}>Con il conto vecchio (totale del periodo contro totale) sarebbero <b style={cifre}>{fmt2(d.suppVecchio)}</b> h: la differenza è la <b>compensazione fra i mesi</b>, che ora non c'è più.</div> : null}
                       <div style={{ fontSize:"12.5px", color:"#475569", lineHeight:1.3, marginTop:"4px" }}>La colonna <b>Assenze</b> sono le ore di ferie, malattia e permessi retribuiti <b>davvero segnate nel Tabellone</b> in quel mese, con sotto le <b>voci che le compongono</b> (giornate per ciascun codice e ore di permesso); non sono più i numeri presunti dei valori comuni. La colonna <b>Festività</b> sono le festività <b>godute</b> contate dal calendario, cioè quelle che nel Tabellone <b>non</b> hanno un codice scritto: dove invece il codice c'è (per esempio <b>FEST</b>) la giornata compare fra le Assenze, per non contarla due volte. <b>Lavorabili = monte del mese − Assenze − Festività.</b></div>
                     </div>
