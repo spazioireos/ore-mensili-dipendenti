@@ -483,7 +483,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver169";
+const APP_VER = "ver170";
 const APP_DATA = "15nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -3895,6 +3895,11 @@ function giorniInForzaMese(dp, y, m){
    invece continua: è il part-time verticale ciclico, le date della scheda non si toccano.
    ⚠️ Serve che il mese sia scritto per intero: basta una cella vuota, un'ora o un altro codice
    perché il mese torni a contare normalmente. */
+/* ver170 (Christian, 15/11/2026: «Di fatto il mese non pagato è un'aspettativa» → «Teniamo ASP 0h»).
+   Il mese NON PAGATO si scrive con ASP 0h (o ASS.ING): la regola della ver112 scatta quindi se tutti i
+   giorni compilabili sono NON RETRIBUITI — codici pay:false — OPPURE AN (i 5 mesi veri già segnati AN
+   restano validi finché non vengono ricodificati). Il nome della funzione resta per non toccare le
+   4 chiamate. */
 function meseTuttoAN(state, dp, y, m){
   const rec = getRecFrom(state, y, m, dp.id);
   if (!rec || !rec.giorni) return false;
@@ -3902,7 +3907,9 @@ function meseTuttoAN(state, dp, y, m){
   let visti = 0;
   for (let d = 1; d <= nd; d++){
     if (isRosso(f, y, m, d)) continue;
-    if (String(rec.giorni[d] == null ? "" : rec.giorni[d]).trim() !== "AN") return false;
+    const cv = String(rec.giorni[d] == null ? "" : rec.giorni[d]).trim();
+    const k = CODE_SET[cv];
+    if (!(cv === "AN" || (k && k.pay === false))) return false;
     visti++;
   }
   return visti > 0;
@@ -5361,7 +5368,7 @@ function CostoOrario(props){
                     <tr><td style={tdE}>Scade il</td><td style={tdV}>{scadEff(dp)}{prorogheList(dp).length ? (" — dopo " + prorogheList(dp).length + (prorogheList(dp).length===1?" proroga":" proroghe")) : ""}</td></tr> : null}
                   {cessEffStr(dp) ? <tr><td style={tdE}>Cessazione</td><td style={tdV}>{cessEffStr(dp)}</td></tr> : null}
                   <tr><td style={tdE}>Nel periodo</td><td style={tdV}>in forza per {fmt2(d.mesiAuto)} mesi · ratei (ferie, 13ª, 14ª) su {d.mesiRateiAuto} {d.mesiRateiAuto===1?"mese":"mesi"} · {d.mesiCedoAuto} {d.mesiCedoAuto===1?"cedolino":"cedolini"}</td></tr>
-                  {d.nMesiAN > 0 ? <tr><td style={tdE}>Mesi non pagati</td><td style={Object.assign({}, tdV, { color:"#7c4a03" })}>{d.mesiAN} — {d.nMesiAN===1?"è tutto «AN»":"sono tutti «AN»"}: {d.nMesiAN===1?"non è pagato":"non sono pagati"} (nessuna busta paga), quindi {d.nMesiAN===1?"è fuori":"sono fuori"} da stipendio, ratei, cedolini e festività. Il rapporto però resta in piedi: contratto, livello e ore settimanali non cambiano.</td></tr> : null}
+                  {d.nMesiAN > 0 ? <tr><td style={tdE}>Mesi non pagati</td><td style={Object.assign({}, tdV, { color:"#7c4a03" })}>{d.mesiAN} — {d.nMesiAN===1?"è tutto non retribuito (ASP 0h / ASS.ING / AN)":"sono tutti non retribuiti (ASP 0h / ASS.ING / AN)"}: {d.nMesiAN===1?"non è pagato":"non sono pagati"} (nessuna busta paga), quindi {d.nMesiAN===1?"è fuori":"sono fuori"} da stipendio, ratei, cedolini e festività. Il rapporto però resta in piedi: contratto, livello e ore settimanali non cambiano.</td></tr> : null}
                 </tbody></table>
                 <div className="co-grid" style={grigliaCampi}>
                   {/* ver147 (A1): la casella si scrive ora nel riquadro «🧪 Simulazione», in

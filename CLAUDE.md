@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver169 · 15nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver170 · 15nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -405,6 +405,43 @@ Banca ore, tetto annuo, contratti e export.
     «— ore» e «non calcolabile»; la stessa persona su «Teoriche» → 18,67 €/h; e il **foglio Excel
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
+
+- 🧊 **IL MESE NON PAGATO SI SCRIVE `ASP 0h`, E IL COSTO ORARIO LO RICONOSCE** (ver170, 15/11/2026,
+  catena di Christian: «AN è il sabato o un giorno in cui non ha lavorato recuperando l'assenza
+  altrove in settimana o nel mese. **Un mese non pagato è AN??**» → «Di fatto il mese non pagato è
+  un'aspettativa» → «**Teniamo ASP 0h**»).
+  - 🔑 **I due significati di `AN` si separano**: `AN` = **solo** il sabato / giorno non lavorato con
+    le ore recuperate altrove (conta nelle ore corrette da dare, non copre, nessuna trattenuta: il
+    mese compensa — ver167). Il **mese non pagato** (part-time verticale ciclico, luglio/agosto) si
+    scrive **`ASP 0h`** («Aspettativa non pagata», già esistente, `pay:false`). Nel Tabellone un mese
+    tutto `ASP 0h` dà Risultato **−tutte le ore corrette da dare** (misurato: ottobre 15 h/sett →
+    **−67,64**), cioè «tutto da trattenere» = nessuna busta: **è la descrizione giusta**, non un
+    difetto. ⚠️ Nei mesi **prima di ottobre 2026** il riquadro non compare (`BM_DAL_YM`, preesistente).
+  - **La regola ver112 segue**: `meseTuttoAN` scatta ora se **tutti** i giorni compilabili sono
+    **non retribuiti** (`pay:false`: `ASP 0h`, `ASS.ING`) **oppure `AN`**. Il nome della funzione e le
+    sue **4 chiamate** (mesi pagati, mesi senza rapporto, due conteggi degli scatti) **non cambiano**.
+    ⚠️ `AN` resta nella regola **di proposito**: i **5 mesi veri** già segnati tutto AN (luglio/agosto
+    2026 di tre persone) continuano a valere «non pagati» finché Christian non li ricodifica in
+    `ASP 0h` («Compila veloce» con `ASP 0h` su tutto il mese). **Nessun dato è stato toccato.**
+  - 📝 **Una dicitura adattata**, nella riga «Mesi non pagati» della scheda Costo orario: «sono tutti
+    «AN»» → «sono tutti **non retribuiti (ASP 0h / ASS.ING / AN)**». Era una frase **scritta da
+    Claude nella ver112**, e con il mese in `ASP 0h` sarebbe diventata falsa. Il resto della frase
+    («non sono pagati (nessuna busta paga), quindi sono fuori da stipendio, ratei, cedolini e
+    festività. Il rapporto però resta in piedi…») è **identico**.
+  - ⚠️ **Limite dichiarato, preesistente**: il Costo orario **non modella le trattenute dei giorni
+    singoli** — un `ASP 0h` o `ASS.ING` isolato abbassa le ore rese ma lo stipendio del mese resta
+    conteggiato pieno. Scala solo il **mese intero** non retribuito. Se Christian vorrà il pro-rata
+    (stipendio − giorni non retribuiti × 1/26) è un'altra richiesta.
+  - **Provato in esecuzione** (`co170`, **10/0**, banchi rigenerati): 15 h/sett, 12 mesi del 2026,
+    **luglio tutto `ASP 0h`** e **agosto tutto `AN`** → «in forza per **10,00** mesi», **10 cedolini**,
+    riga «Mesi non pagati: Luglio 2026, Agosto 2026 — sono tutti non retribuiti (ASP 0h / ASS.ING /
+    AN)…»; luglio tutto `ASS.ING` → idem 10,00; luglio lavorato → **11,00** (la vecchia regola AN
+    regge); Tabellone ottobre tutto `ASP 0h` → **−67,6xx**; zero errori di pagina; e la **ver169
+    congelata** che contava luglio `ASP 0h` come **pagato** (11,00 mesi). Batteria: `tab168` 13/0 ·
+    `tab169` 9/0 · `ordextra-test` 46/0 · `verifica-ore` 10/10 · `nr153` 6/0 · `ver160` 27/0 ·
+    `ver162` 11/0 · `graf155` 15/0 · `sc-dip-A` 38/3 (storici). Babel + `node --check`.
+    ⚠️ Un'attesa **mia** era sbagliata (cercavo il Risultato del mese a **luglio** 2026, che sta prima
+    di `BM_DAL_YM`): spostata su ottobre, non aggirata.
 
 - 🎯 **LE ASSENZE NON RETRIBUITE NON ERODONO PIÙ IL MASSIMALE** (ver169, 15/11/2026, decisione di
   Christian con parole sue: «**l'assenza non retribuita AN o ASS ING non deve erodere il massimale:
@@ -3178,7 +3215,7 @@ Banca ore, tetto annuo, contratti e export.
     della D, i 6 dell'avviso giallo e tutto il registro delle formule — **tutti superati**.
     ⚠️ `vm-B.cjs` è stato **corretto**: leggeva l'importo come «la riga subito dopo il nome della
     voce», che ora è la riga del parametro; adesso cerca la prima riga che è un importo in euro.
-- 🧊 **IL MESE TUTTO «AN» NON SI PAGA, MA IL RAPPORTO VA AVANTI** (ver112, 05/11/2026 —
+- 🧊 **IL MESE TUTTO «AN» NON SI PAGA, MA IL RAPPORTO VA AVANTI** (ver112, 05/11/2026 — ⚠️ **dalla ver170 il mese non pagato si scrive `ASP 0h`** e la regola scatta anche con i codici non retribuiti: vedi la scheda 🧊 della ver170 —
   **regola definitiva, supera ver110 e ver111 dello stesso giorno**). La storia, da non rifare a
   rovescio:
   | | Christian | cosa faceva l'app |
