@@ -498,7 +498,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver175";
+const APP_VER = "ver176";
 const APP_DATA = "15nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -1143,6 +1143,28 @@ function cedolinoBox(state, dp, y, m){
     an: an, festng: festng, note: vociLines(rec),
     ced: ced, eroTot: eroTot, rend: R2(ced + eroTot, 2)
   };
+}
+/* ver176 (15/11/2026, Christian: «in usoint devono andare le ore pagate come da cedolino e quelle deve
+   leggere. Lascia correre le retribuite erosive»). A ogni 💾 si calcolano le ORE A CEDOLINO (ordinarie a
+   cedolino + supplementari, come nel box ver175 e nel Costo orario ver171) per ogni mensilizzato e ogni
+   mese dalla base mensile, e si scrivono nel documento in `cedOre` = { "AAAA-MM": { dipId: ore } }.
+   USOINT le legge come «Lavorate»; dove non ci sono (non mensilizzato, prima di ottobre 2026) continua
+   a sommare le ore del Tabellone come prima. Nessun conto nuovo: è la riga di oreSuppPeriodo. */
+function cedOrePubblica(state){
+  const out = {};
+  Object.keys(state.dati || {}).forEach(function(k){
+    const mm = k.match(/^(\d{4})-(\d{1,2})$/); if (!mm) return;
+    const y = parseInt(mm[1],10), m = parseInt(mm[2],10);
+    (state.dipendenti || []).forEach(function(dp){
+      if (!meseCedolinoTetto(dp, y, m)) return;
+      const rec = (state.dati[k] || {})[dp.id];
+      if (!rec || !recHasData(rec)) return;
+      const r = oreSuppPeriodo(state, dp, [{ y:y, m:m }], null, null, 0).righe[0];
+      if (!r) return;
+      (out[k] = out[k] || {})[dp.id] = R2(R2(r.ordCed, 2) + R2(r.supp, 2), 2);
+    });
+  });
+  return out;
 }
 /* ver174: il mese consuma il massimale «come il cedolino»? (mensilizzato a quella data e base mensile attiva) */
 function meseCedolinoTetto(dp, y, m){
@@ -4227,8 +4249,13 @@ function oreSuppPeriodo(state, dp, pairs, c, escludi, sottoSoglia){
       Object.keys(cont).forEach(function(k){ det.push({ cod:k, gg:cont[k], ore:R2(cont[k]*q,3) }); });
       det.sort(function(a,b){ return b.ore - a.ore; });
     }
+    /* ver176 (15/11/2026, Christian: «deve essere 79,33 ovunque perché alle 82,5 ne togliamo 3,17»):
+       le ore NON fatte che il cedolino trattiene (Risultato del mese negativo). Sono la differenza fra
+       le ordinarie dovute e quelle pagate: servono a togliere dallo stipendio del Costo orario
+       quello che la busta non paga. */
+    const tratt  = recHasData(rec) ? R2(Math.max(0, R2(monteP - ass - fg.ore, 3) - ordCed), 3) : 0;
     righe.push({ y:pr.y, m:pr.m, lav:lav, rese:rese, ass:ass, perm:perm,
-                 fest:fg.ore, festGG:fg.gg, det:det, supp:supp, monteP:monteP, ordCed:ordCed, ced:ced });
+                 fest:fg.ore, festGG:fg.gg, det:det, supp:supp, monteP:monteP, ordCed:ordCed, ced:ced, tratt:tratt });
   });
   return { ore: R2(tot,3), righe: righe };
 }
@@ -4238,8 +4265,8 @@ function oreCedolinoPeriodo(state, dp, pairs, escludi, sottoSoglia){
   const r = oreSuppPeriodo(state, dp, pairs, null, escludi, sottoSoglia).righe;
   /* ogni mese entra gia' al centesimo (ordinarie e supplementari arrotondate, poi sommate): cosi'
      la riga del mese, il totale della tabella e «ordinarie + supplementari» tornano fra loro */
-  let ord=0, sup=0, tot=0; r.forEach(function(x){ ord += R2(x.ordCed, 2); sup += R2(x.supp, 2); tot += x.ced; });
-  return { ore: R2(tot, 2), ord: R2(ord, 2), supp: R2(sup, 2) };
+  let ord=0, sup=0, tot=0, tr=0; r.forEach(function(x){ ord += R2(x.ordCed, 2); sup += R2(x.supp, 2); tot += x.ced; tr += (x.tratt||0); });
+  return { ore: R2(tot, 2), ord: R2(ord, 2), supp: R2(sup, 2), tratt: R2(tr, 3) };
 }
 /* ===== ver120: LE FERIE NON GODUTE SONO UN DEBITO ===========================
    Christian (06/11/2026): «ho timore a utilizzare le vere ore del tabellone: se uno non fa mai
@@ -4536,7 +4563,12 @@ function calcCosto(o){
   const J2 = tot/165;                                   // importo orario globale
   const P2 = O2*165/38;                                 // ore mese teoriche
   const H5 = tot/38*O2;                                 // mensile fisso
-  const J5 = H5*(H2-I2);                                // retribuzione mensilizzata
+  /* ver176 (15/11/2026, Christian: «deve essere 79,33 ovunque»): le ore NON fatte che il cedolino
+     trattiene si tolgono dallo stipendio a paga oraria (J2 = mensile fisso ÷ ore mese). Contributi e
+     TFR seguono da soli (stanno sull'imponibile); 13ª e 14ª restano come sono. Senza trattenute
+     (o con le ore «a mano» / «Teoriche», dove non si sanno) il conto è identico a prima. */
+  const TR = Math.max(0, Number(o.trattOre) || 0);
+  const J5 = Math.max(0, H5*(H2-I2) - TR*J2);           // retribuzione mensilizzata, meno le ore trattenute
   const J6 = H5*(H3/12);                                // tredicesima
   const J8 = H5*((H3/12)/100*c.quattordic);             // quattordicesima
   const fGod = (o.festGodute!=null) ? o.festGodute : c.festGodute;   // ver79: contate dal calendario del periodo
@@ -4648,7 +4680,7 @@ function calcCosto(o){
   const J35 = J5+J6+J8+J12+J13+J14+J17+J18+J19+J21+J23+J25+J26+J27+J28+J29+J30+J31+J32+J34;
   const F38 = O8 + P2*(c.suppPct/100)*H2 - O11*H2;      // ore teoriche rendicontabili
   const H38 = (G38>0)? G38 : F38;                       // ore usate nel calcolo
-  return { J2:J2,P2:P2,H5:H5,J5:J5,J6:J6,J8:J8,J12:J12,J13:J13,ggLiq:ggLiq,E13:E13,J14:J14,L15:L15,
+  return { TR:TR, J2:J2,P2:P2,H5:H5,J5:J5,J6:J6,J8:J8,J12:J12,J13:J13,ggLiq:ggLiq,E13:E13,J14:J14,L15:L15,
            O5:O5,O6:O6,O8:O8,O5calc:O5calc,O6calc:O6calc,E18:E18,J17:J17,J18:J18,L18:L18,H19:H19,J19:J19,J21:J21,
            J20:J20,J23:J23,J25:J25,J26:J26,J27:J27,J28:J28,J29:J29,J30:J30,J31:J31,J32:J32,J34:J34,
            fGod:fGod, fNon:fNon,
@@ -4857,6 +4889,7 @@ function datiCosto(state, dp, pairs){
        rendicontazione: ordinarie a cedolino + supplementari, mese per mese. */
     o.oreCed = oreCedolinoPeriodo(state, dp, pairs, senzaRapp, o.sottoSoglia);
     o.oreManuali = o.oreCed.ore;
+    o.trattOre = o.oreCed.tratt;   /* ver176: ore trattenute, tolte dallo stipendio del periodo */
   }
   /* ver96 (05/11/2026, difetto segnalato da Christian): se si sceglie "dai Riepiloghi" (o "a
      mano") e in quel periodo NON ci sono ore, H38 = (G38>0)? G38 : F38 ricadeva in silenzio
@@ -4997,7 +5030,7 @@ function datiCosto(state, dp, pairs){
       /* le ore di ogni blocco, secondo la fonte scelta */
       const sommaO8 = prep.reduce(function(a,x){ return a + (x.res0.O8||0); }, 0);
       prep.forEach(function(x){
-        if (o.fonte === "riepiloghi") x.ob.oreManuali = oreCedolinoPeriodo(state, dp, x.b.pairs, senzaRapp, o.sottoSoglia).ore;   /* ver171 */
+        if (o.fonte === "riepiloghi"){ const oc = oreCedolinoPeriodo(state, dp, x.b.pairs, senzaRapp, o.sottoSoglia); x.ob.oreManuali = oc.ore; x.ob.trattOre = oc.tratt; }   /* ver171; ver176: trattenute del pezzo */
         else if (o.fonte === "mano")  x.ob.oreManuali = (sommaO8>0) ? R2(o.oreAMano * (x.res0.O8/sommaO8), 3) : 0;
         else x.ob.oreManuali = 0;                 /* teoriche: le calcola il blocco */
         x.res = calcCosto(x.ob);
@@ -5005,7 +5038,7 @@ function datiCosto(state, dp, pairs){
       /* somma dei blocchi. La FORMAZIONE e' una spesa dell'anno, non del blocco:
          si toglie da ogni blocco e si rimette una volta sola sul periodo intero. */
       const campi = ["J5","J6","J8","J12","J13","J14","J17","J18","J19","J20","J21","J23","J25","J26","J27","J28","J29","J30","J31","J34",
-                     "L15","L18","H19","O5","O6","O8","O5calc","O6calc","fGod","fNon","H38"];
+                     "L15","L18","H19","O5","O6","O8","O5calc","O6calc","fGod","fNon","H38","TR"];   /* ver176: TR = ore trattenute */
       const res = {};
       campi.forEach(function(k){ res[k] = prep.reduce(function(a,x){ return a + (Number(x.res[k])||0); }, 0); });
       res.J32 = o.res.J32;                                  /* formazione: una volta sola */
@@ -5030,7 +5063,7 @@ function datiCosto(state, dp, pairs){
       ["E18","H5","J2","P2"].forEach(function(k){            /* valori "al mese": media pesata sui mesi */
         res[k] = mesiTot>0 ? prep.reduce(function(a,x){ return a + (Number(x.res[k])||0)*x.ob.mesi; }, 0)/mesiTot : 0;
       });
-      res.J35 = campi.reduce(function(a,k){ return a + (["L15","L18","H19","O5","O6","O8","O5calc","O6calc","fGod","fNon","H38","J20"].indexOf(k)>=0 ? 0 : (Number(res[k])||0)); }, 0) + res.J32;
+      res.J35 = campi.reduce(function(a,k){ return a + (["L15","L18","H19","O5","O6","O8","O5calc","O6calc","fGod","fNon","H38","J20","TR"].indexOf(k)>=0 ? 0 : (Number(res[k])||0)); }, 0) + res.J32;   /* ver176: TR sono ore, non euro */
       res.F38 = res.H38;
       res.orario = res.H38>0 ? res.J35/res.H38 : 0;
       o.res = res;
@@ -5267,7 +5300,8 @@ function CostoOrario(props){
   const par = {
     /* ⚠️ A pezzi `r.H5` è la MEDIA dei pezzi pesata sui mesi: lo dice, così non sembra il
        mensile di un cedolino vero. */
-    J5:  (aPezzi ? "mensile fisso medio dei pezzi " : "mensile fisso ") + fmt2(r.H5) + " € × " + mesiTxt(R2(d.mesi - d.mesiMater, 3)) + " pagati",
+    J5:  (aPezzi ? "mensile fisso medio dei pezzi " : "mensile fisso ") + fmt2(r.H5) + " € × " + mesiTxt(R2(d.mesi - d.mesiMater, 3)) + " pagati"
+         + ((r.TR > 0.0005) ? " — meno " + fmt2(r.TR) + " h non fatte, trattenute a paga oraria" : ""),   /* ver176 */
     J6:  "mensile fisso × " + nTxt(d.mesiRatei) + "/12 mesi di ratei",
     J8:  "mensile fisso × " + nTxt(d.mesiRatei) + "/12 × " + pctTxt(c.quattordic),
     J12: nTxt(r.fNon) + (Number(r.fNon)===1 ? " giorno" : " giorni") + " × " + fmt2(c.festNonGodCoef) + " (in 26esimi del mensile fisso)",
@@ -7806,10 +7840,14 @@ function App(){
   useEffect(function(){ if (timbroMio.current === null) timbroMio.current = timbroCorrente(); }, []);
   const onTemplateChanged = function(){ setDirty(true); };
   const salvaDavvero = function(){
-    const okLocal = saveLocal(state);
+    /* ver176: le ore a cedolino per USOINT si rifanno a ogni salvataggio. Se il conto non riesce si
+       salva lo stesso, senza (USOINT ricade sulle ore del Tabellone): il 💾 non deve mai fallire per questo. */
+    let stSalva = state;
+    try { stSalva = Object.assign({}, state, { cedOre: cedOrePubblica(state), cedOreAgg: new Date().toISOString() }); } catch (e) { console.error("cedOre", e); }
+    const okLocal = saveLocal(stSalva);
     if (okLocal) timbroMio.current = okLocal;          /* ver144: da ora il timbro buono e' il mio */
     if (FB_READY && uidRef.current && dbRef.current){
-      dbRef.current.collection(FB_COLLECTION).doc(uidRef.current).set(withTemplatesForCloud(state)).then(function(){ setDirty(false); showToast("Salvato (cloud + locale)"); })
+      dbRef.current.collection(FB_COLLECTION).doc(uidRef.current).set(withTemplatesForCloud(stSalva)).then(function(){ setDirty(false); showToast("Salvato (cloud + locale)"); })
       .catch(function(e){ console.error(e); showToast(okLocal ? "Cloud non raggiungibile — salvato in locale" : "Salvataggio non riuscito"); if (okLocal) setDirty(false); });
     } else { if (okLocal){ setDirty(false); showToast("Salvato in locale"); } else showToast("Salvataggio non riuscito"); }
   };

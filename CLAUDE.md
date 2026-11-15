@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver175 · 15nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver176 · 15nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -405,6 +405,43 @@ Banca ore, tetto annuo, contratti e export.
     «— ore» e «non calcolabile»; la stessa persona su «Teoriche» → 18,67 €/h; e il **foglio Excel
     catturato davvero** scrive `GAMMA PROVA … 0 … "non calcolabile"` mentre le altre due righe
     restano coi loro numeri.
+
+- ✂️ **LE ORE TRATTENUTE ESCONO ANCHE DAL COSTO, E USOINT LEGGE LE ORE A CEDOLINO** (ver176,
+  15/11/2026, tre risposte di Christian: «**deve essere 79,33 ovunque perché alle 82,5 ne togliamo
+  3,17**», «**in usoint devono andare le ore pagate come da cedolino e quelle deve leggere. Lascia
+  correre le retribuite erosive**» e, sulla regola dei mesi da 25/27 giorni, «la regola di oggi va
+  bene se la normativa prevede così»).
+  - ✂️ **Costo orario**: le ore NON fatte che il cedolino trattiene (Risultato del mese negativo) si
+    tolgono dallo **stipendio** a paga oraria: `J5 = max(0, H5×(H2−I2) − TR×J2)`, con
+    `TR` = Σ dei mesi di `tratt` (nuovo campo delle righe di `oreSuppPeriodo` = ordinarie dovute −
+    ordinarie pagate) e `J2` = mensile fisso ÷ ore mese. Contributi e TFR seguono da soli; 13ª e 14ª
+    **non** toccate. Vale solo con le ore «dai Riepiloghi» (`o.trattOre`, anche nei pezzi). La nota
+    della voce dice «— meno X h non fatte, trattenute a paga oraria».
+    🐞 **Un mio errore trovato dalla misura**: nei periodi a pezzi `TR` (ore) finiva sommato nel
+    **costo totale** (+0,64 € su una scheda vera); escluso dalla somma di `J35`, rimisurato.
+    - ⚠️ **Vale per tutti i mesi con dati**, anche prima di ottobre 2026, come il denominatore della
+      ver171: allora la busta pagava le ore fatte (criterio orario), e togliere le ore non fatte
+      porta lo stipendio del modello più vicino al vero.
+    - 🔴 **Sui dati veri (backup del 04/11), misurato ver175 contro ver176 (`tratt176-veri`)**:
+      gen→ott 2026 **9 schede su 16** cambiano, costo complessivo **154.557,77 → 149.084,79 €
+      (−5.472,98)**; gen→dic 2025 **7 su 16**, **140.540,25 → 134.731,81 € (−5.808,44)**. Le ore
+      **non cambiano** (erano già quelle a cedolino), scende il €/h: la punta è una scheda con
+      **147 h** trattenute nel 2026 (mesi d'estate con poche ore) che passa da **26,90 a 22,39 €/h**.
+      Zero errori di pagina.
+  - 📤 **Ore a cedolino per USOINT**: a ogni 💾 `cedOrePubblica(state)` scrive nel documento
+    `cedOre = { "AAAA-MM": { dipId: ore } }` (ordinarie a cedolino + supplementari, al centesimo come
+    il box) per i mensilizzati dai mesi della base mensile (`meseCedolinoTetto`), più `cedOreAgg`
+    (quando). Il conto sta in un `try`: se fallisse il 💾 salva lo stesso, senza. ⚠️ **Le erosive NON
+    vanno a USOINT** (decisione sua). ⚠️ È un campo **facoltativo in più**: lo schema del backup
+    non cambia e il backup JSON (`doBackup`) non lo porta, perché si rifà al 💾.
+  - **Provato in esecuzione** (`ced176`, **17/0**): ottobre 2026, 82,50 h su 27 giorni, nessuna
+    assenza → box «ordinarie 79,33 · da trattenere 3,17» e rendiconto 79,33; Costo orario ore
+    **79,33** e retribuzione **−32,65 €** rispetto alla ver175 congelata (= 3,17 × 10,3003); col 💾
+    `cedOre = {"2026-10":{"d1":79.33}}`, settembre escluso, dati del Tabellone intatti; USOINT
+    (ver138) legge **79,33** invece di 82,50, settembre e chi non ha `cedOre` come prima, il
+    riquadro lo dice. Batteria: `box175` 20/0 · `tetto174` 10/0 · `co171` 13/0 · `co170` 10/0 ·
+    `fest173` 13/0 · `tab169` 9/0 · `graf171` 18/0 · `ver155` 18/0. Babel + `node --check`.
+    ⚠️ `par114`, `vm-B` non rieseguiti: girano su banchi vecchi (porte 8120/8129) non più attivi.
 
 - 🧾 **IL BOX «DA INSERIRE A CEDOLINO» NEL TABELLONE** (ver175, 15/11/2026, richiesta di Christian:
   «in tabellone, per ogni dip, in un box dedicato, voglio ben visibili: ore da far inserire a cedolino
