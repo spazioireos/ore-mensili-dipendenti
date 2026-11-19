@@ -11,6 +11,7 @@ GitHub. Per questo qui dentro ci sono gli script di prova e tutto ciò che serve
 ```
 bash collaudo/prepara-banco.sh ver181     # installa le librerie, costruisce il banco, lo serve su :8300
 node collaudo/ver182.cjs                  # collaudo della ver182 (44 controlli)
+node collaudo/ver183.cjs                  # collaudo della ver183 (27 controlli; banco preparato con ver182)
 ```
 
 - `prepara-banco.sh [versione]`: installa in `collaudo/.strumenti` le stesse librerie che l'app carica da
@@ -26,7 +27,8 @@ node collaudo/ver182.cjs                  # collaudo della ver182 (44 controlli)
 
 | script | che cosa prova | esito sulla versione salvata |
 |---|---|---|
-| `ver182.cjs` | quota del giorno, trattenute solo ASS.ING/ASP 0h, box, riquadro, report «conto per le paghe», gli altri quattro report, confronto con la ver181, 390 e 1280 px | 44/0 |
+| `ver182.cjs` | quota del giorno, trattenute solo ASS.ING/ASP 0h, box, riquadro, report «conto per le paghe», gli altri quattro report, confronto con la ver181, 390 e 1280 px | 44/0 (dalla ver183 falliscono i controlli dei quattro report tolti: voluto) |
+| `ver183.cjs` | «Report PDF A4 per le paghe»: due soli pulsanti, un foglio per mensilizzato, TOTALE = voci del cedolino, ORE MESE = somma, = `cedOre`, MAL/ASS.ING, settembre, Report PDF A4 ancora generato | 27/0 |
 
 La batteria storica (circa 40 script fino alla ver181) è andata persa con il contenitore il 15-19/11/2026:
 va ricostruita qui, un pezzo alla volta.

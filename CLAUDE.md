@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver182 · 19nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver183 · 19nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -37,6 +37,32 @@ Banca ore, tetto annuo, contratti e export.
   Corretto anche un difetto **preesistente** che la nuova navigazione rendeva visibile: nella
   testata, in vista Anagrafica, compariva "📅 undefined 2026" (perché `mese` è `null` fuori dalle
   viste mensili); ora mostra "📇 Anagrafica".
+- 🧾 **ver183 (19/11/2026): UN SOLO REPORT PER LE PAGHE, «🖨️ Report PDF A4 per le paghe», CON LE ORE DA RIPORTARE A
+  CEDOLINO** (Christian: «dobbiamo creare un report ore pdf che li obblighi a fare come vogliamo … per ogni mese un report
+  per persona con colonna ordinaria, colonna straordinaria e colonna assenza giustificata e colonna assenza asp0h o ass
+  ing», poi «Lascerei solo il primo … quello puro ore. Poi farei il secondo», sulle ore sotto l'orario «Nel tabellone voglio
+  il vero. Per l'ufficio paghe quello che deve risultare a cedolino mensilizzato», supplementari «nei giorni con più ore»,
+  il «conto per le paghe» «toglilo e basta», e infine «Main e Nu*»).
+  - 🔘 **Restano DUE pulsanti**: «🖨️ Report PDF A4» (le ore vere, invariato) e il nuovo. **Tolti** i pulsanti
+    «mensilizz.», «paghe e LUL», «ord/extra» e «conto per le paghe»: le loro funzioni (`esportaPDFMens`,
+    `esportaPDFOrdExtra`, `esportaPDFConto`, `esportaPDF(…,{lul:true})`) **restano nel file, non più richiamate**.
+  - 📄 **`esportaPDFPaghe(state,pairs)`** + `distCentesimi(pesi,totale)` (resti più grandi): un foglio A4 per ogni
+    mensilizzato (`meseCedolinoTetto`) con dati nel mese, righe = giorni, colonne **Ordinarie · Supplementari · Assenze
+    retribuite (codice e ore) · Non retribuite (ASS.ING / ASP 0h)**. 🔑 **Non sono le ore lavorate** (quelle restano nel
+    Tabellone e nel Report PDF A4): sono le ore **del cedolino mensilizzato** distribuite sui giorni, e i **totali sono
+    esattamente** `ordCed`, `supp`, `ass+fest`, `tratt` di `oreSuppPeriodo` (gli stessi del box, del Costo orario e di
+    `cedOre` per USOINT). Riquadro «DA INSERIRE A CEDOLINO»: ORE MESE = ordinarie + assenze retribuite + da trattenere,
+    supplementari, da trattenere, festività non godute a parte, voci delle assenze.
+  - ⚙️ **Come si distribuisce**: supplementari sui giorni andati più oltre la quota; ordinarie = le ore vere meno le
+    supplementari, poi la differenza col cedolino: se il cedolino paga **di più** (mese corto, ore sotto l'orario non
+    trattenute) va sui giorni dell'orario rimasti vuoti (poi sugli AN), fino a una quota ciascuno; se paga **di meno**
+    (mese lungo) si toglie in proporzione dai giorni lavorati. Assenze a quota del giorno, trattenute sui giorni ASS.ING/ASP.
+  - ⚠️ **Diciture nuove, scritte da Claude** (pulsante, titolo, intestazioni, riquadro), approvate col «Nu*».
+  - **Provato**: `collaudo/ver183.cjs` **27/0** (jsPDF veri: due soli pulsanti, nome del file, un foglio per mensilizzato,
+    TOTALE = voci del cedolino per 5 casi, ORE MESE = somma, ordinarie + supplementari = `cedOre`, MAL a quota, ASS.ING fra
+    le non retribuite, settembre senza fogli, Report PDF A4 ancora generato, zero errori); **dati veri di ottobre** (backup
+    del 19/11, nel Drive): 11 mensilizzati, 11 pagine, **totali coerenti 11 su 11**, ordinaria giornaliera massima 6,69 h.
+    ⚠️ `ver182.cjs` ora fallisce sui quattro report tolti: è voluto (attese invecchiate), non una regressione.
 - 🧮 **ver182 (19/11/2026): QUOTA DEL GIORNO = ORE SETTIMANALI ÷ GIORNI A SETTIMANA, TRATTENUTE SOLO
   ASS.ING / ASP 0h, E IL «🖨️ Report PDF A4 conto per le paghe»** (Christian: «1, ok», «2a», «3, ok», «Nu\*
   legenda si» e, dopo aver visto le trattenute nei cedolini, «Io sceglierei 2a, ma le paghe applicheranno il

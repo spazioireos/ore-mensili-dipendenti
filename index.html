@@ -2763,11 +2763,29 @@ function esportaPDFPaghe(state, pairs){
       ord.forEach(function(x){ if (resto <= 0) return; const t = Math.min(resto, x.e); rows[x.i].s += t; resto -= t; });
       ord.forEach(function(x){ if (resto <= 0) return; const t = Math.min(resto, x.h - rows[x.i].s); rows[x.i].s += t; resto -= t; });
       rows.forEach(function(x){ x.s = x.s / 100; });
-      /* 2) ordinarie a cedolino, sui giorni lavorati in proporzione a ciò che resta dopo le supplementari */
+      /* 2) ordinarie a cedolino. Prima le ore ordinarie VERE dei giorni lavorati (le ore meno le supplementari);
+         poi la differenza col cedolino: se il cedolino paga di più (mese corto, ore sotto l'orario non trattenute)
+         si mette sui giorni dell'orario rimasti senza niente (vuoti, poi AN), fino a una quota ciascuno; se paga
+         di meno (mese lungo) si toglie in proporzione dai giorni lavorati. Così nessun giorno porta ore assurde. */
       const ORD = R2(r.ordCed, 2);
-      const oDist = distCentesimi(rows.map(function(x){ return Math.max(0, x.h - x.s); }), ORD);
+      const oV = rows.map(function(x){ return Math.max(0, x.h - x.s); });
+      const sV = oV.reduce(function(a, v){ return a + v; }, 0);
+      let D = ORD - sV;
+      if (D < 0 && sV > 0){ const k = ORD / sV; for (let i = 0; i < oV.length; i++) oV[i] = oV[i] * k; D = 0; }
+      if (D > 0){
+        [ function(x){ return x.base > 0 && x.h === 0 && x.ret.length === 0 && !x.nr && x.nota === ""; },
+          function(x){ return x.base > 0 && x.h === 0 && x.ret.length === 0 && !x.nr && x.nota === "AN"; } ].forEach(function(cond){
+          if (D <= 0.00001) return;
+          const idx = []; rows.forEach(function(x, i){ if (cond(x)) idx.push(i); });
+          if (!idx.length) return;
+          const per = Math.min(q, D / idx.length);
+          idx.forEach(function(i){ oV[i] += per; }); D -= per * idx.length;
+        });
+        if (D > 0.00001){ const s2 = oV.reduce(function(a, v){ return a + v; }, 0); if (s2 > 0){ const k = (s2 + D) / s2; for (let i = 0; i < oV.length; i++) oV[i] = oV[i] * k; D = 0; } }
+      }
+      const oDist = distCentesimi(oV, ORD);
       rows.forEach(function(x, i){ x.o = oDist[i]; });
-      const ordSenzaGiorni = (ORD > 0.004 && !rows.some(function(x){ return x.h - x.s > 0.0005; }));
+      const ordSenzaGiorni = (ORD > 0.004 && D > 0.00001);
       /* 3) assenze retribuite, a quota, quadrate al totale del cedolino */
       const RET = R2(r.ass + r.fest, 2);
       const flat = []; rows.forEach(function(x, i){ x.ret.forEach(function(a, j){ flat.push({ i:i, j:j, w:a.w }); }); });
@@ -2828,14 +2846,14 @@ function esportaPDFPaghe(state, pairs){
       ];
       if (ordSenzaGiorni) righe.push("* ore ordinarie a cedolino senza giorni lavorati nel mese: vanno nel totale.");
       doc.setFontSize(9.5); doc.setTextColor(15,39,64);
-      let hB = 5;
+      let hB = 5 + 4.6 + 1.5;
       const linee = righe.map(function(t){ const ls = doc.splitTextToSize(t, 176); hB += ls.length * 4.6; return ls; });
       if (doc.setDrawColor) doc.setDrawColor(90,156,226);
       if (doc.setFillColor) doc.setFillColor(248,251,255);
       if (doc.roundedRect) doc.roundedRect(14, y, 182, hB, 2, 2, "FD"); else if (doc.rect) doc.rect(14, y, 182, hB, "FD");
       doc.setFont(undefined, "bold"); doc.text("DA INSERIRE A CEDOLINO", 17, y + 5); doc.setFont(undefined, "normal");
       let yy = y + 5;
-      linee.forEach(function(ls, k){ if (k === 0) yy += 0; doc.text(ls, 17, yy + 4.6); yy += ls.length * 4.6; });
+      linee.forEach(function(ls){ doc.text(ls, 17, yy + 4.6); yy += ls.length * 4.6; });
     });
     if (dipsMese.length > 0 && senzaDati.length === dipsMese.length){
       nuovaPagina(); prodotto = true;
