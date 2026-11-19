@@ -1,0 +1,4 @@
+# strumenti e banco si ricostruiscono con prepara-banco.sh; i PDF e le immagini prodotti dalle prove non si salvano
+.strumenti/
+.banco/
+out/
