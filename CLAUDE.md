@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver185 · 19nov26 (IN ANTEPRIMA, da approvare).** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver186 · 19nov26 (IN ANTEPRIMA, da approvare; contiene anche la ver185, ancora da approvare).** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -37,6 +37,30 @@ Banca ore, tetto annuo, contratti e export.
   Corretto anche un difetto **preesistente** che la nuova navigazione rendeva visibile: nella
   testata, in vista Anagrafica, compariva "📅 undefined 2026" (perché `mese` è `null` fuori dalle
   viste mensili); ora mostra "📇 Anagrafica".
+- ✏️ **ver186 (19/11/2026, IN ANTEPRIMA, da approvare): ENTRANDO IN UNA CELLA DELLE ORE IL CONTENUTO SI SELEZIONA TUTTO**
+  (Christian: «consenti, quando entro in una cella per compilare le ore, che la precedente scritta si selezioni tutta e io
+  ci scriva sopra»). Sopra la ver185, che resta da approvare.
+  - **Celle del Tabellone** (`CellInput`): entrando (clic, tocco o Tab) tutto il contenuto è selezionato e il primo tasto
+    lo sostituisce. Tre funzioni nuove accanto a `CellInput`: `selTuttoFocus` (seleziona all'ingresso), `selTuttoMouseDown`
+    / `selTuttoMouseUp` (solo il PRIMO rilascio del mouse dopo l'ingresso non può togliere la selezione: un secondo clic
+    dentro la cella posiziona il cursore come sempre). In `CellInput` la selezione si rifà **dopo il ridisegno** con un
+    `React.useLayoutEffect` sul focus (ref `elRef`, bandierina `daSel`), perché entrando il valore mostrato cambia (da
+    «6,500» al dato grezzo «6,5») e il browser rimetterebbe il cursore in fondo.
+    ⚠️ **Non con un `setTimeout`**: provato, i tasti già in coda arrivano prima del timer e la prima cifra battuta veniva
+    selezionata e sostituita dalla seconda («4,75» diventava «,75»: lo hanno trovato `ver185.cjs` R11 e `a02` A02.10).
+  - **Le guardie della cella NON sono cambiate**: `iniz` (entrare e uscire senza toccare non cambia niente e il 💾 resta
+    spento), il filtro dei caratteri, la regola dei minuti, il tetto delle 13 ore, i codici. Il tasto battuto sulla
+    selezione passa dal filtro come valore nuovo intero: «4» → 4; «F» → inizio di FERIE; «x» rifiutato e la cella resta com'era.
+  - **Stesso comportamento** (stessi tre gestori, nessun'altra modifica) su **«Ore dichiarate (uso interno)»** e sulla
+    casella **«Ore di permesso»** della finestra del permesso orario: sono caselle di ore che si riaprono già piene.
+    **Non toccata** la casella del valore di **«Compila veloce»**: si apre sempre vuota, non c'è una scritta precedente.
+    **Non toccate** caselle di testo libero (note, anagrafica) né il Costo orario.
+  - ⚠️ **Nessuna dicitura, nessun calcolo, nessun dato cambiato.** ⚠️ Sul telefono il tocco seleziona il contenuto
+    (provato con l'emulazione del tocco a 390px); come appare la selezione e la tastiera dipende dal telefono: **non
+    verificato su un telefono vero**.
+  - **Provato**: `collaudo/ver186.cjs` **20/0** (confronto con la ver185 congelata, dove il clic metteva il cursore in fondo);
+    `ver185.cjs` **30/0** · `a02-tabellone` **49/1** · `a07-grafica-nonregr` **64/0** (il fallito di `a02`, A02.35 «permesso
+    di 20 h», è identico sulla ver185: tetto delle 13 ore non applicato al permesso, già dichiarato nella ver184).
 - 🔢 **ver185 (19/11/2026, IN ANTEPRIMA, da approvare): LE ORE SEMPRE A TRE DECIMALI, E DUE DICITURE NUOVE**
   (Christian, dopo le anteprime della ver184: «Main, ma dammi **tre decimali sempre**, riducendo eventualmente al **90%
   la larghezza del font nelle celle**»; sulle 12 celle fuori griglia: «**lascia 3 decimali**»).

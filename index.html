@@ -512,7 +512,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver185";
+const APP_VER = "ver186";
 const APP_DATA = "19nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -3233,10 +3233,42 @@ function Toast(props){
   return <div className={"toast" + (props.warn ? " warn" : "")}>{props.msg}</div>;
 }
 
+/* ver186 (Christian, 19/11/2026: «quando entro in una cella per compilare le ore, la precedente scritta si
+   selezioni tutta e io ci scriva sopra»). Entrando in una casella delle ore (clic, tocco o Tab) il contenuto
+   risulta tutto selezionato, così il primo tasto lo sostituisce.
+   - nella cella del Tabellone la selezione si rifà anche DOPO il ridisegno (useLayoutEffect, cioè prima che
+     arrivi il tasto successivo): entrando il valore mostrato cambia (da «3,500» al dato grezzo «3,5») e il
+     browser rimetterebbe il cursore in fondo. ⚠️ NON con un setTimeout: provato, i tasti già in coda
+     arrivano prima del timer e la prima cifra battuta veniva selezionata e sostituita dalla seconda;
+   - col mouse, il PRIMO rilascio del tasto dopo l'ingresso non deve togliere la selezione (alcuni browser lo
+     fanno): solo quello. Un secondo clic dentro la casella posiziona il cursore come sempre.
+   Le guardie della cella (iniz, caratteri ammessi, minuti, 13 ore, codici) NON cambiano: il tasto battuto
+   sulla selezione passa dal filtro come valore nuovo intero. */
+function selTuttoFocus(e){
+  const el = e.currentTarget;
+  try { if (el.value !== "") el.select(); } catch (err) {}
+}
+function selTuttoMouseDown(e){ e.currentTarget.dataset.selPrimo = (document.activeElement !== e.currentTarget) ? "1" : ""; }
+function selTuttoMouseUp(e){
+  const el = e.currentTarget;
+  if (el.dataset.selPrimo === "1"){
+    el.dataset.selPrimo = "";
+    if (el.value !== ""){ e.preventDefault(); try { el.select(); } catch (err) {} }
+  }
+}
+
 function CellInput(props){
   const [foc, setFoc] = useState(false);
   const [rif, setRif] = useState(false);          /* ver102: lampeggio quando la scrittura e' rifiutata */
   const iniz = useRef("");                        /* com'era la cella quando ci sono entrato */
+  const elRef = useRef(null);                     /* ver186: la casella, per selezionarne il contenuto */
+  const daSel = useRef(false);                    /* ver186: appena entrato, la selezione va rifatta dopo il ridisegno */
+  React.useLayoutEffect(function(){
+    if (!foc || !daSel.current) return;
+    daSel.current = false;
+    const el = elRef.current;
+    try { if (el && document.activeElement === el && el.value !== "") el.select(); } catch (err) {}
+  }, [foc]);
   const val = (props.value === undefined || props.value === null) ? "" : props.value;
   const s = String(val).trim();
   const isCode = CODE_SET[s] !== undefined;
@@ -3250,10 +3282,11 @@ function CellInput(props){
   const ignota = !foc && isCellaIgnota(s);          /* ver101: mentre scrivi non si segnala niente */
   const fuoriPasso = !foc && isCellaFuoriPasso(s);  /* ver184: ore gia' nei dati con minuti fuori griglia */
   return (
-    <input className={"cell-in " + (isCode ? "is-code" : "is-num") + (props.disabled ? " blocked" : "") + (showTrattino ? " trattino" : "") + (ignota ? " ignota" : "") + (fuoriPasso ? " fuoripasso" : "") + (rif ? " rifiutata" : "")}
+    <input ref={elRef} className={"cell-in " + (isCode ? "is-code" : "is-num") + (props.disabled ? " blocked" : "") + (showTrattino ? " trattino" : "") + (ignota ? " ignota" : "") + (fuoriPasso ? " fuoripasso" : "") + (rif ? " rifiutata" : "")}
       style={props.style} list={foc ? "codici-list" : undefined} title={props.title} disabled={props.disabled}
       value={display} placeholder={showTrattino ? "–" : ""}
-      onFocus={function(){ setFoc(true); setRif(false); iniz.current = String(val == null ? "" : val); }}
+      onFocus={function(e){ setFoc(true); setRif(false); iniz.current = String(val == null ? "" : val); daSel.current = true; selTuttoFocus(e); }}
+      onMouseDown={selTuttoMouseDown} onMouseUp={selTuttoMouseUp}
       onBlur={function(e){
         setFoc(false); setRif(false);
         /* ver102: all'uscita la cella deve contenere un codice vero o un numero.
@@ -3529,6 +3562,7 @@ function EmployeeCard(props){
         <span className="foot-teor" title={TEOR_TITLE}>TOT teorico (assenze e festività godute erosive + permessi retribuiti): <b>{fmt3(totTeor)}</b></span>
         <label>Ore dichiarate (uso interno):</label>
         <input className="dich-in" value={rec.dich || ""} placeholder="—" disabled={mLocked}
+          onFocus={selTuttoFocus} onMouseDown={selTuttoMouseDown} onMouseUp={selTuttoMouseUp}
           onChange={function(e){ props.onDich(dp.id, e.target.value); }} title="Ore dichiarate dal lavoratore. Se sono diverse dal totale calcolato, la differenza resta nel Conguaglio ore e te la ritrovi nei mesi dopo, finché non la sistemi." />
         {(function(){
           const s = String(rec.dich === undefined ? "" : rec.dich).trim();
@@ -7512,7 +7546,8 @@ function PermModal(props){
         <div style={{ fontSize:"11px", color:"#64748b", marginBottom:"12px" }}>Le ore di permesso NON entrano nel TOT (che resta solo ore lavorate). Il permesso viene riportato nell'export.</div>
         <div className="frow">
           <div className="field"><label>Ore di permesso</label>
-            <input type="text" inputMode="decimal" value={ore} onChange={function(e){ setOre(e.target.value); }} placeholder="es. 2" /></div>
+            <input type="text" inputMode="decimal" value={ore} onChange={function(e){ setOre(e.target.value); }} placeholder="es. 2"
+              onFocus={selTuttoFocus} onMouseDown={selTuttoMouseDown} onMouseUp={selTuttoMouseUp} /></div>
           <div className="field"><label>Tipo</label>
             <select value={altro ? "__ALTRO__" : tipo} onChange={function(e){
               const v = e.target.value;
