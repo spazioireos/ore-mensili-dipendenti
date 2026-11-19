@@ -8,19 +8,19 @@ const n=s=>parseFloat(String(s).replace(/\./g,'').replace(',','.'));
   const C=(d)=>K.cella(pg,'GAMMA PROVA',d);
   const scrivi=async(d,txt)=>{ const c=C(d); await c.click(); await c.press('Control+a'); await c.press('Delete'); await pg.keyboard.type(txt,{delay:15}); await c.press('Tab'); await pg.waitForTimeout(250); return await c.inputValue(); };
   /* celle */
-  T('A02.01 «5» → 5,00', (await scrivi(1,'5'))==='5,00');
-  T('A02.02 «4,5» → 4,50', (await scrivi(2,'4,5'))==='4,50');
-  T('A02.03 «4.25» → 4,25', (await scrivi(3,'4.25'))==='4,25');
+  T('A02.01 «5» → 5,000', (await scrivi(1,'5'))==='5,000');   /* ver185: tre decimali */
+  T('A02.02 «4,5» → 4,500', (await scrivi(2,'4,5'))==='4,500');
+  T('A02.03 «4.25» → 4,250', (await scrivi(3,'4.25'))==='4,250');
   T('A02.04 «ferie» minuscolo → FERIE', (await scrivi(5,'ferie'))==='FERIE');
   T('A02.05 «asp 0h» → ASP 0h', (await scrivi(6,'asp 0h'))==='ASP 0h');
   T('A02.06 «ass.ing» → ASS.ING', (await scrivi(7,'ass.ing'))==='ASS.ING');
   let v=await scrivi(8,'CIAO'); T('A02.07 testo libero «CIAO» non entra (cella vuota) con avviso', v==='' , v+' / '+await toast());
   v=await scrivi(9,'FER'); T('A02.08 pezzo di codice «FER» lasciato a metà: la cella si svuota', v==='', v);
-  v=await scrivi(10,'14'); T('A02.09 «14» non entra (tetto 13 ore): resta «1»→1,00', v==='1,00', v);
-  v=await scrivi(12,'13'); T('A02.10 «13» entra', v==='13,00', v);
-  v=await scrivi(13,'13,5'); T('A02.11 «13,5» si ferma a 13', v==='13,00', v);
+  v=await scrivi(10,'14'); T('A02.09 «14» non entra (tetto 13 ore): resta «1»→1,000', v==='1,000', v);
+  v=await scrivi(12,'13'); T('A02.10 «13» entra', v==='13,000', v);
+  v=await scrivi(13,'13,5'); T('A02.11 «13,5» si ferma a 13', v==='13,000', v);
   v=await scrivi(14,'-3'); T('A02.12 «-3»: il negativo non entra (il «-» è l\'inizio del codice «--», poi «-3» è rifiutato: cella vuota con avviso)', v===''||v==='3,00', v);
-  v=await scrivi(15,'999'); T('A02.13 «999» si ferma a «9»', v==='9,00', v);
+  v=await scrivi(15,'999'); T('A02.13 «999» si ferma a «9»', v==='9,000', v);
   v=await scrivi(16,'MALATTIA'); T('A02.14 «MALATTIA» battuto si ferma su MAL', v==='MAL', v);
   /* incolla */
   const c17=C(17); await c17.click(); await c17.press('Control+a'); await c17.press('Delete');
@@ -39,8 +39,8 @@ const n=s=>parseFloat(String(s).replace(/\./g,'').replace(',','.'));
   T('A02.18 TOT calcolato = somma delle celle a video', Math.abs((await totV('GAMMA'))-somma)<0.005, (await totV('GAMMA'))+' vs '+somma);
   /* ALFA ottobre: numeri attesi ricalcolati a mano (38 h/6 gg = 6,3333; 27 gg non domenicali; 24 gg × 6,5 = 156; 3 assenze = 19) */
   const A=K.carta(pg,'ALFA PROVA'); const headA=await A.locator('.emp-head').innerText();
-  T('A02.19 pillola ORE CORRETTE DA DARE ALFA = 38/6×27 = 171,00', /ORE CORRETTE DA DARE: 171(,00)?( |$)/.test(headA.replace(/\s+/g,' ')), headA.replace(/\s+/g,' ').slice(0,200));
-  T('A02.20 ORE MESE ALFA 165', /ORE MESE: 165/.test(headA));
+  T('A02.19 pillola ORE DA FAR RISULTARE NEL TOTALE PER AVERE LE ORE CONTRATTUALI ALFA = 38/6×27 = 171,000', /ORE DA FAR RISULTARE NEL TOTALE PER AVERE LE ORE CONTRATTUALI: 171,000( |$)/.test(headA.replace(/\s+/g,' ')), headA.replace(/\s+/g,' ').slice(0,200));
+  T('A02.20 ORE CONTRATTUALI ALFA 165', /ORE CONTRATTUALI: 165,000/.test(headA));
   T('A02.21 TOT calcolato ALFA = 156,00', (await totV('ALFA'))===156);
   const teor=n((await A.locator('.foot-teor b').innerText()));
   T('A02.22 TOT teorico ALFA = 156 + 3 × 6,333 = 175,000', Math.abs(teor-175)<0.002, teor);
@@ -53,7 +53,7 @@ const n=s=>parseFloat(String(s).replace(/\./g,'').replace(',','.'));
   await ab.click(); await pg.waitForTimeout(300); T('A02.25 secondo clic: torna erosivo', Math.abs(n(await A.locator('.foot-teor b').innerText())-teor)<0.002);
   /* box cedolino */
   const box=(await A.locator('.ced-box').innerText()).replace(/\s+/g,' ');
-  const bm=/ORE MESE ([\d.,]+) h.*di cui ferie ([\d.,]+) h.*altre assenze retribuite ([\d.,]+) h.*festività godute ([\d.,]+) h.*permessi retribuiti ([\d.,]+) h.*ore lavorate ordinarie ([\d.,]+) h.*ORE SUPPLEMENTARI \(Risultato del mese\) \+?([\d.,]+) h/.exec(box);
+  const bm=/ORE CONTRATTUALI ([\d.,]+) h.*di cui ferie ([\d.,]+) h.*altre assenze retribuite ([\d.,]+) h.*festività godute ([\d.,]+) h.*permessi retribuiti ([\d.,]+) h.*ore lavorate ordinarie ([\d.,]+) h.*ORE SUPPLEMENTARI \(Risultato del mese\) \+?([\d.,]+) h/.exec(box);
   T('A02.26 box cedolino ALFA: ORE MESE 165 = ferie + altre + festività + permessi + ordinarie; supplementari = Risultato (4,00)', bm && Math.abs(n(bm[1])-165)<0.01 && Math.abs(n(bm[2])+n(bm[3])+n(bm[4])+n(bm[5])+n(bm[6])-165)<0.015 && Math.abs(n(bm[7])-4)<0.005, bm&&bm.slice(1).join('/'));
   T('A02.27 box: FESTIVITÀ NON GODUTE 1 gg (il 4, domenica)', /FESTIVITÀ NON GODUTE, a sé [\d,]+ h 1 gg/.test(box), box.slice(box.indexOf('FESTIVITÀ NON'),box.indexOf('FESTIVITÀ NON')+60));
   T('A02.28 nessun box per GAMMA (non mensilizzata)', await K.carta(pg,'GAMMA PROVA').locator('.ced-box').count()===0);
@@ -88,7 +88,7 @@ const n=s=>parseFloat(String(s).replace(/\./g,'').replace(',','.'));
   for(const [val,id] of [['-3','A02.36'],['14','A02.37'],['PIPPO','A02.38'],['13,5','A02.39']]){ const q=await qf(val); T(id+' Compila veloce «'+val+'»: pulsante spento e motivo in rosso', q.dis, q.txt.slice(q.txt.indexOf('Valore da inserire'),q.txt.indexOf('Valore da inserire')+150)); await q.m.locator('.modal-actions button').filter({hasText:'Annulla'}).click(); await pg.waitForTimeout(200); }
   let q=await qf('7'); await q.m.locator('input[type=checkbox]').last().check(); await pg.waitForTimeout(100);
   await q.b.click(); await pg.waitForTimeout(300); const cnf=await K.conferma(pg,true);
-  T('A02.40 Compila veloce «7» con «sovrascrivi»: chiede conferma e riempie i feriali', /Sovrascrivere/.test(cnf) && (await C(19).inputValue())==='7,00' && (await C(4).inputValue())==='', cnf.slice(0,80));
+  T('A02.40 Compila veloce «7» con «sovrascrivi»: chiede conferma e riempie i feriali', /Sovrascrivere/.test(cnf) && (await C(19).inputValue())==='7,000' && (await C(4).inputValue())==='', cnf.slice(0,80));
   /* elenco: giorno rosso */
   q=await qf('5'); await q.m.locator('input[type=radio]').nth(2).check(); await q.m.locator('input[placeholder="es. 3, 7, 12"]').fill('4, 11'); await pg.waitForTimeout(150);
   const tgt=(await q.m.innerText()).match(/Giorni interessati: (\d+)/); const salt=/saltati 2 giorni rossi/.test(await q.m.innerText());
@@ -104,7 +104,7 @@ const n=s=>parseFloat(String(s).replace(/\./g,'').replace(',','.'));
   T('A02.43 🔓 Sblocca chiede conferma e riapre', /Sbloccare/.test(cs) && await pg.locator('.emp-card input.cell-in:not([disabled])').count()>40);
   /* Svuota mese con conferma: annulla, poi conferma */
   await G.locator('.edit-mini.svuota').click(); let sv=await K.conferma(pg,false);
-  T('A02.44 🗑 Svuota mese: conferma che nomina persona e mese; annullando resta', /GAMMA PROVA/.test(sv) && /Ottobre 2026/.test(sv) && (await C(19).inputValue())==='7,00');
+  T('A02.44 🗑 Svuota mese: conferma che nomina persona e mese; annullando resta', /GAMMA PROVA/.test(sv) && /Ottobre 2026/.test(sv) && (await C(19).inputValue())==='7,000');
   await G.locator('.edit-mini.svuota').click(); await K.conferma(pg,true); await pg.waitForTimeout(300);
   T('A02.45 confermando il mese di GAMMA si svuota', (await K.carta(pg,'GAMMA PROVA').count())===1 ? (await C(19).inputValue())==='' : true);
   /* FESTNG su giorno rosso, dicembre 2025 */

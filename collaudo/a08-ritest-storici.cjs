@@ -10,8 +10,8 @@ const ver=process.argv[2]||'dip';
   const apos=(tutto+' '+titoli).match(/\b(e|piu|li|finche|gia|anzianita|FESTIVITA|perche|cosi|puo|sara|verra)'(?=[\s.,;:)]|$)/g)||[];
   T('A08.01 ver179: nessun accento scritto con l\'apostrofo nelle 5 viste e nei suggerimenti (esclusi i valori salvati «DA LUNEDI\'…»)', apos.length===0, apos.slice(0,8).join(' | '));
   T('A08.02 ver179: la legenda non dice «crimson» né un codice colore', !/crimson|#B22222/i.test(tutto));
-  await K.vai(pg,'Ott'); const tipMese=await pg.locator('.emp-head .pill').filter({hasText:'ORE MESE'}).first().getAttribute('title');
-  T('A08.03 ver179: il suggerimento di «ORE MESE» non nomina la Banca ore', !/Banca ore/i.test(tipMese||''), tipMese);
+  await K.vai(pg,'Ott'); const tipMese=await pg.locator('.emp-head .pill').filter({hasText:'ORE CONTRATTUALI'})   /* ver185: «ORE MESE» → «ORE CONTRATTUALI» (Christian) */.first().getAttribute('title');
+  T('A08.03 ver179: il suggerimento di «ORE CONTRATTUALI» (era «ORE MESE») non nomina la Banca ore', !/Banca ore/i.test(tipMese||''), tipMese);
   const fs=await pg.evaluate(()=>{ const s=document.querySelector('.monthstrip').getBoundingClientRect(), h=document.querySelector('.app-header').getBoundingClientRect(); return {s:[s.left,s.right],h:[h.left,h.right],W:document.documentElement.clientWidth}; });
   T('A08.04 ver179: la fascia scura del titolo arriva al bordo destro', Math.abs(fs.s[1]-fs.W)<=1 && fs.s[0]<=1, JSON.stringify(fs));
   /* Tetto annuo = motore */

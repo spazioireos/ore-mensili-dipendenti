@@ -19,7 +19,7 @@ const ver=process.argv[2]||'dip';
   pg2.on('download',async d=>{ const f=K.OUT+'/a03-'+Date.now()+'-'+d.suggestedFilename(); await d.saveAs(f); dls.push({nome:d.suggestedFilename(),f}); });
   await pg2.goto(K.BASE+'/'+ver+'/index.html'); await pg2.waitForSelector('.login-box,.app-header'); await K.entraPin(pg2,'1234'); await K.vai(pg2,'Ott');
   const v0=await K.cella(pg2,'GAMMA PROVA',1).inputValue();
-  T('A03.05 la modifica non salvata, chiusa la pagina, è persa (come previsto) — resta il valore vecchio', v0==='3,00', v0);
+  T('A03.05 la modifica non salvata, chiusa la pagina, è persa (come previsto) — resta il valore vecchio', v0==='3,000', v0);   /* ver185: tre decimali */
   const c2=K.cella(pg2,'GAMMA PROVA',1); await c2.click(); await c2.press('Control+a'); await c2.press('Delete'); await pg2.keyboard.type('7,25'); await c2.press('Tab'); await pg2.waitForTimeout(200);
   await pg2.locator('.btn-save').dblclick(); await pg2.waitForTimeout(400);
   const ls1=await K.statoLS(pg2);
@@ -31,7 +31,7 @@ const ver=process.argv[2]||'dip';
   T('A03.08 cedOre pubblicato al 💾: ottobre ALFA = box «ordinarie + supplementari» (150,00); GAMMA non mensilizzata assente', box.pub && Math.abs(box.pub.a-box.ced)<0.006 && Math.abs(box.ced-150)<0.006 && box.pub.c===undefined, JSON.stringify(box));
   T('A03.09 cedOre: settembre (prima della base mensile) non pubblicato', !(ls1.cedOre||{})['2026-09']);
   await pg2.reload(); await pg2.waitForSelector('.login-box'); await K.entraPin(pg2,'1234'); await K.vai(pg2,'Ott');
-  T('A03.10 dopo il ricaricamento il valore salvato c\'è', (await K.cella(pg2,'GAMMA PROVA',1).inputValue())==='7,25');
+  T('A03.10 dopo il ricaricamento il valore salvato c\'è', (await K.cella(pg2,'GAMMA PROVA',1).inputValue())==='7,250');   /* ver185: tre decimali */
   /* timbro fra due schede */
   const pA=pg2; const pB=await ctx.newPage(); pB.on('dialog',d=>d.accept()); await pB.goto(K.BASE+'/'+ver+'/index.html'); await pB.waitForSelector('.login-box'); await K.entraPin(pB,'1234'); await K.vai(pB,'Ott');
   const scr=async(p,val)=>{ const x=K.cella(p,'GAMMA PROVA',2); await x.click(); await x.press('Control+a'); await x.press('Delete'); await p.keyboard.type(val); await x.press('Tab'); await p.waitForTimeout(200); };
@@ -79,9 +79,9 @@ const ver=process.argv[2]||'dip';
   /* import valido e annulla */
   const val=JSON.parse(JSON.stringify(bj)); val.dati['2026-10'].c.giorni[3]='9,75'; val.dipendenti.push({id:'d',nome:'DELTA IMPORT',oreSett:20,livello:'D1',tipoContratto:'indeterminato',dataAssunzione:'01/01/2024'});
   t=await imp('valido.json',JSON.stringify(val)); await K.vai(p,'Ott');
-  T('A03.24 import valido: entra a video («Backup JSON importato») con DELTA IMPORT e 9,75', /importato/.test(t) && (await K.cella(p,'GAMMA PROVA',3).inputValue())==='9,75' && await K.carta(p,'DELTA IMPORT').count()===1, t);
+  T('A03.24 import valido: entra a video («Backup JSON importato») con DELTA IMPORT e 9,75', /importato/.test(t) && (await K.cella(p,'GAMMA PROVA',3).inputValue())==='9,750' && await K.carta(p,'DELTA IMPORT').count()===1, t);
   T('A03.25 import valido: in archivio solo dopo 💾', !(await K.statoLS(p)).dipendenti.some(d=>d.id==='d') && await p.locator('.btn-save.dirty').count()===1);
   await p.locator('.btn').filter({hasText:'Annulla import'}).click(); await p.waitForTimeout(500);
-  T('A03.26 «↩︎ Annulla import» riporta tutto a prima', (await K.cella(p,'GAMMA PROVA',3).inputValue())==='3,00' && await K.carta(p,'DELTA IMPORT').count()===0);
+  T('A03.26 «↩︎ Annulla import» riporta tutto a prima', (await K.cella(p,'GAMMA PROVA',3).inputValue())==='3,000' && await K.carta(p,'DELTA IMPORT').count()===0);
   T('A03.27 zero errori di pagina (escluso il caso A03.20/21)', E.length===0, E.join('|'));
   R.fine(); await br.close(); })().catch(e=>{ console.error(e); process.exit(1); });

@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver184 · 19nov26 (IN ANTEPRIMA, da approvare).** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver185 · 19nov26 (IN ANTEPRIMA, da approvare).** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -37,6 +37,46 @@ Banca ore, tetto annuo, contratti e export.
   Corretto anche un difetto **preesistente** che la nuova navigazione rendeva visibile: nella
   testata, in vista Anagrafica, compariva "📅 undefined 2026" (perché `mese` è `null` fuori dalle
   viste mensili); ora mostra "📇 Anagrafica".
+- 🔢 **ver185 (19/11/2026, IN ANTEPRIMA, da approvare): LE ORE SEMPRE A TRE DECIMALI, E DUE DICITURE NUOVE**
+  (Christian, dopo le anteprime della ver184: «Main, ma dammi **tre decimali sempre**, riducendo eventualmente al **90%
+  la larghezza del font nelle celle**»; sulle 12 celle fuori griglia: «**lascia 3 decimali**»).
+  - 🏷️ **DUE DICITURE SCELTE DA CHRISTIAN IL 19/11/2026**, valide in tutta l'app: «ORE CORRETTE DA DARE» →
+    **«ORE DA FAR RISULTARE NEL TOTALE PER AVERE LE ORE CONTRATTUALI»** (frase intera sua) e «ORE MESE» →
+    **«ORE CONTRATTUALI»**. Cambiano solo le scritte (pillole del Tabellone, suggerimento, box «Da inserire a
+    cedolino», TS, Tetto annuo e i report rimasti nel file); i nomi interni (`oreRetribuibili`, `monteFissoMese`…) no.
+    Punti sostituiti: «ore corrette da dare» **4** (pillola e suo suggerimento, due frasi del report ord/extra, che
+    dalla ver183 non ha più pulsante); «ORE MESE / ore mese» **10** (pillola, due righe del box, due frasi del TS,
+    la frase del Tetto annuo, e nei report non più richiamati — LUL e «conto per le paghe» — tre scritte più la regola
+    che colora la riga). Non esistevano in Excel. ⚠️ La frase lunga va a capo sul telefono (accettato): pillola a
+    12,5px, misurata dentro lo schermo a 390 e 1280px.
+  - 🔢 **Tre decimali per ogni QUANTITÀ DI ORE** a video: funzione nuova **`fmtH`** (= `fmt3`) accanto a `fmt3`,
+    messa in ~100 punti al posto di `fmt2` / `hoursDisp`: celle del Tabellone (a cella chiusa, lette con `parseHour`,
+    quindi «3,17» si mostra **3,167**), TOT e TOT teorico, pillole (ORE SETT, ORE CONTRATTUALI, ore da far risultare),
+    permessi, conguaglio, massimali, box, Riepiloghi, Query, Costo orario (le ore), confronto con Fogli ore, il **TS**
+    (anche la legenda: «,167 = 10 · ,250 = 15 …»). **Restano a due** euro, percentuali, giorni, mesi, settimane.
+    ⚠️ **Non toccati**: il **Report PDF A4 storico** (ore,minuti e totale in centesimi, come chiesto), i report non
+    più richiamati dalla ver183, le **lettere .docx** (`hoursDisp` resta lì) e gli **export Excel** (scrivono i
+    numeri grezzi senza formato: dare il formato a tre decimali vuol dire toccare ogni foglio — lasciato stare).
+  - 📐 **90% dentro la griglia del mese** (autorizzato): ore nelle caselle 20 → **18px**, TOT 19 → **17,1px**, il
+    «teor.» sotto il TOT 12,5 → **11,25px**. Senza, «12,833» usciva dai 66px della casella. **Misurato**: tabella del
+    mese **2254px** contro i 2275-2298 della ver184 (non si allarga), nessuna ora tagliata, niente scorrimento laterale
+    a 390 e 1280px. ⚠️ Fuori dalla griglia nessuna scritta scende sotto i 12,5px.
+  - ⏱ **Regola dei minuti a tre cifre**: ammessi anche ,000 ,167 ,250 ,333 ,500 ,667 ,750 ,833 (a due e a una cifra
+    come prima). `ORE_SESTI` e `parseHour` leggono ,167 ,333 ,667 ,833 come sesti esatti; mentre si scrive vale ogni
+    **pezzo iniziale** di un decimale ammesso (`DEC_PEZZI`, al posto della «seconda cifra obbligata» della ver184:
+    quindi «3,16» entra mentre si scrive e all'uscita si rifiuta). Avviso aggiornato (dicitura di Claude, autorizzata).
+    Sui dati veri **nessuna cella** ha già tre decimali ammessi: nessuna lettura cambia.
+  - 🟨 **Le 12 celle fuori griglia restano** come sono, contate come sono e segnalate: si mostrano 7,660 · 1,667.
+  - 🧾 **Numeri identici alla ver184** (misurato, dati veri di ottobre 2026 e dati inventati): costo orario dei 16,
+    TOT e Risultato del mese di tutte le schede-mese, `cedOre`, Tetto, totali del TS (11 pagine per 11 mensilizzati,
+    una per persona). Per mostrare i millesimi giusti sono passati da 2 a 3 decimali **solo** gli arrotondamenti di
+    VISUALIZZAZIONE del box (`cedolinoBox`) e dei totali del TS (7,67 → 7,667, che è il valore vero del TS).
+  - ⚠️ **Limiti dichiarati**: (a) il **TOT** è tenuto al centesimo dal motore (`totOfRec`), quindi con celle in sesti si
+    legge 75,990 e non 75,993; (b) le **ORE CONTRATTUALI** del TS e del box sono quelle a cedolino tenute al centesimo
+    dalla ver184 (65,130), mentre la pillola mostra il valore del contratto (65,132). Cambiarli vorrebbe dire cambiare
+    numeri: **da decidere con Christian**.
+  - **Provato**: `collaudo/ver185.cjs` **30/0** (confronto diretto con la ver184 congelata); batteria nella tabella di
+    `collaudo/LEGGIMI.md`.
 - ⏱ **ver184 (19/11/2026, IN ANTEPRIMA, da approvare): LA REGOLA DEI MINUTI, IL «TS» CON GLI STESSI NUMERI
   OVUNQUE, E CINQUE CORREZIONI DEL COLLAUDO** (Nu\* di Christian del 19/11/2026).
   - ⏱ **La regola (sua)**: le ore si scrivono e si mostrano solo coi decimali di 0, 10, 15, 20, 30, 40, 45, 50 minuti:

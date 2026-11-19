@@ -53,38 +53,38 @@ async function tsPdf(pg){ await K.vai(pg,'Ott'); await pg.getByRole('button',{na
   const C=(d)=>K.cella(pg,'PROVA CELLE',d);
   const scrivi=async(d,txt)=>{ const c=C(d); await c.click(); await c.press('Control+a'); await c.press('Delete'); await pg.keyboard.type(txt,{delay:15}); await c.press('Tab'); await pg.waitForTimeout(250); return await c.inputValue(); };
   let v=await scrivi(1,'3,86'); let t=await toast();
-  T('M05 «3,86» battuto: il 6 non entra, «3,8» all\'uscita si rifiuta, cella vuota con l\'avviso dei decimali ammessi', v==='' && /,00 ,17 ,25 ,33 ,50 ,67 ,75 ,83/.test(t), v+' / '+t);
-  T('M06 «3,5» → 3,50', (await scrivi(2,'3,5'))==='3,50');
-  T('M07 «3,17» → 3,17 (10 minuti)', (await scrivi(3,'3,17'))==='3,17');
+  T('M05 «3,86» battuto: il 6 non entra, «3,8» all\'uscita si rifiuta, cella vuota con l\'avviso dei decimali ammessi', v==='' && /,000 ,167 ,250 ,333 ,500 ,667 ,750 ,833/.test(t), v+' / '+t);
+  T('M06 «3,5» → 3,500', (await scrivi(2,'3,5'))==='3,500');   /* ver185: tre decimali */
+  T('M07 «3,17» → 3,167 (10 minuti)', (await scrivi(3,'3,17'))==='3,167');
   v=await scrivi(5,'3,3'); T('M08 «3,3» (3 h 18) si rifiuta all\'uscita', v==='', v);
-  T('M09 «3,75» → 3,75; «2,83» → 2,83; «4,0» → 4,00', (await scrivi(7,'3,75'))==='3,75' && (await scrivi(8,'2,83'))==='2,83' && (await scrivi(9,'4,0'))==='4,00');
-  v=await scrivi(10,'3,4'); T('M10 «3,4»: il 4 dopo la virgola non entra (resta 3,00)', v==='3,00', v);
-  T('M11 tetto 13 ore e niente negativi (come nella ver183): «14» → 1,00 · «-3» → cella vuota', (await scrivi(12,'14'))==='1,00' && (await scrivi(13,'-3'))==='');
+  { const a7=await scrivi(7,'3,75'), a8=await scrivi(8,'2,83'), a9=await scrivi(9,'4,0'); T('M09 «3,75» → 3,750; «2,83» → 2,833; «4,0» → 4,000', a7==='3,750' && a8==='2,833' && a9==='4,000', [a7,a8,a9].join(' ')); }
+  v=await scrivi(10,'3,4'); T('M10 «3,4»: il 4 dopo la virgola non entra (resta 3,000)', v==='3,000', v);
+  { const a12=await scrivi(12,'14'), a13=await scrivi(13,'-3'); T('M11 tetto 13 ore e niente negativi (come nella ver183): «14» → 1,000 · «-3» → cella vuota', a12==='1,000' && a13==='', a12+' / '+a13); }
   const st1=await K.statoLS(pg); /* niente è salvato senza 💾: si guarda lo stato a video */
   const c6=C(6); const cls6=await c6.getAttribute('class'); const box6=(await K.carta(pg,'PROVA CELLE').locator('.fuoripasso-box').innerText().catch(()=>'')).replace(/\s+/g,' ');
   T('M12 la cella già nei dati «7,66» è segnalata (ambra tratteggiata, diversa dal rosso) con il riquadro che elenca il giorno', /fuoripasso/.test(cls6) && !/ignota/.test(cls6) && /6 \(7,66\)/.test(box6) && /come sono scritte/.test(box6), cls6+' / '+box6.slice(0,120));
   await c6.click(); await pg.waitForTimeout(100); await c6.press('Tab'); await pg.waitForTimeout(200);
-  T('M13 entrandoci e uscendo senza scrivere, «7,66» resta (non si cancella, non si converte)', (await c6.inputValue())==='7,66');
+  T('M13 entrandoci e uscendo senza scrivere, «7,66» resta (non si cancella, non si converte)', (await c6.inputValue())==='7,660', await c6.inputValue());   /* ver185: si mostra a tre decimali, il dato resta «7,66» (M21) */
   const totX=n((await K.carta(pg,'PROVA CELLE').locator('.foot-tot b').innerText()));
   T('M14 TOT di PROVA CELLE conta 7,66 com\'è: 3,50+3,17+3,75+2,83+4,00+3,00+1,00+7,66 = 28,91', Math.abs(totX-28.91)<0.006, totX);
   /* ===== c) Compila veloce ===== */
   const G=K.carta(pg,'PROVA CELLE'); const qf=async(val)=>{ await G.locator('.edit-mini.qf').click(); await pg.waitForTimeout(300); const m=pg.locator('.modal'); await m.locator('input').first().fill(val); await pg.waitForTimeout(150);
     const b=m.locator('.modal-actions button').last(); return {m,b,dis:await b.isDisabled(),txt:(await m.innerText()).replace(/\s+/g,' ')}; };
-  for(const val of ['3,86','3,4','2,1']){ const q=await qf(val); T('M15 Compila veloce «'+val+'»: pulsante spento con il motivo dei minuti', q.dis && /,00 ,17 ,25 ,33 ,50 ,67 ,75 ,83/.test(q.txt)); await q.m.locator('.modal-actions button').filter({hasText:'Annulla'}).click(); await pg.waitForTimeout(200); }
+  for(const val of ['3,86','3,4','2,1']){ const q=await qf(val); T('M15 Compila veloce «'+val+'»: pulsante spento con il motivo dei minuti', q.dis && /,000 ,167 ,250 ,333 ,500 ,667 ,750 ,833/.test(q.txt)); await q.m.locator('.modal-actions button').filter({hasText:'Annulla'}).click(); await pg.waitForTimeout(200); }
   let q=await qf('3,75'); T('M16 Compila veloce «3,75»: pulsante acceso', !q.dis);
   await q.m.locator('input[type=radio]').nth(2).check(); await q.m.locator('input[placeholder="es. 3, 7, 12"]').fill('4, 11, 14, 15'); await pg.waitForTimeout(150);
   const qtxt=(await q.m.innerText()).replace(/\s+/g,' ');
   T('M17 «Solo questi giorni: 4, 11, 14, 15» (4 e 11 domeniche): «saltati 2 giorni rossi», interessati 2', /Giorni interessati: 2/.test(qtxt) && /saltati 2 giorni rossi/.test(qtxt), qtxt.slice(qtxt.indexOf('Giorni interessati'),qtxt.indexOf('Giorni interessati')+120));
   await q.b.click(); await pg.waitForTimeout(300);
-  T('M18 i giorni rossi restano vuoti (4 e 11) e il 14 e il 15 hanno 3,75', (await C(4).inputValue())==='' && (await C(11).inputValue())==='' && (await C(14).inputValue())==='3,75' && (await C(15).inputValue())==='3,75');
+  T('M18 i giorni rossi restano vuoti (4 e 11) e il 14 e il 15 hanno 3,75', (await C(4).inputValue())==='' && (await C(11).inputValue())==='' && (await C(14).inputValue())==='3,750' && (await C(15).inputValue())==='3,750');
   /* ===== d) permesso orario ===== */
   const permApri=async(d)=>{ await G.locator('table.cal tr').nth(2).locator('td').nth(d-1).locator('.perm-flag').click(); await pg.waitForTimeout(300); return pg.locator('.modal'); };
   let pm=await permApri(16); const tipoInp=await pm.locator('.field input').first().getAttribute('type');
   await pm.locator('.field input').first().click(); await pg.keyboard.type('1,5'); await pm.locator('select').selectOption('EXF'); await pm.locator('.modal-actions button').last().click(); await pg.waitForTimeout(300);
   const lbl=(await G.locator('.perm-lbl').allInnerTexts()).join('|');
-  T('M19 permesso: casella di testo, «1,5» = 1,5 h (non 15)', tipoInp==='text' && /\+1,50 h EXF/.test(lbl), tipoInp+' / '+lbl);
+  T('M19 permesso: casella di testo, «1,5» = 1,5 h (non 15)', tipoInp==='text' && /\+1,500 h EXF/.test(lbl), tipoInp+' / '+lbl);
   pg._dialoghi=[]; pm=await permApri(17); await pm.locator('.field input').first().fill('1,3'); await pm.locator('select').selectOption('EXF'); await pm.locator('.modal-actions button').last().click(); await pg.waitForTimeout(300);
-  T('M20 permesso «1,3» rifiutato con i decimali ammessi', (pg._dialoghi||[]).some(x=>/,00 ,17 ,25/.test(x)) && await pg.locator('.modal').count()===1, (pg._dialoghi||[]).join('|'));
+  T('M20 permesso «1,3» rifiutato con i decimali ammessi', (pg._dialoghi||[]).some(x=>/,000 ,167 ,250/.test(x)) && await pg.locator('.modal').count()===1, (pg._dialoghi||[]).join('|'));
   await pg.locator('.modal .field input').first().fill('1,17'); await pg.locator('.modal .modal-actions button').last().click(); await pg.waitForTimeout(300);
   const pst=await pg.evaluate(()=>{ return null; });
   /* salvo e leggo l'archivio */
@@ -96,25 +96,25 @@ async function tsPdf(pg){ await K.vai(pg,'Ott'); await pg.getByRole('button',{na
   T('M22 TS di ottobre: un foglio per ogni mensilizzato (3)', PS.pagine.length===3, PS.pagine.length);
   for(const [id,nome] of [['q','PROVA QUINDICI'],['c','PROVA CINQUE'],['s','PROVA SEI']]){
     const pag=PS.pagine.find(p=>p.indexOf(nome)!==-1)||''; const righe=pag.split('\n').filter(l=>/^\s*\d{1,2} (lun|mar|mer|gio|ven|sab|dom)\b/.test(l));
-    const celle=[]; let crocetta=0; righe.forEach(l=>{ const croce=/†/.test(l); if(croce) crocetta++; (l.match(/\d+,\d\d/g)||[]).forEach((x,i)=>{ if(croce && i===0) return; celle.push(x); }); });
+    const celle=[]; let crocetta=0; righe.forEach(l=>{ const croce=/†/.test(l); if(croce) crocetta++; (l.match(/\d+,\d{3}/g)||[]).forEach((x,i)=>{ if(croce && i===0) return; celle.push(x); }); });
     const fuori=celle.filter(x=>!okPasso(n(x)));
     const tot=/TOTALE\s+([\d.,]+)(?: \*)?\s+([\d.,]+)\s+([\d.,]+)\s+([\d.,]+)/.exec(pag); const S=A[id].ts;
     T('M23 '+nome+': '+celle.length+' celle del TS tutte ammesse (,00 ,17 ,25 ,33 ,50 ,67 ,75 ,83)', celle.length>20 && fuori.length===0, fuori.join(' '));
     T('M24 '+nome+': TOTALE = componenti del TS (ordinarie '+R2(S.ordC)+' · suppl. '+R2(S.supp)+' · retribuite '+R2(S.ass)+' · trattenute '+R2(S.tratt)+')', tot && Math.abs(n(tot[1])-S.ordC)<0.006 && Math.abs(n(tot[2])-S.supp)<0.006 && Math.abs(n(tot[3])-S.ass)<0.006 && Math.abs(n(tot[4])-S.tratt)<0.006, tot&&tot.slice(1).join(' / '));
     T('M25 '+nome+': supplementari, retribuite e trattenute del totale sono al passo', tot && okPasso(n(tot[2])) && okPasso(n(tot[3])) && okPasso(n(tot[4])));
-    T('M26 '+nome+': box = TS = cedOre = denominatore del Costo orario (ott) = '+R2(S.ced), Math.abs(A[id].box.ced-R2(S.ced,2))<0.001 && Math.abs(A[id].ced-R2(S.ced,2))<0.001 && Math.abs(A[id].costo.H38-R2(S.ced,2))<0.001, JSON.stringify([A[id].box.ced,A[id].ced,A[id].costo.H38]));
+    T('M26 '+nome+': box = TS = cedOre = denominatore del Costo orario (ott) = '+R2(S.ced), Math.abs(A[id].box.ced-R2(S.ced,2))<0.0051 && Math.abs(A[id].ced-R2(S.ced,2))<0.001 && Math.abs(A[id].costo.H38-R2(S.ced,2))<0.001, JSON.stringify([A[id].box.ced,A[id].ced,A[id].costo.H38]));
     T('M27 '+nome+': supplementari del Costo orario = TS; consumo del Tetto = ced + erosive del TS', Math.abs(A[id].costo.supp-S.supp)<0.0006 && Math.abs(A[id].prod-R2(S.ced+S.ero,3))<0.0006, A[id].costo.supp+' / '+A[id].prod);
-    if(id==='q'){ T('M28 PROVA QUINDICI: ORE MESE 65,13 intatte (non 65,17), ordinarie 65,13 col «†» sull\'ultima riga e la nota dello scarto −0,04', /ORE MESE \(stipendio fisso\): 65,13 h/.test(pag) && crocetta===1 && /comprendono -0,04 h/.test(pag.replace(/\s+/g,' ')) && tot && n(tot[1])===65.13, 'croce '+crocetta+' · '+(tot&&tot[1]));
-      const conOrd=righe.filter(l=>/^\s*\d{1,2} \w{3}(?:\s+(?:AN|R|FESTNG))?\s+\d+,\d\d/.test(l)); const ult=conOrd[conOrd.length-1]||''; const vu=n((/\s(\d+,\d\d) †/.exec(ult)||[])[1]);
+    if(id==='q'){ T('M28 PROVA QUINDICI: ORE MESE 65,13 intatte (non 65,17), ordinarie 65,13 col «†» sull\'ultima riga e la nota dello scarto −0,04', /ORE CONTRATTUALI \(stipendio fisso\): 65,130 h/.test(pag) && crocetta===1 && /comprendono -0,037 h/.test(pag.replace(/\s+/g,' ')) && tot && n(tot[1])===65.13, 'croce '+crocetta+' · '+(tot&&tot[1]));
+      const conOrd=righe.filter(l=>/^\s*\d{1,2} \w{3}(?:\s+(?:AN|R|FESTNG))?\s+\d+,\d{3}/.test(l)); const ult=conOrd[conOrd.length-1]||''; const vu=n((/\s(\d+,\d{3}) †/.exec(ult)||[])[1]);
       T('M29 PROVA QUINDICI: la riga con lo scarto («†») è l\'ultima con ordinarie e vale un passo ammesso meno 0,04 ('+(ult.trim().slice(0,30))+')', /†/.test(ult) && okPasso(R2(vu+0.0367,2)), ult.trim()); }
     if(id==='c'){ const flat=pag.replace(/\s+/g,' ');
-      T('M30 PROVA CINQUE (5 gg a sett., quota 3,80 fuori griglia): FERIE 2 gg = 7,67 · MAL 3 gg = 11,33 · EXF 1,25 · ASS.ING 3,83', /FERIE 2 gg = 7,67 h/.test(flat) && /MAL 3 gg = 11,33 h/.test(flat) && /permessi EXF 1,25 h/.test(flat) && /DA TRATTENERE: 3,83 h/.test(flat), flat.slice(flat.indexOf('DA INSERIRE'),flat.indexOf('DA INSERIRE')+420)); }
+      T('M30 PROVA CINQUE (5 gg a sett., quota 3,80 fuori griglia): FERIE 2 gg = 7,67 · MAL 3 gg = 11,33 · EXF 1,25 · ASS.ING 3,83', /FERIE 2 gg = 7,667 h/.test(flat) && /MAL 3 gg = 11,333 h/.test(flat) && /permessi EXF 1,250 h/.test(flat) && /DA TRATTENERE: 3,833 h/.test(flat), flat.slice(flat.indexOf('DA INSERIRE'),flat.indexOf('DA INSERIRE')+420)); }
     if(id==='s'){ const cg=(await K.carta(pg,nome).locator('.cong').first().innerText()).replace(/\s+/g,' '); const mm=/Risultato del mese: ([+\-]?[\d.,]+)/.exec(cg);
       T('M31 PROVA SEI: il Risultato del mese del Tabellone resta il VERO a 3 decimali ('+(mm&&mm[1])+'), il TS porta le supplementari al passo ('+R2(S.supp,2)+')', mm && /,\d{3}$/.test(mm[1]) && Math.abs(n(mm[1])-A.s.banca)<0.0006 && !okPasso(A.s.banca) && okPasso(R2(S.supp,2)) && Math.abs(A.s.banca-S.supp)<0.09, cg.slice(0,140)); }
   }
   /* box a video = TS */
   await K.vai(pg,'Ott'); const bx=(await K.carta(pg,'PROVA CINQUE').locator('.ced-box').innerText()).replace(/\s+/g,' ');
-  T('M32 box a video di PROVA CINQUE: ferie 7,67 · altre 11,33 · permessi 1,25 · da trattenere 3,83 (gli stessi numeri del TS)', /di cui ferie 7,67 h/.test(bx) && /altre assenze retribuite 11,33 h/.test(bx) && /permessi retribuiti 1,25 h/.test(bx) && /da trattenere 3,83 h/.test(bx), bx.slice(0,300));
+  T('M32 box a video di PROVA CINQUE: ferie 7,67 · altre 11,33 · permessi 1,25 · da trattenere 3,83 (gli stessi numeri del TS)', /di cui ferie 7,667 h/.test(bx) && /altre assenze retribuite 11,333 h/.test(bx) && /permessi retribuiti 1,250 h/.test(bx) && /da trattenere 3,833 h/.test(bx), bx.slice(0,300));
   /* ===== mesi non a cedolino mensilizzato: identici alla ver183 ===== */
   const V=await K.apri(br,{ver:'ver183',stato:ST}); const B=await motore(V.pg);
   const ugu=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
@@ -190,7 +190,7 @@ async function tsPdf(pg){ await K.vai(pg,'Ott'); await pg.getByRole('button',{na
   await pd.waitForSelector('.app-header',{timeout:20000}).catch(()=>{}); await pd.waitForTimeout(800);
   await pd.locator('.tabs .tab').nth(9).click(); await pd.waitForTimeout(500);
   const v5=await pd.locator('.emp-card').first().locator('table.cal tr').nth(2).locator('td').nth(4).locator('input.cell-in').inputValue();
-  T('M49 5) rientrando con lo stesso account la modifica è ancora a video e il 💾 è acceso', v5==='6,25' && await pd.locator('.btn-save.dirty').count()===1, v5);
+  T('M49 5) rientrando con lo stesso account la modifica è ancora a video e il 💾 è acceso', v5==='6,250' && await pd.locator('.btn-save.dirty').count()===1, v5);
   await pd.locator('.btn-save').click(); await pd.waitForTimeout(1200);
   const cloud1=await pd.evaluate(()=>__fakefb.get('spazio-ireos-foglio-ore','report-ore-mensile/ADMIN0001'));
   T('M50 5) col 💾 la modifica arriva nel cloud', cloud1.dati['2026-10'].d1.giorni['5']==='6,25');

@@ -71,12 +71,12 @@ const ver=process.argv[2]||'dip';
   await pg.getByRole('button',{name:'+ Aggiungi servizio'}).click(); await pg.getByRole('button',{name:'+ Aggiungi servizio'}).click(); await pg.waitForTimeout(100);
   const nomi=pg.locator('input[placeholder="nome del servizio"]'), ore=pg.locator('input[placeholder="ore"]');
   await nomi.nth(0).fill('SERVIZIO UNO'); await ore.nth(0).fill('200'); await nomi.nth(1).fill('SERVIZIO DUE'); await ore.nth(1).fill('208,5'); await pg.waitForTimeout(150);
-  T('A04.19 servizio per servizio: totale 408,50 mostrato mentre si scrive', /Totale delle righe: 408,50 h/.test(await pg.locator('.ana-sheet').innerText()));
+  T('A04.19 servizio per servizio: totale 408,500 mostrato mentre si scrive', /Totale delle righe: 408,500 h/.test(await pg.locator('.ana-sheet').innerText()));
   await ore.nth(1).fill('-208,5'); await pg.getByRole('button',{name:'✔ Aggiungi'}).first().click(); await pg.waitForTimeout(200);
   T('A04.20 una riga con ore negative ferma il salvataggio col motivo', /servono sia il nome sia le ore/.test(await pg.locator('.ana-sheet').innerText()));
   await ore.nth(1).fill('208,5'); await pg.getByRole('button',{name:'✔ Aggiungi'}).first().click(); await pg.waitForTimeout(300);
   const mx=(await pg.locator('.ana-sheet').innerText()).replace(/\s+/g,' ');
-  T('A04.21 massimale registrato con il dettaglio «SERVIZIO UNO 200,00 h · SERVIZIO DUE 208,50 h»', /SERVIZIO UNO 200,00 h · SERVIZIO DUE 208,50 h/.test(mx) && /408,5/.test(mx));
+  T('A04.21 massimale registrato con il dettaglio «SERVIZIO UNO 200,000 h · SERVIZIO DUE 208,500 h»', /SERVIZIO UNO 200,000 h · SERVIZIO DUE 208,500 h/.test(mx) && /408,5/.test(mx));
   /* Mensilizza tutti */
   await pg.getByRole('button',{name:/Mensilizza tutti dal mese/}).click(); await pg.waitForTimeout(300);
   const pan=(await pg.locator('.content').innerText()).replace(/\s+/g,' ');

@@ -14,8 +14,17 @@ async function giro(br,ver,w){ const {ctx,pg,E}=await K.apri(br,{ver,w}); const 
       T('A07 '+w+'px '+nome+': nessuno scorrimento laterale', !A.lato, A.SW+'/'+A.W);
       T('A07 '+w+'px '+nome+': scritte <12,5px fuori dalle griglie non aumentate rispetto alla ver182 ('+A.piccole+' vs '+B.piccole+')', A.piccole<=B.piccole, A.esempi.join(' | '));
       T('A07 '+w+'px '+nome+': comandi <32px non aumentati ('+A.bassi+' vs '+B.bassi+')', A.bassi<=B.bassi);
-      if(w===1280){ const ta=a.out[nome].testo, tb=b.out[nome].testo; let i=0; while(i<ta.length&&ta[i]===tb[i]) i++;
-        T('A07 non regressione a video, '+nome+': testo della vista identico alla ver182', ta===tb, ta===tb?'':('diverge al carattere '+i+': «'+ta.slice(Math.max(0,i-40),i+60)+'» vs «'+tb.slice(Math.max(0,i-40),i+60)+'»')); }
+      /* ver185: le ore si scrivono a TRE decimali e due diciture sono cambiate (scelte da Christian il 19/11/2026):
+         si riportano le due diciture a com'erano, poi si confrontano le PAROLE identiche e i NUMERI uno per uno, con
+         la tolleranza del mezzo centesimo (3,167 contro 3,17). Qualunque altra parola o numero diverso lo fa cadere. */
+      const dic=(t)=>t.replace(/ORE DA FAR RISULTARE NEL TOTALE PER AVERE LE ORE CONTRATTUALI/g,'ORE CORRETTE DA DARE').replace(/ORE CONTRATTUALI/g,'ORE MESE').replace(/ore contrattuali/g,'ore mese');
+      const RX=/\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d+(?:,\d+)?/g;
+      const pezzi=(t)=>({ parole:dic(t).split(RX), numeri:(dic(t).match(RX)||[]).map(x=>parseFloat(x.replace(/\./g,'').replace(',','.'))) });
+      if(w===1280){ const A2=pezzi(a.out[nome].testo), B2=pezzi(b.out[nome].testo); let dove='';
+        if(A2.parole.length!==B2.parole.length) dove='numero di pezzi '+A2.parole.length+' vs '+B2.parole.length;
+        else { for(let k=0;k<A2.parole.length && !dove;k++){ if(A2.parole[k]!==B2.parole[k]) dove='parole: «'+A2.parole[k].slice(0,80)+'» vs «'+B2.parole[k].slice(0,80)+'»';
+          else if(k<A2.numeri.length && Math.abs(A2.numeri[k]-B2.numeri[k])>0.0051) dove='numero dopo «'+A2.parole[k].slice(-40)+'»: '+A2.numeri[k]+' vs '+B2.numeri[k]; } }
+        T('A07 non regressione a video, '+nome+': testo della vista identico alla ver182 (a meno dei decimali e delle due diciture nuove)', !dove, dove); }
     }
     T('A07 '+w+'px zero errori di pagina (ver183)', a.E.length===0, a.E.join('|'));
     if(w===1280){ const ha=a.head.replace(/\s+/g,' '), hb=b.head.replace(/\s+/g,' ');

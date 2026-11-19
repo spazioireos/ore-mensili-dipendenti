@@ -30,6 +30,7 @@ node collaudo/ver183.cjs                  # collaudo della ver183 (27 controlli;
 | `ver182.cjs` | quota del giorno, trattenute solo ASS.ING/ASP 0h, box, riquadro, report «conto per le paghe», gli altri quattro report, confronto con la ver181, 390 e 1280 px | 44/0 (ver184: i quattro report tolti dalla ver183 si generano chiamando la funzione, e la versione nei nomi dei file si legge dal file dell'app) |
 | `ver183.cjs` | «Report PDF A4 per le paghe»: due soli pulsanti, un foglio per mensilizzato, TOTALE = voci del cedolino, ORE MESE = somma, = `cedOre`, MAL/ASS.ING, settembre, Report PDF A4 ancora generato | 27/0 |
 | `ver184.cjs` | regola dei minuti (celle, Compila veloce, permesso, lettura dei sesti), TS al passo con lo scarto delle ORE MESE sull'ultima riga, box = TS = `cedOre` = Costo orario = Tetto, Risultato vero, mesi non mensilizzati come la ver183, le cinque correzioni del collaudo (il punto 5 sul banco comune 8344: `node collaudo/ver184.cjs 8344`) | 65/0 |
+| `ver185.cjs` | ore a tre decimali (celle, pillole, TOT, box, permessi, Riepiloghi, Costo orario, TS), regola dei minuti a tre cifre (,167 ,250 …), caratteri al 90% nelle caselle, «ORE CONTRATTUALI» e «ORE DA FAR RISULTARE NEL TOTALE PER AVERE LE ORE CONTRATTUALI», nessun numero diverso dalla ver184 (banco preparato con ver184) | 30/0 |
 
 La batteria storica (circa 40 script fino alla ver181) è andata persa con il contenitore il 15-19/11/2026:
 va ricostruita qui, un pezzo alla volta.
