@@ -3,7 +3,7 @@
 Il contenitore in cui lavora Claude può essere ricreato in qualunque momento: resta solo quello che è su
 GitHub. Per questo qui dentro ci sono gli script di prova e tutto ciò che serve a ricostruire il banco.
 
-**Solo dati INVENTATI.** Il repository è pubblico: backup veri, cedolini e LUL stanno nel cartella privata di Google Drive
+**Solo dati INVENTATI.** Il repository è pubblico: backup veri, cedolini e LUL stanno nella cartella privata di Google Drive
 «Dati collaudo Spazio Ireos», mai qui.
 
 ## Come si usa
