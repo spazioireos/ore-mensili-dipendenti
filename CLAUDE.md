@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver186 · 19nov26 (IN ANTEPRIMA, da approvare; contiene anche la ver185, ancora da approvare).** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver186 · 19nov26 (con ver184 e ver185, approvata da Christian e portata su `main` il 19/11/2026: «main per le tre app»).** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -37,7 +37,7 @@ Banca ore, tetto annuo, contratti e export.
   Corretto anche un difetto **preesistente** che la nuova navigazione rendeva visibile: nella
   testata, in vista Anagrafica, compariva "📅 undefined 2026" (perché `mese` è `null` fuori dalle
   viste mensili); ora mostra "📇 Anagrafica".
-- ✏️ **ver186 (19/11/2026, IN ANTEPRIMA, da approvare): ENTRANDO IN UNA CELLA DELLE ORE IL CONTENUTO SI SELEZIONA TUTTO**
+- ✏️ **ver186 (19/11/2026, approvata da Christian e portata su `main` il 19/11/2026: «main per le tre app»): ENTRANDO IN UNA CELLA DELLE ORE IL CONTENUTO SI SELEZIONA TUTTO**
   (Christian: «consenti, quando entro in una cella per compilare le ore, che la precedente scritta si selezioni tutta e io
   ci scriva sopra»). Sopra la ver185, che resta da approvare.
   - **Celle del Tabellone** (`CellInput`): entrando (clic, tocco o Tab) tutto il contenuto è selezionato e il primo tasto
@@ -61,7 +61,7 @@ Banca ore, tetto annuo, contratti e export.
   - **Provato**: `collaudo/ver186.cjs` **20/0** (confronto con la ver185 congelata, dove il clic metteva il cursore in fondo);
     `ver185.cjs` **30/0** · `a02-tabellone` **49/1** · `a07-grafica-nonregr` **64/0** (il fallito di `a02`, A02.35 «permesso
     di 20 h», è identico sulla ver185: tetto delle 13 ore non applicato al permesso, già dichiarato nella ver184).
-- 🔢 **ver185 (19/11/2026, IN ANTEPRIMA, da approvare): LE ORE SEMPRE A TRE DECIMALI, E DUE DICITURE NUOVE**
+- 🔢 **ver185 (19/11/2026, approvata da Christian e portata su `main` il 19/11/2026: «main per le tre app»): LE ORE SEMPRE A TRE DECIMALI, E DUE DICITURE NUOVE**
   (Christian, dopo le anteprime della ver184: «Main, ma dammi **tre decimali sempre**, riducendo eventualmente al **90%
   la larghezza del font nelle celle**»; sulle 12 celle fuori griglia: «**lascia 3 decimali**»).
   - 🏷️ **DUE DICITURE SCELTE DA CHRISTIAN IL 19/11/2026**, valide in tutta l'app: «ORE CORRETTE DA DARE» →
@@ -101,7 +101,7 @@ Banca ore, tetto annuo, contratti e export.
     numeri: **da decidere con Christian**.
   - **Provato**: `collaudo/ver185.cjs` **30/0** (confronto diretto con la ver184 congelata); batteria nella tabella di
     `collaudo/LEGGIMI.md`.
-- ⏱ **ver184 (19/11/2026, IN ANTEPRIMA, da approvare): LA REGOLA DEI MINUTI, IL «TS» CON GLI STESSI NUMERI
+- ⏱ **ver184 (19/11/2026, approvata da Christian e portata su `main` il 19/11/2026: «main per le tre app»): LA REGOLA DEI MINUTI, IL «TS» CON GLI STESSI NUMERI
   OVUNQUE, E CINQUE CORREZIONI DEL COLLAUDO** (Nu\* di Christian del 19/11/2026).
   - ⏱ **La regola (sua)**: le ore si scrivono e si mostrano solo coi decimali di 0, 10, 15, 20, 30, 40, 45, 50 minuti:
     **,00 ,17 ,25 ,33 ,50 ,67 ,75 ,83** (o ,0 / ,5). «sì a 3,75, no a 3,86». «Ovunque» = celle, Compila veloce, permesso
