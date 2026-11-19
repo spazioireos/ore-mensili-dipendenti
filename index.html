@@ -500,7 +500,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver182";
+const APP_VER = "ver183";
 const APP_DATA = "19nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -2671,6 +2671,180 @@ function esportaPDFConto(state, pairs){
   });
   if (first){ doc.setFontSize(12); doc.text("Nessun dato nel periodo selezionato", 14, 24); }
   doc.save(fileName("pdf", "Conto ore per le paghe"));
+}
+
+/* ===== ver183: «🖨️ Report PDF A4 per le paghe» — QUELLO CHE DEVE RISULTARE A CEDOLINO ============
+   Christian (19/11/2026): «dobbiamo creare un report ore pdf che li obblighi a fare come vogliamo … per
+   ogni mese un report per persona con colonna ordinaria, colonna straordinaria e colonna assenza
+   giustificata e colonna assenza asp0h o ass ing», poi «Lascerei solo il primo dei report, quello puro
+   ore. Poi farei il secondo con quello di cui hai detto ora», e sulle ore sotto l'orario: «Nel tabellone
+   voglio il vero. Per l'ufficio paghe quello che deve risultare a cedolino mensilizzato. È sulla base di
+   ciò che devi ragionare». Supplementari: «nei giorni con più ore».
+   - Un foglio A4 per ogni MENSILIZZATO (meseCedolinoTetto) con dati nel mese; righe = giorni.
+   - Le colonne NON sono le ore lavorate (quelle restano nel Tabellone e nel Report PDF A4): sono le ore
+     DA RIPORTARE A CEDOLINO, distribuite sui giorni, e i loro totali sono ESATTAMENTE le voci del cedolino
+     (stessi numeri di oreSuppPeriodo, del box «Da inserire a cedolino» e di cedOre per USOINT):
+       Ordinarie        = ordCed (ore mese − assenze pagate − festività godute − trattenute), sui giorni
+                          lavorati in proporzione alle ore ordinarie del giorno;
+       Supplementari    = il Risultato del mese, messo sui giorni andati più oltre la quota;
+       Assenze retribuite = ferie, malattia, festività godute, permessi orari: giorno per giorno a quota;
+       Non retribuite   = le ore da trattenere (solo ASS.ING / ASP 0h), sui loro giorni.
+     Così ordinarie + assenze retribuite + da trattenere = ORE MESE (stipendio fisso) e non resta niente da
+     ricalcolare. Ogni colonna quadra al centesimo col metodo dei resti più grandi.
+   - Nessun calcolo nuovo: legge e distribuisce. ⚠️ Diciture nuove, scritte da Claude. */
+function distCentesimi(pesi, totale){
+  const T = Math.round(R2(totale, 2) * 100);
+  const n = pesi.length, out = new Array(n).fill(0);
+  const S = pesi.reduce(function(a, w){ return a + (w > 0 ? w : 0); }, 0);
+  if (!(T > 0) || !(S > 0)) return out;
+  const fr = [];
+  let usati = 0;
+  for (let i = 0; i < n; i++){
+    const w = pesi[i] > 0 ? pesi[i] : 0;
+    const x = w / S * T;
+    out[i] = Math.floor(x + 1e-9); usati += out[i];
+    fr.push({ i:i, r: x - out[i], w:w });
+  }
+  fr.sort(function(a, b){ return (b.r - a.r) || (b.w - a.w); });
+  for (let k = 0; usati < T && k < fr.length * 2; k++){ const c = fr[k % fr.length]; if (c.w > 0){ out[c.i]++; usati++; } }
+  return out.map(function(c){ return c / 100; });
+}
+function esportaPDFPaghe(state, pairs){
+  ggComuneAggiorna(state);
+  const JsPDF = window.jspdf.jsPDF;
+  const doc = new JsPDF({ orientation:"portrait", unit:"mm", format:"a4" });
+  const dips = dipSorted(state);
+  const fh = function(x){ return fmt2(x); };
+  let first = true, prodotto = false;
+  const nuovaPagina = function(){ if (!first) doc.addPage(); first = false; };
+  pairs.forEach(function(pr){
+    const anno = pr.y, m = pr.m;
+    const fset = festivitaSet(anno), nd = daysInMonth(anno, m);
+    const dipsMese = dips.filter(function(dp){ return meseCedolinoTetto(dp, anno, m) && meseFrazione(dp, anno, m) > 0; });
+    const senzaDati = [];
+    dipsMese.forEach(function(dp){
+      const rec = getRecFrom(state, anno, m, dp.id);
+      if (!recHasData(rec)){ senzaDati.push(dp.nome); return; }
+      const r = oreSuppPeriodo(state, dp, [{ y:anno, m:m }], null, null, 0).righe[0];
+      if (!r) return;
+      const q = quotaGiorno(dp, anno, m);
+      const qF = oreSettAt(dp, anno, m) / ggSettDi(state, dp);
+      const gs = Math.max(1, Math.round(ggSettPersona(dp)));
+      const g = rec.giorni || {};
+      const P = rec.permessi || {};
+      const rows = [];
+      for (let d = 1; d <= nd; d++){
+        const cv = String(g[d] == null ? "" : g[d]).trim();
+        const wd = weekdayOf(anno, m, d), dom = (wd === 0);
+        const festivo = isFestivo(fset, m, d);
+        const inForce = inForceAt(dp, anno*10000 + m*100 + d);
+        const isCode = CODE_SET[cv] !== undefined;
+        const previsto = inForce && !dom && wd <= gs;                     /* giorno dell'orario (come oreRetribuibili) */
+        const h = (inForce && !isCode && cv !== "") ? Math.max(0, parseHour(cv)) : 0;
+        const ret = [];                                                    /* assenze retribuite del giorno: {cod, w} */
+        if (inForce && copreOre(cv)) ret.push({ cod:cv, w:q });
+        if (inForce && festivo && !dom && !(isCode && cv !== "--" && cv !== "AN")) ret.push({ cod:"FEST", w:qF });
+        const pObj = P[d];
+        if (inForce && pObj && Number(pObj.ore) > 0 && PERM_CODES.indexOf(String(pObj.tipo || "").trim().toUpperCase()) !== -1)
+          ret.push({ cod:String(pObj.tipo).trim().toUpperCase(), w:Number(pObj.ore) });
+        const nr = (inForce && isCode && CODE_SET[cv].pay === false) ? cv : "";
+        let nota = "";
+        if (!inForce) nota = "fuori contratto";
+        else if (cv === "AN") nota = "AN";
+        else if (cv === "--" || (cv === "" && dom)) nota = "R";
+        else if (cv === "FESTNG") nota = "FESTNG";
+        rows.push({ d:d, label: d + " " + WD[wd], h:h, base: previsto ? q : 0, ret:ret, nr:nr, nota:nota, rosso: (dom || festivo), s:0, o:0, retH:[], nrH:0 });
+      }
+      /* 1) supplementari: il totale del mese sui giorni andati più oltre la quota */
+      const SUPP = R2(r.supp, 2);
+      let resto = Math.round(SUPP * 100);
+      const ord = rows.map(function(x, i){ return { i:i, e: Math.round(Math.max(0, x.h - x.base) * 100), h: Math.round(x.h * 100) }; })
+        .filter(function(x){ return x.h > 0; }).sort(function(a, b){ return (b.e - a.e) || (b.h - a.h) || (a.i - b.i); });
+      ord.forEach(function(x){ if (resto <= 0) return; const t = Math.min(resto, x.e); rows[x.i].s += t; resto -= t; });
+      ord.forEach(function(x){ if (resto <= 0) return; const t = Math.min(resto, x.h - rows[x.i].s); rows[x.i].s += t; resto -= t; });
+      rows.forEach(function(x){ x.s = x.s / 100; });
+      /* 2) ordinarie a cedolino, sui giorni lavorati in proporzione a ciò che resta dopo le supplementari */
+      const ORD = R2(r.ordCed, 2);
+      const oDist = distCentesimi(rows.map(function(x){ return Math.max(0, x.h - x.s); }), ORD);
+      rows.forEach(function(x, i){ x.o = oDist[i]; });
+      const ordSenzaGiorni = (ORD > 0.004 && !rows.some(function(x){ return x.h - x.s > 0.0005; }));
+      /* 3) assenze retribuite, a quota, quadrate al totale del cedolino */
+      const RET = R2(r.ass + r.fest, 2);
+      const flat = []; rows.forEach(function(x, i){ x.ret.forEach(function(a, j){ flat.push({ i:i, j:j, w:a.w }); }); });
+      const rDist = distCentesimi(flat.map(function(f){ return f.w; }), RET);
+      flat.forEach(function(f, k){ rows[f.i].retH[f.j] = rDist[k]; });
+      /* 4) da trattenere (solo ASS.ING / ASP 0h) sui loro giorni */
+      const TR = R2(r.tratt, 2);
+      const nDist = distCentesimi(rows.map(function(x){ return x.nr ? q : 0; }), TR);
+      rows.forEach(function(x, i){ x.nrH = nDist[i]; });
+      const vuoto = "";
+      const body = rows.map(function(x){
+        const retT = x.ret.map(function(a, j){ return a.cod + " " + fh(x.retH[j] || 0); }).join(" · ");
+        const nrT = x.nr ? (x.nr + " " + fh(x.nrH)) : vuoto;
+        return [ x.label + (x.nota ? "  " + x.nota : ""), x.o > 0.004 ? fh(x.o) : vuoto, x.s > 0.004 ? fh(x.s) : vuoto, retT, nrT ];
+      });
+      const sumCol = function(fn){ return R2(rows.reduce(function(a, x){ return a + fn(x); }, 0), 2); };
+      const tO = sumCol(function(x){ return x.o; }), tS = sumCol(function(x){ return x.s; });
+      const tR = sumCol(function(x){ return x.retH.reduce(function(a, v){ return a + (v || 0); }, 0); }), tN = sumCol(function(x){ return x.nrH; });
+      nuovaPagina(); prodotto = true;
+      doc.setFontSize(13); doc.setFont(undefined, "bold"); doc.setTextColor(15,39,64);
+      doc.text("Spazio Ireos — Ore da riportare a cedolino (mensilizzato)", 14, 14);
+      doc.setFontSize(11.5); doc.setFont(undefined, "normal");
+      doc.text(dp.nome + "   ·   " + MONTH_LABEL[m-1] + " " + anno, 14, 21);
+      doc.setFontSize(8.5); doc.setTextColor(70,70,70);
+      doc.text("Ore settimanali " + fh(oreSettAt(dp, anno, m)) + " · quota del giorno " + fh(q) + " h. Le ore di ogni giorno sono quelle da riportare sul cedolino mensilizzato: i totali delle colonne sono le voci del cedolino, da non ricalcolare. Le ore realmente lavorate sono nel Report PDF A4.", 14, 26, { maxWidth: 182 });
+      const rosse = []; rows.forEach(function(x, i){ if (x.rosso) rosse.push(i); });
+      doc.autoTable({
+        startY: 35,
+        head: [["Giorno", "Ordinarie", "Supplementari", "Assenze retribuite", "Non retribuite (ASS.ING / ASP 0h)"]],
+        body: body,
+        foot: [["TOTALE", fh(tO) + (ordSenzaGiorni ? " *" : ""), fh(tS), fh(tR), fh(tN)]],
+        styles:{ fontSize:8, cellPadding:1.05, valign:"middle", lineColor:[214,214,214], lineWidth:0.1 },
+        headStyles:{ fillColor:[15,39,64], textColor:[255,255,255], fontSize:8.5, fontStyle:"bold", halign:"center" },
+        footStyles:{ fillColor:[234,240,250], textColor:[15,39,64], fontStyle:"bold", halign:"center" },
+        columnStyles:{ 0:{ halign:"left", cellWidth:36 }, 1:{ halign:"center", cellWidth:26 }, 2:{ halign:"center", cellWidth:28 }, 3:{ halign:"left", cellWidth:52 }, 4:{ halign:"left" } },
+        margin:{ left:14, right:14 },
+        didParseCell: function(data){
+          if (data.section === "body" && rosse.indexOf(data.row.index) !== -1) data.cell.styles.fillColor = [252,238,238];
+          if (data.section === "body" && data.column.index === 2 && String(data.cell.raw || "") !== "") data.cell.styles.textColor = [176,42,42];
+          if (data.section === "body" && data.column.index === 4 && String(data.cell.raw || "") !== "") data.cell.styles.textColor = [154,52,18];
+        }
+      });
+      let y = doc.lastAutoTable.finalY + 6;
+      if (y > 250){ doc.addPage(); y = 18; }
+      const am = assMese(rec, dp, anno, m);
+      const voci = [];
+      Object.keys(am.cop.perCod).sort().forEach(function(c){ voci.push(c + " " + am.cop.perCod[c] + " gg"); });
+      if (r.festGG > 0) voci.push("festività godute " + r.festGG + " gg");
+      if (r.perm > 0.004) voci.push("permessi " + fh(r.perm) + " h");
+      const ngG = contaFestivita([{ y:anno, m:m }], dp).non;
+      const ngO = R2(ngG * q, 2);
+      const righe = [
+        "ORE MESE (stipendio fisso): " + fh(r.monteP) + " h  =  ordinarie " + fh(tO) + "  +  assenze retribuite " + fh(tR) + "  +  da trattenere " + fh(tN),
+        "SUPPLEMENTARI da pagare: " + (tS > 0.004 ? fh(tS) + " h" : "nessuna"),
+        "DA TRATTENERE: " + (tN > 0.004 ? fh(tN) + " h (solo assenze ingiustificate ASS.ING e aspettative non pagate ASP 0h)" : "nessuna: lo stipendio fisso è intero"),
+        "FESTIVITÀ NON GODUTE da pagare in più: " + (ngG > 0 ? ngG + " gg = " + fh(ngO) + " h" : "nessuna"),
+        "Assenze retribuite: " + (voci.length ? voci.join(" · ") : "nessuna")
+      ];
+      if (ordSenzaGiorni) righe.push("* ore ordinarie a cedolino senza giorni lavorati nel mese: vanno nel totale.");
+      doc.setFontSize(9.5); doc.setTextColor(15,39,64);
+      let hB = 5;
+      const linee = righe.map(function(t){ const ls = doc.splitTextToSize(t, 176); hB += ls.length * 4.6; return ls; });
+      if (doc.setDrawColor) doc.setDrawColor(90,156,226);
+      if (doc.setFillColor) doc.setFillColor(248,251,255);
+      if (doc.roundedRect) doc.roundedRect(14, y, 182, hB, 2, 2, "FD"); else if (doc.rect) doc.rect(14, y, 182, hB, "FD");
+      doc.setFont(undefined, "bold"); doc.text("DA INSERIRE A CEDOLINO", 17, y + 5); doc.setFont(undefined, "normal");
+      let yy = y + 5;
+      linee.forEach(function(ls, k){ if (k === 0) yy += 0; doc.text(ls, 17, yy + 4.6); yy += ls.length * 4.6; });
+    });
+    if (dipsMese.length > 0 && senzaDati.length === dipsMese.length){
+      nuovaPagina(); prodotto = true;
+      doc.setFontSize(11); doc.setTextColor(120,20,20);
+      doc.text(MONTH_LABEL[m-1] + " " + anno + ": nessun mensilizzato ha il mese compilato.", 14, 20);
+    }
+  });
+  if (!prodotto){ doc.setFontSize(12); doc.setTextColor(120,20,20); doc.text("Nessun dipendente mensilizzato con dati nel periodo scelto (la base mensile parte da ottobre 2026).", 14, 20, { maxWidth: 182 }); }
+  doc.save(fileName("pdf", "Ore da riportare a cedolino"));
 }
 
 /* ===== ver164: REPORT A4 "ORDINARIO / EXTRA GIORNALIERO" per l'ufficio paghe ===============
@@ -8388,13 +8562,10 @@ function App(){
         {canRestoreImport ? <button className="btn btn-ghost" onClick={onRestoreImport} title="Annulla l ultimo import e torna allo stato precedente">↩︎ Annulla import</button> : null}
         <button className="btn btn-ghost" onClick={function(){ setExportModal("Excel"); }}>📊 Excel</button>
         <button className="btn btn-ghost" onClick={function(){ setExportModal("PDF"); }}>🖨️ Report PDF A4</button>
-        {/* ver153: il report per l'ufficio paghe. Dicitura del pulsante SCELTA da Christian. */}
-        <button className="btn btn-ghost" onClick={function(){ setExportModal("PDF A4 mensilizz."); }}>🖨️ Report PDF A4 mensilizz.</button>
-        <button className="btn btn-ghost" onClick={function(){ setExportModal("PDF A4 paghe e LUL"); }}>🖨️ Report PDF A4 paghe e LUL</button>
-        {/* ver163: report giornaliero ordinario/extra per l'ufficio paghe. Dicitura nuova, scritta da Claude. */}
-        <button className="btn btn-ghost" onClick={function(){ setExportModal("PDF A4 ord/extra"); }}>🖨️ Report PDF A4 ord/extra</button>
-        {/* ver182: il conto delle ore per le paghe (anteprima approvata da Christian). Dicitura nuova, scritta da Claude. */}
-        <button className="btn btn-ghost" onClick={function(){ setExportModal("PDF A4 conto per le paghe"); }}>🖨️ Report PDF A4 conto per le paghe</button>
+        {/* ver183 (Christian 19/11/2026: «Lascerei solo il primo … poi farei il secondo»): tolti i pulsanti dei report
+            mensilizz., paghe e LUL, ord/extra e conto per le paghe (le loro funzioni restano nel file, non più richiamate);
+            al loro posto un solo report per le paghe. Dicitura nuova, scritta da Claude. */}
+        <button className="btn btn-ghost" onClick={function(){ setExportModal("PDF A4 per le paghe"); }}>🖨️ Report PDF A4 per le paghe</button>
         {!FB_READY ? <button className="btn btn-ghost" onClick={changePin}>🔑 PIN</button> : null}
         {FB_READY ? <button className="btn btn-ghost" onClick={function(){ if (dirty && !window.confirm("Ci sono modifiche non salvate. Uscire comunque?")) return; firebase.auth().signOut(); }}>Esci</button> : null}
         <input ref={fileRef} type="file" accept=".xlsx,.xls,.json" className="hidden-file" onChange={onImportFile} />
@@ -8513,7 +8684,7 @@ function App(){
 
       {quickFill ? <QuickFillModal dp={quickFill} rec={getRecFrom(state, anno, mese, quickFill.id)} anno={anno} mese={mese} fset={fset} onApply={onQuickFillApply} onClose={function(){ setQuickFill(null); }} /> : null}
       {exportModal ? <ExportModal kind={exportModal} anni={state.anni} annoCorrente={anno} meseCorrente={mese}
-        onGenera={function(pairs){ if (exportModal === "Excel") esportaExcel(state, pairs); else if (exportModal === "PDF A4 mensilizz.") esportaPDFMens(state, pairs); else if (exportModal === "PDF A4 ord/extra") esportaPDFOrdExtra(state, pairs); else if (exportModal === "PDF A4 conto per le paghe") esportaPDFConto(state, pairs); else if (exportModal === "PDF A4 paghe e LUL") esportaPDF(state, pairs, { lul:true }); else esportaPDF(state, pairs); setExportModal(null); }}
+        onGenera={function(pairs){ if (exportModal === "Excel") esportaExcel(state, pairs); else if (exportModal === "PDF A4 per le paghe") esportaPDFPaghe(state, pairs); else esportaPDF(state, pairs); setExportModal(null); }}
         onClose={function(){ setExportModal(null); }} /> : null}
       {permModal ? (function(){
         const rc = getRecFrom(state, anno, mese, permModal.dipId);
