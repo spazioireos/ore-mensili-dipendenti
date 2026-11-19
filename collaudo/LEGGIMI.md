@@ -32,3 +32,5 @@ node collaudo/ver183.cjs                  # collaudo della ver183 (27 controlli;
 
 La batteria storica (circa 40 script fino alla ver181) è andata persa con il contenitore il 15-19/11/2026:
 va ricostruita qui, un pezzo alla volta.
+| `a00-comune.cjs` | funzioni comuni agli script a01…a08 (seme inventato, PIN, cattura dei file) | — |
+| `a01-accesso-viste.cjs` … `a08-ritest-storici.cjs` | collaudo di Livello A del 19/11/2026: accesso e viste, Tabellone, dati/backup/import, Anagrafica, Costo orario, report ed export, grafica e non regressione, ritest ver176-183. Accettano `ver182` come argomento per il confronto | 32/32 · 47/50 · 26/27 · 26/30 · 27/28 · 22/22 · 64/64 · 10/10 (i falliti sono difetti preesistenti, identici sulla ver182) |
