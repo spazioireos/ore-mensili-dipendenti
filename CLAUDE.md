@@ -65,8 +65,11 @@ Banca ore, tetto annuo, contratti e export.
       «Segnalati a Fogli ore come dipendenti: N.» e «Nessun residuo da pubblicare.».
     - ⚠️ **Regole Firestore NON toccate**: lasciano all'admin scrivere `residui` senza vincoli di campi.
   - 📨 **2 — la pastiglia nel Tabellone, nella testata della scheda accanto al nome** (solo lettura). `foLeggiMese` tiene ora
-    anche i documenti interi e **`foChiusuraMese(tsList)`** (con `foTempoMs`) dà `{chiuso, completamento, at}`: chiuso se
-    **almeno un servizio** ha `meseChiuso:true`; se i servizi discordano **«si» vince**. Passa da `foConfronta`
+    anche i documenti interi e **`foChiusuraMese(tsList)`** (con `foTempoMs`) dà `{chiuso, completamento, at}`: chiuso solo se
+    **OGNI foglio del mese con dati** è chiuso (`meseChiuso:true`, oppure `workerConfirmed` con `completamento`: la stessa
+    regola di Fogli ore rev 19); se i servizi discordano **«si» vince**. ⚠️ Prima stesura: «almeno un servizio» — la prova
+    integrata `ic-01-b10-chiusura` (B10-18) ha mostrato che, riaprendo l'admin un solo servizio, Fogli ore ripresentava la
+    domanda mentre qui restava la risposta vecchia: corretto prima della consegna, ora **26/0**. Passa da `foConfronta`
     (`chiusura`, `haDatiFo`), quindi usa **prima l'account agganciato (`__perUid`) poi il nome**, e con gli omonimi è
     **sospesa** come il confronto. Quattro casi (classe `.chiu-pill`, fuori dalla griglia, ≥12,5px):
     **«📨 Chiede ferie/permessi a completamento»** (ambra `#fbbf24`, bordo `#b45309`, 14px) · **«Lascia così»** (sobria) ·

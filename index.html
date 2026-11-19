@@ -8059,14 +8059,24 @@ function foTempoMs(v){
   } catch (e){ return 0; }
 }
 function foChiusuraMese(tsList){
-  let chiuso = false, si = false, no = false, at = 0;
+  /* ver187: il mese e' chiuso solo se lo e' OGNI foglio del mese che ha dati (stessa regola di Fogli ore
+     rev 19): cosi', se l'admin riapre un solo servizio, qui non resta la risposta vecchia mentre in Fogli
+     ore il lavoratore deve richiudere e rispondere di nuovo (divergenza trovata da ic-01-b10, B10-18). */
+  let conDati = 0, chiusi = 0, si = false, no = false, at = 0;
   (tsList || []).forEach(function(t){
     if (!t || typeof t !== "object") return;
-    if (t.meseChiuso === true){ chiuso = true; at = Math.max(at, foTempoMs(t.meseChiusoAt)); }
+    const dd = (t.days && typeof t.days === "object") ? t.days : {};
+    if (!Object.keys(dd).some(function(k){ const e = dd[k]; return e && typeof e === "object" && Object.keys(e).length > 0; })) return;
+    conDati++;
     const c = String(t.completamento === null || t.completamento === undefined ? "" : t.completamento).trim().toLowerCase();
+    const chiusoQui = t.meseChiuso === true || (t.workerConfirmed === true && c !== "");
+    if (!chiusoQui) return;
+    chiusi++;
+    at = Math.max(at, foTempoMs(t.meseChiusoAt));
     if (c === "si" || c === "s\u00ec") si = true; else if (c === "no") no = true;
   });
-  return { chiuso:chiuso, completamento:(si ? "si" : (no ? "no" : "")), at:at };
+  const chiuso = conDati > 0 && chiusi === conDati;
+  return { chiuso:chiuso, completamento:(chiuso ? (si ? "si" : (no ? "no" : "")) : ""), at:(chiuso ? at : 0) };
 }
 /* lettura timesheets del mese: una query per anno (nessun indice composito) + filtro client su mese.
    Ritorna { "COGNOME NOME": aggregato }. */
