@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver181 · 15nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver182 · 19nov26.** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -37,6 +37,53 @@ Banca ore, tetto annuo, contratti e export.
   Corretto anche un difetto **preesistente** che la nuova navigazione rendeva visibile: nella
   testata, in vista Anagrafica, compariva "📅 undefined 2026" (perché `mese` è `null` fuori dalle
   viste mensili); ora mostra "📇 Anagrafica".
+- 🧮 **ver182 (19/11/2026): QUOTA DEL GIORNO = ORE SETTIMANALI ÷ GIORNI A SETTIMANA, TRATTENUTE SOLO
+  ASS.ING / ASP 0h, E IL «🖨️ Report PDF A4 conto per le paghe»** (Christian: «1, ok», «2a», «3, ok», «Nu\*
+  legenda si» e, dopo aver visto le trattenute nei cedolini, «Io sceglierei 2a, ma le paghe applicheranno il
+  principio per cui il calendario non conta. Staremo a vedere»).
+  - 🔑 **`quotaGiorno(dp,y,m)` = `oreSettAt ÷ ggSettPersona(dp)`** (era `monteFissoMese/26`). `ggSettPersona`
+    legge come il Costo orario: ANAGRAFICA «Giorni settimanali (per il costo orario)» → `dp.costo.ggSett` →
+    valore comune (`GG_SETT_COMUNE`, aggiornato da **`ggComuneAggiorna(state)`** a ogni disegno di `App` e in
+    testa a ogni export, a `datiCosto` e a `cedOrePubblica`) → 6; massimo 6. **`ggSettDi`** dà lo stesso numero.
+    Vale per il valore di ogni giorno di assenza, per le **ore corrette da dare** (`oreRetribuibili` = quota ×
+    giorni lavorativi in forza: 19 h → **85,50** a ottobre) e per le festività non godute. **ORE MESE** (82,50,
+    lo stipendio fisso) **non cambia**. Confermato dai cedolini veri di ottobre: 8 MAL a 19 h = **25,33 h**
+    (Retribuzione 57,16672), 1 giorno di ferie a 18 h = **3,00 h**. Esempio: 2 gg di ferie a 38 h = 12,67 (era 12,69).
+  - 📅 `giorniRetribuibiliInForza`: con 6 giorni (tutti, nei dati veri) **da lunedì a sabato come prima**; con 5
+    da lunedì a venerdì, così «quota × giorni» resta l'orario del mese (scelta di Claude, dichiarata).
+  - ✂️ **Trattenute**: nei mesi a busta **mensilizzata** (`meseCedolinoTetto`) delle ore che mancano all'orario
+    si trattengono **solo** quelle di **ASS.ING / ASP 0h** (`tratt = min(mancano, ore non retribuite)`); il resto
+    è **`sotto`** («ore sotto l'orario, non trattenute») e lo stipendio fisso resta intero. Seguono da sé il box
+    «Da inserire a cedolino», il report paghe e LUL, il Costo orario (`TR`), `cedOre` per USOINT e il massimale.
+    ⚠️ **Prima di ottobre 2026 / non mensilizzati** resta la regola della ver176 (tutte le ore mancanti
+    trattenute), perché allora la busta pagava le ore fatte. `AN` resta: conta nei giorni, non copre, mai trattenuto.
+    🔴 **Da sapere**: nei cedolini di ottobre 2026 l'ufficio paghe ha fatto **il contrario**: ha trattenuto ogni
+    ora sotto le ORE MESE fisse (voce **000050 «tratt. ore/gg. non lavorati»**: due persone a 15 h/sett. con 63 h
+    su 65,13 → −2,13 h; una a 17 h → −1,32; una −0,13; una −0,16) e paga supplementari solo oltre le ORE MESE,
+    senza guardare il calendario. Christian ha scelto lo stesso la 2a: l'app e il report dicono che cosa
+    **dovrebbe** succedere; se le paghe continuano col loro principio, i numeri di cedolino e dell'app
+    **non coincideranno** nei mesi con ore sotto l'orario. ⚠️ Un'anteprima precedente diceva per errore che a
+    quelle persone non era stato trattenuto niente: era una lettura sbagliata dei cedolini (corretta in chat).
+  - 🖨️ **`esportaPDFConto(state,pairs)`**, pulsante **«🖨️ Report PDF A4 conto per le paghe»**: una riga per
+    mensilizzato (Ore settim. · Stipendio fisso · Ore previste · - Assenze pagate · = Ore da lavorare · Ore
+    lavorate · SUPPLEMENTARI · Ore sotto l'orario (non trattenute) · Da trattenere (ASS.ING / ASP 0h) ·
+    Festività non godute · Assenze), TOTALE e la legenda **«Come si legge»** approvata. ⚠️ Nel PDF il segno «−»
+    non esiste nei caratteri standard di jsPDF (esce «"»): si scrive «-».
+  - 👁️ A video: nel riquadro del Risultato la **base mostrata** è ora le ore previste (prima diceva il monte
+    mentre il conto usava le ore corrette da dare) e, se il mese è in meno, una pastiglia «da trattenere ·
+    sotto l'orario, non trattenute». Adattate (frasi scritte da Claude) quelle che sarebbero diventate false: la
+    nota «Base = …», «le ore in meno si tolgono», la riga «Ordinarie a cedolino = …» del Costo orario e la quota
+    nel report ord/extra. Box/LUL: riga nuova «ORE SOTTO L'ORARIO, non trattenute» e nota della trattenuta.
+  - 🔢 **Sui dati veri (backup 04/11, misurato il 15/11)**: il Risultato del mese cambia di **al massimo 0,33 h**;
+    Costo orario gen→ott 2026 **149.084,79 → 149.350,80 €** (11 schede su 16, €/h da −0,01 a −0,07), gen→dic 2025
+    **134.731,81 → 134.902,61 €**; `cedOre` di ottobre 60,49 → **65,13** e 99,33 → **99,50**.
+    ⚠️ **I residui pubblicati vanno rifatti con 📤.**
+  - **Provato** (`ver182.cjs` **44/0**, jsPDF 2.5.1 e autotable 3.8.2 veri, `pdftotext`; confronto con la ver181
+    congelata che dava 85,67 e +41,215; tutti e cinque i report si generano; 390 e 1280px senza scorrimento
+    laterale e senza scritte sotto i 12,5px nel box e nel riquadro; Costo orario senza NaN ed errori).
+    ⚠️ **Batteria storica NON rieseguita sulla versione salvata**: il 15/11 era girata (23 script su 38 a zero
+    falliti; gli altri avevano attese invecchiate dalla nuova quota, in corso di riallineamento), ma il
+    contenitore è stato poi ricreato e banchi, script e backup di prova sono andati persi. Da ricostruire.
 - 🔺 **AGGIORNATO ver166 (15/11/2026): la soglia NON è più il monte fisso, ma le «ORE CORRETTE
   DA DARE» = `monte/26 × giorni non domenicali in forza` (`oreRetribuibili`).** Vedi la scheda
   🟨 in cima. La formula qui sotto resta vera **salvo l'ultimo termine**: ora

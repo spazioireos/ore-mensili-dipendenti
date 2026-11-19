@@ -500,8 +500,8 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver181";
-const APP_DATA = "15nov26";
+const APP_VER = "ver182";
+const APP_DATA = "19nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
 const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
@@ -778,7 +778,21 @@ function orarioTempAt(dp,y,m){ const refYM=y*100+m; let r=null; (Array.isArray(d
 const SETT_FULLTIME = 38;           // orario settimanale full-time di riferimento
 const MONTE_MESE_FULLTIME = 165;    // monte ore mensile fisso del full-time (riproporzionato per gli altri)
 function monteFissoMese(dp,y,m){ return MONTE_MESE_FULLTIME * oreSettAt(dp,y,m) / SETT_FULLTIME; } // fisso mensile = 165 h a 38 h/sett, riproporzionato
-function quotaGiorno(dp,y,m){ return monteFissoMese(dp,y,m)/26; }           // quota giornaliera allineata al mese = monte ÷ 26
+/* ver182 (Christian: «1, ok» + i cedolini veri, dove 1 giorno di ferie a 18 h/sett. vale 3,00 h e le 8 malattie
+   a 19 h/sett. valgono 25,33 h): la QUOTA DEL GIORNO non è più «monte ÷ 26» ma ORE SETTIMANALI ÷ GIORNI A
+   SETTIMANA della scheda (19/6 = 3,1667; 38/6 = 6,3333). Vale per il valore di ogni giorno di assenza, per le
+   ore previste del mese (le «ore corrette da dare») e per le festività non godute. ORE MESE (lo stipendio
+   fisso, monteFissoMese) NON cambia. I giorni a settimana si leggono come nel Costo orario: ANAGRAFICA
+   («Giorni settimanali (per il costo orario)») → scheda del Costo orario → valore comune → 6.
+   Il valore comune lo tiene GG_SETT_COMUNE, aggiornato da ggComuneAggiorna(state) a ogni disegno. */
+let GG_SETT_COMUNE = 6;
+function ggComuneAggiorna(state){ const v = cNum(costoComune(state || {}).ggSett, 6); GG_SETT_COMUNE = (v > 0) ? v : 6; }
+function ggSettPersona(dp){
+  const a = anaVoceNum(dp, "ggSettCosto");
+  const v = (a != null) ? a : cNum(costoPar(dp).ggSett, GG_SETT_COMUNE);
+  return (v > 0) ? Math.min(6, v) : 6;            /* la domenica non è mai un giorno lavorativo */
+}
+function quotaGiorno(dp,y,m){ return oreSettAt(dp,y,m) / ggSettPersona(dp); }   // ver182: ore settimanali ÷ giorni a settimana
 /* ver165 (14/11/2026, Christian): «giorni RETRIBUIBILI» = i giorni del mese riempibili con
    qualcosa che non sia il riposo domenicale (i festivi infrasettimanali SI contano), limitati
    al periodo in cui il contratto è in piedi. «ORE RETRIBUIBILI» = monte ÷ 26 × giorni
@@ -789,7 +803,9 @@ function quotaGiorno(dp,y,m){ return monteFissoMese(dp,y,m)/26; }           // q
    dare. Il sabato è lavorativo anche se nell'effetto si fanno 0 ore». Quindi si contano TUTTI i giorni
    non domenicali in forza, qualunque codice portino (AN e -- compresi): la soglia non dipende più da
    cosa c'è scritto nel mese. Il parametro rec resta per non toccare le chiamate, ma non viene letto. */
-function giorniRetribuibiliInForza(dp,y,m,rec){ let n=0, nd=daysInMonth(y,m); const a=assunzInt(dp), e=effEndInt(dp); for(let d=1; d<=nd; d++){ if(weekdayOf(y,m,d)===0) continue; const D=y*10000+m*100+d; if((!a||a<=D)&&(!e||e>=D)) n++; } return n; }
+/* ver182: con 6 giorni a settimana (tutti oggi) si contano da lunedì a sabato, come prima; con 5 da lunedì
+   a venerdì, così «quota × giorni» resta l'orario del mese e non lo gonfia di un giorno in più ogni settimana. */
+function giorniRetribuibiliInForza(dp,y,m,rec){ let n=0, nd=daysInMonth(y,m); const a=assunzInt(dp), e=effEndInt(dp); const gs=Math.max(1, Math.round(ggSettPersona(dp))); for(let d=1; d<=nd; d++){ const wd=weekdayOf(y,m,d); if(wd===0 || wd>gs) continue; const D=y*10000+m*100+d; if((!a||a<=D)&&(!e||e>=D)) n++; } return n; }
 function oreRetribuibili(dp,y,m,rec){ return R2(quotaGiorno(dp,y,m)*giorniRetribuibiliInForza(dp,y,m,rec),2); }
 function mensDalYM(dp){ const v=ymdIt(dp && dp.mensilizzatoDal); return v?Math.floor(v/100):0; } // YM di decorrenza mensilizzazione (0 = da sempre)
 /* ===== ver151 (11/11/2026) — CHE COSA COPRE LE ORE DOVUTE DEL MESE ===========
@@ -857,8 +873,9 @@ function coverAbsHours(rec,dp,y,m){                                        // or
    ⚠️ `coverAbsHours` NON e' stata toccata: se le festivita' finissero li' dentro verrebbero
    contate due volte nel Costo orario, che le somma gia' per conto suo. */
 function ggSettDi(state, dp){
-  const v = cNum(costoPar(dp).ggSett, cNum(costoComune(state).ggSett, 6));
-  return (v > 0) ? v : 6;
+  /* ver182: stesso ordine del Costo orario (ANAGRAFICA prima), così festività e assenze hanno la stessa quota */
+  ggComuneAggiorna(state);
+  return ggSettPersona(dp);
 }
 /* ver122: una festivita' si conta SOLO se quel giorno non porta gia' un codice di assenza.
    Serve per i dati vecchi: fino alla ver77 i giorni rossi si potevano compilare, e nell'elenco
@@ -1139,7 +1156,8 @@ function cedolinoBox(state, dp, y, m){
     altreTot: { gg:altreGG, ore:R2(altreGG*q,2), oreE:R2(altreGGE*q,2), oreNE:R2((altreGG-altreGGE)*q,2) },
     fest: { gg:festGod.length, ore:R2(festGod.length*qF,2), giorni:festGod.map(function(x){ return x.d; }), ggE:festGGE, oreE:R2(festGGE*qF,2), oreNE:R2((festGod.length-festGGE)*qF,2) },
     perm: { ore:R2(pm.pagate,2), oreE:R2(permE,2), oreNE:R2(pm.pagate-permE,2), altre:R2(pm.altre,2) },
-    ordC: ordC, tratt: R2(-inMeno, 2), supp: supp, risultato: (r.supp > 0.0005) ? R2(r.supp,3) : R2(inMeno,3),
+    ordC: ordC, tratt: R2(r.tratt, 2), sotto: R2(r.sotto, 2), previste: oreRetribuibili(dp, y, m, rec),   /* ver182: trattenute solo ASS.ING / ASP 0h */
+    supp: supp, risultato: (r.supp > 0.0005) ? R2(r.supp,3) : R2(inMeno,3),
     nonGod: { gg:festNon.length, ore:R2(festNon.length*q,2), giorni:festNon },
     nonRetr: Object.keys(nonRetr).sort().map(function(k){ return { cod:k, gg:nonRetr[k], ore:R2(nonRetr[k]*q,2) }; }),
     an: an, festng: festng, note: vociLines(rec),
@@ -1153,6 +1171,7 @@ function cedolinoBox(state, dp, y, m){
    USOINT le legge come «Lavorate»; dove non ci sono (non mensilizzato, prima di ottobre 2026) continua
    a sommare le ore del Tabellone come prima. Nessun conto nuovo: è la riga di oreSuppPeriodo. */
 function cedOrePubblica(state){
+  ggComuneAggiorna(state);
   const out = {};
   Object.keys(state.dati || {}).forEach(function(k){
     const mm = k.match(/^(\d{4})-(\d{1,2})$/); if (!mm) return;
@@ -1779,6 +1798,7 @@ function fileName(ext, desc){
 
 /* ===================== EXPORT EXCEL ===================== */
 function esportaExcel(state, pairs){
+  ggComuneAggiorna(state);
   const wb = XLSX.utils.book_new();
   wb.Props = { Title:"Report Ore mensile", Author:"Christian Canonica", Company:"Spazio Ireos Società Cooperativa Sociale", CreatedDate:new Date() };
   const F = "Nunito";
@@ -1895,6 +1915,7 @@ function pdfHM(v){
   return (neg ? "-" : "") + h + "," + (mm < 10 ? "0" : "") + mm;
 }
 function esportaPDF(state, pairs, opz){
+  ggComuneAggiorna(state);
   /* ver177 (15/11/2026, Christian: «dobbiamo indicare le ore per giornata perché deve inserirle nel lul,
      ma dobbiamo facilitarlo» → «1, ok, come report storico»). Con opz.lul lo STESSO report diventa
      «Per le paghe e il LUL»: le assenze retribuite portano accanto al codice le loro ore, le festività
@@ -2153,10 +2174,11 @@ function esportaPDF(state, pairs, opz){
                 ["   di cui altre assenze retribuite", h(B.altreTot.ore), B.altre.length ? B.altre.map(function(a){ return a.cod + " " + a.gg + " gg = " + fmt2(a.ore) + " h"; }).join(" · ") : "nessuna"],
                 ["   di cui festività godute", h(B.fest.ore), B.fest.gg ? B.fest.gg + " gg × " + fmt3(B.qF) + " h (" + gl(B.fest.giorni) + ")" : "nessuna"],
                 ["   di cui permessi retribuiti", h(B.perm.ore), B.perm.ore > 0.004 ? "" : "nessuno"],
-                ["   di cui ore lavorate ordinarie", h(B.ordC), "ore mese meno le assenze pagate" + (B.tratt > 0.004 ? " e le ore non fatte" : "")]
+                ["   di cui ore lavorate ordinarie", h(B.ordC), "ore mese meno le assenze pagate" + (B.tratt > 0.004 ? " e le ore da trattenere" : "")]
               ];
-              if (B.tratt > 0.004) body.push(["   di cui ore non fatte, da trattenere", h(B.tratt), "il Risultato del mese è negativo"]);
-              body.push(["ORE SUPPLEMENTARI (Risultato del mese)", B.supp > 0.004 ? "+" + h(B.supp) : h(0), B.supp > 0.004 ? "da pagare in più, maggiorate" : (B.tratt > 0.004 ? "nessuna: mancano " + h(B.tratt) + ", già tolte sopra" : "in pari")]);
+              if (B.tratt > 0.004) body.push(["   di cui ore non fatte, da trattenere", h(B.tratt), "solo assenze ingiustificate (ASS.ING) e aspettative non pagate (ASP 0h)"]);
+              body.push(["ORE SUPPLEMENTARI (Risultato del mese)", B.supp > 0.004 ? "+" + h(B.supp) : h(0), B.supp > 0.004 ? "da pagare in più, maggiorate" : ((B.tratt + B.sotto) > 0.004 ? "nessuna: mancano " + h(B.tratt + B.sotto) + " alle ore previste (" + h(B.previste) + ")" : "in pari")]);
+              if (B.sotto > 0.004) body.push(["ORE SOTTO L'ORARIO, non trattenute", h(B.sotto), "mancano alle ore previste del mese, ma senza una causa (ASS.ING / ASP 0h) non si trattengono: lo stipendio fisso resta intero"]);
               body.push(["FESTIVITÀ NON GODUTE, a sé", h(B.nonGod.ore), B.nonGod.gg ? B.nonGod.gg + " gg × " + fmt3(B.q) + " h (" + gl(B.nonGod.giorni) + ") — da pagare in più" : "nessuna"]);
               const note = [B.an ? "AN " + B.an + " gg" : null,
                 B.nonRetr.length ? "non retribuite: " + B.nonRetr.map(function(z){ return z.cod + " " + z.gg + " gg = " + fmt2(z.ore) + " h"; }).join(" · ") : null,
@@ -2172,7 +2194,7 @@ function esportaPDF(state, pairs, opz){
                 didParseCell: function(data){
                   if (data.section !== "body") return;
                   const lbl = String(data.row.raw[0] || "");
-                  if (/^(ORE MESE|ORE SUPPLEMENTARI|FESTIVITÀ NON GODUTE)/.test(lbl)){ data.cell.styles.fillColor = [238,245,252]; data.cell.styles.textColor = [31,78,130]; data.cell.styles.fontStyle = "bold"; }
+                  if (/^(ORE MESE|ORE SUPPLEMENTARI|ORE SOTTO|FESTIVITÀ NON GODUTE)/.test(lbl)){ data.cell.styles.fillColor = [238,245,252]; data.cell.styles.textColor = [31,78,130]; data.cell.styles.fontStyle = "bold"; }
                 }
               });
               yT = doc.lastAutoTable.finalY + 5;
@@ -2205,6 +2227,7 @@ function esportaPDF(state, pairs, opz){
    alla stessa quota delle festivita' godute, cioe' ore settimanali / giorni settimanali.
    ⚠️ Diciture nuove, scritte da Claude. */
 function esportaPDFMens(state, pairs){
+  ggComuneAggiorna(state);
   const JsPDF = window.jspdf.jsPDF;
   const doc = new JsPDF({ orientation:"landscape", unit:"mm", format:"a4" });
   const PG_H = (doc.internal && doc.internal.pageSize && doc.internal.pageSize.getHeight)
@@ -2244,8 +2267,8 @@ function esportaPDFMens(state, pairs){
       const fg = festGoduteMese(state, dp, anno, m, null);
       const perm = permOreMese(rec);
       const nonGodGG = contaFestivita([{ y:anno, m:m }], dp).non;
-      /* ver154 (Christian: «2 uniforma su monte/26»): la quota delle festività NON GODUTE è ora
-         la stessa del Costo orario (J12 = H5/26). Le GODUTE restano a oreSett/ggSett (ver119). */
+      /* ver154 la uniformava su monte/26; dalla ver182 quotaGiorno = ore settimanali ÷ giorni a settimana,
+         la stessa delle festività GODUTE: le due quote coincidono di nuovo. */
       const quotaFest = quotaGiorno(dp, anno, m);
       let ggP = 0, ggAN = 0;
       for (let d=1; d<=nd; d++){
@@ -2540,6 +2563,116 @@ function esportaPDFMens(state, pairs){
   doc.save(fileName("pdf", "Presenze mensilizzati"));
 }
 
+/* ===== ver182: REPORT A4 «CONTO PER LE PAGHE» =================================================
+   Christian («Dobbiamo creare un report elementare da sottoporre» → anteprima → «Nu* legenda si»). Una riga per
+   ogni mensilizzato: lo stipendio fisso (ore mese), le ore previste nel mese (ore settimanali ÷ giorni a
+   settimana × giorni lavorativi), meno le assenze già pagate, = le ore da lavorare; le ore lavorate; i
+   SUPPLEMENTARI = lavorate − da lavorare; le ore sotto l'orario (NON trattenute); le sole ore da trattenere
+   (ASS.ING / ASP 0h); le festività non godute, da pagare a parte. Nessun calcolo nuovo: è la riga di
+   oreSuppPeriodo, la stessa del box «Da inserire a cedolino». In fondo la legenda «Come si legge» approvata.
+   ⚠️ Diciture nuove, scritte da Claude. ⚠️ Il segno «−» non esiste nei caratteri standard di jsPDF (esce «"»):
+   nel PDF si scrive «-». */
+function esportaPDFConto(state, pairs){
+  ggComuneAggiorna(state);
+  const JsPDF = window.jspdf.jsPDF;
+  const doc = new JsPDF({ orientation:"landscape", unit:"mm", format:"a4" });
+  const PG_H = (doc.internal && doc.internal.pageSize && doc.internal.pageSize.getHeight) ? doc.internal.pageSize.getHeight() : 210;
+  const FONDO = PG_H - 10;
+  const dips = dipSorted(state);
+  const dash = "—";
+  const h = function(v){ return fmt2(v); };
+  let first = true;
+  pairs.forEach(function(pr){
+    const anno = pr.y, m = pr.m;
+    const mk = monthKey(anno, m);
+    const dati = state.dati[mk] || {};
+    const haData = Object.keys(dati).some(function(k){ return recHasData(dati[k]); });
+    const dipsMese = dips.filter(function(dp){ return meseCedolinoTetto(dp, anno, m) && meseFrazione(dp, anno, m) > 0; });
+    if (!haData && dipsMese.length === 0) return;
+    if (!first) doc.addPage();
+    first = false;
+    doc.setFontSize(15); doc.setTextColor(15,39,64); doc.setFont(undefined,"bold");
+    doc.text("Spazio Ireos — Conto delle ore per le paghe · " + MONTH_LABEL[m-1] + " " + anno, 14, 13);
+    doc.setFont(undefined,"normal");
+    if (dipsMese.length === 0){
+      doc.setFontSize(10); doc.setTextColor(120,20,20);
+      doc.text("In questo mese non c'è nessun dipendente mensilizzato" + ((anno*100+m) < BM_DAL_YM ? " (la base mensile parte da ottobre 2026)" : "") + ": niente da mandare alle paghe.", 14, 22);
+      return;
+    }
+    const gsSet = {}; dipsMese.forEach(function(dp){ gsSet[ggSettPersona(dp)] = 1; });
+    const gsK = Object.keys(gsSet);
+    const gnd = giorniNonDomenica(anno, m);
+    doc.setFontSize(10); doc.setTextColor(51,65,85);
+    doc.text(MONTH_LABEL[m-1] + " " + anno + ": " + gnd + " giorni lavorativi (da lunedì a sabato) · quota del giorno = ore settimanali ÷ "
+      + (gsK.length === 1 ? String(gsK[0]).replace(".", ",") : "i giorni a settimana della scheda") + " · solo dipendenti mensilizzati", 14, 19);
+    const head = [["Dipendente", "Ore settim.", "Stipendio fisso (ore mese)", "Ore previste nel mese", "- Assenze pagate (h)", "= Ore da lavorare",
+                   "Ore lavorate", "SUPPLEMENTARI da pagare", "Ore sotto l'orario (non trattenute)", "Da trattenere (ASS.ING / ASP 0h)",
+                   "Festività non godute (h) in più", "Assenze"]];
+    const body = [];
+    const T = { monte:0, prev:0, ass:0, lav:0, rese:0, supp:0, sotto:0, tratt:0, ng:0 };
+    dipsMese.forEach(function(dp){
+      const rec = getRecFrom(state, anno, m, dp.id);
+      if (!recHasData(rec)){
+        body.push([dp.nome, h(oreSettAt(dp, anno, m)), { content:"mese non compilato", colSpan:10, styles:{ halign:"left", textColor:[100,116,139], fontStyle:"italic" } }]);
+        return;
+      }
+      const r = oreSuppPeriodo(state, dp, [{ y:anno, m:m }], null, null, 0).righe[0];
+      if (!r) return;
+      const prev = oreRetribuibili(dp, anno, m, rec);
+      const assP = R2(r.ass + r.fest, 3);
+      const ngO = R2(contaFestivita([{ y:anno, m:m }], dp).non * quotaGiorno(dp, anno, m), 2);
+      const am = assMese(rec, dp, anno, m);
+      const vv = [];
+      Object.keys(am.cop.perCod).sort().forEach(function(c){ const gg = am.cop.perCod[c]; vv.push(c + " " + gg + " gg = " + fmt2(gg*am.quota) + " h"); });
+      if (r.festGG > 0) vv.push("festività godute " + r.festGG + " gg = " + fmt2(r.fest) + " h");
+      if (r.perm > 0.004) vv.push("permessi " + fmt2(r.perm) + " h");
+      Object.keys(am.nonRetr.perCod).sort().forEach(function(c){ const gg = am.nonRetr.perCod[c]; vv.push(c + " " + gg + " gg (non retribuita)"); });
+      let an = 0; const g = rec.giorni || {}; for (let d=1; d<=daysInMonth(anno, m); d++){ if (String(g[d]==null?"":g[d]).trim() === "AN") an++; }
+      if (an) vv.push("AN " + an + " gg");
+      T.monte += R2(r.monteP,2); T.prev += prev; T.ass += R2(assP,2); T.lav += R2(r.lav,2); T.rese += R2(r.rese,2);
+      T.supp += R2(r.supp,2); T.sotto += R2(r.sotto,2); T.tratt += R2(r.tratt,2); T.ng += ngO;
+      body.push([dp.nome, h(oreSettAt(dp, anno, m)), h(r.monteP), h(prev), assP > 0.004 ? "- " + h(assP) : dash, h(r.lav), h(r.rese),
+                 r.supp > 0.004 ? "+" + h(r.supp) : dash, r.sotto > 0.004 ? h(r.sotto) : dash, r.tratt > 0.004 ? h(r.tratt) : dash,
+                 ngO > 0.004 ? h(ngO) : dash, vv.join(" · ")]);
+    });
+    body.push(["TOTALE", "", h(T.monte), h(T.prev), T.ass > 0.004 ? "- " + h(T.ass) : dash, h(T.lav), h(T.rese),
+               T.supp > 0.004 ? "+" + h(T.supp) : dash, T.sotto > 0.004 ? h(T.sotto) : dash, T.tratt > 0.004 ? h(T.tratt) : dash,
+               T.ng > 0.004 ? h(T.ng) : dash, ""]);
+    const nB = body.length;
+    doc.autoTable({
+      head: head, body: body, startY: 23, theme:"grid", margin:{ left:14, right:14, top:16, bottom:10 }, tableWidth: 269,
+      styles:{ fontSize:9, cellPadding:1.3, halign:"right", valign:"middle", lineColor:[203,213,225], lineWidth:0.1, overflow:"linebreak" },
+      headStyles:{ fillColor:[15,39,64], textColor:[255,255,255], fontSize:7.8, halign:"center", valign:"bottom", fontStyle:"bold" },
+      columnStyles:{ 0:{ halign:"left", fontStyle:"bold", cellWidth:42 }, 1:{ cellWidth:15 }, 2:{ cellWidth:19 }, 3:{ cellWidth:18 }, 4:{ cellWidth:19 },
+                     5:{ cellWidth:19, fontStyle:"bold" }, 6:{ cellWidth:17 }, 7:{ cellWidth:27, fontStyle:"bold", fontSize:10 }, 8:{ cellWidth:20 },
+                     9:{ cellWidth:20 }, 10:{ cellWidth:19 }, 11:{ halign:"left", cellWidth:34, fontSize:7.8 } },
+      didParseCell: function(data){
+        if (data.section === "head" && (data.column.index === 4 || data.column.index === 5)) data.cell.styles.fillColor = [31,78,130];
+        if (data.section !== "body") return;
+        if (data.cell.raw && typeof data.cell.raw === "object") return;   /* «mese non compilato» */
+        const c = data.column.index;
+        if (c === 2) data.cell.styles.fillColor = [238,245,252];
+        if (c === 5) data.cell.styles.fillColor = [254,249,195];
+        if (c === 7 && String(data.cell.raw||"").charAt(0) === "+") data.cell.styles.textColor = [185,28,28];
+        if (c === 8 && String(data.cell.raw||"") !== dash) data.cell.styles.textColor = [13,148,136];
+        if (data.row.index === nB - 1){ data.cell.styles.fontStyle = "bold"; if (c !== 2 && c !== 5) data.cell.styles.fillColor = [238,242,255]; }
+      }
+    });
+    let yy = doc.lastAutoTable.finalY + 5;
+    const leg = "Come si legge: lo stipendio fisso si paga sempre intero (mensilizzazione). Le ore da lavorare sono l'orario del mese meno le assenze già pagate (ferie, malattia, permessi). Supplementari = ore lavorate - ore da lavorare. Le ore sotto l'orario senza una causa non si trattengono; si trattengono solo le assenze ingiustificate (ASS.ING) e le aspettative non pagate (ASP 0h). Le festività non godute si pagano a parte.";
+    doc.setFontSize(9.5); doc.setTextColor(15,39,64);
+    const ls = doc.splitTextToSize(leg, 263);
+    const hL = ls.length * 4.4 + 5;
+    if (yy + hL > FONDO){ doc.addPage(); yy = 16; }
+    if (doc.setDrawColor) doc.setDrawColor(90,156,226);
+    if (doc.setFillColor) doc.setFillColor(248,251,255);
+    if (doc.roundedRect) doc.roundedRect(14, yy, 269, hL, 2, 2, "FD"); else if (doc.rect) doc.rect(14, yy, 269, hL, "FD");
+    doc.text(ls, 17, yy + 5);
+  });
+  if (first){ doc.setFontSize(12); doc.text("Nessun dato nel periodo selezionato", 14, 24); }
+  doc.save(fileName("pdf", "Conto ore per le paghe"));
+}
+
 /* ===== ver164: REPORT A4 "ORDINARIO / EXTRA GIORNALIERO" per l'ufficio paghe ===============
    Christian (14/11/2026): «un pdf a4 che ci dica giornalmente quanto è ordinario e quanto
    extra. X deve fare 18 ore settimanali = 3 ore al giorno (6 giorni lavorativi). Se nel giorno
@@ -2566,6 +2699,7 @@ function esportaPDFMens(state, pairs){
    - In calce: ore ordinarie (= monte) · ore EXTRA · ore effettivamente RESE (= solo lavorate),
      gg ferie e le altre voci. ⚠️ Diciture nuove, scritte da Claude. */
 function esportaPDFOrdExtra(state, pairs){
+  ggComuneAggiorna(state);
   const JsPDF = window.jspdf.jsPDF;
   const doc = new JsPDF({ orientation:"portrait", unit:"mm", format:"a4" });
   const dips = dipSorted(state);
@@ -2582,7 +2716,7 @@ function esportaPDFOrdExtra(state, pairs){
       const rec = getRecFrom(state, anno, m, dp.id);
       if (!recHasData(rec)) return;   /* persona senza dati nel mese: nessun foglio */
       const monte = monteFissoMese(dp, anno, m);
-      const quota = quotaGiorno(dp, anno, m);                                 /* quota giornaliera = monte ÷ 26 */
+      const quota = quotaGiorno(dp, anno, m);                                 /* ver182: quota giornaliera = ore settimanali ÷ giorni a settimana */
       const retrib = oreRetribuibili(dp, anno, m, rec);                           /* soglia dell'ordinario = monte÷26 × giorni retribuibili in forza */
       const rows = [];
       let totExtra = 0, totWorked = 0, shortfall = 0, sumOrd = 0;
@@ -2656,7 +2790,7 @@ function esportaPDFOrdExtra(state, pairs){
       doc.setFontSize(11.5); doc.setFont(undefined,"normal"); doc.setTextColor(15,39,64);
       doc.text(dp.nome + "   ·   " + MONTH_LABEL[m-1] + " " + anno, 14, 21);
       doc.setFontSize(8.5); doc.setTextColor(90,90,90);
-      doc.text("Quota giornaliera: monte " + fh(monte) + " h ÷ 26 = " + fh(quota) + " h al giorno. L'ordinario raggiunge le ore CORRETTE DA DARE del mese (" + fh(retrib) + " h = quota × " + giorniRetribuibiliInForza(dp, anno, m, rec) + " giorni non domenicali): le assenze retribuite, le festività godute e i permessi orari riempiono la quota. L'extra è la somma dei singoli giorni oltre la quota (nessuna compensazione).", 14, 26, { maxWidth: 182 });
+      doc.text("Quota giornaliera: " + fh(oreSettAt(dp, anno, m)) + " h settimanali ÷ " + String(ggSettPersona(dp)).replace(".", ",") + " giorni = " + fh(quota) + " h al giorno. L'ordinario raggiunge le ore CORRETTE DA DARE del mese (" + fh(retrib) + " h = quota × " + giorniRetribuibiliInForza(dp, anno, m, rec) + " giorni lavorativi): le assenze retribuite, le festività godute e i permessi orari riempiono la quota. L'extra è la somma dei singoli giorni oltre la quota (nessuna compensazione).", 14, 26, { maxWidth: 182 });
       doc.autoTable({
         startY: 36,
         head: [["Giorno","Ordinario (h)","Extra (h)","Assenze / permessi"]],
@@ -2872,7 +3006,7 @@ function EmployeeCard(props){
         {livelloAt(dp,y,m) ? <span className="pill">Liv. {livelloAt(dp,y,m)}</span> : null}
         <span className="pill">ORE SETT: {hoursDisp(oreSettAt(dp,y,m))}</span>
         <span className="pill" title="Monte ore mensile: 165 h per chi fa 38 h/settimana, in proporzione per gli altri">ORE MESE: {hoursDisp(monteFissoMese(dp,y,m))}</span>
-        <span className="pill" style={{ background:"#fde047", color:"#12324f", fontWeight:800 }} title={"Ore corrette da dare nel mese = monte ÷ 26 × giorni non domenicali in forza (" + giorniRetribuibiliInForza(dp,y,m,rec) + "). È la soglia: lo straordinario è solo ciò che la supera."}>ORE CORRETTE DA DARE: {hoursDisp(oreRetribuibili(dp,y,m,rec))}</span>
+        <span className="pill" style={{ background:"#fde047", color:"#12324f", fontWeight:800 }} title={"Ore corrette da dare nel mese = ore settimanali ÷ giorni a settimana (" + fmt3(quotaGiorno(dp,y,m)) + " h al giorno) × giorni lavorativi in forza (" + giorniRetribuibiliInForza(dp,y,m,rec) + "). È la soglia: lo straordinario è solo ciò che la supera."}>ORE CORRETTE DA DARE: {hoursDisp(oreRetribuibili(dp,y,m,rec))}</span>
         <span className="pill">{contrLabelAt(dp,y,m)}</span>
         {orarioTempAt(dp,y,m)!=null ? <span className="pill" style={{ background:"#fde68a", color:"#78350f" }}>⏱ orario temp. {hoursDisp(orarioTempAt(dp,y,m))}h</span> : null}
         {(function(){ const ce=cessEffStr(dp); if(!ce) return null; const now=new Date(); const tInt=now.getFullYear()*10000+(now.getMonth()+1)*100+now.getDate(); const ceInt=ymdIt(ce); return (ceInt && ceInt < tInt) ? <span className="pill cess">CESSATO {ce}</span> : <span className="pill" style={{ background:"#fbe0ec", color:"#8A2358" }}>fino al {ce}</span>; })()}
@@ -3066,10 +3200,11 @@ function EmployeeCard(props){
         })() : null}
         {(function(){
           if ((y*100+m) < BM_DAL_YM) return null;                                    // base mensile attiva solo dai mesi >= ottobre 2026
-          const base = monteFissoMese(dp,y,m);
-          if (!base || base<=0) return null;
+          /* ver182: la base mostrata è quella vera del conto, le ORE PREVISTE del mese (oreRetribuibili):
+             prima si scriveva il monte fisso mentre il Risultato si calcolava sulle ore corrette da dare. */
+          if (!(monteFissoMese(dp,y,m) > 0)) return null;
+          const base = oreRetribuibili(dp,y,m,rec);
           if (!recHasData(rec)) return null;                                          // niente riquadro finché il mese non è compilato
-          const quota = base/26;
           /* ver151: un solo punto decide che cosa copre le ore dovute (`copreOre`), e il
              conteggio arriva da `assMese`, lo stesso che usa `coverAbsHours`. */
           const am = assMese(rec, dp, y, m);
@@ -3108,10 +3243,12 @@ function EmployeeCard(props){
                 : null}
               <span className="cong-chip strong">Risultato del mese: <b>{segno}{fmt3(delta)} h</b></span>
               <span className="cong-status">{esito}</span>
+              {/* ver182 (Christian, «2a»): delle ore in meno si trattengono SOLO ASS.ING e ASP 0h */}
+              {delta < -0.0005 ? (function(){ const tr = Math.min(-delta, am.nonRetr.ore), so = Math.max(0, -delta - tr); return <span className="cong-chip">da trattenere (ASS.ING / ASP 0h): <b>{fmt3(tr)} h</b> · sotto l'orario, non trattenute: <b>{fmt3(so)} h</b></span>; })() : null}
             </div>
             <div className="cong-res">
-              Ogni mese fa storia a sé: le <b>ore in più</b> si pagano maggiorate (straordinario), le <b>ore in meno</b> si tolgono. <b>Niente si riporta</b> al mese dopo. Il totale annuo per persona è nella <b>Query personale → ⚡ Straordinario</b>.
-              <div style={{ fontSize:"11px", color:"#9a3412", marginTop:"2px" }}>Base = 165 h per chi fa 38 h/settimana, in proporzione per gli altri. Numeri a 3 decimali.</div>
+              Ogni mese fa storia a sé: le <b>ore in più</b> si pagano maggiorate (straordinario), delle <b>ore in meno</b> si tolgono solo le assenze ingiustificate (ASS.ING) e le aspettative non pagate (ASP 0h). <b>Niente si riporta</b> al mese dopo. Il totale annuo per persona è nella <b>Query personale → ⚡ Straordinario</b>.
+              <div style={{ fontSize:"11px", color:"#9a3412", marginTop:"2px" }}>Base = ore previste del mese: ore settimanali ÷ giorni a settimana × giorni lavorativi in forza. Numeri a 3 decimali.</div>
             </div>
           </div>;
         })()}
@@ -3130,9 +3267,10 @@ function EmployeeCard(props){
               <tr className="sub"><td className="l">di cui altre assenze retribuite</td><td className="n">{h(B.altreTot.ore)}</td><td className="d">{B.altre.length ? B.altre.map(function(a){ return a.cod + " " + a.gg + " gg (erosive " + fmt2(a.oreE) + " · non erosive " + fmt2(a.oreNE) + ")"; }).join(" · ") : "nessuna"}{B.altre.length > 1 ? " — in tutto " + ene(B.altreTot.oreE, B.altreTot.oreNE) : ""}</td></tr>
               <tr className="sub"><td className="l">di cui festività godute</td><td className="n">{h(B.fest.ore)}</td><td className="d">{B.fest.gg ? B.fest.gg + " gg × " + fmt3(B.qF) + " h (" + gl(B.fest.giorni) + ") — " + ene(B.fest.oreE, B.fest.oreNE) : "nessuna"}</td></tr>
               <tr className="sub"><td className="l">di cui permessi retribuiti</td><td className="n">{h(B.perm.ore)}</td><td className="d">{B.perm.ore > 0.004 ? ene(B.perm.oreE, B.perm.oreNE) : "nessuno"}</td></tr>
-              <tr className="sub"><td className="l">di cui ore lavorate ordinarie</td><td className="n">{h(B.ordC)}</td><td className="d">ore mese meno le assenze pagate{B.tratt > 0.004 ? " e le ore non fatte" : ""}</td></tr>
-              {B.tratt > 0.004 ? <tr className="sub"><td className="l">di cui ore non fatte, da trattenere</td><td className="n">{h(B.tratt)}</td><td className="d">il Risultato del mese è negativo</td></tr> : null}
-              <tr className="top"><td className="l">ORE SUPPLEMENTARI (Risultato del mese)</td><td className="n">{B.supp > 0.004 ? "+" + h(B.supp) : h(0)}</td><td className="d">{B.supp > 0.004 ? "da pagare in più, maggiorate" : (B.tratt > 0.004 ? "nessuna: mancano " + h(B.tratt) + ", già tolte sopra" : "in pari")}</td></tr>
+              <tr className="sub"><td className="l">di cui ore lavorate ordinarie</td><td className="n">{h(B.ordC)}</td><td className="d">ore mese meno le assenze pagate{B.tratt > 0.004 ? " e le ore da trattenere" : ""}</td></tr>
+              {B.tratt > 0.004 ? <tr className="sub"><td className="l">di cui ore non fatte, da trattenere</td><td className="n">{h(B.tratt)}</td><td className="d">solo assenze ingiustificate (ASS.ING) e aspettative non pagate (ASP 0h)</td></tr> : null}
+              <tr className="top"><td className="l">ORE SUPPLEMENTARI (Risultato del mese)</td><td className="n">{B.supp > 0.004 ? "+" + h(B.supp) : h(0)}</td><td className="d">{B.supp > 0.004 ? "da pagare in più, maggiorate" : ((B.tratt + B.sotto) > 0.004 ? "nessuna: mancano " + h(B.tratt + B.sotto) + " alle ore previste (" + h(B.previste) + ")" : "in pari")}</td></tr>
+              {B.sotto > 0.004 ? <tr className="top"><td className="l">ORE SOTTO L'ORARIO, non trattenute</td><td className="n">{h(B.sotto)}</td><td className="d">mancano alle ore previste del mese, ma senza una causa (ASS.ING / ASP 0h) non si trattengono: lo stipendio fisso resta intero</td></tr> : null}
               <tr className="top"><td className="l">FESTIVITÀ NON GODUTE, a sé</td><td className="n">{h(B.nonGod.ore)}</td><td className="d">{B.nonGod.gg ? B.nonGod.gg + " gg × " + fmt3(B.q) + " h (" + gl(B.nonGod.giorni) + ") — da pagare in più" : "nessuna"}</td></tr>
             </tbody></table>
             <div className="ced-note"><b>Note:</b> {[
@@ -4302,9 +4440,21 @@ function oreSuppPeriodo(state, dp, pairs, c, escludi, sottoSoglia){
        ordinarie a cedolino + supplementari. In un mese da 26 giorni coincide con le ore rese; nei
        mesi da 25/27 giorni se ne discosta della quota di un giorno: è lo scarto Tabellone/cedolino. */
     const monteP = R2(monteFissoMese(dp, pr.y, pr.m) * meseFrazione(dp, pr.y, pr.m), 3);
-    const inMeno = Math.min(0, R2(rese + (Number(sottoSoglia)||0) - lav, 3));      /* ore trattenute (≤ 0) */
+    /* ver182 (Christian: «2a», e «le paghe applicheranno il principio per cui il calendario non conta. Staremo a
+       vedere»): le ore che mancano all'orario del mese si TRATTENGONO solo se hanno una causa non pagata —
+       assenza ingiustificata (ASS.ING) o aspettativa non pagata (ASP 0h). Le altre ore sotto l'orario NON si
+       trattengono (lo stipendio fisso resta intero): si contano a parte in `sotto`, solo per farle vedere.
+       ⚠️ Nei cedolini di ottobre 2026 l'ufficio paghe ha invece trattenuto ogni ora sotto le ORE MESE fisse
+       (voce 000050), senza guardare il calendario: è la scelta di Christian di chiedere il contrario. */
+    const manca  = recHasData(rec) ? Math.max(0, R2(lav - rese - (Number(sottoSoglia)||0), 3)) : 0;
+    const nrOre  = recHasData(rec) ? R2(assMese(rec, dp, pr.y, pr.m).nonRetr.ore, 3) : 0;
+    /* ⚠️ Vale per i mesi in cui la busta è MENSILIZZATA (mensilizzato a quella data, da ottobre 2026: lo
+       stesso confine del box e del massimale, meseCedolinoTetto). Prima, col criterio orario, la busta
+       pagava le ore fatte: lì le ore mancanti restano tutte trattenute, come dalla ver176. */
+    const tratt  = meseCedolinoTetto(dp, pr.y, pr.m) ? R2(Math.min(manca, nrOre), 3) : manca;   /* ore trattenute */
+    const sotto  = R2(manca - tratt, 3);                           /* ore sotto l'orario, NON trattenute */
     /* un mese SENZA dati nel Tabellone non sa niente del cedolino: vale 0, come le ore rese di prima */
-    const ordCed = recHasData(rec) ? R2(Math.max(0, monteP - ass - fg.ore + inMeno), 3) : 0;
+    const ordCed = recHasData(rec) ? R2(Math.max(0, monteP - ass - fg.ore - tratt), 3) : 0;
     const ced    = R2(R2(ordCed, 2) + R2(supp, 2), 2);   /* somma dei due addendi gia' al centesimo: a video torna */
     /* ver124 (06/11/2026, Christian: «spacchettami bene le assenze indicandone le voci che le
        compongono»): quante giornate per ciascun codice, piu' le ore di permesso retribuito.
@@ -4323,9 +4473,9 @@ function oreSuppPeriodo(state, dp, pairs, c, escludi, sottoSoglia){
        le ore NON fatte che il cedolino trattiene (Risultato del mese negativo). Sono la differenza fra
        le ordinarie dovute e quelle pagate: servono a togliere dallo stipendio del Costo orario
        quello che la busta non paga. */
-    const tratt  = recHasData(rec) ? R2(Math.max(0, R2(monteP - ass - fg.ore, 3) - ordCed), 3) : 0;
+    /* ver182: `tratt` è calcolato sopra (nei mesi mensilizzati comprende SOLO ASS.ING e ASP 0h). */
     righe.push({ y:pr.y, m:pr.m, lav:lav, rese:rese, ass:ass, perm:perm,
-                 fest:fg.ore, festGG:fg.gg, det:det, supp:supp, monteP:monteP, ordCed:ordCed, ced:ced, tratt:tratt });
+                 fest:fg.ore, festGG:fg.gg, det:det, supp:supp, monteP:monteP, ordCed:ordCed, ced:ced, tratt:tratt, sotto:sotto });
   });
   return { ore: R2(tot,3), righe: righe };
 }
@@ -4799,6 +4949,7 @@ function istatAl(state, anno, difetto){
 
 // mette insieme i dati della scheda, i valori comuni e gli scostamenti della persona
 function datiCosto(state, dp, pairs){
+  ggComuneAggiorna(state);
   const c = costoComune(state);
   const p = costoPar(dp);
   /* ver117: serve PRIMA di calcCosto, perche' decide anche se le ore in piu' si contano
@@ -6154,7 +6305,7 @@ function CostoOrario(props){
                         </tr>
                       </tbody></table>
                       </div>
-                      <div style={{ fontSize:"12.5px", color:"#475569", lineHeight:1.3, marginTop:"4px" }}><b>Ordinarie a cedolino</b> = ore da pagare fisse del mese (i 26 giorni) meno le assenze, i permessi e le festività pagate lì dentro, meno le eventuali ore in meno trattenute; <b>A cedolino</b> = ordinarie a cedolino + in più. Sono le <b>ore retribuite a cedolino ammesse in rendicontazione</b>, e dividono il costo del periodo. Nei mesi da 25 o 27 giorni si discostano dalle ore rese della quota di un giorno: è lo scarto fra Tabellone e cedolino.</div>
+                      <div style={{ fontSize:"12.5px", color:"#475569", lineHeight:1.3, marginTop:"4px" }}><b>Ordinarie a cedolino</b> = ore da pagare fisse del mese (i 26 giorni) meno le assenze, i permessi e le festività pagate lì dentro, meno le eventuali ore trattenute (solo assenze ingiustificate ASS.ING e aspettative non pagate ASP 0h); <b>A cedolino</b> = ordinarie a cedolino + in più. Sono le <b>ore retribuite a cedolino ammesse in rendicontazione</b>, e dividono il costo del periodo. Si discostano dalle ore rese quando l'orario del mese (ore settimanali ÷ giorni a settimana × giorni lavorativi) non è uguale alle ore fisse: è lo scarto fra Tabellone e cedolino.</div>
                       {(!d.blocchi && d.suppVecchio != null) ? <div style={{ fontSize:"12.5px", color:"#475569", lineHeight:1.3, marginTop:"4px" }}>Con il conto vecchio (totale del periodo contro totale) sarebbero <b style={cifre}>{fmt2(d.suppVecchio)}</b> h: la differenza è la <b>compensazione fra i mesi</b>, che ora non c'è più.</div> : null}
                       <div style={{ fontSize:"12.5px", color:"#475569", lineHeight:1.3, marginTop:"4px" }}>La colonna <b>Assenze</b> sono le ore di ferie, malattia e permessi retribuiti <b>davvero segnate nel Tabellone</b> in quel mese, con sotto le <b>voci che le compongono</b> (giornate per ciascun codice e ore di permesso); non sono più i numeri presunti dei valori comuni. La colonna <b>Festività</b> sono le festività <b>godute</b> contate dal calendario, cioè quelle che nel Tabellone <b>non</b> hanno un codice scritto: dove invece il codice c'è (per esempio <b>FEST</b>) la giornata compare fra le Assenze, per non contarla due volte. <b>Lavorabili = monte del mese − Assenze − Festività.</b></div>
                     </div>
@@ -7480,6 +7631,7 @@ function App(){
   const [authState, setAuthState] = useState(FB_READY ? "checking" : "gate");
   const [denied, setDenied] = useState("");
   const [state, setState] = useState(null);
+  if (state) ggComuneAggiorna(state);   /* ver182: il valore comune dei giorni a settimana per quotaGiorno */
   const [anno, setAnno] = useState(2026);
   const [vista, setVista] = useState("m1");
   const [anaSel, setAnaSel] = useState(null);
@@ -8241,6 +8393,8 @@ function App(){
         <button className="btn btn-ghost" onClick={function(){ setExportModal("PDF A4 paghe e LUL"); }}>🖨️ Report PDF A4 paghe e LUL</button>
         {/* ver163: report giornaliero ordinario/extra per l'ufficio paghe. Dicitura nuova, scritta da Claude. */}
         <button className="btn btn-ghost" onClick={function(){ setExportModal("PDF A4 ord/extra"); }}>🖨️ Report PDF A4 ord/extra</button>
+        {/* ver182: il conto delle ore per le paghe (anteprima approvata da Christian). Dicitura nuova, scritta da Claude. */}
+        <button className="btn btn-ghost" onClick={function(){ setExportModal("PDF A4 conto per le paghe"); }}>🖨️ Report PDF A4 conto per le paghe</button>
         {!FB_READY ? <button className="btn btn-ghost" onClick={changePin}>🔑 PIN</button> : null}
         {FB_READY ? <button className="btn btn-ghost" onClick={function(){ if (dirty && !window.confirm("Ci sono modifiche non salvate. Uscire comunque?")) return; firebase.auth().signOut(); }}>Esci</button> : null}
         <input ref={fileRef} type="file" accept=".xlsx,.xls,.json" className="hidden-file" onChange={onImportFile} />
@@ -8359,7 +8513,7 @@ function App(){
 
       {quickFill ? <QuickFillModal dp={quickFill} rec={getRecFrom(state, anno, mese, quickFill.id)} anno={anno} mese={mese} fset={fset} onApply={onQuickFillApply} onClose={function(){ setQuickFill(null); }} /> : null}
       {exportModal ? <ExportModal kind={exportModal} anni={state.anni} annoCorrente={anno} meseCorrente={mese}
-        onGenera={function(pairs){ if (exportModal === "Excel") esportaExcel(state, pairs); else if (exportModal === "PDF A4 mensilizz.") esportaPDFMens(state, pairs); else if (exportModal === "PDF A4 ord/extra") esportaPDFOrdExtra(state, pairs); else if (exportModal === "PDF A4 paghe e LUL") esportaPDF(state, pairs, { lul:true }); else esportaPDF(state, pairs); setExportModal(null); }}
+        onGenera={function(pairs){ if (exportModal === "Excel") esportaExcel(state, pairs); else if (exportModal === "PDF A4 mensilizz.") esportaPDFMens(state, pairs); else if (exportModal === "PDF A4 ord/extra") esportaPDFOrdExtra(state, pairs); else if (exportModal === "PDF A4 conto per le paghe") esportaPDFConto(state, pairs); else if (exportModal === "PDF A4 paghe e LUL") esportaPDF(state, pairs, { lul:true }); else esportaPDF(state, pairs); setExportModal(null); }}
         onClose={function(){ setExportModal(null); }} /> : null}
       {permModal ? (function(){
         const rc = getRecFrom(state, anno, mese, permModal.dipId);
