@@ -38,7 +38,7 @@ const num=s=>parseFloat(String(s).replace(/\./g,'').replace(',','.'));
   const eng=await pg.evaluate(()=>{ const st=JSON.parse(localStorage.getItem('spazioireos_reportore_v1')); const o={}; st.dipendenti.forEach(dp=>{ const r=oreSuppPeriodo(st,dp,[{y:2026,m:10}],null,null,0).righe[0]; if(r) o[dp.nome]={ord:R2(r.ordCed,2),supp:R2(r.supp,2),ret:R2(r.ass+r.fest,2),tr:R2(r.tratt,2),monte:R2(r.monteP,2),ced:cedOrePubblica(st)['2026-10'][dp.id]}; }); return o; });
   const R=await pdf(pg,'🖨️ Report PDF A4 per le paghe',10);
   T('P3 il report per le paghe si genera (ottobre)', R.dl, R.nome);
-  T('P4 nome del file secondo la convenzione', /^Spazio Ireos Ore da riportare a cedolino - \d{2}[a-z]{3}\d{2} - ver183 - \d{2}\.\d{2}\.pdf$/.test(R.nome||''), R.nome);
+  T('P4 nome del file secondo la convenzione', new RegExp('^Spazio Ireos Ore da riportare a cedolino - \\d{2}[a-z]{3}\\d{2} - '+APPV+' - \\d{2}\\.\\d{2}\\.pdf$').test(R.nome||''), R.nome);   /* ver184: la versione si legge dal file (era scritta a mano «ver183») */
   const pagine=(R.txt||'').split('\f').filter(p=>p.trim());
   const mens=['PROVA MALATTIA','PROVA SOTTO','PROVA INGIUST','PROVA CINQUE','PROVA QUINDICI'];
   T('P5 un foglio per ogni mensilizzato con dati (5), uno per pagina; il non mensilizzato non c\'è', R.pagine===5 && !/PROVA ORARIO/.test(R.flat), R.pagine);

@@ -66,8 +66,8 @@ const n=s=>parseFloat(String(s).replace(/\./g,'').replace(',','.'));
   T('A02.30 riquadro 🎯 Tetto annuo presente per ALFA con «Massimo dell\'anno: 500»', /Tetto annuo/.test(txtA) && /500,000 h/.test(txtA));
   /* permesso orario */
   await A.locator('table.cal tr').nth(2).locator('td').nth(8).locator('.perm-flag').click(); await pg.waitForTimeout(300);
-  const pm=pg.locator('.modal'); await pm.locator('input[type=number]').click(); await pg.keyboard.type('1,5');
-  const valPerm=await pm.locator('input[type=number]').inputValue();
+  const pm=pg.locator('.modal'); await pm.locator('.field input').first().click(); await pg.keyboard.type('1,5');
+  const valPerm=await pm.locator('.field input').first().inputValue();
   T('A02.31 permesso orario: «1,5» battuto nella casella Ore', valPerm==='1.5'||valPerm==='1,5', 'valore della casella = «'+valPerm+'»');
   await pm.locator('select').selectOption('EXF'); await pm.locator('.modal-actions button').last().click(); await pg.waitForTimeout(300);
   const plbl=await A.locator('.perm-lbl').allInnerTexts();
@@ -76,9 +76,9 @@ const n=s=>parseFloat(String(s).replace(/\./g,'').replace(',','.'));
   T('A02.33 il permesso EXF entra nel Risultato del mese ma non nel TOT', /Permessi orari: [\d,]+ h/.test(cong3) && (await totV('ALFA'))===156, cong3.slice(cong3.indexOf('Permessi'),cong3.indexOf('Permessi')+30));
   /* permesso negativo / zero */
   pg._dialoghi=[]; await A.locator('table.cal tr').nth(2).locator('td').nth(9).locator('.perm-flag').click(); await pg.waitForTimeout(300);
-  await pg.locator('.modal input[type=number]').fill('-2'); await pg.locator('.modal select').selectOption('EXF'); await pg.locator('.modal .modal-actions button').last().click(); await pg.waitForTimeout(300);
+  await pg.locator('.modal .field input').first().fill('-2'); await pg.locator('.modal select').selectOption('EXF'); await pg.locator('.modal .modal-actions button').last().click(); await pg.waitForTimeout(300);
   T('A02.34 permesso −2 rifiutato con avviso', (pg._dialoghi||[]).some(x=>/numero di ore valido/.test(x)) && await pg.locator('.modal').count()===1);
-  await pg.locator('.modal input[type=number]').fill('20'); await pg.locator('.modal .modal-actions button').last().click(); await pg.waitForTimeout(300);
+  await pg.locator('.modal .field input').first().fill('20'); await pg.locator('.modal .modal-actions button').last().click(); await pg.waitForTimeout(300);
   const p20=await pg.evaluate(()=>1); const lbl2=await A.locator('.perm-lbl').allInnerTexts();
   T('A02.35 permesso orario di 20 h in un giorno (tetto 13 ore?)', !lbl2.some(t=>/20,00/.test(t)), lbl2.join('|'));
   if(await pg.locator('.modal').count()) await pg.locator('.modal .modal-actions button').filter({hasText:'Annulla'}).click();
@@ -91,9 +91,11 @@ const n=s=>parseFloat(String(s).replace(/\./g,'').replace(',','.'));
   T('A02.40 Compila veloce «7» con «sovrascrivi»: chiede conferma e riempie i feriali', /Sovrascrivere/.test(cnf) && (await C(19).inputValue())==='7,00' && (await C(4).inputValue())==='', cnf.slice(0,80));
   /* elenco: giorno rosso */
   q=await qf('5'); await q.m.locator('input[type=radio]').nth(2).check(); await q.m.locator('input[placeholder="es. 3, 7, 12"]').fill('4, 11'); await pg.waitForTimeout(150);
-  const tgt=(await q.m.innerText()).match(/Giorni interessati: (\d+)/); await q.b.click(); await pg.waitForTimeout(300);
+  const tgt=(await q.m.innerText()).match(/Giorni interessati: (\d+)/); const salt=/saltati 2 giorni rossi/.test(await q.m.innerText());
+  /* ver184: dalla correzione i due giorni rossi si saltano anche qui, quindi i giorni interessati sono 0 e il pulsante è spento (si chiude con Annulla) */
+  if(await q.b.isDisabled()){ await q.m.locator('.modal-actions button').filter({hasText:'Annulla'}).click(); } else { await q.b.click(); } await pg.waitForTimeout(300);
   const v4=await C(4).inputValue();
-  T('A02.41 Compila veloce «Solo questi giorni: 4, 11» (domeniche): i giorni rossi NON devono essere scritti', v4==='', 'giorni interessati '+(tgt&&tgt[1])+', cella 4 ottobre (domenica, non compilabile) = «'+v4+'»');
+  T('A02.41 Compila veloce «Solo questi giorni: 4, 11» (domeniche): i giorni rossi NON devono essere scritti (e la nota dice «saltati 2 giorni rossi»)', v4==='' && salt, 'giorni interessati '+(tgt&&tgt[1])+', cella 4 ottobre (domenica, non compilabile) = «'+v4+'»');
   /* Blocca / sblocca */
   await pg.getByRole('button',{name:/Blocca mese/}).click(); await pg.waitForTimeout(300);
   const dis=await pg.locator('.emp-card input.cell-in:not([disabled])').count();

@@ -23,11 +23,18 @@ async function apri(br,url,w){ const ctx=await br.newContext({viewport:{width:w|
 const card=(pg,nome)=>pg.evaluate((nome)=>{ const c=[...document.querySelectorAll('.emp-card')].find(c=>((c.querySelector('.emp-head .nome')||{}).innerText||'').indexOf(nome)!==-1); if(!c) return null;
   const pill=[...c.querySelectorAll('.emp-head .pill')].map(p=>p.innerText).join(' | '); const b=c.querySelector('.ced-box'); const cg=c.querySelector('.cong');
   const teor=[...c.querySelectorAll('.teor-abs')].map(x=>x.innerText.trim()); return { pill, box:b?b.innerText.replace(/[ \t]+/g,' '):'', cong:cg?cg.innerText.replace(/\s+/g,' '):'', teor }; },nome);
-async function pdf(pg,nomeBtn,mese){ const btn=pg.getByRole('button',{name:nomeBtn,exact:true}); if(!(await btn.count())) return {esiste:false};
-  await btn.first().click(); await pg.waitForTimeout(700); const sel=pg.locator('.modal select'); await sel.nth(0).selectOption(String(mese)); await sel.nth(1).selectOption('2026');
-  const dlP=pg.waitForEvent('download',{timeout:30000}).catch(()=>null); await pg.getByRole('button',{name:/^Genera /}).first().click(); const dl=await dlP; if(!dl) return {esiste:true,dl:null};
+/* ver184: dalla ver183 i pulsanti «conto per le paghe», «ord/extra», «paghe e LUL» e «mensilizz.» NON ci sono più
+   (decisione di Christian), ma le funzioni restano nel file: se il pulsante manca e si indica la funzione, il PDF
+   si genera chiamandola direttamente, così il controllo sul CONTENUTO resta quello di prima. */
+async function pdf(pg,nomeBtn,mese,fn){ const btn=pg.getByRole('button',{name:nomeBtn,exact:true}); const nBtn=await btn.count(); if(!nBtn && !fn) return {esiste:false};
+  let dl;
+  if(nBtn){ await btn.first().click(); await pg.waitForTimeout(700); const sel=pg.locator('.modal select'); await sel.nth(0).selectOption(String(mese)); await sel.nth(1).selectOption('2026');
+    const dlP=pg.waitForEvent('download',{timeout:30000}).catch(()=>null); await pg.getByRole('button',{name:/^Genera /}).first().click(); dl=await dlP; }
+  else { const dlP=pg.waitForEvent('download',{timeout:30000}).catch(()=>null);
+    await pg.evaluate(([fn,mese])=>{ const st=JSON.parse(localStorage.getItem('spazioireos_reportore_v1')); const pr=[{y:2026,m:mese}]; if(fn==='LUL') esportaPDF(st,pr,{lul:true}); else window[fn](st,pr); },[fn,mese]); dl=await dlP; }
+  if(!dl) return {esiste:!!nBtn,dl:null,senzaPulsante:!nBtn};
   const out=__dirname+'/out/'+mese+'-'+(dl.suggestedFilename()||'o.pdf'); await dl.saveAs(out); const pagine=+(/^Pages:\s+(\d+)/m.exec(sh('pdfinfo '+JSON.stringify(out)))||[0,0])[1];
-  const txt=sh('pdftotext -layout '+JSON.stringify(out)+' -'); return {esiste:true,dl,out,pagine,txt,flat:txt.replace(/\s+/g,' '),nome:dl.suggestedFilename()}; }
+  const txt=sh('pdftotext -layout '+JSON.stringify(out)+' -'); return {esiste:!!nBtn,senzaPulsante:!nBtn,dl,out,pagine,txt,flat:txt.replace(/\s+/g,' '),nome:dl.suggestedFilename()}; }
 (async()=>{ const br=await chromium.launch({args:['--no-sandbox']});
   const {ctx,pg,E}=await apri(br,'http://127.0.0.1:8300/dip/index.html');
   T('V1 targhetta '+APPV, (await pg.locator('.app-rev').first().innerText()).indexOf(APPV)!==-1);
@@ -59,10 +66,10 @@ async function pdf(pg,nomeBtn,mese){ const btn=pg.getByRole('button',{name:nomeB
   T('V21 trattenute del Costo orario: A 0 · B 0 · C 3 · 15 h 0', co.a.tratt===0 && co.b.tratt===0 && co.c.tratt===3 && co.p.tratt===0);
   T('V22 NON mensilizzato (criterio orario): le ore mancanti restano trattenute come prima (4,50)', co.o.tratt===4.5 && co.o.sotto===0, JSON.stringify(co.o));
   T('V23 settembre 2026 (prima della base mensile): trattenute come prima', co.p.settTratt>0, co.p.settTratt);
-  const R=await pdf(pg,'🖨️ Report PDF A4 conto per le paghe',10);
-  T('V24 pulsante «Report PDF A4 conto per le paghe» e PDF scaricato', R.esiste && !!R.dl, R.nome);
+  const R=await pdf(pg,'🖨️ Report PDF A4 conto per le paghe',10,'esportaPDFConto');
+  T('V24 dalla ver183 il pulsante «Report PDF A4 conto per le paghe» non c\'è più, ma la funzione genera ancora il PDF', R.senzaPulsante && !!R.dl, R.nome);
   if(R.dl){ console.log(R.txt.split('\n').filter(x=>x.trim()).map(x=>'    '+x.replace(/\s+/g,' ')).join('\n'));
-    T('V25 nome file «Conto ore per le paghe» con versione e ora', /Spazio Ireos Conto ore per le paghe - \d{2}[a-z]{3}\d{2} - ver182 - \d{2}\.\d{2}\.pdf/.test(R.nome), R.nome);
+    T('V25 nome file «Conto ore per le paghe» con versione e ora', new RegExp('Spazio Ireos Conto ore per le paghe - \\d{2}[a-z]{3}\\d{2} - '+APPV+' - \\d{2}\\.\\d{2}\\.pdf').test(R.nome), R.nome);   /* ver184: versione dal file (era «ver182» scritto a mano) */
     T('V26 titolo e sottotitolo (27 giorni, solo mensilizzati)', /Conto delle ore per le paghe · Ottobre 2026/.test(R.flat) && /27 giorni lavorativi \(da lunedì a sabato\)/.test(R.flat) && /solo dipendenti mensilizzati/.test(R.flat));
     T('V27 riga A: 19,00 82,50 85,50 - 25,33 60,17 101,50 +41,33 — — 3,17', /PROVA MALATTIA 19,00 82,50 85,50 - 25,33 60,17 101,50 \+41,33 — — 3,17/.test(R.flat));
     T('V28 riga B: sotto l\'orario 4,00, nessuna trattenuta', /PROVA SOTTO 17,00 73,82 76,50 — 76,50 72,50 — 4,00 —/.test(R.flat));
@@ -73,10 +80,10 @@ async function pdf(pg,nomeBtn,mese){ const btn=pg.getByRole('button',{name:nomeB
     T('V33 nessun carattere sbagliato (il «−» di jsPDF esce come «"»)', !/"/.test(R.txt));
     T('V34 una pagina sola', R.pagine===1, R.pagine);
     sh('pdftoppm -r 80 -png "'+R.out+'" '+__dirname+'/out/conto'); }
-  const S=await pdf(pg,'🖨️ Report PDF A4 conto per le paghe',9); T('V35 settembre: nessun mensilizzato → lo dice', S.dl && /nessun dipendente mensilizzato \(la base mensile parte da ottobre 2026\)/.test(S.flat), S.flat&&S.flat.slice(0,160));
-  const O=await pdf(pg,'🖨️ Report PDF A4 ord/extra',10); T('V36 ord/extra: «19,00 h settimanali ÷ 6 giorni = 3,17 h al giorno»', O.dl && /19,00 h settimanali ÷ 6 giorni = 3,17 h al giorno/.test(O.flat));
-  const L=await pdf(pg,'🖨️ Report PDF A4 paghe e LUL',10); T('V37 paghe e LUL: MAL 25,33 e riga «ORE SOTTO L\'ORARIO, non trattenute 4,00»', L.dl && /altre assenze retribuite 25,33 h/.test(L.flat) && /ORE SOTTO L'ORARIO, non trattenute 4,00 h/.test(L.flat));
-  const M=await pdf(pg,'🖨️ Report PDF A4 mensilizz.',10); T('V38 report mensilizz. si genera ancora', M.dl && /SUPPLEMENTARE/.test(M.flat));
+  const S=await pdf(pg,'🖨️ Report PDF A4 conto per le paghe',9,'esportaPDFConto'); T('V35 settembre: nessun mensilizzato → lo dice', S.dl && /nessun dipendente mensilizzato \(la base mensile parte da ottobre 2026\)/.test(S.flat), S.flat&&S.flat.slice(0,160));
+  const O=await pdf(pg,'🖨️ Report PDF A4 ord/extra',10,'esportaPDFOrdExtra'); T('V36 ord/extra: «19,00 h settimanali ÷ 6 giorni = 3,17 h al giorno»', O.dl && /19,00 h settimanali ÷ 6 giorni = 3,17 h al giorno/.test(O.flat));
+  const L=await pdf(pg,'🖨️ Report PDF A4 paghe e LUL',10,'LUL'); T('V37 paghe e LUL: MAL 25,33 e riga «ORE SOTTO L\'ORARIO, non trattenute 4,00»', L.dl && /altre assenze retribuite 25,33 h/.test(L.flat) && /ORE SOTTO L'ORARIO, non trattenute 4,00 h/.test(L.flat));
+  const M=await pdf(pg,'🖨️ Report PDF A4 mensilizz.',10,'esportaPDFMens'); T('V38 report mensilizz. si genera ancora', M.dl && /SUPPLEMENTARE/.test(M.flat));
   const H=await pdf(pg,'🖨️ Report PDF A4',10); T('V39 Report storico si genera ancora', H.dl && /Report Ore/.test(H.flat));
   T('V40 zero errori di pagina', E.length===0, E.join('|')||'nessuno');
   await ctx.close();

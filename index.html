@@ -100,6 +100,11 @@
   .cell-in.ignota { background:#fee2e2 !important; border-color:#dc2626 !important; color:#7f1d1d !important; font-weight:900; }
   .ignote-box { background:#fee2e2; border-bottom:3px solid #dc2626; color:#7f1d1d; font-size:13px; font-weight:800; padding:6px 10px; line-height:1.45; }
   .ignote-box .det { font-weight:600; }
+  .pendente-box { background:#fee2e2; border:2px solid #dc2626; color:#7f1d1d; border-radius:10px; padding:10px 12px; font-size:13px; line-height:1.45; text-align:left; margin-bottom:14px; }
+  /* ver184: minuti fuori griglia (ambra tratteggiata, distinta dal rosso delle scritte ignote) */
+  .cell-in.fuoripasso { background:#fef3c7 !important; border:2px dashed #d97706 !important; color:#7c2d12 !important; font-weight:900; }
+  .fuoripasso-box { background:#fef3c7; border-bottom:3px dashed #d97706; color:#7c2d12; font-size:13px; font-weight:800; padding:6px 10px; line-height:1.45; }
+  .fuoripasso-box .det { font-weight:600; }
   .cell-wrap { position:relative; display:inline-block; line-height:0; }
   .perm-flag { position:absolute; top:1px; right:1px; width:11px; height:11px; border-radius:50%; border:2px solid #fff; background:#7c3aed; cursor:pointer; opacity:0.16; padding:0; box-shadow:0 0 2px rgba(0,0,0,.3); }
   .perm-flag.on { opacity:1; }
@@ -500,7 +505,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver183";
+const APP_VER = "ver184";
 const APP_DATA = "19nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -566,15 +571,81 @@ function oreEntroIlMassimo(t){
 function cellaScritturaAmmessa(t){        // va bene COME PEZZO mentre si scrive?
   const v = String(t == null ? "" : t);
   if (v === "") return true;
-  if (/^\d{0,2}([.,]\d{0,2})?$/.test(v)) return oreEntroIlMassimo(v);   /* ver142: e sotto il tetto */
+  if (/^\d{0,2}([.,]\d{0,2})?$/.test(v)) return oreEntroIlMassimo(v) && minutiAmmessiPezzo(v);   /* ver142: e sotto il tetto; ver184: e coi minuti ammessi */
   return CODE_PREFIX[v.toUpperCase()] === true;               // l'inizio di un codice
 }
 function cellaValoreFinale(t){            // alla fine: il codice vero, il numero, oppure null
   const v = String(t == null ? "" : t).trim();
   if (v === "") return "";
   if (CODE_UP[v.toUpperCase()] !== undefined) return CODE_UP[v.toUpperCase()];
-  if (isNumeric(v)) return oreEntroIlMassimo(v) ? v : null;      /* ver142: mai piu' di 13 ore */
+  if (isNumeric(v)) return (oreEntroIlMassimo(v) && minutiAmmessi(v)) ? v : null;   /* ver142: mai piu' di 13 ore; ver184: solo minuti ammessi */
   return null;                                                 // non ammesso
+}
+/* ===== ver184 (19/11/2026) — LA REGOLA DEI MINUTI ==========================================
+   Christian: le ore si scrivono e si mostrano solo con decimali che corrispondono a 0, 10, 15,
+   20, 30, 40, 45, 50 minuti: ,00 ,17 ,25 ,33 ,50 ,67 ,75 ,83 (oppure ,0 / ,5 a una cifra).
+   «sì a 3,75, no a 3,86». Vale «ovunque»: celle, Compila veloce, permesso orario, report paghe.
+   ,17 ,33 ,67 ,83 si LEGGONO come sesti esatti (parseHour). */
+const ORE_SESTI = { "17":1/6, "33":1/3, "67":2/3, "83":5/6 };
+const DEC_AMMESSI = ["", "0", "5", "00", "17", "25", "33", "50", "67", "75", "83"];
+const DEC_AMMESSI_TXT = ",00 ,17 ,25 ,33 ,50 ,67 ,75 ,83";
+const MINUTI_AMMESSI = [0, 10, 15, 20, 30, 40, 45, 50, 60];
+/* mentre si scrive: dopo la virgola la prima cifra ∈ {0,1,2,3,5,6,7,8}, la seconda e' obbligata */
+const SECONDA_CIFRA = { "0":"0", "1":"7", "2":"5", "3":"3", "5":"0", "6":"7", "7":"5", "8":"3" };
+function decimaliDi(t){ const v = String(t == null ? "" : t).trim(); const i = v.search(/[.,]/); return i < 0 ? "" : v.slice(i + 1); }
+function minutiAmmessi(t){ return DEC_AMMESSI.indexOf(decimaliDi(t)) !== -1; }          /* testo completo */
+function minutiAmmessiPezzo(t){                                                           /* pezzo mentre si scrive */
+  const dd = decimaliDi(t);
+  if (dd.length === 0) return true;
+  if (dd.length === 1) return SECONDA_CIFRA[dd] !== undefined;
+  return dd.length === 2 && SECONDA_CIFRA[dd[0]] === dd[1];
+}
+/* il valore AMMESSO piu' vicino (in ore esatte: 3h10 = 3,1666…). A parita' si va su. */
+function alPasso(v){
+  const n = Number(v); if (!isFinite(n)) return 0;
+  const seg = n < 0 ? -1 : 1, a = Math.abs(n);
+  const h = Math.floor(a + 1e-9); const min = Math.round((a - h) * 600) / 10;   /* al decimo di minuto: un valore già arrotondato a 3 decimali (9,583) non perde il pareggio (35 minuti → 40) */
+  let best = 0, bd = Infinity;
+  MINUTI_AMMESSI.forEach(function(x){ const d = Math.abs(min - x); if (d < bd - 1e-7 || (Math.abs(d - bd) <= 1e-7 && x > best)){ bd = d; best = x; } });
+  const r = h + best / 60;
+  return r === 0 ? 0 : seg * r;
+}
+function alPassoOk(v){ const k = Math.round(Math.abs(Number(v) || 0) * 12); return Math.abs(Math.abs(Number(v) || 0) * 12 - k) < 1e-6 && [0,2,3,4,6,8,9,10].indexOf(k % 12) !== -1; }
+/* Distribuisce `totale` (gia' al passo) sulle righe con peso > 0, in proporzione ai pesi, in modo che
+   OGNI riga sia un valore ammesso e la SOMMA torni esatta. Si lavora in dodicesimi d'ora (5 minuti):
+   ammessi i resti 0,2,3,4,6,8,9,10 (multipli di 10 e di 15 minuti). Programmazione dinamica sulla somma:
+   fra tutte le scelte ammesse vicine al valore proporzionale, quella che si scosta meno in totale. */
+function distPassi(pesi, totale){
+  const n = pesi.length, out = new Array(n).fill(0);
+  const T = Math.round(Math.abs(Number(totale) || 0) * 12);
+  const S = pesi.reduce(function(a, w){ return a + (w > 0 ? w : 0); }, 0);
+  if (!(T > 0) || !(S > 0)) return out;
+  const OK = [0,2,3,4,6,8,9,10];
+  let dp = {}; dp[0] = { c:0, prev:null, k:0, i:-1 };
+  for (let i = 0; i < n; i++){
+    const w = pesi[i] > 0 ? pesi[i] : 0, x = w / S * T;
+    const cand = [];
+    if (w > 0){ for (let k = Math.max(0, Math.floor(x) - 7); k <= Math.ceil(x) + 7; k++) if (OK.indexOf(k % 12) !== -1) cand.push(k); }
+    else cand.push(0);
+    const nx = {};
+    Object.keys(dp).forEach(function(sk){
+      const st = dp[sk], s0 = +sk;
+      cand.forEach(function(k){
+        const s1 = s0 + k; if (s1 > T) return;
+        const c = st.c + Math.abs(k - x);
+        if (!nx[s1] || c < nx[s1].c - 1e-9) nx[s1] = { c:c, prev:st, k:k, i:i };
+      });
+    });
+    dp = nx;
+  }
+  if (!dp[T]){                                   /* non dovrebbe succedere: ripiego proporzionale */
+    let rest = T, ultimo = -1;
+    for (let i = 0; i < n; i++){ if (pesi[i] > 0){ out[i] = Math.floor((pesi[i] / S) * T); rest -= out[i]; ultimo = i; } }
+    if (ultimo >= 0) out[ultimo] += rest;
+    return out.map(function(k){ return k / 12; });
+  }
+  for (let st = dp[T]; st && st.i >= 0; st = st.prev) out[st.i] = st.k / 12;
+  return out;
 }
 
 /* ver131 (07/11/2026, Christian: «i colori scheda sono pochi, va messa palette … ok 24, no
@@ -667,6 +738,11 @@ function parseHour(v){
   const s = String(v).trim();
   if (s === "") return 0;
   if (CODE_SET[s]) return 0;
+  /* ver184 (19/11/2026, regola dei minuti di Christian): ,17 ,33 ,67 ,83 sono SESTI d'ora
+     (10, 20, 40, 50 minuti) e si leggono esatti, altrimenti 31 × 0,17 farebbe 5,27 invece di
+     5,1667. Nessun altro valore cambia lettura (7,66 resta 7,66; 1,6666 resta 1,6666). */
+  const m6 = /^(\d+)[.,](17|33|67|83)$/.exec(s);
+  if (m6) return parseInt(m6[1], 10) + ORE_SESTI[m6[2]];
   const n = parseFloat(s.replace(",", "."));
   return isNaN(n) ? 0 : n;
 }
@@ -1000,6 +1076,19 @@ function celleIgnoteMese(rec, y, m){
   for (let d = 1; d <= nd; d++){ if (isCellaIgnota(rec.giorni[d])) out.push(d); }
   return out;
 }
+/* ver184: ore GIA' nei dati scritte con minuti fuori griglia (es. 7,66). Non si convertono e non si
+   cancellano: si contano COME SONO e si segnalano, cosi' chi le vede le puo' correggere a mano. */
+const AVVISO_MINUTI = "Dopo la virgola si scrivono solo " + DEC_AMMESSI_TXT + " (0, 10, 15, 20, 30, 40, 45, 50 minuti).";
+function isCellaFuoriPasso(v){
+  const t = String(v == null ? "" : v).trim();
+  if (t === "" || CODE_SET[t] !== undefined || !isNumeric(t)) return false;
+  return !minutiAmmessi(t);
+}
+function celleFuoriPassoMese(rec, y, m){
+  const out = []; const g = (rec && rec.giorni) || {}; const nd = daysInMonth(y, m);
+  for (let d = 1; d <= nd; d++) if (isCellaFuoriPasso(g[d])) out.push(d);
+  return out;
+}
 function eroOn(rec,d){ return !(rec && rec.ero && rec.ero[d] === false); }   // predefinito: erosiva
 /* ver169 (Christian, 15/11/2026): «l'assenza non retribuita AN o ASS.ING non deve erodere il massimale:
    la correzione tocca anche ASP 0h». Erode solo l'assenza RETRIBUITA (pay:true): -- e AN erano già fuori,
@@ -1106,31 +1195,43 @@ function prodottoMese(rec,dp,y,m,state){                                   // or
    dettagliare meglio è»). Solo LEGGE: ogni numero viene dalle funzioni che già fanno i conti (ver151,
    ver171, ver173/174). null quando il box non ha senso (non mensilizzato, prima di ottobre 2026, mese
    vuoto). Le ore si scrivono al centesimo partendo dal valore pieno, come sul cedolino. */
-function cedolinoBox(state, dp, y, m){
-  if (!meseCedolinoTetto(dp, y, m)) return null;
+/* ===== ver184 (19/11/2026) — IL «TS» DEL DIPENDENTE: UNA FUNZIONE SOLA PER GLI STESSI NUMERI =====
+   Christian: «Ne deriva che devi costruire diversamente il TS del dipendente» e «sì, ovunque gli stessi
+   numeri del TS (così il rendiconto combacia col cedolino vero)»; sulle ORE MESE: «Restano 65,13».
+   tsDaRiga prende la riga VERA del mese (oreSuppPeriodo) e porta al PASSO AMMESSO (0, 10, 15, 20, 30,
+   40, 45, 50 minuti) le ore della persona, voce per voce: assenze retribuite per codice, festività
+   godute, permessi per tipo, trattenute (ASS.ING / ASP 0h), supplementari, ore sotto l'orario,
+   festività non godute, e le parti erosive. Le ORE MESE (lo stipendio fisso del contratto) NON si
+   arrotondano: le ordinarie a cedolino sono ORE MESE − assenze − trattenute, quindi portano loro lo
+   scarto di pochi minuti (nel TS va sull'ultima riga delle ordinarie).
+   La usano: il TS (esportaPDFPaghe), il box «Da inserire a cedolino», cedOre per USOINT, il Costo
+   orario (oreSuppPeriodo/oreCedolinoPeriodo) e il massimale (consumoCedolinoMese).
+   ⚠️ Il «Risultato del mese» del Tabellone resta il VERO a 3 decimali (bancaMeseA non passa di qui). */
+function tsDaRiga(state, dp, y, m, r){
   const rec = getRecFrom(state, y, m, dp.id);
-  if (!rec || !recHasData(rec)) return null;
-  const r = oreSuppPeriodo(state, dp, [{ y:y, m:m }], null, null, 0).righe[0];
-  if (!r) return null;
   const q = quotaGiorno(dp, y, m), qF = oreSettAt(dp, y, m) / ggSettDi(state, dp), nd = daysInMonth(y, m);
   const fr = meseFrazione(dp, y, m);
   const g = rec.giorni || {};
-  const ferie = { gg:0, ggE:0 }, altre = {};          /* altre: cod -> {gg, ggE} */
-  const nonRetr = {}; let an = 0, festng = 0;
+  const voci = {};                                    /* codice che copre le ore -> {gg, ggE, giorni} */
+  const nonRetr = {}; const nrGiorni = []; let an = 0, festng = 0;
   for (let d = 1; d <= nd; d++){
     const cv = String(g[d]==null ? "" : g[d]).trim();
     if (cv === "AN"){ an++; continue; }
     if (cv === "FESTNG"){ festng++; continue; }
     if (!CODE_SET[cv] || cv === "--") continue;
     if (copreOre(cv)){
-      const e = eroOn(rec, d);
-      if (cv === "FERIE"){ ferie.gg++; if (e) ferie.ggE++; }
-      else { const t = altre[cv] || (altre[cv] = { gg:0, ggE:0 }); t.gg++; if (e) t.ggE++; }
-    } else { nonRetr[cv] = (nonRetr[cv]||0) + 1; }
+      const t = voci[cv] || (voci[cv] = { gg:0, ggE:0, giorni:[] });
+      t.gg++; t.giorni.push(d); if (eroOn(rec, d)) t.ggE++;
+    } else { nonRetr[cv] = (nonRetr[cv]||0) + 1; nrGiorni.push(d); }
   }
-  /* festività godute del mese (stesso perimetro di festGoduteMese) e quali sono erosive */
-  const f = festivitaSet(y); const festGod = []; const tuttoNR = meseTuttoAN(state, dp, y, m);
-  const festNon = [];
+  const voce = function(cod, gg, ggE, giorni, qq){
+    const ore = alPasso(gg * qq), oreE = alPasso(ggE * qq);
+    return { cod:cod, gg:gg, ggE:ggE, giorni:giorni, ore:ore, oreE:oreE, oreNE:ore - oreE };
+  };
+  const ferie = voci.FERIE ? voce("FERIE", voci.FERIE.gg, voci.FERIE.ggE, voci.FERIE.giorni, q) : voce("FERIE", 0, 0, [], q);
+  const altre = Object.keys(voci).filter(function(k){ return k !== "FERIE"; }).sort().map(function(k){ return voce(k, voci[k].gg, voci[k].ggE, voci[k].giorni, q); });
+  /* festività godute (stesso perimetro di festGoduteMese) e non godute (calendario) */
+  const f = festivitaSet(y); const festGod = []; const festNon = []; const tuttoNR = meseTuttoAN(state, dp, y, m);
   for (let d = 1; d <= nd; d++){
     if (!isFestivo(f, m, d)) continue;
     if (!inForceAt(dp, y*10000 + m*100 + d)) continue;
@@ -1141,27 +1242,72 @@ function cedolinoBox(state, dp, y, m){
   }
   FEST_NON_GOD_FISSE.forEach(function(x){ if (x[0] === m && inForceAt(dp, y*10000 + m*100 + x[1])) festNon.push(x[1]); });
   festNon.sort(function(a,b){ return a-b; });
-  const pm = permOreMese(rec), permE = permOreEroseMese(rec);
-  const inMeno = Math.min(0, R2(r.rese - r.lav, 3));
-  const altreGG = Object.keys(altre).reduce(function(a,k){ return a + altre[k].gg; }, 0);
-  const altreGGE = Object.keys(altre).reduce(function(a,k){ return a + altre[k].ggE; }, 0);
   const festGGE = festGod.filter(function(x){ return x.ero; }).length;
-  const ordC = R2(r.ordCed, 2), supp = R2(r.supp, 2);
-  const eroTot = R2(ferie.ggE*q + altreGGE*q + festGGE*qF + permE, 2);
-  const ced = R2(ordC + supp, 2);
+  const fest = voce("FEST", festGod.length, festGGE, festGod.map(function(x){ return x.d; }), qF);
+  /* permessi orari retribuiti, per tipo */
+  const P = rec.permessi || {}; const permT = {}; let permAltre = 0;
+  Object.keys(P).forEach(function(d){
+    const v = P[d]; const o = Number(v && v.ore) || 0; if (!(o > 0)) return;
+    const tp = String((v && v.tipo) || "").trim().toUpperCase();
+    if (PERM_CODES.indexOf(tp) === -1){ permAltre += o; return; }
+    const t = permT[tp] || (permT[tp] = { ore:0, oreE:0, giorni:[], pesi:[] });
+    t.ore += o; t.giorni.push(+d); t.pesi.push(o); if (eroOn(rec, d)) t.oreE += o;
+  });
+  const perm = Object.keys(permT).sort().map(function(k){ const t = permT[k]; const ore = alPasso(t.ore), oreE = alPasso(t.oreE);
+    return { cod:k, ore:ore, oreE:oreE, oreNE:ore - oreE, giorni:t.giorni, pesi:t.pesi }; });
+  const somma = function(arr, k){ return arr.reduce(function(a, x){ return a + x[k]; }, 0); };
+  const permTot = { ore:somma(perm, "ore"), oreE:somma(perm, "oreE"), oreNE:somma(perm, "oreNE"), altre:permAltre };
+  const altreTot = { gg:somma(altre, "gg"), ore:somma(altre, "ore"), oreE:somma(altre, "oreE"), oreNE:somma(altre, "oreNE") };
+  const monte = R2(r.monteP, 2);                      /* ORE MESE: valore del contratto, NON si arrotonda */
+  const tratt = alPasso(r.tratt), supp = alPasso(r.supp), sotto = alPasso(r.sotto);
+  const assTot = ferie.ore + altreTot.ore + fest.ore + permTot.ore;
+  const ordC = recHasData(rec) ? Math.max(0, monte - assTot - tratt) : 0;
+  const eroTot = ferie.oreE + altreTot.oreE + fest.oreE + permTot.oreE;
   return {
-    monte: R2(r.monteP, 2), parziale: fr < 0.9999, fr: fr, q: q, qF: qF,
-    ferie: { gg:ferie.gg, ore:R2(ferie.gg*q,2), ggE:ferie.ggE, oreE:R2(ferie.ggE*q,2), oreNE:R2((ferie.gg-ferie.ggE)*q,2) },
-    altre: Object.keys(altre).sort().map(function(k){ const t = altre[k]; return { cod:k, gg:t.gg, ggE:t.ggE, ore:R2(t.gg*q,2), oreE:R2(t.ggE*q,2), oreNE:R2((t.gg-t.ggE)*q,2) }; }),
-    altreTot: { gg:altreGG, ore:R2(altreGG*q,2), oreE:R2(altreGGE*q,2), oreNE:R2((altreGG-altreGGE)*q,2) },
-    fest: { gg:festGod.length, ore:R2(festGod.length*qF,2), giorni:festGod.map(function(x){ return x.d; }), ggE:festGGE, oreE:R2(festGGE*qF,2), oreNE:R2((festGod.length-festGGE)*qF,2) },
-    perm: { ore:R2(pm.pagate,2), oreE:R2(permE,2), oreNE:R2(pm.pagate-permE,2), altre:R2(pm.altre,2) },
-    ordC: ordC, tratt: R2(r.tratt, 2), sotto: R2(r.sotto, 2), previste: oreRetribuibili(dp, y, m, rec),   /* ver182: trattenute solo ASS.ING / ASP 0h */
-    supp: supp, risultato: (r.supp > 0.0005) ? R2(r.supp,3) : R2(inMeno,3),
-    nonGod: { gg:festNon.length, ore:R2(festNon.length*q,2), giorni:festNon },
-    nonRetr: Object.keys(nonRetr).sort().map(function(k){ return { cod:k, gg:nonRetr[k], ore:R2(nonRetr[k]*q,2) }; }),
-    an: an, festng: festng, note: vociLines(rec),
-    ced: ced, eroTot: eroTot, rend: R2(ced + eroTot, 2)
+    monte: monte, parziale: fr < 0.9999, fr: fr, q: q, qF: qF,
+    ferie: ferie, altre: altre, altreTot: altreTot, fest: fest, perm: permTot, permTipi: perm,
+    ordC: ordC, ordCPasso: alPasso(ordC), tratt: tratt, sotto: sotto, supp: supp, assTot: assTot,
+    nonGod: { gg:festNon.length, ore:alPasso(festNon.length * q), giorni:festNon },
+    nonRetr: Object.keys(nonRetr).sort().map(function(k){ return { cod:k, gg:nonRetr[k], ore:alPasso(nonRetr[k] * q) }; }), nrGiorni: nrGiorni,
+    an: an, festng: festng, ced: ordC + supp, eroTot: eroTot
+  };
+}
+/* il TS del mese (null se il mese non è a cedolino mensilizzato o non ha dati) */
+function tsMese(state, dp, y, m){
+  if (!meseCedolinoTetto(dp, y, m)) return null;
+  const rec = getRecFrom(state, y, m, dp.id);
+  if (!rec || !recHasData(rec)) return null;
+  const r = oreSuppPeriodo(state, dp, [{ y:y, m:m }], null, null, 0).righe[0];
+  return (r && r.ts) ? Object.assign({ riga:r }, r.ts) : null;
+}
+/* ver175 (15/11/2026, Christian: «in tabellone, per ogni dip, in un box dedicato, voglio ben visibili:
+   ore da far inserire a cedolino secondo mensilizzazione (le c.d. Ore mese), di cui ore ferie e ore
+   altre assenze retribuite (suddivise per erosive e non erosive), nonché le festività non godute (che
+   viaggiano a sé) e le ore supplementari, altre note se disponibili» → «le parole vanno bene, più puoi
+   dettagliare meglio è»). Solo LEGGE. null quando il box non ha senso (non mensilizzato, prima di
+   ottobre 2026, mese vuoto).
+   ver184: i numeri sono quelli del TS (tsMese), al passo ammesso; ORE MESE restano quelle del contratto. */
+function cedolinoBox(state, dp, y, m){
+  const T = tsMese(state, dp, y, m);
+  if (!T) return null;
+  const rec = getRecFrom(state, y, m, dp.id);
+  const r = T.riga;
+  const inMeno = Math.min(0, R2(r.rese - r.lav, 3));
+  const v2 = function(x){ return R2(x, 2); };
+  const vv = function(o){ return { gg:o.gg, ore:v2(o.ore), ggE:o.ggE, oreE:v2(o.oreE), oreNE:v2(o.oreNE) }; };
+  return {
+    monte: T.monte, parziale: T.parziale, fr: T.fr, q: T.q, qF: T.qF,
+    ferie: vv(T.ferie),
+    altre: T.altre.map(function(a){ return Object.assign({ cod:a.cod }, vv(a)); }),
+    altreTot: { gg:T.altreTot.gg, ore:v2(T.altreTot.ore), oreE:v2(T.altreTot.oreE), oreNE:v2(T.altreTot.oreNE) },
+    fest: Object.assign(vv(T.fest), { giorni:T.fest.giorni }),
+    perm: { ore:v2(T.perm.ore), oreE:v2(T.perm.oreE), oreNE:v2(T.perm.oreNE), altre:v2(T.perm.altre) },
+    ordC: v2(T.ordC), tratt: v2(T.tratt), sotto: v2(T.sotto), previste: oreRetribuibili(dp, y, m, rec),   /* ver182: trattenute solo ASS.ING / ASP 0h */
+    supp: v2(T.supp), risultato: (T.supp > 0.0005) ? R2(T.supp,3) : R2(inMeno,3),
+    nonGod: { gg:T.nonGod.gg, ore:v2(T.nonGod.ore), giorni:T.nonGod.giorni },
+    nonRetr: T.nonRetr.map(function(x){ return { cod:x.cod, gg:x.gg, ore:v2(x.ore) }; }),
+    an: T.an, festng: T.festng, note: vociLines(rec),
+    ced: v2(T.ced), eroTot: v2(T.eroTot), rend: v2(T.ced + T.eroTot)
   };
 }
 /* ver176 (15/11/2026, Christian: «in usoint devono andare le ore pagate come da cedolino e quelle deve
@@ -1178,11 +1324,9 @@ function cedOrePubblica(state){
     const y = parseInt(mm[1],10), m = parseInt(mm[2],10);
     (state.dipendenti || []).forEach(function(dp){
       if (!meseCedolinoTetto(dp, y, m)) return;
-      const rec = (state.dati[k] || {})[dp.id];
-      if (!rec || !recHasData(rec)) return;
-      const r = oreSuppPeriodo(state, dp, [{ y:y, m:m }], null, null, 0).righe[0];
-      if (!r) return;
-      (out[k] = out[k] || {})[dp.id] = R2(R2(r.ordCed, 2) + R2(r.supp, 2), 2);
+      const T = tsMese(state, dp, y, m);              /* ver184: gli stessi numeri del TS */
+      if (!T) return;
+      (out[k] = out[k] || {})[dp.id] = R2(T.ordC + T.supp, 2);
     });
   });
   return out;
@@ -1197,14 +1341,11 @@ function meseCedolinoTetto(dp, y, m){
    Le assenze erosive si contano sullo stesso perimetro che le toglie dalle ordinarie (copreOre), così
    un'assenza NON erosiva esce davvero e una erosiva rientra esattamente per quanto era stata tolta. */
 function consumoCedolinoMese(state, rec, dp, y, m){
-  const r = oreSuppPeriodo(state, dp, [{ y:y, m:m }], null, null, 0).righe[0];
-  if (!r) return 0;
-  let assEro = 0;
-  if (rec && rec.giorni){
-    const q = quotaGiorno(dp, y, m), nd = daysInMonth(y, m);
-    for (let d = 1; d <= nd; d++){ const cv = String(rec.giorni[d]==null ? "" : rec.giorni[d]).trim(); if (copreOre(cv) && eroOn(rec, d)) assEro += q; }
-  }
-  return R2(r.ordCed + r.supp + assEro + permOreEroseMese(rec) + festOreEroseMese(state, dp, y, m), 3);
+  /* ver184: gli stessi numeri del TS — ore a cedolino (ordinarie + supplementari al passo) + le parti
+     EROSIVE al passo (assenze per codice, festività godute, permessi). */
+  const T = tsMese(state, dp, y, m);
+  if (!T) return 0;
+  return R2(T.ced + T.eroTot, 3);
 }
 function tettoWindow(periodo,y,m){                                         // finestra YM (incluso) del periodo che contiene (y,m)
   if(periodo==="civile") return { fromYM:y*100+1, toYM:y*100+12 };
@@ -1544,6 +1685,8 @@ const NOTE_RECOVERY = {
   // riferimenti a malattie e rimborsi. Stesso motivo: file pubblico.
 };
 
+/* ver184: numero di schema dei dati che questa app sa leggere (lo scrive migrate in `version`). */
+const DIP_SCHEMA = 4;
 function migrate(obj){
   if (!obj) return obj;
   if (!obj.anni) obj.anni = [];
@@ -2725,13 +2868,14 @@ function esportaPDFPaghe(state, pairs){
     dipsMese.forEach(function(dp){
       const rec = getRecFrom(state, anno, m, dp.id);
       if (!recHasData(rec)){ senzaDati.push(dp.nome); return; }
-      const r = oreSuppPeriodo(state, dp, [{ y:anno, m:m }], null, null, 0).righe[0];
-      if (!r) return;
+      /* ver184: i numeri del mese sono quelli del TS (tsMese), al passo ammesso; qui si distribuiscono sui giorni
+         con distPassi, così OGNI cella è un valore ammesso e ogni colonna somma esatta alla sua voce. */
+      const TS = tsMese(state, dp, anno, m);
+      if (!TS) return;
+      const r = TS.riga;
       const q = quotaGiorno(dp, anno, m);
-      const qF = oreSettAt(dp, anno, m) / ggSettDi(state, dp);
       const gs = Math.max(1, Math.round(ggSettPersona(dp)));
       const g = rec.giorni || {};
-      const P = rec.permessi || {};
       const rows = [];
       for (let d = 1; d <= nd; d++){
         const cv = String(g[d] == null ? "" : g[d]).trim();
@@ -2741,33 +2885,38 @@ function esportaPDFPaghe(state, pairs){
         const isCode = CODE_SET[cv] !== undefined;
         const previsto = inForce && !dom && wd <= gs;                     /* giorno dell'orario (come oreRetribuibili) */
         const h = (inForce && !isCode && cv !== "") ? Math.max(0, parseHour(cv)) : 0;
-        const ret = [];                                                    /* assenze retribuite del giorno: {cod, w} */
-        if (inForce && copreOre(cv)) ret.push({ cod:cv, w:q });
-        if (inForce && festivo && !dom && !(isCode && cv !== "--" && cv !== "AN")) ret.push({ cod:"FEST", w:qF });
-        const pObj = P[d];
-        if (inForce && pObj && Number(pObj.ore) > 0 && PERM_CODES.indexOf(String(pObj.tipo || "").trim().toUpperCase()) !== -1)
-          ret.push({ cod:String(pObj.tipo).trim().toUpperCase(), w:Number(pObj.ore) });
         const nr = (inForce && isCode && CODE_SET[cv].pay === false) ? cv : "";
         let nota = "";
         if (!inForce) nota = "fuori contratto";
         else if (cv === "AN") nota = "AN";
         else if (cv === "--" || (cv === "" && dom)) nota = "R";
         else if (cv === "FESTNG") nota = "FESTNG";
-        rows.push({ d:d, label: d + " " + WD[wd], h:h, base: previsto ? q : 0, ret:ret, nr:nr, nota:nota, rosso: (dom || festivo), s:0, o:0, retH:[], nrH:0 });
+        rows.push({ d:d, label: d + " " + WD[wd], h:h, base: previsto ? q : 0, ret:[], retH:[], nr:nr, nota:nota, rosso: (dom || festivo), s:0, o:0, nrH:0 });
       }
+      /* assenze retribuite: ogni voce (codice, festività godute, permessi per tipo) sui SUOI giorni */
+      const metti = function(cod, giorni, pesi, tot){
+        const dist = distPassi(pesi, tot);
+        giorni.forEach(function(d, k){ const x = rows[d-1]; if (!x) return; x.ret.push(cod); x.retH.push(dist[k]); });
+      };
+      [TS.ferie].concat(TS.altre).forEach(function(v){ if (v.gg > 0) metti(v.cod, v.giorni, v.giorni.map(function(){ return 1; }), v.ore); });
+      if (TS.fest.gg > 0) metti("FEST", TS.fest.giorni, TS.fest.giorni.map(function(){ return 1; }), TS.fest.ore);
+      TS.permTipi.forEach(function(v){ metti(v.cod, v.giorni, v.pesi, v.ore); });
       /* 1) supplementari: il totale del mese sui giorni andati più oltre la quota */
-      const SUPP = R2(r.supp, 2);
-      let resto = Math.round(SUPP * 100);
-      const ord = rows.map(function(x, i){ return { i:i, e: Math.round(Math.max(0, x.h - x.base) * 100), h: Math.round(x.h * 100) }; })
+      const SUPP = TS.supp;
+      let resto = SUPP;
+      const sRaw = rows.map(function(){ return 0; });
+      const ord = rows.map(function(x, i){ return { i:i, e: Math.max(0, x.h - x.base), h: x.h }; })
         .filter(function(x){ return x.h > 0; }).sort(function(a, b){ return (b.e - a.e) || (b.h - a.h) || (a.i - b.i); });
-      ord.forEach(function(x){ if (resto <= 0) return; const t = Math.min(resto, x.e); rows[x.i].s += t; resto -= t; });
-      ord.forEach(function(x){ if (resto <= 0) return; const t = Math.min(resto, x.h - rows[x.i].s); rows[x.i].s += t; resto -= t; });
-      rows.forEach(function(x){ x.s = x.s / 100; });
+      ord.forEach(function(x){ if (resto <= 1e-9) return; const t = Math.min(resto, x.e); sRaw[x.i] += t; resto -= t; });
+      ord.forEach(function(x){ if (resto <= 1e-9) return; const t = Math.min(resto, x.h - sRaw[x.i]); sRaw[x.i] += t; resto -= t; });
+      const sDist = distPassi(sRaw, SUPP);
+      rows.forEach(function(x, i){ x.s = sDist[i]; });
       /* 2) ordinarie a cedolino. Prima le ore ordinarie VERE dei giorni lavorati (le ore meno le supplementari);
          poi la differenza col cedolino: se il cedolino paga di più (mese corto, ore sotto l'orario non trattenute)
          si mette sui giorni dell'orario rimasti senza niente (vuoti, poi AN), fino a una quota ciascuno; se paga
-         di meno (mese lungo) si toglie in proporzione dai giorni lavorati. Così nessun giorno porta ore assurde. */
-      const ORD = R2(r.ordCed, 2);
+         di meno (mese lungo) si toglie in proporzione dai giorni lavorati. Così nessun giorno porta ore assurde.
+         ver184: si distribuisce il valore AL PASSO e lo scarto delle ORE MESE va sull'ultima riga. */
+      const ORDc = TS.ordC, ORD = TS.ordCPasso;
       const oV = rows.map(function(x){ return Math.max(0, x.h - x.s); });
       const sV = oV.reduce(function(a, v){ return a + v; }, 0);
       let D = ORD - sV;
@@ -2783,23 +2932,24 @@ function esportaPDFPaghe(state, pairs){
         });
         if (D > 0.00001){ const s2 = oV.reduce(function(a, v){ return a + v; }, 0); if (s2 > 0){ const k = (s2 + D) / s2; for (let i = 0; i < oV.length; i++) oV[i] = oV[i] * k; D = 0; } }
       }
-      const oDist = distCentesimi(oV, ORD);
+      const oDist = distPassi(oV, ORD);
       rows.forEach(function(x, i){ x.o = oDist[i]; });
       const ordSenzaGiorni = (ORD > 0.004 && D > 0.00001);
-      /* 3) assenze retribuite, a quota, quadrate al totale del cedolino */
-      const RET = R2(r.ass + r.fest, 2);
-      const flat = []; rows.forEach(function(x, i){ x.ret.forEach(function(a, j){ flat.push({ i:i, j:j, w:a.w }); }); });
-      const rDist = distCentesimi(flat.map(function(f){ return f.w; }), RET);
-      flat.forEach(function(f, k){ rows[f.i].retH[f.j] = rDist[k]; });
+      /* lo scarto delle ORE MESE (pochi minuti, il valore del contratto non è al passo) sull'ULTIMA riga delle ordinarie */
+      const scarto = ORDc - ORD; let rigaScarto = -1;
+      if (Math.abs(scarto) > 1e-9){
+        for (let i = rows.length - 1; i >= 0; i--) if (rows[i].o > 0 && rows[i].o + scarto >= 0){ rigaScarto = i; break; }
+        if (rigaScarto >= 0) rows[rigaScarto].o += scarto;
+      }
       /* 4) da trattenere (solo ASS.ING / ASP 0h) sui loro giorni */
-      const TR = R2(r.tratt, 2);
-      const nDist = distCentesimi(rows.map(function(x){ return x.nr ? q : 0; }), TR);
+      const TR = TS.tratt;
+      const nDist = distPassi(rows.map(function(x){ return x.nr ? q : 0; }), TR);
       rows.forEach(function(x, i){ x.nrH = nDist[i]; });
       const vuoto = "";
       const body = rows.map(function(x){
-        const retT = x.ret.map(function(a, j){ return a.cod + " " + fh(x.retH[j] || 0); }).join(" · ");
+        const retT = x.ret.map(function(a, j){ return a + " " + fh(x.retH[j] || 0); }).join(" · ");
         const nrT = x.nr ? (x.nr + " " + fh(x.nrH)) : vuoto;
-        return [ x.label + (x.nota ? "  " + x.nota : ""), x.o > 0.004 ? fh(x.o) : vuoto, x.s > 0.004 ? fh(x.s) : vuoto, retT, nrT ];
+        return [ x.label + (x.nota ? "  " + x.nota : ""), x.o > 0.004 ? fh(x.o) + (x.d - 1 === rigaScarto ? " †" : "") : vuoto, x.s > 0.004 ? fh(x.s) : vuoto, retT, nrT ];
       });
       const sumCol = function(fn){ return R2(rows.reduce(function(a, x){ return a + fn(x); }, 0), 2); };
       const tO = sumCol(function(x){ return x.o; }), tS = sumCol(function(x){ return x.s; });
@@ -2810,7 +2960,7 @@ function esportaPDFPaghe(state, pairs){
       doc.setFontSize(11.5); doc.setFont(undefined, "normal");
       doc.text(dp.nome + "   ·   " + MONTH_LABEL[m-1] + " " + anno, 14, 21);
       doc.setFontSize(8.5); doc.setTextColor(70,70,70);
-      doc.text("Ore settimanali " + fh(oreSettAt(dp, anno, m)) + " · quota del giorno " + fh(q) + " h. Le ore di ogni giorno sono quelle da riportare sul cedolino mensilizzato: i totali delle colonne sono le voci del cedolino, da non ricalcolare. Le ore realmente lavorate sono nel Report PDF A4.", 14, 26, { maxWidth: 182 });
+      doc.text("Ore settimanali " + fh(oreSettAt(dp, anno, m)) + " · quota del giorno " + fh(q) + " h. Le ore di ogni giorno sono quelle da riportare sul cedolino mensilizzato: i totali delle colonne sono le voci del cedolino, da non ricalcolare. Le ore realmente lavorate sono nel Report PDF A4. Minuti: ,17 = 10 · ,25 = 15 · ,33 = 20 · ,50 = 30 · ,67 = 40 · ,75 = 45 · ,83 = 50.", 14, 26, { maxWidth: 182 });
       const rosse = []; rows.forEach(function(x, i){ if (x.rosso) rosse.push(i); });
       doc.autoTable({
         startY: 35,
@@ -2830,21 +2980,21 @@ function esportaPDFPaghe(state, pairs){
       });
       let y = doc.lastAutoTable.finalY + 6;
       if (y > 250){ doc.addPage(); y = 18; }
-      const am = assMese(rec, dp, anno, m);
       const voci = [];
-      Object.keys(am.cop.perCod).sort().forEach(function(c){ voci.push(c + " " + am.cop.perCod[c] + " gg"); });
-      if (r.festGG > 0) voci.push("festività godute " + r.festGG + " gg");
-      if (r.perm > 0.004) voci.push("permessi " + fh(r.perm) + " h");
-      const ngG = contaFestivita([{ y:anno, m:m }], dp).non;
-      const ngO = R2(ngG * q, 2);
+      [TS.ferie].concat(TS.altre).forEach(function(v){ if (v.gg > 0) voci.push(v.cod + " " + v.gg + " gg = " + fh(v.ore) + " h"); });
+      if (TS.fest.gg > 0) voci.push("festività godute " + TS.fest.gg + " gg = " + fh(TS.fest.ore) + " h");
+      TS.permTipi.forEach(function(v){ voci.push("permessi " + v.cod + " " + fh(v.ore) + " h"); });
+      const ngG = TS.nonGod.gg;
+      const ngO = TS.nonGod.ore;
       const righe = [
-        "ORE MESE (stipendio fisso): " + fh(r.monteP) + " h  =  ordinarie " + fh(tO) + "  +  assenze retribuite " + fh(tR) + "  +  da trattenere " + fh(tN),
+        "ORE MESE (stipendio fisso): " + fh(TS.monte) + " h  =  ordinarie " + fh(tO) + "  +  assenze retribuite " + fh(tR) + "  +  da trattenere " + fh(tN),
         "SUPPLEMENTARI da pagare: " + (tS > 0.004 ? fh(tS) + " h" : "nessuna"),
         "DA TRATTENERE: " + (tN > 0.004 ? fh(tN) + " h (solo assenze ingiustificate ASS.ING e aspettative non pagate ASP 0h)" : "nessuna: lo stipendio fisso è intero"),
         "FESTIVITÀ NON GODUTE da pagare in più: " + (ngG > 0 ? ngG + " gg = " + fh(ngO) + " h" : "nessuna"),
         "Assenze retribuite: " + (voci.length ? voci.join(" · ") : "nessuna")
       ];
       if (ordSenzaGiorni) righe.push("* ore ordinarie a cedolino senza giorni lavorati nel mese: vanno nel totale.");
+      if (rigaScarto >= 0 && Math.abs(scarto) >= 0.005) righe.push("† le ordinarie del giorno " + rows[rigaScarto].d + " comprendono " + (scarto > 0 ? "+" : "") + fh(scarto) + " h perché il totale torni con le ORE MESE (" + fh(TS.monte) + "), che sono il valore del contratto.");
       doc.setFontSize(9.5); doc.setTextColor(15,39,64);
       let hB = 5 + 4.6 + 1.5;
       const linee = righe.map(function(t){ const ls = doc.splitTextToSize(t, 176); hB += ls.length * 4.6; return ls; });
@@ -3084,8 +3234,9 @@ function CellInput(props){
   else display = String(val);
   const showTrattino = (s === "" && props.rosso && !props.disabled);
   const ignota = !foc && isCellaIgnota(s);          /* ver101: mentre scrivi non si segnala niente */
+  const fuoriPasso = !foc && isCellaFuoriPasso(s);  /* ver184: ore gia' nei dati con minuti fuori griglia */
   return (
-    <input className={"cell-in " + (isCode ? "is-code" : "is-num") + (props.disabled ? " blocked" : "") + (showTrattino ? " trattino" : "") + (ignota ? " ignota" : "") + (rif ? " rifiutata" : "")}
+    <input className={"cell-in " + (isCode ? "is-code" : "is-num") + (props.disabled ? " blocked" : "") + (showTrattino ? " trattino" : "") + (ignota ? " ignota" : "") + (fuoriPasso ? " fuoripasso" : "") + (rif ? " rifiutata" : "")}
       style={props.style} list={foc ? "codici-list" : undefined} title={props.title} disabled={props.disabled}
       value={display} placeholder={showTrattino ? "–" : ""}
       onFocus={function(){ setFoc(true); setRif(false); iniz.current = String(val == null ? "" : val); }}
@@ -3104,7 +3255,9 @@ function CellInput(props){
             if (props.onAvviso) props.onAvviso(
               (isNumeric(grezzo) && !oreEntroIlMassimo(grezzo))
                 ? ("In un giorno non si possono scrivere più di " + ORE_MAX_GIORNO + " ore: la cella è stata lasciata vuota.")   /* ver142 */
-                : ("«" + grezzo + "» non è un codice né un numero: la cella è stata lasciata vuota."), true);
+                : (isNumeric(grezzo) && !minutiAmmessi(grezzo))
+                  ? ("«" + grezzo + "»: " + AVVISO_MINUTI + " La cella è stata lasciata vuota.")   /* ver184 */
+                  : ("«" + grezzo + "» non è un codice né un numero: la cella è stata lasciata vuota."), true);
           }
         } else if (fin !== grezzo){
           props.onChange(fin);
@@ -3119,7 +3272,9 @@ function CellInput(props){
           if (props.onAvviso) props.onAvviso(
             /^\d{0,2}([.,]\d{0,2})?$/.test(v) && !oreEntroIlMassimo(v)
               ? ("In un giorno non si possono scrivere più di " + ORE_MAX_GIORNO + " ore.")   /* ver142 */
-              : "Qui si scrive un numero di ore oppure un codice dell'elenco (FERIE, MAL, EXF…).", true);
+              : (/^\d{0,2}([.,]\d{0,2})?$/.test(v) && !minutiAmmessiPezzo(v))
+                ? AVVISO_MINUTI                                                              /* ver184 */
+                : "Qui si scrive un numero di ore oppure un codice dell'elenco (FERIE, MAL, EXF…).", true);
         }
       }} />
   );
@@ -3221,6 +3376,14 @@ function EmployeeCard(props){
         return <div className="ignote-box">
           ⚠️ {ign.length === 1 ? "Una cella contiene" : (ign.length + " celle contengono")} una <b>scritta non riconosciuta</b> — {ign.map(function(d){ return d + " (" + String(rec.giorni[d]).trim() + ")"; }).join(" · ")}
           <div className="det">Vale <b>0 ore</b> e <b>non conta come assenza</b>: non copre il monte ore e non consuma il tetto. Scrivi un numero di ore oppure uno dei codici dell'elenco (FERIE, MAL, EXF, …).</div>
+        </div>;
+      })()}
+      {(function(){   /* ver184: ore con minuti fuori griglia, gia' nei dati. ⚠️ Dicitura nuova, scritta da Claude. */
+        const fp = celleFuoriPassoMese(rec, y, m);
+        if (!fp.length) return null;
+        return <div className="fuoripasso-box">
+          ⏱ {fp.length === 1 ? "Una cella ha" : (fp.length + " celle hanno")} <b>minuti fuori griglia</b> — {fp.map(function(d){ return d + " (" + String(rec.giorni[d]).trim().replace(".", ",") + ")"; }).join(" · ")}
+          <div className="det">Sono contate <b>come sono scritte</b>. Dopo la virgola si usano solo {DEC_AMMESSI_TXT} (0, 10, 15, 20, 30, 40, 45, 50 minuti): se vanno corrette, riscrivile.</div>
         </div>;
       })()}
       {props.fuoriPeriodo ? <div style={{ background:"#fef3c7", borderBottom:"2px solid #f59e0b", color:"#92400e", fontSize:"12px", fontWeight:700, padding:"5px 10px" }}>⚠️ Mese fuori dal periodo di rapporto (prima dell'assunzione o dopo la cessazione), ma contiene ore già inserite: controlla e, se vanno tolte, usa 🧹 Pulisci ore dopo nella scheda (✎).</div> : null}
@@ -4023,6 +4186,7 @@ function SchedaContratto(props){
     const oreTxt=String(ntOre).trim();
     const oreV=(oreTxt==="")? null : cNum(oreTxt, null);
     if(oreTxt!=="" && oreV==null){ setErrTra("Il monte ore non è un numero: scrivilo come 30 oppure 30,5."); return false; }
+    if(oreV!=null && oreV<0){ setErrTra("Il monte ore non può essere negativo."); return false; }   /* ver184 (regola A4: niente negativi) */
     if(oreV!=null) rec.oreSett=oreV;
     if(ntIndet) rec.toIndet=true;
     /* ver131: il superminimo. Lo ZERO e' un valore valido (serve a TOGLIERE un superminimo che
@@ -4051,6 +4215,7 @@ function SchedaContratto(props){
     if(!mf||mf<1||mf>12||!yf||yf<2000||yf>2100){ setErrOt("Scegli mese e anno di fine validi (anno di 4 cifre)."); return false; }
     const oreV=String(otOre).replace(",",".").trim();
     if(oreV==="" || isNaN(Number(oreV))){ setErrOt("Scrivi quante ore a settimana (es. 20)."); return false; }
+    if(Number(oreV)<0){ setErrOt("Il monte ore non può essere negativo."); return false; }   /* ver184 (regola A4: niente negativi) */
     if((yi*100+mi) > (yf*100+mf)){ setErrOt("Il mese di inizio viene dopo quello di fine."); return false; }
     const rec={ inizio:"01/"+(mi<10?"0":"")+mi+"/"+yi, fine:"01/"+(mf<10?"0":"")+mf+"/"+yf, oreSett:Number(oreV) };
     patch({ orariTemp: orariTemp.concat([rec]).sort(function(a,b){ return ymdIt(a.inizio)-ymdIt(b.inizio); }) });
@@ -4174,7 +4339,7 @@ function SchedaContratto(props){
               <div><div style={etich}>Nuovo livello</div>
                 <input value={ntLiv} placeholder="es. D2" autoFocus style={Object.assign({width:"100%"}, giallo)} onChange={function(e){ setNtLiv(e.target.value.toUpperCase()); }} /></div>
               <div><div style={etich}>Nuovo monte ore/sett</div>
-                <input value={ntOre} placeholder="es. 24" inputMode="decimal" style={Object.assign({width:"100%"}, giallo)} onChange={function(e){ setNtOre(e.target.value); }} /></div>
+                <input value={ntOre} placeholder="es. 24" inputMode="decimal" style={Object.assign({width:"100%"}, giallo)} onChange={function(e){ setNtOre(e.target.value.replace(/[-\u2212]/g, "")); }} /></div>
               <div><div style={etich}>Nuovo superminimo €</div>
                 <input value={ntSup} placeholder="es. 100 (0 per togliere)" inputMode="decimal" style={Object.assign({width:"100%"}, giallo)} onChange={function(e){ setNtSup(e.target.value); }} /></div>
               <label style={{ display:"flex", alignItems:"center", gap:"6px", fontSize:"13px" }}><input type="checkbox" checked={ntIndet} onChange={function(e){ setNtIndet(e.target.checked); }} /> → a tempo indeterminato</label>
@@ -4212,7 +4377,7 @@ function SchedaContratto(props){
             <div><div style={etich}>Anno</div>
               <input value={otAnnoF} inputMode="numeric" style={Object.assign({width:"100%"}, giallo)} onChange={function(e){ setOtAnnoF(e.target.value.replace(/[^0-9]/g,"").slice(0,4)); }} /></div>
             <div><div style={etich}>Ore a settimana</div>
-              <input value={otOre} placeholder="es. 20" inputMode="decimal" autoFocus style={Object.assign({width:"100%"}, giallo)} onChange={function(e){ setOtOre(e.target.value); }} /></div>
+              <input value={otOre} placeholder="es. 20" inputMode="decimal" autoFocus style={Object.assign({width:"100%"}, giallo)} onChange={function(e){ setOtOre(e.target.value.replace(/[-\u2212]/g, "")); }} /></div>
             <div style={{ display:"flex", gap:"6px", flexWrap:"wrap" }}>
               <button className="btn btn-blue" onClick={function(){ if(addOt()) chiudiOt(); }}>✔ Aggiungi</button>
               <button className="btn btn-gray" onClick={chiudiOt}>Annulla</button>
@@ -4666,8 +4831,19 @@ function oreSuppPeriodo(state, dp, pairs, c, escludi, sottoSoglia){
        le ordinarie dovute e quelle pagate: servono a togliere dallo stipendio del Costo orario
        quello che la busta non paga. */
     /* ver182: `tratt` è calcolato sopra (nei mesi mensilizzati comprende SOLO ASS.ING e ASP 0h). */
-    righe.push({ y:pr.y, m:pr.m, lav:lav, rese:rese, ass:ass, perm:perm,
-                 fest:fg.ore, festGG:fg.gg, det:det, supp:supp, monteP:monteP, ordCed:ordCed, ced:ced, tratt:tratt, sotto:sotto });
+    let riga = { y:pr.y, m:pr.m, lav:lav, rese:rese, ass:ass, perm:perm,
+                 fest:fg.ore, festGG:fg.gg, det:det, supp:supp, monteP:monteP, ordCed:ordCed, ced:ced, tratt:tratt, sotto:sotto };
+    /* ver184 (Christian: «sì, ovunque gli stessi numeri del TS»): nei mesi a cedolino MENSILIZZATO le ore
+       della persona (supplementari, trattenute, ore sotto l'orario) si portano al passo ammesso e le
+       ordinarie a cedolino diventano ORE MESE − assenze − trattenute AL PASSO, cioè i numeri del TS
+       (tsDaRiga). Gli altri mesi NON cambiano di un millesimo. `vero` tiene i numeri di prima. */
+    if (meseCedolinoTetto(dp, pr.y, pr.m) && recHasData(rec)){
+      const t = tsDaRiga(state, dp, pr.y, pr.m, riga);
+      riga = Object.assign({}, riga, { vero:{ supp:supp, ordCed:ordCed, tratt:tratt, sotto:sotto, ced:ced },
+        supp:t.supp, ordCed:t.ordC, tratt:t.tratt, sotto:t.sotto, ced:R2(t.ordC + t.supp, 2), ts:t });
+    }
+    tot += riga.supp - supp;
+    righe.push(riga);
   });
   return { ore: R2(tot,3), righe: righe };
 }
@@ -5561,6 +5737,14 @@ function CostoOrario(props){
     : "non in uso: tutti hanno il fondo TFR scritto nella scheda";
   /* ver178: niente segno meno nei valori comuni, TRANNE l'ISTAT, che può essere davvero negativo
      (deflazione): il tasso del TFR è 1,50% + 75% dell'ISTAT anche quando l'ISTAT scende. */
+  /* ver184 (collaudo): una casella dei valori comuni SVUOTATA restava piena del valore di riserva
+     (cMostra mostra il predefinito quando il dato è vuoto), così riscrivendo «26,90» la cifra si
+     accodava e diventava «26,9027». Ora, se la casella è stata svuotata, si vede vuota e il valore
+     usato nei conti (il predefinito, come prima) resta come segnaposto grigio. Nessun conto cambia. */
+  const cMostraC = function(campo, auto){
+    const svuotata = Object.prototype.hasOwnProperty.call(sc, campo) && (sc[campo] == null || String(sc[campo]) === "");
+    return svuotata ? { v:"", ph:cMostra(null, auto) } : cMostra(sc[campo], auto);
+  };
   const setComune = function(campo, val){ if (props.onCostoComune) props.onCostoComune(campo, (campo === "istat" || typeof val !== "string") ? val : val.replace(/[-\u2212]/g, "")); };
   /* ver138 — legge l'incollaggio «LIVELLO IMPORTO», una riga per livello. Accetta sia
      «D1 1.637,57» sia «D1  1637.57» sia «D1 = 1.637,57»; salta le righe vuote e quelle che non
@@ -5625,9 +5809,11 @@ function CostoOrario(props){
   /* ver107: due campi insieme, in una sola copia dello stato (vedi onCostoPatchMulti). */
   const setParMulti = function(campi){ if (dp && props.onCostoPatchMulti) props.onCostoPatchMulti(dp.id, campi); };
 
+  /* ver184: `valore` può essere anche {v, ph} (valore e segnaposto), per i valori comuni (cMostraC) */
   const campoNum = function(lbl, valore, onCh, segno, titoloAiuto, spento){
+    const vv = (valore && typeof valore === "object") ? valore : { v:valore, ph:"" };
     return <label style={cella} title={titoloAiuto||""}><span style={spento ? Object.assign({}, etich, { color:"#64748b" }) : etich}>{lbl}</span>
-      <input value={valore==null?"":String(valore)} inputMode="decimal" style={giallo} onChange={function(e){ onCh(e.target.value); }} />
+      <input value={vv.v==null?"":String(vv.v)} placeholder={vv.ph||""} inputMode="decimal" style={giallo} onChange={function(e){ onCh(e.target.value); }} />
       {segno ? <span style={{ fontSize:"12.5px", color:"#475569" }}>{segno}</span> : null}
       {spento ? <span style={{ display:"block", fontSize:"13px", fontWeight:700, color:"#64748b" }}>{(typeof spento==="string") ? spento : "non in uso: serve solo con le ore «Teoriche»"}</span> : null}</label>;
   };
@@ -5926,20 +6112,20 @@ function CostoOrario(props){
                 semplicemente non si legge e non si scrive più, come `ana.proroAvvio` dalla ver69.
                 La tabella in vigore si sceglie SEMPRE dalla data, e si aggiorna da
                 ⚙ AGGIORNA TABELLE CCNL. */}
-            {campoNum("Giorni settimanali", cMostra(sc.ggSett, COSTO_COMUNE_DEF.ggSett), function(v){ setComune("ggSett", v); }, "divisore giornaliero")}
-            {campoNum("Quattordicesima %", cMostra(sc.quattordic, COSTO_COMUNE_DEF.quattordic), function(v){ setComune("quattordic", v); }, "50 = metà mensilità")}
-            {campoNum("Ferie + permessi (gg/anno)", cMostra(sc.ferie, COSTO_COMUNE_DEF.ferie), function(v){ setComune("ferie", v); }, "26 ferie + 4 permessi")}
-            {campoNum("Festività godute (gg/anno)", cMostra(sc.festGodute, COSTO_COMUNE_DEF.festGodute), function(v){ setComune("festGodute", v); }, "nel periodo scelto: " + fmt2(d.res.fGod), "", "non in uso: ora si contano dal calendario")}
-            {campoNum("Festività NON godute (gg/anno)", cMostra(sc.festNonGod, COSTO_COMUNE_DEF.festNonGod), function(v){ setComune("festNonGod", v); }, "nel periodo scelto: " + fmt2(d.res.fNon), "", "non in uso: ora si contano dal calendario")}
-            {campoNum("Malattia presunta (gg/mese)", cMostra(sc.malattiaMese, COSTO_COMUNE_DEF.malattiaMese), function(v){ setComune("malattiaMese", v); })}
-            {campoNum("Altri permessi (gg/anno)", cMostra(sc.altriPermessi, COSTO_COMUNE_DEF.altriPermessi), function(v){ setComune("altriPermessi", v); })}
-            {campoNum("Ore supplementari stimate %", cMostra(sc.suppPct, COSTO_COMUNE_DEF.suppPct), function(v){ setComune("suppPct", v); }, "% delle ore del mese", "", !suppAttiva)}
+            {campoNum("Giorni settimanali", cMostraC("ggSett", COSTO_COMUNE_DEF.ggSett), function(v){ setComune("ggSett", v); }, "divisore giornaliero")}
+            {campoNum("Quattordicesima %", cMostraC("quattordic", COSTO_COMUNE_DEF.quattordic), function(v){ setComune("quattordic", v); }, "50 = metà mensilità")}
+            {campoNum("Ferie + permessi (gg/anno)", cMostraC("ferie", COSTO_COMUNE_DEF.ferie), function(v){ setComune("ferie", v); }, "26 ferie + 4 permessi")}
+            {campoNum("Festività godute (gg/anno)", cMostraC("festGodute", COSTO_COMUNE_DEF.festGodute), function(v){ setComune("festGodute", v); }, "nel periodo scelto: " + fmt2(d.res.fGod), "", "non in uso: ora si contano dal calendario")}
+            {campoNum("Festività NON godute (gg/anno)", cMostraC("festNonGod", COSTO_COMUNE_DEF.festNonGod), function(v){ setComune("festNonGod", v); }, "nel periodo scelto: " + fmt2(d.res.fNon), "", "non in uso: ora si contano dal calendario")}
+            {campoNum("Malattia presunta (gg/mese)", cMostraC("malattiaMese", COSTO_COMUNE_DEF.malattiaMese), function(v){ setComune("malattiaMese", v); })}
+            {campoNum("Altri permessi (gg/anno)", cMostraC("altriPermessi", COSTO_COMUNE_DEF.altriPermessi), function(v){ setComune("altriPermessi", v); })}
+            {campoNum("Ore supplementari stimate %", cMostraC("suppPct", COSTO_COMUNE_DEF.suppPct), function(v){ setComune("suppPct", v); }, "% delle ore del mese", "", !suppAttiva)}
             <label style={cella}><span style={etich}>Supplementari nel TFR</span>
               <select value={c.tfrSupp} style={gialloSel} onChange={function(e){ setComune("tfrSupp", e.target.value); }}>
                 <option value="SI">SI</option><option value="NO">NO</option></select></label>
-            {campoNum("Divisore TFR", cMostra(sc.tfrDiv, COSTO_COMUNE_DEF.tfrDiv), function(v){ setComune("tfrDiv", v); }, "13,5")}
-            {campoNum("Anni per rivalutazione TFR", cMostra(sc.anniTfr, COSTO_COMUNE_DEF.anniTfr), function(v){ setComune("anniTfr", v); }, anniTfrAttivo ? anniTfrNota : "", "", anniTfrAttivo ? false : anniTfrNota)}
-            {campoNum("ISTAT anno prec. %", cMostra(sc.istat, numTxt(COSTO_COMUNE_DEF.istat)), function(v){ setComune("istat", v); })}
+            {campoNum("Divisore TFR", cMostraC("tfrDiv", COSTO_COMUNE_DEF.tfrDiv), function(v){ setComune("tfrDiv", v); }, "13,5")}
+            {campoNum("Anni per rivalutazione TFR", cMostraC("anniTfr", COSTO_COMUNE_DEF.anniTfr), function(v){ setComune("anniTfr", v); }, anniTfrAttivo ? anniTfrNota : "", "", anniTfrAttivo ? false : anniTfrNota)}
+            {campoNum("ISTAT anno prec. %", cMostraC("istat", numTxt(COSTO_COMUNE_DEF.istat)), function(v){ setComune("istat", v); })}
             {/* ver161: l'ISTAT anno per anno. Senza, con i fondi per anno si userebbe il fondo
                 giusto e la percentuale sbagliata. ⚠️ Diciture nuove, scritte da Claude. */}
             {(function(){
@@ -5971,18 +6157,18 @@ function CostoOrario(props){
                 <span style={{ display:"block", fontSize:"12.5px", color:"#475569", lineHeight:1.3, marginTop:"2px" }}>una riga per anno: si usa quella di <b>dicembre dell’anno prima</b> del periodo, la stessa del fondo TFR. Finché l’elenco è vuoto vale il valore unico qui sopra.</span>
               </label>;
             })()}
-            {campoNum("Previdenza compl. %", cMostra(sc.prevCompl, COSTO_COMUNE_DEF.prevCompl), function(v){ setComune("prevCompl", v); })}
-            {campoNum("Previdenza compl. — quota pagata %", cMostra(sc.prevComplPag, COSTO_COMUNE_DEF.prevComplPag), function(v){ setComune("prevComplPag", v); })}
-            {campoNum("INPS %", cMostra(sc.inps, COSTO_COMUNE_DEF.inps), function(v){ setComune("inps", v); }, "26,40 netta")}
-            {campoNum("FIS %", cMostra(sc.fis, COSTO_COMUNE_DEF.fis), function(v){ setComune("fis", v); })}
-            {campoNum("INAIL %", cMostra(sc.inail, COSTO_COMUNE_DEF.inail), function(v){ setComune("inail", v); }, "+1% di addizionale")}
-            {campoNum("IRAP %", cMostra(sc.irap, COSTO_COMUNE_DEF.irap), function(v){ setComune("irap", v); })}
-            {campoNum("IRAP — quota pagata %", cMostra(sc.irapPag, COSTO_COMUNE_DEF.irapPag), function(v){ setComune("irapPag", v); }, "0 se esente")}
-            {campoNum("Integrazione maternità %", cMostra(sc.integrMater, COSTO_COMUNE_DEF.integrMater), function(v){ setComune("integrMater", v); })}
-            {campoNum("Assistenza sanitaria €/anno", cMostra(sc.sanitaria, COSTO_COMUNE_DEF.sanitaria), function(v){ setComune("sanitaria", v); }, "solo indeterminati, fissa")}
-            {campoNum("Paghe e dichiarazioni €/mese", cMostra(sc.paghe, COSTO_COMUNE_DEF.paghe), function(v){ setComune("paghe", v); })}
-            {campoNum("Formazione €/anno", cMostra(sc.formazione, COSTO_COMUNE_DEF.formazione), function(v){ setComune("formazione", v); })}
-            {campoNum("Rimborso km €", cMostra(sc.kmMese, COSTO_COMUNE_DEF.kmMese || ""), function(v){ setComune("kmMese", v); }, "vuoto = nessun rimborso")}
+            {campoNum("Previdenza compl. %", cMostraC("prevCompl", COSTO_COMUNE_DEF.prevCompl), function(v){ setComune("prevCompl", v); })}
+            {campoNum("Previdenza compl. — quota pagata %", cMostraC("prevComplPag", COSTO_COMUNE_DEF.prevComplPag), function(v){ setComune("prevComplPag", v); })}
+            {campoNum("INPS %", cMostraC("inps", COSTO_COMUNE_DEF.inps), function(v){ setComune("inps", v); }, "26,40 netta")}
+            {campoNum("FIS %", cMostraC("fis", COSTO_COMUNE_DEF.fis), function(v){ setComune("fis", v); })}
+            {campoNum("INAIL %", cMostraC("inail", COSTO_COMUNE_DEF.inail), function(v){ setComune("inail", v); }, "+1% di addizionale")}
+            {campoNum("IRAP %", cMostraC("irap", COSTO_COMUNE_DEF.irap), function(v){ setComune("irap", v); })}
+            {campoNum("IRAP — quota pagata %", cMostraC("irapPag", COSTO_COMUNE_DEF.irapPag), function(v){ setComune("irapPag", v); }, "0 se esente")}
+            {campoNum("Integrazione maternità %", cMostraC("integrMater", COSTO_COMUNE_DEF.integrMater), function(v){ setComune("integrMater", v); })}
+            {campoNum("Assistenza sanitaria €/anno", cMostraC("sanitaria", COSTO_COMUNE_DEF.sanitaria), function(v){ setComune("sanitaria", v); }, "solo indeterminati, fissa")}
+            {campoNum("Paghe e dichiarazioni €/mese", cMostraC("paghe", COSTO_COMUNE_DEF.paghe), function(v){ setComune("paghe", v); })}
+            {campoNum("Formazione €/anno", cMostraC("formazione", COSTO_COMUNE_DEF.formazione), function(v){ setComune("formazione", v); })}
+            {campoNum("Rimborso km €", cMostraC("kmMese", COSTO_COMUNE_DEF.kmMese || ""), function(v){ setComune("kmMese", v); }, "vuoto = nessun rimborso")}
           </div>
         </div> : null}
 
@@ -7179,8 +7365,9 @@ function QuickFillModal(props){
   // festivi non filtrano, altrimenti scrivere "7" e avere la domenica deselezionata
   // non riempirebbe niente senza spiegazione.
   const target = [];
+  let rossiSaltati = 0;   /* ver184: anche in «Solo questi giorni» domeniche e festivi si saltano (ver77: non si compilano) */
   for (let d=1; d<=nd; d++){
-    if (modo === "elenco"){ if (elencoSet[d]) target.push(d); continue; }
+    if (modo === "elenco"){ if (elencoSet[d]){ if (isRosso(fset,y,m,d)) rossiSaltati++; else target.push(d); } continue; }
     if (modo === "intervallo" && (d < dalN || d > alN)) continue;
     const gd = weekdayOf(y,m,d); if (!sel[gd]) continue;
     if (isRosso(fset,y,m,d)) continue;   /* ver77: i festivi non si compilano mai */
@@ -7205,7 +7392,9 @@ function QuickFillModal(props){
      Tabellone il meno non si puo' scrivere (ver102), ma «Compila veloce» NON passa da
      CellInput: era lo stesso buco della ver143 e della ver144, rimasto aperto sul segno. */
   const valNegativo = (!isCode) && vTrim !== "" && isNumeric(valNorm) && cNum(valNorm, 0) < 0;
-  const apply = function(){ if (vTrim === "" || valOltreIlTetto || valNonValido || valNegativo) return; props.onApply({ dpId:dp.id, valore:valNorm, target:target, overwrite:overwrite, occupied:occupied }); };
+  /* ver184: la regola dei minuti vale anche qui (stessa della cella) */
+  const valFuoriPasso = (!isCode) && vTrim !== "" && isNumeric(valNorm) && !valNegativo && !valOltreIlTetto && !minutiAmmessi(valNorm);
+  const apply = function(){ if (vTrim === "" || valOltreIlTetto || valNonValido || valNegativo || valFuoriPasso) return; props.onApply({ dpId:dp.id, valore:valNorm, target:target, overwrite:overwrite, occupied:occupied }); };
   return (
     <div className="overlay" onClick={props.onClose}>
       <div className="modal" onClick={function(e){ e.stopPropagation(); }} style={{ maxWidth:"560px" }}>
@@ -7215,7 +7404,7 @@ function QuickFillModal(props){
           <label style={{ fontSize:"13px", fontWeight:"700" }}>Valore da inserire:</label>
           <input value={valore} onChange={function(e){ setValore(e.target.value); }} list="codici-list" placeholder="es. 7  oppure  FERIE"
             style={{ padding:"7px 9px", border:"2px solid #f59e0b", background:"#fffde7", borderRadius:"6px", width:"160px", fontSize:"15px", fontWeight:"700" }} />
-          <span style={{ fontSize:"12px", color: (valOltreIlTetto||valNonValido||valNegativo) ? "#b91c1c" : "#64748b", fontWeight: (valOltreIlTetto||valNonValido||valNegativo) ? 700 : 400 }}>{vTrim==="" ? "" : (isCode ? "codice: " + CODE_SET[vTrim.toUpperCase()].l : (valNonValido ? "Qui va un numero di ore oppure un codice dell'elenco (FERIE, MAL, EXF…)." : (valNegativo ? "Le ore non possono essere negative." : (valOltreIlTetto ? ("In un giorno non si possono scrivere più di " + ORE_MAX_GIORNO + " ore.") : ("ore: " + valNorm)))))}</span>
+          <span style={{ fontSize:"12px", color: (valOltreIlTetto||valNonValido||valNegativo||valFuoriPasso) ? "#b91c1c" : "#64748b", fontWeight: (valOltreIlTetto||valNonValido||valNegativo||valFuoriPasso) ? 700 : 400 }}>{vTrim==="" ? "" : (isCode ? "codice: " + CODE_SET[vTrim.toUpperCase()].l : (valNonValido ? "Qui va un numero di ore oppure un codice dell'elenco (FERIE, MAL, EXF…)." : (valNegativo ? "Le ore non possono essere negative." : (valOltreIlTetto ? ("In un giorno non si possono scrivere più di " + ORE_MAX_GIORNO + " ore.") : (valFuoriPasso ? AVVISO_MINUTI : ("ore: " + valNorm))))))}</span>
         </div>
         <div style={{ marginBottom:"10px", background:"#f8fafc", border:"1px solid #e2e8f0", borderRadius:"8px", padding:"8px 10px" }}>
           <div style={{ fontSize:"13px", fontWeight:"700", marginBottom:"6px" }}>Quali giorni del mese:</div>
@@ -7237,7 +7426,7 @@ function QuickFillModal(props){
               style={{ width:"190px", padding:"5px 8px", border:"2px solid #f59e0b", background: modo==="elenco" ? "#fffde7" : "#f1f5f9", borderRadius:"6px", fontWeight:"700" }} />
           </label>
           {modo==="elenco" ? <div style={{ fontSize:"12px", color:"#b45309", marginTop:"6px", lineHeight:1.45 }}>
-            Scrivi i numeri separati da virgola o spazio. In questo caso valgono <b>solo i giorni che scrivi</b>: i giorni della settimana qui sotto e i festivi <b>non contano</b>.
+            Scrivi i numeri separati da virgola o spazio. In questo caso valgono <b>solo i giorni che scrivi</b>: i giorni della settimana qui sotto <b>non contano</b>; domeniche e festivi si saltano comunque.
             {elencoFuori>0 ? <span> — attenzione: {elencoFuori} numero/i non valido/i per questo mese, verranno ignorati.</span> : null}
           </div> : null}
         </div>
@@ -7266,13 +7455,13 @@ function QuickFillModal(props){
           <input type="checkbox" checked={overwrite} onChange={function(){ setOverwrite(!overwrite); }} /> Sovrascrivi anche i valori già presenti
         </label>
         <div style={{ fontSize:"12px", color: (overwrite && occupied>0) ? "#b45309" : "#64748b", background:"#f8fafc", border:"1px solid #e2e8f0", borderRadius:"8px", padding:"8px 10px", margin:"6px 0" }}>
-          Giorni interessati: <b>{target.length}</b>{overwrite && occupied>0 ? <span> — di cui <b>{occupied}</b> già compilati che verranno <b>sovrascritti</b> (ti chiederò conferma)</span> : (occupied>0 ? <span> — {occupied} già compilati verranno <b>lasciati intatti</b></span> : null)}
+          Giorni interessati: <b>{target.length}</b>{(modo==="elenco" && rossiSaltati>0) ? <span> — saltati <b>{rossiSaltati}</b> {rossiSaltati===1 ? "giorno rosso" : "giorni rossi"} (domeniche e festivi non si compilano)</span> : null}{overwrite && occupied>0 ? <span> — di cui <b>{occupied}</b> già compilati che verranno <b>sovrascritti</b> (ti chiederò conferma)</span> : (occupied>0 ? <span> — {occupied} già compilati verranno <b>lasciati intatti</b></span> : null)}
         </div>
         <div className="modal-actions">
           <span></span>
           <span>
             <button className="btn btn-gray" onClick={props.onClose}>Annulla</button>
-            <button className="btn btn-blue" style={{ marginLeft:"8px" }} disabled={vTrim==="" || target.length===0 || valOltreIlTetto || valNonValido || valNegativo} onClick={apply}>Compila {target.length} giorni</button>
+            <button className="btn btn-blue" style={{ marginLeft:"8px" }} disabled={vTrim==="" || target.length===0 || valOltreIlTetto || valNonValido || valNegativo || valFuoriPasso} onClick={apply}>Compila {target.length} giorni</button>
           </span>
         </div>
       </div>
@@ -7283,7 +7472,8 @@ function QuickFillModal(props){
 function PermModal(props){
   const cur = props.perm || {};
   const knownTipo = PERM_CODES.indexOf(cur.tipo) !== -1;
-  const [ore, setOre] = useState(cur.ore !== undefined ? String(cur.ore) : "");
+  /* ver184: la casella e' di testo (prima type="number": «1,5» diventava 15 h) e si mostra con la virgola */
+  const [ore, setOre] = useState(cur.ore !== undefined ? fmt2(cur.ore).replace(/\./g, "") : "");
   const [altro, setAltro] = useState(cur.tipo !== undefined && cur.tipo !== "" && !knownTipo);
   const [tipo, setTipo] = useState(knownTipo ? cur.tipo : "");
   const [altroTxt, setAltroTxt] = useState((cur.tipo !== undefined && !knownTipo) ? cur.tipo : "");
@@ -7293,11 +7483,13 @@ function PermModal(props){
   const [chiuso, setChiuso] = useState(props.ero === false);
   const esiste = props.perm && props.perm.ore !== undefined;
   const save = function(){
-    const oreNum = parseFloat(String(ore).replace(",", "."));
+    const oreTxt = String(ore).trim();
+    const oreNum = /^\d*([.,]\d*)?$/.test(oreTxt) ? parseHour(oreTxt) : NaN;   /* ver184: con la virgola, sesti esatti */
     if (isNaN(oreNum) || oreNum <= 0){ window.alert("Indica un numero di ore valido (> 0)."); return; }
+    if (!minutiAmmessi(oreTxt)){ window.alert("Ore del permesso: " + AVVISO_MINUTI); return; }   /* ver184 */
     const t = altro ? altroTxt.trim().toUpperCase() : tipo;
     if (t === ""){ window.alert("Indica il tipo di permesso."); return; }
-    props.onSave({ ore: Math.round(oreNum * 100) / 100, tipo: t }, !chiuso);   /* ver99: secondo argomento = giornata erosiva si/no */
+    props.onSave({ ore: alPassoOk(oreNum) ? oreNum : Math.round(oreNum * 100) / 100, tipo: t }, !chiuso);   /* ver184: 1h10 resta 1,1666… esatto */   /* ver99: secondo argomento = giornata erosiva si/no */
   };
   return (
     <div className="overlay" onClick={props.onClose}>
@@ -7306,7 +7498,7 @@ function PermModal(props){
         <div style={{ fontSize:"11px", color:"#64748b", marginBottom:"12px" }}>Le ore di permesso NON entrano nel TOT (che resta solo ore lavorate). Il permesso viene riportato nell'export.</div>
         <div className="frow">
           <div className="field"><label>Ore di permesso</label>
-            <input type="number" step="0.25" value={ore} onChange={function(e){ setOre(e.target.value); }} placeholder="es. 2" /></div>
+            <input type="text" inputMode="decimal" value={ore} onChange={function(e){ setOre(e.target.value); }} placeholder="es. 2" /></div>
           <div className="field"><label>Tipo</label>
             <select value={altro ? "__ALTRO__" : tipo} onChange={function(e){
               const v = e.target.value;
@@ -7561,6 +7753,7 @@ function Login(props){
   const [pin, setPin] = useState(""); const [pin2, setPin2] = useState("");
   const [email, setEmail] = useState(""); const [pwd, setPwd] = useState("");
   const [err, setErr] = useState("");
+  const [bkFatto, setBkFatto] = useState("");   /* ver184 */
   const doFb = function(){ setErr(""); firebase.auth().signInWithEmailAndPassword(email, pwd).catch(function(e){ setErr("Accesso non riuscito. Verifica le credenziali."); console.error(e); }); };
   const doPin = function(){
     setErr("");
@@ -7574,6 +7767,12 @@ function Login(props){
     <div className="login-box">
       <div className="logo">Spazio Ireos</div>
       <div className="tag">Report Ore mensile — accesso riservato</div>
+      {props.pendente ? <div className="pendente-box">
+        ⚠️ <b>Sei stato disconnesso da un'altra scheda</b> (per esempio con «Esci» in Fogli ore, che usa lo stesso accesso): le modifiche fatte qui <b>NON sono salvate</b>.
+        <div style={{ marginTop:"6px" }}>Non chiudere la pagina: <b>rientra qui sotto con lo stesso account</b> e le ritroverai a video, poi premi 💾. Oppure scaricane una copia:</div>
+        <button className="btn btn-yellow" style={{ marginTop:"8px", width:"100%", justifyContent:"center" }} onClick={function(){ setBkFatto(props.onBackupPendente() ? "ok" : "ko"); }}>⬇ Backup delle modifiche</button>
+        {bkFatto === "ok" ? <div style={{ marginTop:"6px", color:"#166534" }}>Copia scaricata.</div> : (bkFatto === "ko" ? <div style={{ marginTop:"6px" }}>Copia non riuscita.</div> : null)}
+      </div> : null}
       {FB_READY ?
         <div>
           <div className="field"><label style={{textAlign:"left"}}>Email</label>
@@ -7828,6 +8027,14 @@ function App(){
   const [vista, setVista] = useState("m1");
   const [anaSel, setAnaSel] = useState(null);
   const [dirty, setDirty] = useState(false);
+  /* ver184 (collaudo, decisione di Christian: l'accesso resta condiviso con Fogli ore, ma niente perdite
+     silenziose). Fogli ore usa lo stesso progetto Firebase e la stessa sessione: «Esci» in un'altra scheda
+     fa uscire anche questa. Se in quel momento ci sono modifiche non salvate, NON si buttano: restano in
+     memoria (pendenteRef) e tornano a video quando si rientra con lo stesso account; intanto la schermata
+     di accesso lo dice e permette di scaricarne una copia. Niente si scrive da solo nel cloud. */
+  const stateRef = useRef(null); const dirtyRef = useRef(false); const uscitaVolutaRef = useRef(false); const pendenteRef = useRef(null);
+  stateRef.current = state; dirtyRef.current = dirty;
+  const [pendente, setPendente] = useState(null);
   const [canRestoreImport, setCanRestoreImport] = useState(false);
   const [zoom, setZoom] = useState(function(){ const z = parseInt(localStorage.getItem(LS_ZOOM) || "100", 10); return (isNaN(z) || z < 40 || z > 110) ? 100 : z; });
   const setZoomP = function(z){ let v = Math.round(z); if (v < 40) v = 40; if (v > 110) v = 110; setZoom(v); try { localStorage.setItem(LS_ZOOM, String(v)); } catch (e) { console.error(e); } };
@@ -7854,6 +8061,16 @@ function App(){
       if (user){
         if (!isAdminEmail(user.email)){ setDenied(user.email || ""); firebase.auth().signOut(); return; }
         setDenied(""); uidRef.current = user.uid; setAuthState("in");
+        /* ver184: rientro dopo un'uscita fatta da un'altra scheda, con modifiche non salvate */
+        const pend = pendenteRef.current;
+        if (pend){
+          pendenteRef.current = null; setPendente(null);
+          if (pend.uid === user.uid){
+            setState(pend.state); setDirty(true);
+            showToast("Sei di nuovo dentro: le modifiche non salvate sono ancora qui. Premi 💾 per salvarle", true);
+            return;
+          }
+        }
         /* ver179: un salvataggio rimasto solo nel browser, fatto da QUESTO account, va prima rimandato nel cloud. */
         const sosp = cloudSospesoLeggi(); const locSosp = (sosp && sosp.uid === user.uid) ? loadLocal() : null;
         if (locSosp){
@@ -7869,7 +8086,15 @@ function App(){
           let st; if (snap.exists){ const _raw = snap.data(); if (_raw && _raw.modelli){ applyTemplates(_raw.modelli); delete _raw.modelli; } st = migrate(_raw); } else st = migrate(loadLocal() || emptyState());
           setState(st); if (st.anni && st.anni.length) setAnno(st.anni[st.anni.length-1]);
         }).catch(function(e){ console.error(e); const st = migrate(loadLocal() || emptyState()); setState(st); });
-      } else { setAuthState("out"); }
+      } else {
+        /* ver184: uscita NON chiesta da qui (es. «Esci» in Fogli ore) con modifiche non salvate: si tengono */
+        if (!uscitaVolutaRef.current && dirtyRef.current && stateRef.current && uidRef.current){
+          const p = { uid: uidRef.current, state: stateRef.current, quando: new Date() };
+          pendenteRef.current = p; setPendente(p);
+        }
+        uscitaVolutaRef.current = false;
+        setAuthState("out");
+      }
     });
   }, []);
 
@@ -8343,7 +8568,18 @@ function App(){
     if (name.slice(-5) === ".json"){
       const reader = new FileReader();
       reader.onload = function(ev){
-        try { let obj = JSON.parse(ev.target.result); if (!obj || !obj.dipendenti) throw new Error("struttura non valida");
+        try { let obj = JSON.parse(ev.target.result); if (!obj || !Array.isArray(obj.dipendenti)) throw new Error("struttura non valida");
+          /* ver184 (collaudo): il numero di schema si controlla PRIMA di toccare qualunque cosa (§10.1),
+             come nelle altre app: mancante → avviso e conferma; non numerico o più alto di quello
+             dell'app → rifiuto. ⚠️ Diciture nuove, scritte da Claude. */
+          const ver = obj.version;
+          if (ver === undefined || ver === null){
+            if (!window.confirm("Questo backup non dice con quale versione dei dati è stato fatto (manca il numero di schema): può essere molto vecchio.\n\nImportarlo lo stesso? Prima dell'import l'app ha già scaricato una copia di sicurezza dei dati di adesso.")){
+              showToast("Import annullato: niente è stato toccato", true); return; }
+          } else if (typeof ver !== "number" || !isFinite(ver) || ver > DIP_SCHEMA){
+            showToast("Backup NON importato: è di uno schema dati (" + String(ver) + ") che questa versione dell'app non conosce (al massimo " + DIP_SCHEMA + "). Niente è stato toccato.", true);
+            return;
+          }
           if (obj.modelli){ applyTemplates(obj.modelli); delete obj.modelli; }
           obj = migrate(obj); touch(obj); if (obj.anni && obj.anni.length) setAnno(obj.anni[obj.anni.length-1]); showToast("Backup JSON importato — se sbagliato usa Annulla import, poi salva"); }
         catch (err) { console.error(err); showToast("Backup JSON non valido"); }
@@ -8557,7 +8793,7 @@ function App(){
       <button className="btn btn-blue" style={{ width:"100%", justifyContent:"center" }} onClick={function(){ setDenied(""); }}>Accedi con un altro account</button>
     </div>
   );
-  if (FB_READY && authState === "out") return <Login />;
+  if (FB_READY && authState === "out") return <Login pendente={pendente} onBackupPendente={function(){ return pendente ? downloadStateJson(pendente.state, "modifiche non salvate") : false; }} />;
   if (!FB_READY && authState === "gate") return <Login onPinOk={function(){ setAuthState("in"); }} />;
   if (!state) return <div style={{ padding:"40px", textAlign:"center" }}>Caricamento dati…</div>;
 
@@ -8585,7 +8821,7 @@ function App(){
             al loro posto un solo report per le paghe. Dicitura nuova, scritta da Claude. */}
         <button className="btn btn-ghost" onClick={function(){ setExportModal("PDF A4 per le paghe"); }}>🖨️ Report PDF A4 per le paghe</button>
         {!FB_READY ? <button className="btn btn-ghost" onClick={changePin}>🔑 PIN</button> : null}
-        {FB_READY ? <button className="btn btn-ghost" onClick={function(){ if (dirty && !window.confirm("Ci sono modifiche non salvate. Uscire comunque?")) return; firebase.auth().signOut(); }}>Esci</button> : null}
+        {FB_READY ? <button className="btn btn-ghost" onClick={function(){ if (dirty && !window.confirm("Ci sono modifiche non salvate. Uscire comunque?")) return; uscitaVolutaRef.current = true; firebase.auth().signOut(); }}>Esci</button> : null}
         <input ref={fileRef} type="file" accept=".xlsx,.xls,.json" className="hidden-file" onChange={onImportFile} />
         <div className="monthstrip">{vista === "rep" ? "📊 Riepiloghi" : (vista === "ana" ? "📇 Anagrafica" : (vista === "costo" ? "💶 Costo orario" : (vista === "query" ? "🔎 Query personale" : ["📅 Tabellone " + MONTH_LABEL[mese-1] + " " + anno + (mLocked ? "  🔒 bloccato" : ""), React.createElement("span", { key:"gnd", style:{ marginLeft:"12px", whiteSpace:"nowrap", display:"inline-block", background:"#fde047", color:"#12324f", borderRadius:"6px", padding:"2px 9px", fontSize:"15px", fontWeight:800 } }, giorniNonDomenica(anno, mese) + " giorni (no domeniche)")])))}</div>
       </div>

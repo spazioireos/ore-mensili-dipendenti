@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver183 · 19nov26.** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver184 · 19nov26 (IN ANTEPRIMA, da approvare).** `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -37,6 +37,65 @@ Banca ore, tetto annuo, contratti e export.
   Corretto anche un difetto **preesistente** che la nuova navigazione rendeva visibile: nella
   testata, in vista Anagrafica, compariva "📅 undefined 2026" (perché `mese` è `null` fuori dalle
   viste mensili); ora mostra "📇 Anagrafica".
+- ⏱ **ver184 (19/11/2026, IN ANTEPRIMA, da approvare): LA REGOLA DEI MINUTI, IL «TS» CON GLI STESSI NUMERI
+  OVUNQUE, E CINQUE CORREZIONI DEL COLLAUDO** (Nu\* di Christian del 19/11/2026).
+  - ⏱ **La regola (sua)**: le ore si scrivono e si mostrano solo coi decimali di 0, 10, 15, 20, 30, 40, 45, 50 minuti:
+    **,00 ,17 ,25 ,33 ,50 ,67 ,75 ,83** (o ,0 / ,5). «sì a 3,75, no a 3,86». «Ovunque» = celle, Compila veloce, permesso
+    orario, report per le paghe. Funzioni nuove accanto a `cellaValoreFinale`: `ORE_SESTI`, `DEC_AMMESSI`, `minutiAmmessi`
+    (testo completo), `minutiAmmessiPezzo` (mentre si scrive: prima cifra dopo la virgola ∈ {0,1,2,3,5,6,7,8}, la seconda
+    obbligata 0→0 1→7 2→5 3→3 5→0 6→7 7→5 8→3), `alPasso` (valore ammesso più vicino; a parità si va su, al decimo di
+    minuto), `alPassoOk`, `distPassi` (distribuzione in dodicesimi d'ora con programmazione dinamica: ogni riga ammessa,
+    somma esatta), `isCellaFuoriPasso`, `celleFuoriPassoMese`, `AVVISO_MINUTI`.
+    - **Lettura**: `parseHour` legge ,17 ,33 ,67 ,83 come **sesti esatti** (31 × 0,17 = 5,1667, non 5,27). Nessun altro
+      valore cambia lettura. **Misurato sui dati veri**: 4 celle così (2,83 · 7,83 · 1,33 · 2,33, tutte prima di ottobre
+      2026): **zero** differenze su TOT, Risultato del mese e costo orario dei 16 (il TOT si arrotonda al centesimo).
+    - **Celle**: il carattere che non può diventare un valore ammesso non entra; all'uscita «3,5» → 3,50, «3,3»/«3,86»
+      si rifiutano con l'avviso dei decimali ammessi. Tetto 13 ore e niente negativi restano. ⚠️ Una cella **già nei
+      dati** fuori griglia **non** si cancella entrandoci (guardia `iniz` della ver102), si conta **com'è** e si segnala:
+      bordo ambra tratteggiato (`.cell-in.fuoripasso`, distinto dal rosso delle «ignote») e riquadro `.fuoripasso-box`
+      che elenca i giorni. **Nei dati veri sono 12**: le 11 note (7,66 ×5 · 3,66 ×2 · 5,16 · 6,66 · 7,16 · 3,16) più la
+      cella a 4 decimali 1,6666 (già nota dalla ver171).
+    - **Compila veloce**: stessa regola (`valFuoriPasso`, pulsante spento col motivo). **Permesso orario**: casella di
+      testo con la virgola (era `type="number"`: «1,5» diventava 15 h), letta con `parseHour`, regola dei minuti;
+      1 h 10 si salva come 1,1666… esatto. Tetto delle 13 ore sul permesso **non** aggiunto (non richiesto).
+  - 🧾 **Il TS e gli stessi numeri ovunque** («sì, ovunque gli stessi numeri del TS»): funzione unica **`tsDaRiga`**
+    (prende la riga vera di `oreSuppPeriodo`) e **`tsMese(state,dp,y,m)`**. Per i mesi a cedolino mensilizzato
+    (`meseCedolinoTetto`) porta al passo, **voce per voce**, le ore della persona: assenze per codice, festività godute,
+    permessi per tipo, trattenute, supplementari, ore sotto l'orario, non godute, erosive. Le **ORE MESE** (contratto)
+    **non** si arrotondano («Restano 65,13»): ordinarie a cedolino = ORE MESE − assenze − trattenute al passo.
+    - La usano **il TS** (`esportaPDFPaghe`, ricostruito: ogni voce si distribuisce sui suoi giorni con `distPassi`, le
+      ordinarie si distribuiscono **al passo** e lo **scarto delle ORE MESE va sull'ultima riga delle ordinarie**, segnata
+      «†» con la nota), **il box** (`cedolinoBox` ora legge `tsMese`), **`cedOrePubblica`**, il **Costo orario**
+      (`oreSuppPeriodo` sostituisce supplementari, trattenute e ordinarie dei mesi a cedolino coi numeri del TS e tiene
+      i vecchi in `riga.vero`; `oreCedolinoPeriodo` li somma) e il **massimale** (`consumoCedolinoMese` = ced + erosive
+      del TS).
+    - ⚠️ Il **«Risultato del mese» del Tabellone resta il VERO a 3 decimali** (`bancaMeseA` non passa di qui). I mesi
+      non a cedolino mensilizzato **non cambiano di un millesimo** (provato contro la ver183).
+    - ⚠️ **Limite dichiarato**: ogni **voce** è al passo; la somma di voci miste (sesti + quarti, es. MAL 3,17 + permesso
+      1,25) può non esserlo, e la colonna «Assenze retribuite» del TS ne porta la somma.
+    - ⚠️ Nel box la riga «ORE SUPPLEMENTARI (Risultato del mese)» mostra ora il numero **al passo** del TS: può differire
+      di qualche minuto dal Risultato vero del Tabellone. Dicitura (ver175, di Claude) **non** cambiata.
+  - 🔧 **Le cinque correzioni del collaudo**: (1) monte ore temporaneo e «Nuovo monte ore/sett» della trasformazione:
+    il segno meno non entra (e un negativo si rifiuta); (2) valori comuni del Costo orario: una casella **svuotata**
+    restava piena del predefinito e riscrivendo «26,90» diventava «26,9027» — ora resta vuota col predefinito come
+    segnaposto (`cMostraC`, `campoNum` accetta `{v, ph}`; nessun conto cambia); (3) «Compila veloce» → «Solo questi
+    giorni» salta anche lì domeniche e festivi e dice quanti; (4) import: `DIP_SCHEMA = 4`, schema mancante → avviso e
+    conferma, non numerico o più alto → rifiuto senza toccare niente, controllato **prima** di tutto; (5) **accesso
+    condiviso con Fogli ore**: se un'altra scheda fa uscire (es. «Esci» in Fogli ore) con modifiche non salvate, queste
+    restano **in memoria** (`pendenteRef`), la schermata di accesso lo dice e offre «⬇ Backup delle modifiche», e
+    rientrando con lo **stesso account** tornano a video col 💾 acceso (niente si scrive da solo nel cloud). L'«Esci»
+    premuto in Dipendenti non fa scattare l'avviso (`uscitaVolutaRef`).
+  - ⚠️ **Diciture nuove, scritte da Claude**: gli avvisi dei minuti, il riquadro dei minuti fuori griglia, «saltati N
+    giorni rossi», la frase d'aiuto di «Solo questi giorni» (adattata: diceva che i festivi non contano), l'avviso del
+    permesso, «Il monte ore non può essere negativo.», i messaggi dello schema dell'import, l'avviso di disconnessione,
+    «⬇ Backup delle modifiche», e nel TS la legenda dei minuti, le ore per voce e la nota «†».
+  - **Provato**: `collaudo/ver184.cjs` **65/0** (banco 8300 + banco comune 8344 con finta Firebase per il punto 5);
+    `ver183.cjs` **27/0** e `ver182.cjs` **44/0** con **attese invecchiate aggiornate** (versione scritta a mano nei nomi
+    dei file; i quattro report tolti dalla ver183 si generano chiamando la funzione); batteria `a01`…`a08` senza
+    falliti nuovi (attese aggiornate in `a02`: casella del permesso di testo e «Solo questi giorni» con zero giorni).
+    **Dati veri di ottobre** (scratchpad): TS con **0 celle fuori griglia** su 290 (la ver183 ne aveva 195 su 268),
+    totali delle 11 pagine identici alla ver183, costo orario dei 16 **identico**, `cedOre` identico, Tetto «Già usate»
+    al più ±0,008 (ORE MESE ora a 2 decimali).
 - 🧾 **ver183 (19/11/2026): UN SOLO REPORT PER LE PAGHE, «🖨️ Report PDF A4 per le paghe», CON LE ORE DA RIPORTARE A
   CEDOLINO** (Christian: «dobbiamo creare un report ore pdf che li obblighi a fare come vogliamo … per ogni mese un report
   per persona con colonna ordinaria, colonna straordinaria e colonna assenza giustificata e colonna assenza asp0h o ass
