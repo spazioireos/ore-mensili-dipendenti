@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver186 · 19nov26 (con ver184 e ver185, approvata da Christian e portata su `main` il 19/11/2026: «main per le tre app»).** `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver187 · 19nov26, IN ANTEPRIMA sul ramo di lavoro, da approvare** (su `main` c'è la ver186 · 19nov26, con ver184 e ver185, approvata da Christian il 19/11/2026: «main per le tre app»). `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -37,6 +37,51 @@ Banca ore, tetto annuo, contratti e export.
   Corretto anche un difetto **preesistente** che la nuova navigazione rendeva visibile: nella
   testata, in vista Anagrafica, compariva "📅 undefined 2026" (perché `mese` è `null` fuori dalle
   viste mensili); ora mostra "📇 Anagrafica".
+- 📨 **ver187 (19/11/2026, IN ANTEPRIMA, da approvare; «Nu\*» di Christian): FOGLI ORE SA CHI È DIPENDENTE, E IL TABELLONE
+  MOSTRA LA CHIUSURA DEL MESE E LA RISPOSTA SUL COMPLETAMENTO.** Lavoro gemello di **Fogli ore rev 19** (altra persona): dal 1°
+  del mese dopo ogni operatore chiude il mese, e ai DIPENDENTI viene chiesto «Se non avessi raggiunto con le ore dichiarate
+  lavorate in questo mese il dovuto contrattuale, vuoi che ti siano assegnati ferie/permessi a completamento o lasci così?».
+  Nomi dei campi **fissi, concordati con Fogli ore**: `dip`, `meseChiuso`, `meseChiusoAt`, `completamento` ("si"/"no").
+  - 📤 **1 — `dip:true` in `residui/<uid>` (scelta B1 di Christian).** In `pubblicaResidui`, per ogni dipendente
+    **AGGANCIATO** (`dp.foUid`, ver158, con l'account presente fra gli operatori di Fogli ore):
+    | caso | prima (ver186) | ver187 |
+    |---|---|---|
+    | massimale in vigore nel mese | residuo scritto | residuo scritto **+ `dip:true`** |
+    | **nessun** massimale in scheda | documento **cancellato** (ver149) | documento **riscritto** con soli `{dip:true, aggiornato}` (senza tetto: in Fogli ore il riquadro 🎯 resta nascosto, esce solo se tetto > 0) |
+    | massimale che non vale per questo mese (parte più avanti) | non toccato | si **aggiunge** `dip:true` (merge), i numeri restano |
+    - 🔑 **Scelta prudente sui CESSATI (di Claude, dichiarata)**: `dip:true` **solo se il rapporto non è finito PRIMA del
+      mese guardato** (`effEndInt` vuota o ≥ 1° del mese). Chi ha finito prima: residuo scritto come prima ma con `dip`
+      **tolto** (`FieldValue.delete()`); senza massimale il documento **si cancella come prima**; con un massimale fuori
+      periodo e un `dip` vecchio, si toglie solo `dip`. ⚠️ Guardando un mese vecchio, chi ha finito dopo quel mese riceve
+      ancora `dip:true` finché non si ripubblica da un mese recente.
+    - ⚠️ **Chi NON è agganciato si comporta esattamente come prima** (abbinamento per nome, omonimi saltati, cancellazione
+      senza massimale, nessun `dip`). ⚠️ I documenti degli agganciati non contano più fra i «residui che non corrispondono a
+      nessun dipendente di oggi» (prima un agganciato con un massimale che parte più avanti finiva lì per sbaglio).
+    - ⚠️ **Diciture nuove, scritte da Claude**: nella conferma «Ai N dipendenti agganciati a un account di Fogli ore viene
+      anche segnalato che sono DIPENDENTI (chiudendo il mese in Fogli ore riceveranno la domanda su ferie/permessi a
+      completamento): …» e «NON viene segnalato (rapporto finito prima di ‹mese anno›): …»; «‹nome› (resta solo il segno di
+      dipendente)» nell'elenco di chi perde il residuo; «Nessun residuo da pubblicare. Vuoi aggiornare lo stesso Fogli ore?»
+      quando c'è **solo** da segnare (se c'è solo da togliere resta la frase di prima, verificato); nell'esito
+      «Segnalati a Fogli ore come dipendenti: N.» e «Nessun residuo da pubblicare.».
+    - ⚠️ **Regole Firestore NON toccate**: lasciano all'admin scrivere `residui` senza vincoli di campi.
+  - 📨 **2 — la pastiglia nel Tabellone, nella testata della scheda accanto al nome** (solo lettura). `foLeggiMese` tiene ora
+    anche i documenti interi e **`foChiusuraMese(tsList)`** (con `foTempoMs`) dà `{chiuso, completamento, at}`: chiuso se
+    **almeno un servizio** ha `meseChiuso:true`; se i servizi discordano **«si» vince**. Passa da `foConfronta`
+    (`chiusura`, `haDatiFo`), quindi usa **prima l'account agganciato (`__perUid`) poi il nome**, e con gli omonimi è
+    **sospesa** come il confronto. Quattro casi (classe `.chiu-pill`, fuori dalla griglia, ≥12,5px):
+    **«📨 Chiede ferie/permessi a completamento»** (ambra `#fbbf24`, bordo `#b45309`, 14px) · **«Lascia così»** (sobria) ·
+    **«Mese chiuso in Fogli ore»** (chiuso senza risposta: caso in più, dichiarato) · **«Mese non ancora chiuso in Fogli
+    ore»** (grigia, 12,5px, solo se in Fogli ore ci sono ore o assenze di quel mese). Il suggerimento dice la data di
+    chiusura. ⚠️ **Diciture nuove, scritte da Claude.** ⚠️ **Nessun calcolo cambia e in Fogli ore non si scrive niente.**
+  - **Provato** (`collaudo/ver187.cjs`, banco comune 8344 con la finta Firebase, **32/0**): le quattro pastiglie e nessuna
+    per un documento vuoto; i sette casi di `residui` (agganciato con/senza/fuori massimale, cessati, non agganciati, un
+    residuo estraneo non toccato); Fogli ore rev 18 (`buildResiduoAnnuoPanel`) mostra 🎯 ad ALFA e non a BETA (solo `dip`);
+    **zero scritture** in `users`/`timesheets` (spia); ripubblicazione idempotente; costo orario gen→ott, Risultato, box e TOT
+    **identici alla ver186** (8 schede su 8); 390 e 1280px senza scorrimento laterale; zero errori di pagina; confronto
+    con la ver186 congelata (nessuna pastiglia, BETA cancellato, nessun `dip`). Batteria: `ver186` 20/0 · `ver185` 30/0 ·
+    `a02` 49/1 (A02.35, identico alla ver186) · `a07` 64/0; interconnessioni (repo USOINT, non toccate): `ic-01-b2-residui`
+    14/1 e `b1` 9/5, `b8` B8-04 KO — **identici sulla ver186** (B2-08 promemoria; B1 attese a 2 decimali invecchiate dalla
+    ver185). ⚠️ **Non verificato con Firebase vero** né con la rev 19 vera di Fogli ore (i campi sono seminati a mano).
 - ✏️ **ver186 (19/11/2026, approvata da Christian e portata su `main` il 19/11/2026: «main per le tre app»): ENTRANDO IN UNA CELLA DELLE ORE IL CONTENUTO SI SELEZIONA TUTTO**
   (Christian: «consenti, quando entro in una cella per compilare le ore, che la precedente scritta si selezioni tutta e io
   ci scriva sopra»). Sopra la ver185, che resta da approvare.

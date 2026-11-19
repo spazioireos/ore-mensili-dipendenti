@@ -481,6 +481,12 @@ input:focus,select:focus,textarea:focus{outline:3px solid #1d4ed8;outline-offset
   table.cal .cell-in.is-num, table.cal .cell-in.trattino::placeholder { font-size:18px; }
   table.cal td.tot-v { font-size:17.1px; }
   table.cal td.tot-v .tot-teor { font-size:11.25px; }   /* anche il «teor.» sotto il TOT, 12,5 → 11,25px (90%), dentro la griglia */
+  /* ver187 (19/11/2026): la chiusura del mese in Fogli ore e la risposta sul completamento, nella testata della scheda.
+     Fuori dalla griglia: nessuna scritta sotto i 12,5px. */
+  .emp-head .chiu-pill { border-radius:20px; padding:3px 11px; font-size:13px; font-weight:800; white-space:nowrap; }
+  .emp-head .chiu-pill.chiu-si { background:#fbbf24; color:#451a03; border:2px solid #b45309; font-size:14px; }
+  .emp-head .chiu-pill.chiu-no { background:rgba(255,255,255,.85); color:#334155; border:1px solid #94a3b8; font-weight:700; }
+  .emp-head .chiu-pill.chiu-aperto { background:#e2e8f0; color:#475569; border:1px solid #cbd5e1; font-size:12.5px; font-weight:600; }
 </style>
 </head>
 <body>
@@ -512,7 +518,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver186";
+const APP_VER = "ver187";
 const APP_DATA = "19nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -3397,6 +3403,17 @@ function EmployeeCard(props){
     <div className="emp-card" style={{ borderColor: dp.colore || "#00B0F0", borderWidth:"8px" }}>
       <div className="emp-head" style={{ background: dp.colore || "#00B0F0" }}>
         <span className="nome" style={{ color:"#08344a" }}>{dp.nome}</span>
+        {(function(){   /* ver187 (19/11/2026): chiusura del mese in Fogli ore e risposta sul completamento. Solo lettura.
+                           ⚠ Diciture nuove, scritte da Claude. */
+          const fo = props.fogliOre; const ch = fo && fo.chiusura; if (!ch) return null;
+          let quando = "";
+          if (ch.at){ const dt = new Date(ch.at); quando = " il " + pad2(dt.getDate()) + "/" + pad2(dt.getMonth()+1) + "/" + dt.getFullYear(); }
+          if (ch.chiuso && ch.completamento === "si") return <span className="chiu-pill chiu-si" title={"Ha chiuso " + MONTH_LABEL[m-1] + " " + y + " in Fogli ore" + quando + " e, se le ore dichiarate non arrivano al dovuto contrattuale, chiede che siano assegnati ferie/permessi a completamento. Qui non cambia niente da solo: lo decidi tu nel Tabellone."}>📨 Chiede ferie/permessi a completamento</span>;
+          if (ch.chiuso && ch.completamento === "no") return <span className="chiu-pill chiu-no" title={"Ha chiuso " + MONTH_LABEL[m-1] + " " + y + " in Fogli ore" + quando + " e, alla domanda su ferie/permessi a completamento delle ore dovute, ha risposto di lasciare così."}>Lascia così</span>;
+          if (ch.chiuso) return <span className="chiu-pill chiu-no" title={"Ha chiuso " + MONTH_LABEL[m-1] + " " + y + " in Fogli ore" + quando + ", senza rispondere alla domanda su ferie/permessi a completamento."}>Mese chiuso in Fogli ore</span>;
+          if (fo.haDatiFo) return <span className="chiu-pill chiu-aperto" title={"In Fogli ore ci sono ore o assenze di " + MONTH_LABEL[m-1] + " " + y + ", ma il mese non è ancora stato chiuso."}>Mese non ancora chiuso in Fogli ore</span>;
+          return null;
+        })()}
         {livelloAt(dp,y,m) ? <span className="pill">Liv. {livelloAt(dp,y,m)}</span> : null}
         <span className="pill">ORE SETT: {fmtH(oreSettAt(dp,y,m))}</span>
         <span className="pill" title="Monte ore mensile: 165 h per chi fa 38 h/settimana, in proporzione per gli altri">ORE CONTRATTUALI: {fmtH(monteFissoMese(dp,y,m))}</span>
@@ -7977,7 +7994,10 @@ function foConfronta(rec, y, m, agg){
      "soloInfo" e' vero e il riquadro si colora in modo sobrio. */
   return { totMio:totMio, totFo:totFo, diffTot:diffTot, giorni:giorni,
            assConta: (agg && agg.assConta) ? agg.assConta : {},
-           soloInfo: (!diffTot && giorni.length === 0) };
+           soloInfo: (!diffTot && giorni.length === 0),
+           /* ver187: chiusura del mese in Fogli ore e risposta sul completamento (solo da mostrare) */
+           chiusura: (agg && agg.chiusura) ? agg.chiusura : null,
+           haDatiFo: !!(agg && ((agg.tot || 0) > 0.005 || (agg.ass && Object.keys(agg.ass).length))) };
 }
 /* ver150 (10/11/2026, punto 1 dell'elenco, risposta di Christian: «avvisa»).
    L'unico identificativo che attraversa il confine fra le app e' il NOME, scritto a mano in
@@ -8023,6 +8043,31 @@ function foLeggiUtenti(db, cache){
     return map;
   });
 }
+/* ver187 (19/11/2026, «Nu*» di Christian): Fogli ore (rev 19) fa CHIUDERE il mese all'operatore dal 1° del
+   mese dopo e ai DIPENDENTI chiede se vogliono ferie/permessi a completamento delle ore dovute. Scrive, in OGNI
+   documento `timesheets` del mese (uno per servizio): `meseChiuso:true`, `meseChiusoAt`, `completamento:"si"|"no"`.
+   Qui si LEGGE e basta (sola lettura, come sempre): il mese è chiuso se almeno un servizio lo dice; se i servizi
+   discordano sulla risposta, «si» vince. ⚠ Nessun calcolo cambia. */
+function foTempoMs(v){
+  try {
+    if (v === null || v === undefined || v === "") return 0;
+    if (typeof v.toMillis === "function") return v.toMillis();
+    if (typeof v.toDate === "function") return v.toDate().getTime();
+    if (typeof v === "number") return v;
+    if (typeof v === "object" && typeof v.seconds === "number") return v.seconds * 1000;
+    const t = Date.parse(String(v)); return isNaN(t) ? 0 : t;
+  } catch (e){ return 0; }
+}
+function foChiusuraMese(tsList){
+  let chiuso = false, si = false, no = false, at = 0;
+  (tsList || []).forEach(function(t){
+    if (!t || typeof t !== "object") return;
+    if (t.meseChiuso === true){ chiuso = true; at = Math.max(at, foTempoMs(t.meseChiusoAt)); }
+    const c = String(t.completamento === null || t.completamento === undefined ? "" : t.completamento).trim().toLowerCase();
+    if (c === "si" || c === "s\u00ec") si = true; else if (c === "no") no = true;
+  });
+  return { chiuso:chiuso, completamento:(si ? "si" : (no ? "no" : "")), at:at };
+}
 /* lettura timesheets del mese: una query per anno (nessun indice composito) + filtro client su mese.
    Ritorna { "COGNOME NOME": aggregato }. */
 function foLeggiMese(db, cache, y, m){
@@ -8034,6 +8079,7 @@ function foLeggiMese(db, cache, y, m){
       return ts;
     }).then(function(ts){
       const perUid = {};
+      const perUidTs = {};   /* ver187: i documenti interi, per la chiusura del mese */
       ts.forEach(function(doc){
         try {
           const t = doc.data() || {};
@@ -8043,16 +8089,18 @@ function foLeggiMese(db, cache, y, m){
           if (!u || !utenti[u]) return;
           if (!perUid[u]) perUid[u] = [];
           perUid[u].push(t.days);
+          if (!perUidTs[u]) perUidTs[u] = [];
+          perUidTs[u].push(t);
         } catch (e){ console.error("foLeggiMese", e); }
       });
       const perNome = {};
-      Object.keys(perUid).forEach(function(u){ perNome[foChiave(utenti[u])] = foAggregaMese(perUid[u]); });   /* ver149 (punto 8): la chiave ignora accenti e apostrofo finale */
+      Object.keys(perUid).forEach(function(u){ const ag = foAggregaMese(perUid[u]); ag.chiusura = foChiusuraMese(perUidTs[u]); perNome[foChiave(utenti[u])] = ag; });   /* ver149 (punto 8): la chiave ignora accenti e apostrofo finale · ver187: + chiusura del mese */
       /* ver158 (TR-03): lo stesso aggregato tenuto anche per UID dell'account. Chi ha
          l'account agganciato in scheda non passa piu' dal nome, quindi gli omonimi e le
          scritture diverse non lo toccano. ⚠ `perNome` resta identico: nessuno dei conti di
          prima cambia. */
       const perUidAgg = {};
-      Object.keys(perUid).forEach(function(u){ perUidAgg[u] = foAggregaMese(perUid[u]); });
+      Object.keys(perUid).forEach(function(u){ const ag = foAggregaMese(perUid[u]); ag.chiusura = foChiusuraMese(perUidTs[u]); perUidAgg[u] = ag; });
       perNome.__perUid = perUidAgg;
       /* ver150 (punto 1): se due account di Fogli ore hanno lo stesso nome, l'aggregato di
          uno ha appena sovrascritto quello dell'altro. Quel numero sarebbe una bugia: si
@@ -8701,7 +8749,16 @@ function App(){
     if (!FB_READY || !dbRef.current){ window.alert("Serve il collegamento al database: questa funzione non lavora in modalità locale."); return; }
     const righe = [];
     const senzaTetto = [];                                  /* ver149 (punto 6) */
+    /* ver187 (scelta B1 di Christian): a ogni dipendente AGGANCIATO (dp.foUid, ver158) si scrive nel suo
+       `residui/<uid>` anche `dip:true`, così Fogli ore sa che è un dipendente e alla chiusura del mese gli fa
+       la domanda sul completamento con ferie/permessi. ⚠ Scelta prudente sui CESSATI (dichiarata): `dip:true`
+       solo se il rapporto non è finito PRIMA del mese guardato; altrimenti il segno si toglie, e un documento
+       senza massimale si cancella come prima (ver149). */
+    const meseInizio = anno * 10000 + mese * 100 + 1;
+    const dipInForza = function(dp){ const e = effEndInt(dp); return !(e && e < meseInizio); };
+    const agganciati = [];
     dipSorted(state).forEach(function(dp){
+      if (dp && dp.foUid) agganciati.push({ nome:dp.nome, foUid:dp.foUid, inForza:dipInForza(dp), haTetti:(tettiList(dp).length > 0) });
       const tetto = tettoForPeriod(dp, anno, mese);
       if (isNaN(tetto) || tetto <= 0){
         if (!tettiList(dp).length) senzaTetto.push(dp.nome);   /* nessun massimale in scheda */
@@ -8712,7 +8769,7 @@ function App(){
                    annoRif: tettoStartYear(dp, anno, mese),
                    tetto:R2(tetto,3), usate:R2(usate,3), restano:R2(tetto-usate,3) });
     });
-    if (!righe.length && !senzaTetto.length){ window.alert("Nessun dipendente ha un massimale annuo impostato per questo periodo: non c'è niente da pubblicare."); return; }
+    if (!righe.length && !senzaTetto.length && !agganciati.length){ window.alert("Nessun dipendente ha un massimale annuo impostato per questo periodo: non c'è niente da pubblicare."); return; }
     setPubEsito("lettura degli operatori di Fogli ore in corso…");
     const db = dbRef.current;
     foLeggiUtenti(db, foCacheRef.current).then(function(utenti){
@@ -8739,31 +8796,44 @@ function App(){
       /* ver149 (punto 6): chi non ha più nessun massimale, e ha un account, va ripulito */
       const uidSenzaTetto = {};
       const foUidDi = {}; (state.dipendenti||[]).forEach(function(d){ if (d && d.foUid) foUidDi[d.nome] = d.foUid; });   /* ver158 */
+      const aggDi = {}; agganciati.forEach(function(a){ if (utenti[a.foUid]) aggDi[a.foUid] = a; });   /* ver187 */
       senzaTetto.forEach(function(nm){ const ag = foUidDi[nm];
-        if (ag && utenti[ag]){ uidSenzaTetto[ag] = nm; return; }                                   /* ver158: agganciato */
+        if (ag && utenti[ag]){ if (!(aggDi[ag] && aggDi[ag].inForza)) uidSenzaTetto[ag] = nm; return; }   /* ver158: agganciato · ver187: in forza = resta col solo «dip» */
         if (ambiguo(nm)) return; const u = perNome[foChiave(nm)]; if (u) uidSenzaTetto[u] = nm; });
       const uidConTetto = {};
-      daScrivere.forEach(function(r){ uidConTetto[r.uid] = true; });
+      daScrivere.forEach(function(r){ uidConTetto[r.uid] = true;
+        if (aggDi[r.uid] && r.foUid === r.uid) r.dip = aggDi[r.uid].inForza;   /* ver187: solo per gli agganciati */ });
+      /* ver187: gli agganciati in forza senza un residuo da scrivere ricevono il solo segno «dip» */
+      const soloDip = [];
+      Object.keys(aggDi).forEach(function(u){ const a = aggDi[u]; if (!a.inForza || uidConTetto[u]) return;
+        soloDip.push({ uid:u, nome:a.nome, sostituisci:!a.haTetti }); });
       /* leggo la collection `residui` per cancellare SOLO quello che c'e' davvero */
       return db.collection("residui").get().then(function(snap){
-        const daTogliere = [], altri = [];
+        const daTogliere = [], altri = [], togliDip = [];
+        const conNumeri = {};   /* ver187: chi ha già un residuo pubblicato (tetto > 0) */
         snap.forEach(function(d){
+          try { const dd0 = d.data(); if (dd0 && parseFloat(dd0.tetto) > 0) conNumeri[d.id] = true; } catch (e){}
           if (uidSenzaTetto[d.id]) daTogliere.push({ uid:d.id, nome:uidSenzaTetto[d.id] });
-          else if (!uidConTetto[d.id]) altri.push(d.id);
+          else if (!uidConTetto[d.id] && !aggDi[d.id]) altri.push(d.id);
+          /* ver187: agganciato CESSATO, senza residuo da scrivere né da togliere: se il segno c'era, si toglie */
+          else if (!uidConTetto[d.id] && aggDi[d.id] && !aggDi[d.id].inForza){ let dd = null; try { dd = d.data(); } catch (e){}
+            if (dd && dd.dip === true) togliDip.push({ uid:d.id, nome:aggDi[d.id].nome }); }
         });
-        return { daScrivere:daScrivere, senzaAccount:senzaAccount, omonimi:omonimi, daTogliere:daTogliere, altri:altri, lettoElenco:true };
+        soloDip.forEach(function(x){ if (x.sostituisci && conNumeri[x.uid]) x.toltoResiduo = true; });
+        return { daScrivere:daScrivere, senzaAccount:senzaAccount, omonimi:omonimi, daTogliere:daTogliere, altri:altri, lettoElenco:true, soloDip:soloDip, togliDip:togliDip, aggDi:aggDi };
       }).catch(function(e){
         console.error("residui (elenco)", e);
-        return { daScrivere:daScrivere, senzaAccount:senzaAccount, omonimi:omonimi, daTogliere:[], altri:[], lettoElenco:false };
+        return { daScrivere:daScrivere, senzaAccount:senzaAccount, omonimi:omonimi, daTogliere:[], altri:[], lettoElenco:false, soloDip:soloDip, togliDip:[], aggDi:aggDi };
       });
     }).then(function(pl){
       const daScrivere = pl.daScrivere, senzaAccount = pl.senzaAccount, daTogliere = pl.daTogliere;
       const omonimi = pl.omonimi || [];
+      const soloDip = pl.soloDip || [], togliDip = pl.togliDip || [];   /* ver187 */
       /* ver150 (punto 1): l'avviso sugli omonimi compare sia nella conferma sia qui, perche'
          se sono l'UNICA cosa rimasta non ci sarebbe nessuna conferma in cui dirlo.
          ⚠ Dicitura nuova, scritta da Claude. */
       const avvOmon = omonimi.length ? ("\n\nOMONIMI (saltati: né pubblicati né tolti, perché l'app non può sapere quali ore sono di chi):\n" + omonimi.map(function(x){ return "• " + x; }).join("\n") + "\nPer pubblicarli distingui i nomi nelle due anagrafiche.") : "";
-      if (!daScrivere.length && !daTogliere.length){
+      if (!daScrivere.length && !daTogliere.length && !soloDip.length && !togliDip.length){
         setPubEsito("");
         window.alert((senzaAccount.length
           ? ("Nessuno dei dipendenti con un massimale ha un account in Fogli ore con lo stesso COGNOME NOME:\n\n" + senzaAccount.join("\n"))
@@ -8772,26 +8842,55 @@ function App(){
       }
       const elenco = daScrivere.map(function(r){ return "• " + r.nome + ": restano " + fmt3(r.restano) + " h su " + fmt3(r.tetto); }).join("\n");
       const avviso = senzaAccount.length ? ("\n\nSENZA ACCOUNT in Fogli ore (saltati):\n" + senzaAccount.join("\n")) : "";
-      const avvTog = daTogliere.length ? ("\n\nA QUESTI VIENE TOLTO il residuo, perché non hanno più nessun massimale in scheda (dentro Fogli ore non vedranno più niente):\n" + daTogliere.map(function(x){ return "• " + x.nome; }).join("\n")) : "";
+      const togliVis = daTogliere.map(function(x){ return "• " + x.nome; })
+        .concat((pl.soloDip || []).filter(function(x){ return x.toltoResiduo; }).map(function(x){ return "• " + x.nome + " (resta solo il segno di dipendente)"; }));   /* ver187 */
+      const avvTog = togliVis.length ? ("\n\nA QUESTI VIENE TOLTO il residuo, perché non hanno più nessun massimale in scheda (dentro Fogli ore non vedranno più niente):\n" + togliVis.join("\n")) : "";
       const avvAltri = pl.altri.length ? ("\n\nCi sono anche " + pl.altri.length + " residui pubblicati che non corrispondono a nessun dipendente di oggi: NON vengono toccati.") : "";
       const avvElenco = pl.lettoElenco ? "" : "\n\n⚠️ Non sono riuscito a leggere l'elenco dei residui già pubblicati: questa volta non ne viene tolto nessuno.";
-      if (!window.confirm("Vuoi pubblicare il residuo a questi " + daScrivere.length + " dipendenti?\nLo vedranno dentro Fogli ore, ciascuno solo il proprio.\n\n" + elenco + avviso + avvOmon + avvTog + avvAltri + avvElenco)){ setPubEsito(""); return; }
+      /* ver187: una riga che dice a chi viene segnalato a Fogli ore che è un dipendente. ⚠ Dicitura nuova, scritta da Claude. */
+      const aggDi = pl.aggDi || {};
+      const nomiDip = Object.keys(aggDi).filter(function(u){ return aggDi[u].inForza; }).map(function(u){ return aggDi[u].nome; }).sort();
+      const nomiCess = Object.keys(aggDi).filter(function(u){ return !aggDi[u].inForza; }).map(function(u){ return aggDi[u].nome; }).sort();
+      const avvDip = (nomiDip.length ? ("\n\nAi " + nomiDip.length + " dipendenti agganciati a un account di Fogli ore viene anche segnalato che sono DIPENDENTI (chiudendo il mese in Fogli ore riceveranno la domanda su ferie/permessi a completamento): " + nomiDip.join(", ") + ".") : "") +
+                     (nomiCess.length ? ("\nNON viene segnalato (rapporto finito prima di " + MONTH_LABEL[mese-1] + " " + anno + "): " + nomiCess.join(", ") + ".") : "");
+      const testaConf = (daScrivere.length || (!soloDip.length && !togliDip.length)) ? ("Vuoi pubblicare il residuo a questi " + daScrivere.length + " dipendenti?\nLo vedranno dentro Fogli ore, ciascuno solo il proprio.\n\n" + elenco)
+                                          : "Nessun residuo da pubblicare. Vuoi aggiornare lo stesso Fogli ore?";
+      if (!window.confirm(testaConf + avviso + avvOmon + avvTog + avvAltri + avvElenco + avvDip)){ setPubEsito(""); return; }
       setPubEsito("pubblicazione in corso…");
       const db = dbRef.current;
       const scritture = daScrivere.map(function(r){
-        return db.collection("residui").doc(r.uid).set({
+        const campi = {
           tetto:r.tetto, usate:r.usate, restano:r.restano, periodo:r.periodo, anno:r.annoRif,
           aggiornato: firebase.firestore.FieldValue.serverTimestamp()
-        }, { merge:true }).then(function(){ return { ok:true, nome:r.nome }; })
+        };
+        if (r.dip === true) campi.dip = true;                                                  /* ver187 */
+        else if (r.dip === false) campi.dip = firebase.firestore.FieldValue.delete();          /* ver187: agganciato cessato */
+        return db.collection("residui").doc(r.uid).set(campi, { merge:true }).then(function(){ return { ok:true, nome:r.nome, dipSeg:(r.dip === true) }; })
           .catch(function(e){ console.error("residui", r.nome, e); return { ok:false, nome:r.nome, err:(e && e.message) || "errore" }; });
       });
       const cancellazioni = daTogliere.map(function(x){
         return db.collection("residui").doc(x.uid).delete().then(function(){ return { ok:true, nome:x.nome, tolto:true }; })
           .catch(function(e){ console.error("residui (togli)", x.nome, e); return { ok:false, nome:x.nome, tolto:true, err:(e && e.message) || "errore" }; });
       });
-      Promise.all(scritture.concat(cancellazioni)).then(function(esiti){
+      /* ver187: il solo segno «dip». Senza nessun massimale in scheda il documento si RISCRIVE con soli
+         {dip, aggiornato} (i numeri del tetto spariscono, quindi in Fogli ore il riquadro 🎯 resta nascosto);
+         con un massimale che non vale per questo mese si AGGIUNGE il segno e i numeri restano (ver149). */
+      const segni = soloDip.map(function(x){
+        const pr = x.sostituisci
+          ? db.collection("residui").doc(x.uid).set({ dip:true, aggiornato: firebase.firestore.FieldValue.serverTimestamp() })
+          : db.collection("residui").doc(x.uid).set({ dip:true }, { merge:true });
+        return pr.then(function(){ return { ok:true, nome:x.nome, dip:true }; })
+          .catch(function(e){ console.error("residui (dip)", x.nome, e); return { ok:false, nome:x.nome, dip:true, err:(e && e.message) || "errore" }; });
+      }).concat(togliDip.map(function(x){
+        return db.collection("residui").doc(x.uid).set({ dip: firebase.firestore.FieldValue.delete() }, { merge:true })
+          .then(function(){ return { ok:true, nome:x.nome, nodip:true }; })
+          .catch(function(e){ console.error("residui (togli dip)", x.nome, e); return { ok:false, nome:x.nome, nodip:true, err:(e && e.message) || "errore" }; });
+      }));
+      Promise.all(scritture.concat(cancellazioni).concat(segni)).then(function(esiti){
         const ko = esiti.filter(function(x){ return !x.ok; });
         const nTog = esiti.filter(function(x){ return x.tolto && x.ok; }).length;
+        const nSegni = esiti.filter(function(x){ return (x.dip || x.nodip) && x.ok; }).length;   /* ver187 */
+        const nDipTot = esiti.filter(function(x){ return x.ok && (x.dip || x.dipSeg); }).length;
         setPubEsito("");
         /* ver149 (punto 5): si tiene da parte quanto e' stato pubblicato, per poterlo ricordare */
         if (!ko.length){
@@ -8800,8 +8899,10 @@ function App(){
           setPubTimbro(respubScrivi(val));
         }
         const codaTog = nTog ? ("\nTolto il residuo a " + nTog + (nTog===1?" persona":" persone") + " senza massimale.") : "";
-        if (!ko.length){ window.alert("Pubblicati " + (esiti.length - nTog) + " residui. Ogni dipendente vede il proprio dentro Fogli ore." + codaTog); return; }
-        window.alert("Riusciti " + (esiti.length - ko.length) + " su " + esiti.length + "." + codaTog + "\n\nNON riusciti:\n" +
+        const codaDip = nDipTot ? ("\nSegnalati a Fogli ore come dipendenti: " + nDipTot + ".") : "";   /* ver187. ⚠ Dicitura nuova, scritta da Claude. */
+        const nRes = esiti.length - nTog - nSegni;
+        if (!ko.length){ window.alert((nRes || !nSegni ? ("Pubblicati " + nRes + " residui. Ogni dipendente vede il proprio dentro Fogli ore.") : "Nessun residuo da pubblicare.") + codaTog + codaDip); return; }
+        window.alert("Riusciti " + (esiti.length - ko.length) + " su " + esiti.length + "." + codaTog + codaDip + "\n\nNON riusciti:\n" +
           ko.map(function(x){ return "• " + x.nome + " — " + x.err; }).join("\n") +
           "\n\nSe l'errore parla di permessi, le regole di sicurezza nuove non sono ancora pubblicate in console Firebase.");
       });
