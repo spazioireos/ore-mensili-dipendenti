@@ -20,32 +20,32 @@ const n=s=>parseFloat(String(s).replace(/\./g,'').replace(',','.'));
   /* paghe */
   d=await genera('🖨️ Report PDF A4 per le paghe',10); I=d&&info(d.f);
   T('A06.05 «🖨️ Report PDF A4 per le paghe» ottobre: nome «Ore da riportare a cedolino - …» secondo convenzione', d && NOMEF.test(d.nome) && /Ore da riportare a cedolino/.test(d.nome), d&&d.nome);
-  T('A06.06 paghe: una pagina per mensilizzato con dati (ALFA, BETA = 2), GAMMA non mensilizzata assente', I.pag===2 && !/GAMMA PROVA/.test(I.txt), I.pag);
+  T('A06.06 paghe (ver189: tre per pagina, A4 orizzontale): ALFA e BETA sulla stessa pagina, GAMMA non mensilizzata assente', I.pag===1 && /ALFA PROVA/.test(I.txt) && /BETA PROVA/.test(I.txt) && !/GAMMA PROVA/.test(I.txt), I.pag);
   const pA=I.txt.split('\f').find(p=>/ALFA PROVA/.test(p)).replace(/\s+/g,' ');
   const box=await pg.evaluate(()=>{ const st=JSON.parse(localStorage.getItem('spazioireos_reportore_v1')); const r={}; st.dipendenti.filter(d=>d.id!=='c').forEach(dp=>{ const B=cedolinoBox(st,dp,2026,10); r[dp.nome]={ordC:B.ordC,supp:B.supp,ced:B.ced,ced2:cedOrePubblica(st)['2026-10'][dp.id]}; }); return r; });
   const mT=/TOTALE ([\d.,]+)(?: \*)? ([\d.,]+)/.exec(pA);
   T('A06.07 paghe ALFA: TOTALE ordinarie e supplementari = box del Tabellone (146,00 · 4,00) = cedOre (150,00)', mT && Math.abs(n(mT[1])-box['ALFA PROVA'].ordC)<0.006 && Math.abs(n(mT[2])-box['ALFA PROVA'].supp)<0.006 && Math.abs(box['ALFA PROVA'].ced-box['ALFA PROVA'].ced2)<0.006, mT&&mT.slice(1).join('/')+' '+JSON.stringify(box['ALFA PROVA']));
   const pB=I.txt.split('\f').find(p=>/BETA PROVA/.test(p)).replace(/\s+/g,' ');
-  T('A06.08 paghe BETA: ASS.ING del 12 fra le non retribuite e «DA TRATTENERE» valorizzato', /ASS\.ING/.test(pB) && /DA TRATTENERE: [\d,]+ h/.test(pB), (pB.match(/DA TRATTENERE[^.]*/)||[''])[0].slice(0,60));
+  T('A06.08 paghe BETA: ASS.ING del 12 fra le non retribuite, con le ore in ore,minuti (ver189: il riquadro «DA TRATTENERE» non c\'è più)', /12 lun.*ASS\.ING \d+,[0-5]\d/.test(I.txt) && !/DA TRATTENERE/.test(pB), (I.txt.match(/ASS\.ING \d+,\d+/)||[''])[0]);
   d=await genera('🖨️ Report PDF A4 per le paghe',9); I=d&&info(d.f);
   T('A06.09 paghe settembre (prima della base mensile): dice che non c\'è nessun mensilizzato', d && /Nessun dipendente mensilizzato/.test(I.txt));
   /* intervallo: due mesi */
   await pg.getByRole('button',{name:'🖨️ Report PDF A4 per le paghe',exact:true}).click(); await pg.waitForTimeout(300);
   const s=pg.locator('.modal select'); await pg.locator('.modal input[type=radio]').nth(1).check(); await s.nth(2).selectOption('10'); await s.nth(3).selectOption('2026'); await s.nth(4).selectOption('11'); await s.nth(5).selectOption('2026');
   d=await K.scarica(pg,()=>pg.locator('.modal .modal-actions button').last().click(),30000); I=d&&info(d.f);
-  T('A06.10 paghe ottobre→novembre: ALFA ha anche novembre (3 pagine: ALFA ott, BETA ott, ALFA nov)', d && I.pag===3, d&&I.pag);
+  T('A06.10 paghe ottobre→novembre: ALFA ha anche novembre (ver189: 2 pagine, ottobre con ALFA e BETA, novembre con ALFA)', d && I.pag===2, d&&I.pag);
   /* Excel del mese */
   d=await genera('📊 Excel',10); let wb=d&&XLSX.readFile(d.f);
-  T('A06.11 📊 Excel del mese: .xlsx, nome «Report Ore mensile - … - '+K.APPV+'», autore Christian Canonica', d && NOMEF.test(d.nome) && /Report Ore mensile/.test(d.nome) && wb.Props && wb.Props.Author==='Christian Canonica', d&&d.nome+' '+JSON.stringify(wb&&wb.Props).slice(0,80));
+  T('A06.11 📊 Excel del mese: .xlsx, nome «Report Ore mensile - … - '+K.APPV+'», autore Christian', d && NOMEF.test(d.nome) && /Report Ore mensile/.test(d.nome) && wb.Props && wb.Props.Author==='Christian', d&&d.nome+' '+JSON.stringify(wb&&wb.Props).slice(0,80));
   const flat=wb?wb.SheetNames.map(sn=>JSON.stringify(XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1}))).join(' '):'';
   T('A06.12 Excel del mese: nessun NaN, ci sono i 156 di ALFA', flat.indexOf('NaN')===-1 && /156/.test(flat));
   /* Riepiloghi */
   await K.vai(pg,'rep'); d=await K.scarica(pg,()=>pg.getByRole('button',{name:'📊 Esporta riepiloghi (Excel)'}).click()); wb=d&&XLSX.readFile(d.f);
-  T('A06.13 Riepiloghi: nome «Riepiloghi - … - '+K.APPV+'» (ver181), autore', d && NOMEF.test(d.nome) && /Riepiloghi/.test(d.nome) && (wb.Props||{}).Author==='Christian Canonica', d&&d.nome);
+  T('A06.13 Riepiloghi: nome «Riepiloghi - … - '+K.APPV+'» (ver181), autore', d && NOMEF.test(d.nome) && /Riepiloghi/.test(d.nome) && (wb.Props||{}).Author==='Christian', d&&d.nome);
   /* Anagrafica */
   await K.vai(pg,'ana'); d=await K.scarica(pg,()=>pg.locator('.toolbar').getByRole('button',{name:'📊 Esporta Excel'}).click()); wb=d&&XLSX.readFile(d.f);
   const ncol=wb?(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1})[0]||[]).length:0;
-  T('A06.14 Anagrafica: nome «Anagrafica dipendenti - … - '+K.APPV+'» (ver181), autore, intestazioni', d && NOMEF.test(d.nome) && /Anagrafica dipendenti/.test(d.nome) && (wb.Props||{}).Author==='Christian Canonica' && ncol>40, d&&d.nome+' · colonne '+ncol);
+  T('A06.14 Anagrafica: nome «Anagrafica dipendenti - … - '+K.APPV+'» (ver181), autore, intestazioni', d && NOMEF.test(d.nome) && /Anagrafica dipendenti/.test(d.nome) && (wb.Props||{}).Author==='Christian' && ncol>40, d&&d.nome+' · colonne '+ncol);
   /* Query personale */
   await K.vai(pg,'query');
   await pg.getByRole('button',{name:'➕ Totale su intervallo'}).click(); await pg.waitForTimeout(300);

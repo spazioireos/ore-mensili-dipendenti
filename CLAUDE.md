@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver188 · 20nov26, IN ANTEPRIMA sul ramo di lavoro, da approvare** (su `main` c'è la ver187 · 19nov26, approvata il 20/11/2026: «main Fogli ore rev 19 e Dipendenti ver187»). `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver189 · 20nov26, IN ANTEPRIMA sul ramo di lavoro, da approvare** (su `main` c'è la ver187 · 19nov26, approvata il 20/11/2026: «main Fogli ore rev 19 e Dipendenti ver187»). `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -37,6 +37,17 @@ Banca ore, tetto annuo, contratti e export.
   Corretto anche un difetto **preesistente** che la nuova navigazione rendeva visibile: nella
   testata, in vista Anagrafica, compariva "📅 undefined 2026" (perché `mese` è `null` fuori dalle
   viste mensili); ora mostra "📇 Anagrafica".
+- 🔧 **ver189 (20/11/2026, IN ANTEPRIMA, da approvare; risposte di Christian al collaudo integrato)**, sopra la ver188 (mai pubblicata):
+  1. **«1, ti ricordi che nei report le ore vanno in sessantesimi??»** — nel «🖨️ Report PDF A4 per le paghe» le **righe** sono ora in
+     **ORE,MINUTI** con `pdfHM` (3,1731 h → «3,10»), come il Report storico dalla ver87; il **TOTALE** resta in **centesimi** (`fmt2`),
+     come lì. Nessun numero cambia: cambia come si scrive (misurato: totali identici alla ver187/188 sui 5 casi inventati).
+  2. **«2, Christian»** — autore nei metadati di tutti gli Excel, nei commenti delle celle e nei `meta` della pagina: «Christian»
+     (era «Christian Canonica»).
+  3. **«3, aggiungere conferma»** — le ✕ di **proroga, trasformazione, periodo del monte ore e massimale** in fondo alla scheda
+     chiedono conferma nominando la voce (`delPro`, `delTrasf`, `delOt`, `delTetto`); finché non si preme 💾 si recupera ricaricando.
+     ⚠️ Christian aveva nominato trasformazione e massimale: proroga e periodo sono lo stesso tipo di ✕ e il §10.1 la chiede per tutte.
+  4. **«4, metti il tetto»** — il **permesso orario** rifiuta più di **13 ore** (`ORE_MAX_GIORNO`) con lo stesso avviso delle celle.
+  ⚠️ **Diciture nuove, scritte da Claude**: le quattro conferme. Provato: `collaudo/ver189.cjs` (report), batteria `a01`…`a08`.
 - 🖨️ **ver188 (20/11/2026, IN ANTEPRIMA, da approvare): IL «🖨️ Report PDF A4 per le paghe» CON TRE DIPENDENTI PER PAGINA**
   (Christian: «Nel report a4 per le paghe, togli le legende e l'intestazione deve riportare solo nominativo e mese di
   riferimento. Ogni pagina contenga 3 dipendenti»; sue scelte: **A4 orizzontale**, riquadro «DA INSERIRE A CEDOLINO»
@@ -5051,7 +5062,7 @@ esplicitamente**: una valutazione teorica del codice non sostituisce una verific
 
 - Nome file: `[descrizione] - ggMMMaa - verN - HH.MM.ext` (mesi italiani minuscoli, ora di Roma,
   senza underscore).
-- Autore nei metadata sempre **"Christian Canonica"**; veri file Office, mai testo camuffato;
+- Autore nei metadata sempre **"Christian"** (decisione di Christian del 20/11/2026: «2, Christian»; prima qui c'era «Christian Canonica»); veri file Office, mai testo camuffato;
   elenchi nominativi in **STAMPATELLO**.
 - **Versioni sequenziali, mai saltate**, ognuna verificata. Prima di un cambiamento grosso
   Christian fornisce la versione attuale stabile come punto di salvataggio, per poter tornare

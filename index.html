@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="author" content="Christian Canonica">
-<meta name="creator" content="Christian Canonica - Spazio Ireos Società Cooperativa Sociale">
+<meta name="author" content="Christian">
+<meta name="creator" content="Christian - Spazio Ireos Società Cooperativa Sociale">
 <title>Spazio Ireos — Report Ore mensile</title>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -518,7 +518,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver188";
+const APP_VER = "ver189";
 const APP_DATA = "20nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -1601,7 +1601,7 @@ function inForceAt(dp, D){ const a=assunzInt(dp); if(!a) return false; if(a>D) r
 function intToIt(n){ if(!n) return ""; const y=Math.floor(n/10000), m=Math.floor((n%10000)/100), d=n%100; return pad2(d)+"/"+pad2(m)+"/"+y; }
 function cellCode(v){ const s=String(v==null?"":v).trim().toUpperCase(); if(s==="") return ""; if(isNumeric(v)) return ""; return s.split(/\s+/)[0]; }
 function sumOverRange(state, dipId, fromInt, toInt, what){ let total=0; let y=Math.floor(fromInt/10000), m=Math.floor((fromInt%10000)/100); const ty=Math.floor(toInt/10000), tm=Math.floor((toInt%10000)/100); while(y<ty || (y===ty && m<=tm)){ const rec=getRecFrom(state,y,m,dipId); if(rec && rec.giorni){ const dim=daysInMonth(y,m); for(let d=1; d<=dim; d++){ const di=y*10000+m*100+d; if(di<fromInt||di>toInt) continue; const v=rec.giorni[d]; if(v==null||v==="") continue; if(what==="ORE") total+=parseHour(v); else if(cellCode(v)===what) total+=1; } } m++; if(m>12){m=1;y++;} } return total; }
-function qExport(nome, aoa){ const wb=XLSX.utils.book_new(); wb.Props={ Title:"Query personale", Author:"Christian Canonica", Company:"Spazio Ireos Societa' Cooperativa Sociale", CreatedDate:new Date() }; const ws=XLSX.utils.aoa_to_sheet(aoa); XLSX.utils.book_append_sheet(wb, ws, "Query"); /* ver181: nome secondo la convenzione (Spazio Ireos … - ggmmmaa - verN - HH.MM), senza trattino basso */ XLSX.writeFile(wb, fileName("xlsx", String(nome).replace(/\.xlsx$/,"").replace(/_/g," al "))); }
+function qExport(nome, aoa){ const wb=XLSX.utils.book_new(); wb.Props={ Title:"Query personale", Author:"Christian", Company:"Spazio Ireos Societa' Cooperativa Sociale", CreatedDate:new Date() }; const ws=XLSX.utils.aoa_to_sheet(aoa); XLSX.utils.book_append_sheet(wb, ws, "Query"); /* ver181: nome secondo la convenzione (Spazio Ireos … - ggmmmaa - verN - HH.MM), senza trattino basso */ XLSX.writeFile(wb, fileName("xlsx", String(nome).replace(/\.xlsx$/,"").replace(/_/g," al "))); }
 function cfClean(s){ return String(s==null?"":s).toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^A-Z]/g,""); }
 function cfCons(s){ return s.replace(/[AEIOU]/g,""); }
 function cfVow(s){ return s.replace(/[^AEIOU]/g,""); }
@@ -1963,7 +1963,7 @@ function fileName(ext, desc){
 function esportaExcel(state, pairs){
   ggComuneAggiorna(state);
   const wb = XLSX.utils.book_new();
-  wb.Props = { Title:"Report Ore mensile", Author:"Christian Canonica", Company:"Spazio Ireos Società Cooperativa Sociale", CreatedDate:new Date() };
+  wb.Props = { Title:"Report Ore mensile", Author:"Christian", Company:"Spazio Ireos Società Cooperativa Sociale", CreatedDate:new Date() };
   const F = "Nunito";
   const styTitle = { font:{ name:F, bold:true, sz:14, color:{rgb:"FFFFFFFF"} }, fill:{ patternType:"solid", fgColor:{rgb:"FF0F2740"} }, alignment:{ horizontal:"left", vertical:"center" } };
   const styGiornoHead = { font:{ name:F, bold:true, sz:11, color:{rgb:"FFFFFFFF"} }, fill:{ patternType:"solid", fgColor:{rgb:"FF0F2740"} }, alignment:{ horizontal:"center", vertical:"center" } };
@@ -2053,7 +2053,7 @@ function esportaExcel(state, pairs){
       const parts = key.split("_");
       const ref = XLSX.utils.encode_cell({ r:parseInt(parts[0],10), c:parseInt(parts[1],10) });
       if (!ws[ref]) ws[ref] = { t:"s", v:"" };
-      ws[ref].c = [{ a:"Christian Canonica", t:commentMap[key] }];
+      ws[ref].c = [{ a:"Christian", t:commentMap[key] }];
       ws[ref].c.hidden = true;
     });
     ws["!merges"] = merges;
@@ -2877,7 +2877,8 @@ function esportaPDFPaghe(state, pairs){
   const JsPDF = window.jspdf.jsPDF;
   const doc = new JsPDF({ orientation:"landscape", unit:"mm", format:"a4" });   /* ver188: tre dipendenti per pagina, affiancati */
   const dips = dipSorted(state);
-  const fh = function(x){ return fmtH(x); };
+  const fh = function(x){ return pdfHM(R2(x, 3)); };   /* ver188: righe in ORE,MINUTI (sessantesimi), come il Report storico */
+  const ft = function(x){ return fmt2(x); };          /* ver188: il TOTALE in centesimi, come il Report storico (ver87) */
   let first = true, prodotto = false;
   const nuovaPagina = function(){ if (!first) doc.addPage(); first = false; };
   pairs.forEach(function(pr){
@@ -2991,7 +2992,7 @@ function esportaPDFPaghe(state, pairs){
         startY: 19,
         head: [["Giorno", "Ordinarie", "Supplementari", "Assenze retribuite", "Non retribuite (ASS.ING / ASP 0h)"]],
         body: body,
-        foot: [["TOTALE", fh(tO), fh(tS), fh(tR), fh(tN)]],
+        foot: [["TOTALE", ft(tO), ft(tS), ft(tR), ft(tN)]],
         styles:{ fontSize:7.5, cellPadding:0.75, valign:"middle", lineColor:[214,214,214], lineWidth:0.1, overflow:"linebreak" },
         headStyles:{ fillColor:[15,39,64], textColor:[255,255,255], fontSize:7, fontStyle:"bold", halign:"center" },
         footStyles:{ fillColor:[234,240,250], textColor:[15,39,64], fontStyle:"bold", halign:"center" },
@@ -4216,7 +4217,7 @@ function SchedaContratto(props){
     patch({ proroghe: proroghe.concat([v]) }); setNuovaPro(""); setErrPro(""); return true;
   };
   const chiudiPro = function(){ setApPro(false); setNuovaPro(""); setErrPro(""); };
-  const delPro = function(i){ patch({ proroghe: proroghe.filter(function(_,k){ return k!==i; }) }); };
+  const delPro = function(i){ if (!window.confirm("Togliere la " + (i+1) + "ª proroga (" + proroghe[i] + ")? Finché non premi 💾 la puoi recuperare ricaricando la pagina.")) return; patch({ proroghe: proroghe.filter(function(_,k){ return k!==i; }) }); };
   const addTrasf = function(){
     const mm=parseInt(ntMese,10), yy=parseInt(ntAnno,10);
     if(!mm||mm<1||mm>12||!yy||yy<2000||yy>2100){ setErrTra("Scegli un mese e un anno di 4 cifre (es. 2026)."); return false; }
@@ -4248,7 +4249,7 @@ function SchedaContratto(props){
   };
   const chiudiTra = function(){ setApTra(false); setNtLiv(""); setNtOre(""); setNtSup(""); setNtIndet(false);
     setNtMese(String(_now.getMonth()+1)); setNtAnno(String(_now.getFullYear())); setErrTra(""); };
-  const delTrasf = function(i){ patch({ trasformazioni: trasf.filter(function(_,k){ return k!==i; }) }); };
+  const delTrasf = function(i){ if (!window.confirm("Togliere la trasformazione «" + trasfSummary(trasf[i]) + "»? Finché non premi 💾 la puoi recuperare ricaricando la pagina.")) return; patch({ trasformazioni: trasf.filter(function(_,k){ return k!==i; }) }); };
 
   // --- monte ore temporaneo ---
   const otLabel = function(w){
@@ -4270,7 +4271,7 @@ function SchedaContratto(props){
   const chiudiOt = function(){ setApOt(false); setOtOre("");
     setOtMeseI(String(_now.getMonth()+1)); setOtAnnoI(String(_now.getFullYear()));
     setOtMeseF(String(_now.getMonth()+1)); setOtAnnoF(String(_now.getFullYear())); setErrOt(""); };
-  const delOt = function(i){ patch({ orariTemp: orariTemp.filter(function(_,k){ return k!==i; }) }); };
+  const delOt = function(i){ if (!window.confirm("Togliere il periodo «" + otLabel(orariTemp[i]) + "»? Finché non premi 💾 lo puoi recuperare ricaricando la pagina.")) return; patch({ orariTemp: orariTemp.filter(function(_,k){ return k!==i; }) }); };
 
   // --- mensilizzazione ---
   const dalStr = function(m,y){
@@ -4325,7 +4326,7 @@ function SchedaContratto(props){
     setNtTettoAnno(""); setNtTettoOre(""); setNtVoci([]); setErrTet(""); return true;
   };
   const chiudiTet = function(){ setApTet(false); setNtTettoAnno(""); setNtTettoOre(""); setNtVoci([]); setErrTet(""); };
-  const delTetto = function(i){ patchTetti(tetti.filter(function(_,k){ return k!==i; })); };
+  const delTetto = function(i){ if (!window.confirm("Togliere il massimale «" + tettoRowLabel(tetti[i]) + "»? Finché non premi 💾 lo puoi recuperare ricaricando la pagina.")) return; patchTetti(tetti.filter(function(_,k){ return k!==i; })); };
 
   const box = function(colore, bordo){ return { background:colore, border:"1.5px solid "+bordo, borderRadius:"10px", padding:"12px 14px", marginBottom:"12px", boxShadow:"0 1px 3px rgba(15,23,42,.08)" }; };
   const titolo = { fontWeight:800, fontSize:"14px", marginBottom:"6px", display:"block" };
@@ -6013,7 +6014,7 @@ function CostoOrario(props){
                   dd.oreMancanti ? "non calcolabile" : R2(dd.res.orario)]);
     });
     const wb = XLSX.utils.book_new();
-    wb.Props = { Title:"Costo orario dipendenti", Author:"Christian Canonica", Company:"Spazio Ireos Società Cooperativa Sociale", CreatedDate:new Date() };
+    wb.Props = { Title:"Costo orario dipendenti", Author:"Christian", Company:"Spazio Ireos Società Cooperativa Sociale", CreatedDate:new Date() };
     const ws = XLSX.utils.aoa_to_sheet(righe);
     const hdr = { font:{ name:"Arial", bold:true, color:{rgb:"FFFFFFFF"} }, fill:{ patternType:"solid", fgColor:{rgb:"FF0F2740"} }, alignment:{horizontal:"center"} };
     (righe[0]||[]).forEach(function(_,i){ const ref=XLSX.utils.encode_cell({r:0,c:i}); if (ws[ref]) ws[ref].s=hdr; });
@@ -7533,6 +7534,7 @@ function PermModal(props){
     const oreNum = /^\d*([.,]\d*)?$/.test(oreTxt) ? parseHour(oreTxt) : NaN;   /* ver184: con la virgola, sesti esatti */
     if (isNaN(oreNum) || oreNum <= 0){ window.alert("Indica un numero di ore valido (> 0)."); return; }
     if (!minutiAmmessi(oreTxt)){ window.alert("Ore del permesso: " + AVVISO_MINUTI); return; }   /* ver184 */
+    if (oreNum > ORE_MAX_GIORNO){ window.alert("In un giorno non si possono scrivere più di " + ORE_MAX_GIORNO + " ore."); return; }   /* ver188: il tetto delle 13 ore vale anche per il permesso (Christian, 20/11/2026: «metti il tetto») */
     const t = altro ? altroTxt.trim().toUpperCase() : tipo;
     if (t === ""){ window.alert("Indica il tipo di permesso."); return; }
     props.onSave({ ore: alPassoOk(oreNum) ? oreNum : Math.round(oreNum * 100) / 100, tipo: t }, !chiuso);   /* ver184: 1h10 resta 1,1666… esatto */   /* ver99: secondo argomento = giornata erosiva si/no */
@@ -7662,7 +7664,7 @@ function Riepiloghi(props){
 
   const esportaRiepiloghi = function(){
     const wb = XLSX.utils.book_new();
-    wb.Props = { Title:"Riepiloghi", Author:"Christian Canonica", Company:"Spazio Ireos Società Cooperativa Sociale", CreatedDate:new Date() };
+    wb.Props = { Title:"Riepiloghi", Author:"Christian", Company:"Spazio Ireos Società Cooperativa Sociale", CreatedDate:new Date() };
     const hdr = { font:{ name:"Arial", bold:true, color:{rgb:"FFFFFFFF"} }, fill:{ patternType:"solid", fgColor:{rgb:"FF0F2740"} }, alignment:{horizontal:"center"} };
     const mkSheet = function(name, aoa){
       const ws = XLSX.utils.aoa_to_sheet(aoa);
@@ -8450,7 +8452,7 @@ function App(){
       if (c[0]==="__trasfAvvio") return trasfAvvioAuto(dp);
       return String(anaVal(dp, c[0])); })); });
     const wb = XLSX.utils.book_new();
-    wb.Props = { Title:"Anagrafica dipendenti", Author:"Christian Canonica", Company:"Spazio Ireos Società Cooperativa Sociale", CreatedDate:new Date() };
+    wb.Props = { Title:"Anagrafica dipendenti", Author:"Christian", Company:"Spazio Ireos Società Cooperativa Sociale", CreatedDate:new Date() };
     const ws = XLSX.utils.aoa_to_sheet(aoa);
     (aoa[0]||[]).forEach(function(_, c){ const ref=XLSX.utils.encode_cell({r:0,c:c}); if (ws[ref]) ws[ref].s=hdrStyle; });
     ws["!cols"] = cols.map(function(){ return { wch:20 }; });

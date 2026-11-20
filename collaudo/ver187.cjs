@@ -75,7 +75,7 @@ async function pubblica(pg,D){ const n0=D.length; await pg.locator('button.btn-y
   const br=await K.chromium.launch();
   /* ===== ver187 ===== */
   const A=await apriDip(br,'dip','ver187-a');
-  T('V00 targhetta ver187', /ver187/.test(await A.pg.locator('.app-rev').innerText().catch(()=>'')));
+  { const V=(require('fs').readFileSync(__dirname+'/../index.html','utf8').match(/const APP_VER = "(ver\d+)"/)||[])[1]; T('V00 targhetta '+V+' (si legge dal file)', new RegExp(V).test(await A.pg.locator('.app-rev').innerText().catch(()=>''))); }
   await A.pg.waitForFunction(()=>document.querySelectorAll('.chiu-pill').length>=4,null,{timeout:15000}).catch(()=>{});
   const P=await pastiglie(A.pg);
   T('V01 ALFA (due servizi chiusi, risposte «no» e «si»): «📨 Chiede ferie/permessi a completamento», ambra, ≥12,5px', P['ALFA PROVA']&&P['ALFA PROVA'].t==='📨 Chiede ferie/permessi a completamento'&&/chiu-si/.test(P['ALFA PROVA'].cls)&&parseFloat(P['ALFA PROVA'].fs)>=12.5&&/251, 191, 36/.test(P['ALFA PROVA'].bg), JSON.stringify(P['ALFA PROVA']));

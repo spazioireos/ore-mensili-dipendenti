@@ -85,7 +85,7 @@ const n=s=>parseFloat(String(s).replace(/\./g,'').replace(',','.'));
   /* Excel */
   const dl=await K.scarica(pg,()=>pg.getByRole('button',{name:'📊 Esporta Excel'}).click());
   let wb=null; try{ wb=XLSX.readFile(dl.f); }catch(e){}
-  T('A05.26 📊 Esporta Excel: vero .xlsx, nome «… - ggmmmaa - '+K.APPV+' - HH.MM.xlsx», autore «Christian Canonica»', wb && /^Spazio Ireos .+ - \d{2}[a-z]{3}\d{2} - ver\d+ - \d{2}\.\d{2}\.xlsx$/.test(dl.nome) && (wb.Props||{}).Author==='Christian Canonica', dl&&dl.nome+' / '+JSON.stringify((wb||{}).Props||{}).slice(0,100));
+  T('A05.26 📊 Esporta Excel: vero .xlsx, nome «… - ggmmmaa - '+K.APPV+' - HH.MM.xlsx», autore «Christian»', wb && /^Spazio Ireos .+ - \d{2}[a-z]{3}\d{2} - ver\d+ - \d{2}\.\d{2}\.xlsx$/.test(dl.nome) && (wb.Props||{}).Author==='Christian', dl&&dl.nome+' / '+JSON.stringify((wb||{}).Props||{}).slice(0,100));
   const rows=wb?XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1}):[]; const flat=JSON.stringify(rows);
   T('A05.27 Excel: il €/h di ALFA è quello a video, nessun NaN', flat.indexOf('NaN')===-1 && rows.some(r=>JSON.stringify(r).indexOf('ALFA')!==-1 && r.some(c=>Math.abs(+c-n(base.eh))<0.006)), base.eh);
   T('A05.28 zero errori di pagina', E.length===0, E.join('|'));
