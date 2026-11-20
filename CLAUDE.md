@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver192 · 20nov26, sul ramo di lavoro, da approvare** (su `main` c'è la ver191 · 20nov26, approvata il 20/11/2026: «Main per tutto»). `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver192 · 20nov26 — approvata da Christian e portata su `main` il 20/11/2026** («Main»). `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -37,7 +37,7 @@ Banca ore, tetto annuo, contratti e export.
   Corretto anche un difetto **preesistente** che la nuova navigazione rendeva visibile: nella
   testata, in vista Anagrafica, compariva "📅 undefined 2026" (perché `mese` è `null` fuori dalle
   viste mensili); ora mostra "📇 Anagrafica".
-- 🔑 **ver192 (20/11/2026, sul ramo, da approvare) — UN OPERATORE CHE ENTRA IN FOGLI ORE NON VIENE PIÙ BUTTATO FUORI DA DIPENDENTI**
+- 🔑 **ver192 (20/11/2026, su `main` dal 20/11/2026) — UN OPERATORE CHE ENTRA IN FOGLI ORE NON VIENE PIÙ BUTTATO FUORI DA DIPENDENTI**
   (Christian: «Sì, correggi», collaudo B8-06). L'accesso Firebase è **uno per browser** ed è condiviso con Fogli ore (stessa origine,
   stessa apiKey). Prima, se in un'altra scheda un operatore entrava in Fogli ore, `onAuthStateChanged` di Dipendenti vedeva un non-admin
   e faceva `firebase.auth().signOut()`: chiudeva l'accesso anche a Fogli ore. Ora mostra solo «Accesso non consentito» (con
