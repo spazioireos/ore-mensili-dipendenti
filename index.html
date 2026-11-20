@@ -518,7 +518,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver191";
+const APP_VER = "ver192";
 const APP_DATA = "20nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -8149,7 +8149,18 @@ function App(){
     firebase.initializeApp(firebaseConfig); dbRef.current = firebase.firestore();
     firebase.auth().onAuthStateChanged(function(user){
       if (user){
-        if (!isAdminEmail(user.email)){ setDenied(user.email || ""); firebase.auth().signOut(); return; }
+        /* ver192 (20/11/2026, Christian: «Sì, correggi»). L'accesso è UNO per browser, condiviso con Fogli ore: se in un'altra
+           scheda un operatore entra in Fogli ore, qui arriva il suo account. Prima Dipendenti faceva signOut() e così buttava
+           fuori anche l'operatore da Fogli ore. Ora mostra solo «Accesso non consentito» e NON chiude l'accesso. Le modifiche
+           non salvate dell'amministratore si tengono come per l'uscita fatta da un'altra scheda (ver184). */
+        if (!isAdminEmail(user.email)){
+          if (!uscitaVolutaRef.current && dirtyRef.current && stateRef.current && uidRef.current && !pendenteRef.current){
+            const p = { uid: uidRef.current, state: stateRef.current, quando: new Date() };
+            pendenteRef.current = p; setPendente(p);
+          }
+          uscitaVolutaRef.current = false;
+          setDenied(user.email || ""); setAuthState("out"); return;
+        }
         setDenied(""); uidRef.current = user.uid; setAuthState("in");
         /* ver184: rientro dopo un'uscita fatta da un'altra scheda, con modifiche non salvate */
         const pend = pendenteRef.current;
@@ -8933,6 +8944,7 @@ function App(){
       <div style={{ background:"#fee2e2", color:"#991b1b", borderRadius:"10px", padding:"14px", fontSize:"13px", fontWeight:"700", marginBottom:"16px" }}>
         Accesso non consentito per <b>{denied}</b>.<br/>Questa area è riservata all'amministrazione.
       </div>
+      <div style={{ fontSize:"13px", color:"#334155", marginBottom:"14px", lineHeight:1.4 }}>Questo browser è entrato con l'account di un operatore (per esempio in Fogli ore, in un'altra scheda): quella scheda resta aperta e funziona. Se qui accedi come amministratore, anche Fogli ore in questo browser passerà all'amministratore.</div>
       <button className="btn btn-blue" style={{ width:"100%", justifyContent:"center" }} onClick={function(){ setDenied(""); }}>Accedi con un altro account</button>
     </div>
   );

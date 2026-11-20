@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver191 · 20nov26 — approvata da Christian e portata su `main` il 20/11/2026** («Main per tutto»; contiene le ver188-190, mai pubblicate da sole). `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver192 · 20nov26, sul ramo di lavoro, da approvare** (su `main` c'è la ver191 · 20nov26, approvata il 20/11/2026: «Main per tutto»). `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -37,6 +37,18 @@ Banca ore, tetto annuo, contratti e export.
   Corretto anche un difetto **preesistente** che la nuova navigazione rendeva visibile: nella
   testata, in vista Anagrafica, compariva "📅 undefined 2026" (perché `mese` è `null` fuori dalle
   viste mensili); ora mostra "📇 Anagrafica".
+- 🔑 **ver192 (20/11/2026, sul ramo, da approvare) — UN OPERATORE CHE ENTRA IN FOGLI ORE NON VIENE PIÙ BUTTATO FUORI DA DIPENDENTI**
+  (Christian: «Sì, correggi», collaudo B8-06). L'accesso Firebase è **uno per browser** ed è condiviso con Fogli ore (stessa origine,
+  stessa apiKey). Prima, se in un'altra scheda un operatore entrava in Fogli ore, `onAuthStateChanged` di Dipendenti vedeva un non-admin
+  e faceva `firebase.auth().signOut()`: chiudeva l'accesso anche a Fogli ore. Ora mostra solo «Accesso non consentito» (con
+  `setAuthState("out")`, così non resta su «Caricamento…») e **non chiude niente**. Le modifiche non salvate dell'amministratore si
+  tengono come per l'uscita da un'altra scheda (ver184, `pendenteRef`) e tornano quando rientra. Sotto l'avviso una frase nuova (scritta
+  da Claude): «Questo browser è entrato con l'account di un operatore (per esempio in Fogli ore, in un'altra scheda): quella scheda resta
+  aperta e funziona. Se qui accedi come amministratore, anche Fogli ore in questo browser passerà all'amministratore.»
+  ⚠️ **Resta vero, ed è detto nell'avviso**: un browser ha un solo accesso; rientrando qui come amministratore anche Fogli ore passa
+  all'amministratore. Fogli ore **non è stato toccato**. Provato: `ic-01-b8` 11/11 (B8-06 ora superato), nuovo
+  `ic-02-b8b-sessione.cjs` 9/9 (cambio diretto di account, rientro dell'admin con la modifica non salvata, Dipendenti aperto dopo
+  l'operatore), `b1` 14/16, `b2` 15/17, `b3` 20/21, `b5` 12/12, `b10` 26/26, `ver184` (punto 5) e `ver187` 32/0, `a01` 32/0, `ver189` 34/0.
 - ➕ **ver191 (20/11/2026, su `main`)** — Christian: «Il totale va bene in centesimi ma aggiungi fra parentesi anche i sessantesimi».
   Nei due report A4 il **TOTALE** è ora «**101,50 (101,30)**»: centesimi e, fra parentesi, ore,minuti (`pdfHM`). Nella colonna stretta
   delle ordinarie del report paghe il totale va su due righe (misurato, leggibile). Prove: `ver189.cjs` 34/0 (Q7b, Q17), `a02` 50/0,
