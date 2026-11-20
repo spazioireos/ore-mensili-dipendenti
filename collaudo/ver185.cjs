@@ -1,10 +1,10 @@
 /* Collaudo ver185 (dati INVENTATI): ore sempre a TRE decimali, regola dei minuti a tre cifre, caratteri al 90%
-   nelle caselle, «ORE CONTRATTUALI» e «ORE DA FAR RISULTARE NEL TOTALE PER AVERE LE ORE CONTRATTUALI».
+   nelle caselle, «ORE CONTRATTUALI» e «ORE CHE DEVONO RISULTARE NEL TOTALE TEORICO MENSILE PER AVERE LE ORE CONTRATTUALI».
    Prima: bash collaudo/prepara-banco.sh ver184   (banco proprio, porta 8300, con la ver184 congelata per il confronto)
    Poi:   node collaudo/ver185.cjs                                                                                     */
 const K=require('./a00-comune.cjs'); const R=K.contatore('ver185'); const T=R.T; const fs=require('fs');
 const n=s=>parseFloat(String(s).replace(/\./g,'').replace(',','.'));
-const LUNGA='ORE DA FAR RISULTARE NEL TOTALE PER AVERE LE ORE CONTRATTUALI';
+const LUNGA='ORE CHE DEVONO RISULTARE NEL TOTALE TEORICO MENSILE PER AVERE LE ORE CONTRATTUALI';
 function feriali(y,m,val,sab){ const g={}; const nd=new Date(y,m,0).getDate(); for(let d=1;d<=nd;d++){ const wd=new Date(y,m-1,d).getDay(); if(wd===0) continue; if(wd===6 && !sab) continue; g[d]=val; } return g; }
 function ottSesti(){ const g=feriali(2026,10,'3,17'); g[5]='FERIE'; g[6]='7,66'; g[7]='1,6666'; g[8]='12,83'; g[9]='MAL'; return g; }
 const ST={ version:4, anni:[2026], locked:{}, costoComune:{}, dipendenti:[
@@ -24,7 +24,7 @@ const motore=(pg)=>pg.evaluate(()=>{ const st=JSON.parse(localStorage.getItem('s
   const V=await K.apri(br,{ver:'ver184',stato:ST}); const M4=await motore(V.pg); await V.ctx.close();
   const {ctx,pg,E}=await K.apri(br,{stato:ST}); const M5=await motore(pg);
   T('R01 targhetta '+K.APPV, (await pg.locator('.app-rev').first().innerText()).indexOf(K.APPV)!==-1);
-  T('R02 nessun numero cambia (TOT, Risultato, costo, ore, €/h, cedOre, Tetto, ore da far risultare, ORE CONTRATTUALI): identici alla ver184', JSON.stringify(M4)===JSON.stringify(M5), JSON.stringify(M5).slice(0,200));
+  T('R02 nessun numero cambia (TOT, Risultato, costo, ore, €/h, cedOre, Tetto, ore da far risultare, ORE MENSILI): identici alla ver184', JSON.stringify(M4)===JSON.stringify(M5), JSON.stringify(M5).slice(0,200));
   /* ===== lettura a tre cifre ===== */
   const L=await pg.evaluate(()=>[parseHour('3,167'),parseHour('3,333'),parseHour('2,250'),parseHour('0,833'),parseHour('7.667'),parseHour('3,16'),parseHour('1,6666'),R2(parseHour('0,167')*31,4)]);
   T('R03 «3,167» «3,333» «0,833» «7.667» si leggono come sesti esatti, come «3,17»; 2,250 = 2,25; 3,16 e 1,6666 restano come sono; 31 × 0,167 = 5,1667',
@@ -48,11 +48,11 @@ const motore=(pg)=>pg.evaluate(()=>{ const st=JSON.parse(localStorage.getItem('s
   const fp=[await S(6).inputValue(), await S(7).inputValue(), await S(8).inputValue(), await S(1).inputValue()]; const cls=[await S(6).getAttribute('class'), await S(7).getAttribute('class')];
   T('R12 celle già nei dati: 7,66 → 7,660 e 1,6666 → 1,667, ancora segnalate (fuoripasso); 12,83 → 12,833; 3,17 → 3,167', fp.join('|')==='7,660|1,667|12,833|3,167' && cls.every(c=>/fuoripasso/.test(c)), fp.join('|'));
   const head=(await K.carta(pg,'PROVA SESTI').locator('.emp-head').innerText()).replace(/\s+/g,' ');
-  T('R13 pillole a tre decimali: ORE SETT 19,000 · ORE CONTRATTUALI 82,500 · '+LUNGA+' 85,500', /ORE SETT: 19,000/.test(head) && /ORE CONTRATTUALI: 82,500/.test(head) && new RegExp(LUNGA+': 85,500').test(head), head.slice(0,240));
+  T('R13 pillole a tre decimali: ORE SETT 19,000 · ORE MENSILI 82,500 · '+LUNGA+' 85,500', /ORE SETT: 19,000/.test(head) && /ORE MENSILI: 82,500/.test(head) && new RegExp(LUNGA+': 85,500').test(head), head.slice(0,240));
   const totS=(await K.carta(pg,'PROVA SESTI').locator('.foot-tot b').innerText());
   T('R14 TOT calcolato a tre decimali', /^\d[\d.]*,\d{3}$/.test(totS.trim()), totS);
   const bx=(await K.carta(pg,'PROVA SESTI').locator('.ced-box').innerText()).replace(/\s+/g,' ');
-  T('R15 box: «ORE CONTRATTUALI 82,500 h», MAL 1 gg = 3,167 h (non 3,170), ferie 3,167', /ORE CONTRATTUALI 82,500 h/.test(bx) && /di cui ferie 3,167 h/.test(bx) && /3,167 h MAL 1 gg/.test(bx) && !/ORE MESE/.test(bx), bx.slice(0,260));
+  T('R15 box: «ORE CONTRATTUALI 82,500 h», MAL 1 gg = 3,167 h (non 3,170), ferie 3,167', /ORE MENSILI 82,500 h/.test(bx) && /di cui ferie 3,167 h/.test(bx) && /3,167 h MAL 1 gg/.test(bx) && !/ORE MESE/.test(bx), bx.slice(0,260));
   const tutto=async()=> (await pg.locator('body').innerText());
   let tx=await tutto(); T('R16 Tabellone: nessun «ORE MESE» e nessun «ORE CORRETTE DA DARE» a video', !/ORE MESE|ore mese|CORRETTE DA DARE|corrette da dare/i.test(tx));
   /* grafica */

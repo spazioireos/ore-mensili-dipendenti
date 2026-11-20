@@ -17,7 +17,7 @@ async function giro(br,ver,w){ const {ctx,pg,E}=await K.apri(br,{ver,w}); const 
       /* ver185: le ore si scrivono a TRE decimali e due diciture sono cambiate (scelte da Christian il 19/11/2026):
          si riportano le due diciture a com'erano, poi si confrontano le PAROLE identiche e i NUMERI uno per uno, con
          la tolleranza del mezzo centesimo (3,167 contro 3,17). Qualunque altra parola o numero diverso lo fa cadere. */
-      const dic=(t)=>t.replace(/ORE DA FAR RISULTARE NEL TOTALE PER AVERE LE ORE CONTRATTUALI/g,'ORE CORRETTE DA DARE').replace(/ORE CONTRATTUALI/g,'ORE MESE').replace(/ore contrattuali/g,'ore mese');
+      const dic=(t)=>t.replace(/ORE CHE DEVONO RISULTARE NEL TOTALE TEORICO MENSILE PER AVERE LE ORE CONTRATTUALI/g,'ORE CORRETTE DA DARE').replace(/ore che devono risultare nel totale teorico mensile per avere le ore contrattuali/g,'ore corrette da dare').replace(/ORE MENSILI/g,'ORE MESE').replace(/ore mensili/g,'ore mese').replace(/ORE DA FAR RISULTARE NEL TOTALE PER AVERE LE ORE CONTRATTUALI/g,'ORE CORRETTE DA DARE').replace(/ORE CONTRATTUALI/g,'ORE MESE').replace(/ore contrattuali/g,'ore mese');
       const RX=/\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d+(?:,\d+)?/g;
       const pezzi=(t)=>({ parole:dic(t).split(RX), numeri:(dic(t).match(RX)||[]).map(x=>parseFloat(x.replace(/\./g,'').replace(',','.'))) });
       if(w===1280){ const A2=pezzi(a.out[nome].testo), B2=pezzi(b.out[nome].testo); let dove='';

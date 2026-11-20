@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver192 · 20nov26 — approvata da Christian e portata su `main` il 20/11/2026** («Main»). `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver193 · 20nov26, sul ramo di lavoro, da approvare** (su `main` c'è la ver192 · 20nov26, approvata il 20/11/2026: «Main»). `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -37,6 +37,17 @@ Banca ore, tetto annuo, contratti e export.
   Corretto anche un difetto **preesistente** che la nuova navigazione rendeva visibile: nella
   testata, in vista Anagrafica, compariva "📅 undefined 2026" (perché `mese` è `null` fuori dalle
   viste mensili); ora mostra "📇 Anagrafica".
+- 🏷️ **ver193 (20/11/2026, sul ramo, da approvare) — DUE DICITURE CAMBIATE DA CHRISTIAN** (testuale: «In dipendenti ore
+  contrattuali diviene ore mensili e ORE DA FAR RISULTARE NEL TOTALE PER AVERE LE ORE CONTRATTUALI diviene ORE CHE DEVONO
+  RISULTARE NEL TOTALE TEORICO MENSILE PER AVERE LE ORE CONTRATTUALI»). Cambiano **solo le scritte**, nei punti della ver185:
+  «ORE CONTRATTUALI» → **«ORE MENSILI»** (pillola del Tabellone, riga del box «Da inserire a cedolino», sua spiegazione
+  «ore mensili meno le assenze pagate», frase del Tetto annuo, e nei report non più richiamati — box del report LUL, la sua
+  regola di colore, la colonna «Stipendio fisso (ore mensili)» del conto per le paghe) e la frase lunga →
+  **«ORE CHE DEVONO RISULTARE NEL TOTALE TEORICO MENSILE PER AVERE LE ORE CONTRATTUALI»** (pillola gialla, suo suggerimento,
+  due frasi del report ord/extra non più richiamato). ⚠️ Nella frase lunga «ORE CONTRATTUALI» **resta**, perché è scritta così
+  da Christian. ⚠️ Nessun calcolo, nessun nome interno, nessun export Excel toccato. La frase lunga va a capo sul telefono
+  (misurato a 390px, dentro lo schermo, niente scorrimento laterale). Attese aggiornate in `a02`, `a07` (normalizzazione delle
+  diciture), `a08`, `ver182`, `ver185`.
 - 🔑 **ver192 (20/11/2026, su `main` dal 20/11/2026) — UN OPERATORE CHE ENTRA IN FOGLI ORE NON VIENE PIÙ BUTTATO FUORI DA DIPENDENTI**
   (Christian: «Sì, correggi», collaudo B8-06). L'accesso Firebase è **uno per browser** ed è condiviso con Fogli ore (stessa origine,
   stessa apiKey). Prima, se in un'altra scheda un operatore entrava in Fogli ore, `onAuthStateChanged` di Dipendenti vedeva un non-admin

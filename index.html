@@ -518,7 +518,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver192";
+const APP_VER = "ver193";
 const APP_DATA = "20nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -2332,12 +2332,12 @@ function esportaPDF(state, pairs, opz){
             boxes.forEach(function(x){
               const B = x.B;
               const body = [
-                ["ORE CONTRATTUALI" + (B.parziale ? " (mese parziale)" : ""), h(B.monte), B.parziale ? "contratto in piedi per " + fmt2(B.fr*100) + "% del mese" : "le ore fisse della mensilizzazione"],
+                ["ORE MENSILI" + (B.parziale ? " (mese parziale)" : ""), h(B.monte), B.parziale ? "contratto in piedi per " + fmt2(B.fr*100) + "% del mese" : "le ore fisse della mensilizzazione"],
                 ["   di cui ferie", h(B.ferie.ore), B.ferie.gg + " gg × " + fmt3(B.q) + " h"],
                 ["   di cui altre assenze retribuite", h(B.altreTot.ore), B.altre.length ? B.altre.map(function(a){ return a.cod + " " + a.gg + " gg = " + fmt2(a.ore) + " h"; }).join(" · ") : "nessuna"],
                 ["   di cui festività godute", h(B.fest.ore), B.fest.gg ? B.fest.gg + " gg × " + fmt3(B.qF) + " h (" + gl(B.fest.giorni) + ")" : "nessuna"],
                 ["   di cui permessi retribuiti", h(B.perm.ore), B.perm.ore > 0.004 ? "" : "nessuno"],
-                ["   di cui ore lavorate ordinarie", h(B.ordC), "ore contrattuali meno le assenze pagate" + (B.tratt > 0.004 ? " e le ore da trattenere" : "")]
+                ["   di cui ore lavorate ordinarie", h(B.ordC), "ore mensili meno le assenze pagate" + (B.tratt > 0.004 ? " e le ore da trattenere" : "")]
               ];
               if (B.tratt > 0.004) body.push(["   di cui ore non fatte, da trattenere", h(B.tratt), "solo assenze ingiustificate (ASS.ING) e aspettative non pagate (ASP 0h)"]);
               body.push(["ORE SUPPLEMENTARI (Risultato del mese)", B.supp > 0.004 ? "+" + h(B.supp) : h(0), B.supp > 0.004 ? "da pagare in più, maggiorate" : ((B.tratt + B.sotto) > 0.004 ? "nessuna: mancano " + h(B.tratt + B.sotto) + " alle ore previste (" + h(B.previste) + ")" : "in pari")]);
@@ -2357,7 +2357,7 @@ function esportaPDF(state, pairs, opz){
                 didParseCell: function(data){
                   if (data.section !== "body") return;
                   const lbl = String(data.row.raw[0] || "");
-                  if (/^(ORE CONTRATTUALI|ORE SUPPLEMENTARI|ORE SOTTO|FESTIVITÀ NON GODUTE)/.test(lbl)){ data.cell.styles.fillColor = [238,245,252]; data.cell.styles.textColor = [31,78,130]; data.cell.styles.fontStyle = "bold"; }
+                  if (/^(ORE MENSILI|ORE SUPPLEMENTARI|ORE SOTTO|FESTIVITÀ NON GODUTE)/.test(lbl)){ data.cell.styles.fillColor = [238,245,252]; data.cell.styles.textColor = [31,78,130]; data.cell.styles.fontStyle = "bold"; }
                 }
               });
               yT = doc.lastAutoTable.finalY + 5;
@@ -2768,7 +2768,7 @@ function esportaPDFConto(state, pairs){
     doc.setFontSize(10); doc.setTextColor(51,65,85);
     doc.text(MONTH_LABEL[m-1] + " " + anno + ": " + gnd + " giorni lavorativi (da lunedì a sabato) · quota del giorno = ore settimanali ÷ "
       + (gsK.length === 1 ? String(gsK[0]).replace(".", ",") : "i giorni a settimana della scheda") + " · solo dipendenti mensilizzati", 14, 19);
-    const head = [["Dipendente", "Ore settim.", "Stipendio fisso (ore contrattuali)", "Ore previste nel mese", "- Assenze pagate (h)", "= Ore da lavorare",
+    const head = [["Dipendente", "Ore settim.", "Stipendio fisso (ore mensili)", "Ore previste nel mese", "- Assenze pagate (h)", "= Ore da lavorare",
                    "Ore lavorate", "SUPPLEMENTARI da pagare", "Ore sotto l'orario (non trattenute)", "Da trattenere (ASS.ING / ASP 0h)",
                    "Festività non godute (h) in più", "Assenze"]];
     const body = [];
@@ -3134,7 +3134,7 @@ function esportaPDFOrdExtra(state, pairs){
       doc.setFontSize(11.5); doc.setFont(undefined,"normal"); doc.setTextColor(15,39,64);
       doc.text(dp.nome + "   ·   " + MONTH_LABEL[m-1] + " " + anno, 14, 21);
       doc.setFontSize(8.5); doc.setTextColor(90,90,90);
-      doc.text("Quota giornaliera: " + fh(oreSettAt(dp, anno, m)) + " h settimanali ÷ " + String(ggSettPersona(dp)).replace(".", ",") + " giorni = " + fh(quota) + " h al giorno. L'ordinario raggiunge le ORE DA FAR RISULTARE NEL TOTALE PER AVERE LE ORE CONTRATTUALI del mese (" + fh(retrib) + " h = quota × " + giorniRetribuibiliInForza(dp, anno, m, rec) + " giorni lavorativi): le assenze retribuite, le festività godute e i permessi orari riempiono la quota. L'extra è la somma dei singoli giorni oltre la quota (nessuna compensazione).", 14, 26, { maxWidth: 182 });
+      doc.text("Quota giornaliera: " + fh(oreSettAt(dp, anno, m)) + " h settimanali ÷ " + String(ggSettPersona(dp)).replace(".", ",") + " giorni = " + fh(quota) + " h al giorno. L'ordinario raggiunge le ORE CHE DEVONO RISULTARE NEL TOTALE TEORICO MENSILE PER AVERE LE ORE CONTRATTUALI del mese (" + fh(retrib) + " h = quota × " + giorniRetribuibiliInForza(dp, anno, m, rec) + " giorni lavorativi): le assenze retribuite, le festività godute e i permessi orari riempiono la quota. L'extra è la somma dei singoli giorni oltre la quota (nessuna compensazione).", 14, 26, { maxWidth: 182 });
       doc.autoTable({
         startY: 36,
         head: [["Giorno","Ordinario (h)","Extra (h)","Assenze / permessi"]],
@@ -3153,7 +3153,7 @@ function esportaPDFOrdExtra(state, pairs){
       let y = doc.lastAutoTable.finalY + 7;
       if (y > 272){ doc.addPage(); y = 18; }
       doc.setFontSize(10.5); doc.setFont(undefined,"bold"); doc.setTextColor(15,39,64);
-      doc.text("Ore ordinarie del mese: " + fh(totOrd) + " h   ·   ore da far risultare nel totale per avere le ore contrattuali" + (parziale ? " (in forza)" : "") + ": " + fh(retrib) + " h" + (sottoMonte ? ("   —   mancano " + fh(R2(retrib - totOrd, 2)) + " h (ha lavorato meno)") : ""), 14, y, { maxWidth: 182 });
+      doc.text("Ore ordinarie del mese: " + fh(totOrd) + " h   ·   ore che devono risultare nel totale teorico mensile per avere le ore contrattuali" + (parziale ? " (in forza)" : "") + ": " + fh(retrib) + " h" + (sottoMonte ? ("   —   mancano " + fh(R2(retrib - totOrd, 2)) + " h (ha lavorato meno)") : ""), 14, y, { maxWidth: 182 });
       y += 6;
       doc.text("Ore EXTRA del mese: " + fh(totExtra) + " h   ·   ore effettivamente rese (lavorate): " + fh(resLav) + " h", 14, y);
       y += 6; doc.setFont(undefined,"normal"); doc.setFontSize(9); doc.setTextColor(40,40,40);
@@ -3398,8 +3398,8 @@ function EmployeeCard(props){
         })()}
         {livelloAt(dp,y,m) ? <span className="pill">Liv. {livelloAt(dp,y,m)}</span> : null}
         <span className="pill">ORE SETT: {fmtH(oreSettAt(dp,y,m))}</span>
-        <span className="pill" title="Monte ore mensile: 165 h per chi fa 38 h/settimana, in proporzione per gli altri">ORE CONTRATTUALI: {fmtH(monteFissoMese(dp,y,m))}</span>
-        <span className="pill" style={{ background:"#fde047", color:"#12324f", fontWeight:800 }} title={"Ore da far risultare nel totale per avere le ore contrattuali, nel mese = ore settimanali ÷ giorni a settimana (" + fmt3(quotaGiorno(dp,y,m)) + " h al giorno) × giorni lavorativi in forza (" + giorniRetribuibiliInForza(dp,y,m,rec) + "). È la soglia: lo straordinario è solo ciò che la supera."}>ORE DA FAR RISULTARE NEL TOTALE PER AVERE LE ORE CONTRATTUALI: {fmtH(oreRetribuibili(dp,y,m,rec))}</span>
+        <span className="pill" title="Monte ore mensile: 165 h per chi fa 38 h/settimana, in proporzione per gli altri">ORE MENSILI: {fmtH(monteFissoMese(dp,y,m))}</span>
+        <span className="pill" style={{ background:"#fde047", color:"#12324f", fontWeight:800 }} title={"Ore che devono risultare nel totale teorico mensile per avere le ore contrattuali, nel mese = ore settimanali ÷ giorni a settimana (" + fmt3(quotaGiorno(dp,y,m)) + " h al giorno) × giorni lavorativi in forza (" + giorniRetribuibiliInForza(dp,y,m,rec) + "). È la soglia: lo straordinario è solo ciò che la supera."}>ORE CHE DEVONO RISULTARE NEL TOTALE TEORICO MENSILE PER AVERE LE ORE CONTRATTUALI: {fmtH(oreRetribuibili(dp,y,m,rec))}</span>
         <span className="pill">{contrLabelAt(dp,y,m)}</span>
         {orarioTempAt(dp,y,m)!=null ? <span className="pill" style={{ background:"#fde68a", color:"#78350f" }}>⏱ orario temp. {fmtH(orarioTempAt(dp,y,m))}h</span> : null}
         {(function(){ const ce=cessEffStr(dp); if(!ce) return null; const now=new Date(); const tInt=now.getFullYear()*10000+(now.getMonth()+1)*100+now.getDate(); const ceInt=ymdIt(ce); return (ceInt && ceInt < tInt) ? <span className="pill cess">CESSATO {ce}</span> : <span className="pill" style={{ background:"#fbe0ec", color:"#8A2358" }}>fino al {ce}</span>; })()}
@@ -3664,12 +3664,12 @@ function EmployeeCard(props){
           return <div className="ced-box">
             <div className="ced-head">🧾 DA INSERIRE A CEDOLINO — {MESE}</div>
             <table className="ced-tab"><tbody>
-              <tr className="top"><td className="l">ORE CONTRATTUALI{B.parziale ? " (mese parziale)" : ""}</td><td className="n">{h(B.monte)}</td><td className="d">{B.parziale ? "contratto in piedi per " + fmt2(B.fr*100) + "% del mese" : "le ore fisse della mensilizzazione"}</td></tr>
+              <tr className="top"><td className="l">ORE MENSILI{B.parziale ? " (mese parziale)" : ""}</td><td className="n">{h(B.monte)}</td><td className="d">{B.parziale ? "contratto in piedi per " + fmt2(B.fr*100) + "% del mese" : "le ore fisse della mensilizzazione"}</td></tr>
               <tr className="sub"><td className="l">di cui ferie</td><td className="n">{h(B.ferie.ore)}</td><td className="d">{B.ferie.gg} gg × {fmt3(B.q)} h — {ene(B.ferie.oreE, B.ferie.oreNE)}</td></tr>
               <tr className="sub"><td className="l">di cui altre assenze retribuite</td><td className="n">{h(B.altreTot.ore)}</td><td className="d">{B.altre.length ? B.altre.map(function(a){ return a.cod + " " + a.gg + " gg (erosive " + fmtH(a.oreE) + " · non erosive " + fmtH(a.oreNE) + ")"; }).join(" · ") : "nessuna"}{B.altre.length > 1 ? " — in tutto " + ene(B.altreTot.oreE, B.altreTot.oreNE) : ""}</td></tr>
               <tr className="sub"><td className="l">di cui festività godute</td><td className="n">{h(B.fest.ore)}</td><td className="d">{B.fest.gg ? B.fest.gg + " gg × " + fmt3(B.qF) + " h (" + gl(B.fest.giorni) + ") — " + ene(B.fest.oreE, B.fest.oreNE) : "nessuna"}</td></tr>
               <tr className="sub"><td className="l">di cui permessi retribuiti</td><td className="n">{h(B.perm.ore)}</td><td className="d">{B.perm.ore > 0.004 ? ene(B.perm.oreE, B.perm.oreNE) : "nessuno"}</td></tr>
-              <tr className="sub"><td className="l">di cui ore lavorate ordinarie</td><td className="n">{h(B.ordC)}</td><td className="d">ore contrattuali meno le assenze pagate{B.tratt > 0.004 ? " e le ore da trattenere" : ""}</td></tr>
+              <tr className="sub"><td className="l">di cui ore lavorate ordinarie</td><td className="n">{h(B.ordC)}</td><td className="d">ore mensili meno le assenze pagate{B.tratt > 0.004 ? " e le ore da trattenere" : ""}</td></tr>
               {B.tratt > 0.004 ? <tr className="sub"><td className="l">di cui ore non fatte, da trattenere</td><td className="n">{h(B.tratt)}</td><td className="d">solo assenze ingiustificate (ASS.ING) e aspettative non pagate (ASP 0h)</td></tr> : null}
               <tr className="top"><td className="l">ORE SUPPLEMENTARI (Risultato del mese)</td><td className="n">{B.supp > 0.004 ? "+" + h(B.supp) : h(0)}</td><td className="d">{B.supp > 0.004 ? "da pagare in più, maggiorate" : ((B.tratt + B.sotto) > 0.004 ? "nessuna: mancano " + h(B.tratt + B.sotto) + " alle ore previste (" + h(B.previste) + ")" : "in pari")}</td></tr>
               {B.sotto > 0.004 ? <tr className="top"><td className="l">ORE SOTTO L'ORARIO, non trattenute</td><td className="n">{h(B.sotto)}</td><td className="d">mancano alle ore previste del mese, ma senza una causa (ASS.ING / ASP 0h) non si trattengono: lo stipendio fisso resta intero</td></tr> : null}
@@ -3771,7 +3771,7 @@ function EmployeeCard(props){
                 <span style={{ color:"#64748b" }}> — è l'assegnazione; le ore consumate sono complessive.</span>
               </div>;
             })()}
-            <div className="cong-res">Si consuma con le <b>ore pagate a cedolino</b> (per i mensilizzati da ottobre 2026: ore contrattuali meno le assenze pagate, più o meno il Risultato del mese; prima, le <b>ore fatte</b> dal foglio), con <b>ferie e malattia</b>, con le <b>festività godute</b> e con i <b>permessi retribuiti</b>. Periodo: {per}. Le giornate di assenza o festività <b>spente col clic</b> (servizio chiuso) non consumano. <span style={{ fontSize:"11px", color:"#9a3412" }}>Numeri a 3 decimali.</span></div>
+            <div className="cong-res">Si consuma con le <b>ore pagate a cedolino</b> (per i mensilizzati da ottobre 2026: ore mensili meno le assenze pagate, più o meno il Risultato del mese; prima, le <b>ore fatte</b> dal foglio), con <b>ferie e malattia</b>, con le <b>festività godute</b> e con i <b>permessi retribuiti</b>. Periodo: {per}. Le giornate di assenza o festività <b>spente col clic</b> (servizio chiuso) non consumano. <span style={{ fontSize:"11px", color:"#9a3412" }}>Numeri a 3 decimali.</span></div>
           </div>;
         })()}
       </div>

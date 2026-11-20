@@ -39,8 +39,8 @@ const n=s=>parseFloat(String(s).replace(/\./g,'').replace(',','.'));
   T('A02.18 TOT calcolato = somma delle celle a video', Math.abs((await totV('GAMMA'))-somma)<0.005, (await totV('GAMMA'))+' vs '+somma);
   /* ALFA ottobre: numeri attesi ricalcolati a mano (38 h/6 gg = 6,3333; 27 gg non domenicali; 24 gg × 6,5 = 156; 3 assenze = 19) */
   const A=K.carta(pg,'ALFA PROVA'); const headA=await A.locator('.emp-head').innerText();
-  T('A02.19 pillola ORE DA FAR RISULTARE NEL TOTALE PER AVERE LE ORE CONTRATTUALI ALFA = 38/6×27 = 171,000', /ORE DA FAR RISULTARE NEL TOTALE PER AVERE LE ORE CONTRATTUALI: 171,000( |$)/.test(headA.replace(/\s+/g,' ')), headA.replace(/\s+/g,' ').slice(0,200));
-  T('A02.20 ORE CONTRATTUALI ALFA 165', /ORE CONTRATTUALI: 165,000/.test(headA));
+  T('A02.19 pillola ORE CHE DEVONO RISULTARE NEL TOTALE TEORICO MENSILE PER AVERE LE ORE CONTRATTUALI ALFA = 38/6×27 = 171,000', /ORE CHE DEVONO RISULTARE NEL TOTALE TEORICO MENSILE PER AVERE LE ORE CONTRATTUALI: 171,000( |$)/.test(headA.replace(/\s+/g,' ')), headA.replace(/\s+/g,' ').slice(0,200));
+  T('A02.20 ORE MENSILI ALFA 165', /ORE MENSILI: 165,000/.test(headA));
   T('A02.21 TOT calcolato ALFA = 156,00', (await totV('ALFA'))===156);
   const teor=n((await A.locator('.foot-teor b').innerText()));
   T('A02.22 TOT teorico ALFA = 156 + 3 × 6,333 = 175,000', Math.abs(teor-175)<0.002, teor);
@@ -53,7 +53,7 @@ const n=s=>parseFloat(String(s).replace(/\./g,'').replace(',','.'));
   await ab.click(); await pg.waitForTimeout(300); T('A02.25 secondo clic: torna erosivo', Math.abs(n(await A.locator('.foot-teor b').innerText())-teor)<0.002);
   /* box cedolino */
   const box=(await A.locator('.ced-box').innerText()).replace(/\s+/g,' ');
-  const bm=/ORE CONTRATTUALI ([\d.,]+) h.*di cui ferie ([\d.,]+) h.*altre assenze retribuite ([\d.,]+) h.*festività godute ([\d.,]+) h.*permessi retribuiti ([\d.,]+) h.*ore lavorate ordinarie ([\d.,]+) h.*ORE SUPPLEMENTARI \(Risultato del mese\) \+?([\d.,]+) h/.exec(box);
+  const bm=/ORE MENSILI ([\d.,]+) h.*di cui ferie ([\d.,]+) h.*altre assenze retribuite ([\d.,]+) h.*festività godute ([\d.,]+) h.*permessi retribuiti ([\d.,]+) h.*ore lavorate ordinarie ([\d.,]+) h.*ORE SUPPLEMENTARI \(Risultato del mese\) \+?([\d.,]+) h/.exec(box);
   T('A02.26 box cedolino ALFA: ORE MESE 165 = ferie + altre + festività + permessi + ordinarie; supplementari = Risultato (4,00)', bm && Math.abs(n(bm[1])-165)<0.01 && Math.abs(n(bm[2])+n(bm[3])+n(bm[4])+n(bm[5])+n(bm[6])-165)<0.015 && Math.abs(n(bm[7])-4)<0.005, bm&&bm.slice(1).join('/'));
   T('A02.27 box: FESTIVITÀ NON GODUTE 1 gg (il 4, domenica)', /FESTIVITÀ NON GODUTE, a sé [\d,]+ h 1 gg/.test(box), box.slice(box.indexOf('FESTIVITÀ NON'),box.indexOf('FESTIVITÀ NON')+60));
   T('A02.28 nessun box per GAMMA (non mensilizzata)', await K.carta(pg,'GAMMA PROVA').locator('.ced-box').count()===0);
