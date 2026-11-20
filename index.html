@@ -134,6 +134,21 @@
   .teor-fest.no-ero { color:#94a3b8; text-decoration:line-through; }
   .teor-abs.no-ero { color:#94a3b8; text-decoration:line-through; }
   .teor-abs.no-ero:hover { background:#e2e8f0; }
+  /* ver197 (20/11/2026, Christian: «L'erosione dove la segno? Rendi più visibile»): il segno sotto la cella diventa una
+     linguetta vera — «E» (erosiva, arancio pieno) / «NE» (non erosiva, grigia tratteggiata). Solo aspetto: stesso clic. */
+  table.cal .teor-abs, table.cal .teor-fest { font-size:10px; font-weight:900; border:1.5px solid #ea580c; background:#ffedd5; color:#7c2d12;
+    border-radius:4px; padding:1px 2px; margin-top:2px; white-space:nowrap; box-shadow:0 1px 0 rgba(0,0,0,.12); }
+  table.cal .teor-fest { border-color:#2563eb; background:#dbeafe; color:#1e3a8a; }
+  table.cal .teor-abs:hover { background:#fdba74; }  table.cal .teor-fest:hover { background:#bfdbfe; }
+  table.cal .teor-abs.no-ero, table.cal .teor-fest.no-ero { border:1.5px dashed #94a3b8; background:#f1f5f9; color:#64748b; box-shadow:none; }
+  .ero-tag { font-weight:900; margin-right:2px; }
+  .ero-legenda { font-size:12.5px; color:#7c2d12; background:#fff7ed; border:1px solid #fdba74; border-radius:6px; padding:4px 9px; margin:4px 14px 0; line-height:1.35; }
+  .ero-legenda .e { display:inline-block; font-size:12.5px; font-weight:900; border:1.5px solid #ea580c; background:#ffedd5; color:#7c2d12; border-radius:4px; padding:0 4px; }
+  .ero-legenda .ne { display:inline-block; font-size:12.5px; font-weight:900; border:1.5px dashed #94a3b8; background:#f1f5f9; color:#64748b; border-radius:4px; padding:0 4px; }
+  /* ver197 (Christian): capsula «Devi riempire ancora per» = ore che devono risultare − TOT teorico */
+  .foot-line .foot-ancora { font-size:12.5px; font-weight:800; border-radius:6px; padding:2px 8px; border:1.5px solid #d97706; background:#fef3c7; color:#78350f; }
+  .foot-line .foot-ancora b { font-size:17px; font-weight:900; }
+  .foot-line .foot-ancora.fatto { border-color:#15803d; background:#dcfce7; color:#14532d; }
   .provv-lbl { display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:700; color:#92400e; background:#fffbeb; border:1px solid #fcd34d; border-radius:6px; padding:3px 8px; cursor:pointer; }
   .provv-base { font-size:12px; font-weight:700; border:1px solid #fcd34d; border-radius:6px; padding:3px 6px; background:#fff; }
   .conguaglio-warn { display:inline-flex; align-items:center; gap:8px; font-size:13px; font-weight:800; color:#7c2d12; background:#ffedd5; border:2px solid #fb923c; border-radius:8px; padding:4px 10px; }
@@ -518,7 +533,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver196";
+const APP_VER = "ver197";
 const APP_DATA = "20nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -3576,7 +3591,7 @@ function EmployeeCard(props){
                         : ("Giornata NON erosiva (servizio chiuso): non brucia niente. Clic per rimetterla erosiva.")}
                       onClick={function(){ if(!blocked) props.onEro(dp.id, d, !ero); }}
                       onKeyDown={function(e){ if(!blocked && (e.key==="Enter"||e.key===" ")){ e.preventDefault(); props.onEro(dp.id, d, !ero); } }}
-                      >{fmt3(quotaDay)}</div>;
+                      >{<span className="ero-tag">{ero ? "E" : "NE"}</span>}{fmt3(quotaDay)}</div>;
                   })() : null}
                   {/* ver172 (15/11/2026, Christian: «scrivi sempre le ore in piccolo sotto le assenze retribuite perché
                       concorrono a formare le ore dovute mensili»): anche la FESTIVITÀ GODUTA — giorno rosso non domenicale,
@@ -3595,7 +3610,7 @@ function EmployeeCard(props){
                             : ("Festività goduta NON erosiva (servizio chiuso): concorre alle ore dovute del mese ma non brucia niente dal Tetto annuo. Clic per rimetterla erosiva.")}
                           onClick={function(){ if(!blocked) props.onEro(dp.id, d, !ero); }}
                           onKeyDown={function(e){ if(!blocked && (e.key==="Enter"||e.key===" ")){ e.preventDefault(); props.onEro(dp.id, d, !ero); } }}
-                          >{fmt3(props.festQuota)}</div>;
+                          >{<span className="ero-tag">{ero ? "E" : "NE"}</span>}{fmt3(props.festQuota)}</div>;
                       })()
                     : null}
                 </td>
@@ -3605,9 +3620,16 @@ function EmployeeCard(props){
           </tr>
         </tbody></table>
       </div>
+      {(oreErose > 0 || Object.keys(rec.giorni || {}).some(function(k){ const v = String(rec.giorni[k]||"").trim(); return CODE_SET[v] && v !== "--" && v !== "AN" && copreOre(v); }) || (props.festQuota > 0 && (props.festGG||0) > 0))
+        ? <div className="ero-legenda">🎯 <b>Erosione del massimale:</b> sotto ogni assenza retribuita e festività goduta c'è la linguetta <span className="e">E</span> = erosiva (consuma il massimale). <b>Cliccala</b> se quel giorno il servizio era chiuso: diventa <span className="ne">NE</span> = non erosiva. Per un permesso orario: nella sua finestra, spunta «Quel giorno il servizio era chiuso». Serve 💾 per salvare.</div>
+        : null}
       <div className="foot-line">
         <span className="foot-tot">TOT calcolato: <b>{fmtH(tot)}</b></span>
         <span className="foot-teor" title={TEOR_TITLE}>TOT teorico (assenze e festività godute erosive + permessi retribuiti): <b>{fmt3(totTeor)}</b></span>
+        {/* ver197 (20/11/2026, Christian): «aggiungi la capsula "Devi riempire ancora per" e ci scrivi il risultato positivo o
+            negativo dato da ORE CHE DEVONO RISULTARE NEL TOTALE TEORICO MENSILE PER AVERE LE ORE CONTRATTUALI meno quel TOT teorico» */}
+        {(function(){ const dov = oreRetribuibili(dp, y, m, rec); if (!(dov > 0)) return null; const r = R2(dov - totTeor, 3);
+          return <span className={"foot-ancora" + (r > 0.0005 ? "" : " fatto")} title={"Ore che devono risultare nel totale teorico mensile per avere le ore contrattuali (" + fmt3(dov) + ") meno il TOT teorico (" + fmt3(totTeor) + "). Positivo = ore ancora da riempire; negativo = già oltre."}>Devi riempire ancora per: <b>{(r > 0.0005 ? "+" : "") + fmt3(r)}</b></span>; })()}
         <label>Ore dichiarate (uso interno):</label>
         <input className="dich-in" value={rec.dich || ""} placeholder="—" disabled={mLocked}
           onFocus={selTuttoFocus} onMouseDown={selTuttoMouseDown} onMouseUp={selTuttoMouseUp}

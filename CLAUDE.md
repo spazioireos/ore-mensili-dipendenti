@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver196 · 20nov26 — sul ramo di lavoro, da approvare** (su `main` c'è la ver195, approvata il 20/11/2026 insieme alla ver194). `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver197 · 20nov26 — sul ramo di lavoro, da approvare insieme alla ver196** (su `main` c'è la ver195, approvata il 20/11/2026 insieme alla ver194). `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -37,6 +37,23 @@ Banca ore, tetto annuo, contratti e export.
   Corretto anche un difetto **preesistente** che la nuova navigazione rendeva visibile: nella
   testata, in vista Anagrafica, compariva "📅 undefined 2026" (perché `mese` è `null` fuori dalle
   viste mensili); ora mostra "📇 Anagrafica".
+- 🎯 **ver197 (20/11/2026, ramo di lavoro) — LA CAPSULA «DEVI RIEMPIRE ANCORA PER» E L'EROSIONE BEN VISIBILE** (Christian:
+  «L'erosione dove la segno? Rendi più visibile» e «aggiungi la capsula "Devi riempire ancora per" e ci scrivi il risultato positivo o
+  negativo dato da ORE CHE DEVONO RISULTARE NEL TOTALE TEORICO MENSILE PER AVERE LE ORE CONTRATTUALI meno quel TOT teorico»).
+  - **Capsula** `.foot-ancora` accanto al TOT teorico, nella riga in fondo alla scheda: `oreRetribuibili(dp,y,m,rec) − totTeor`, a 3
+    decimali, col «+» se positivo; ambra se c'è ancora da riempire, verde (`.fatto`) se zero o negativo. Non compare se le ore che devono
+    risultare sono 0 (mese fuori contratto). ⚠️ **Segue alla lettera la formula di Christian**: il TOT teorico conta solo le assenze e
+    festività **erosive**, quindi una ferie o una festività segnata **NE** (servizio chiuso) resta «da riempire» anche se è pagata
+    (misurato: dicembre 2026 con una ferie NE e una festività NE → «+6,000» mentre il Risultato del mese dice «in pari»). Segnalato.
+  - **Erosione**: il numerino sotto le assenze retribuite e le festività godute (`.teor-abs`/`.teor-fest`, ver77/ver173) diventa una
+    **linguetta**: «E» + ore, arancio pieno con bordo (blu per le festività) = erosiva; «NE» + ore, grigia tratteggiata = non erosiva.
+    Stesso clic di prima, nessun calcolo toccato. Sotto la griglia, solo nei mesi con assenze retribuite o festività godute, la riga
+    `.ero-legenda` («🎯 Erosione del massimale: … Cliccala se quel giorno il servizio era chiuso: diventa NE … Per un permesso orario:
+    nella sua finestra, spunta «Quel giorno il servizio era chiuso». Serve 💾 per salvare.»).
+  - ⚠️ Diciture nuove, scritte da Claude: «E»/«NE», la riga di spiegazione, il suggerimento della capsula («Devi riempire ancora per» è
+    di Christian). La linguetta sta a 10px **dentro la griglia** (eccezione dichiarata); la tabella del mese non si allarga (2253 px,
+    misurato), a 390px niente scorrimento laterale.
+  - **Provato**: `collaudo/ver197.cjs` **15/0** (confronto con la ver196 congelata).
 - ✂️ **ver196 (20/11/2026, ramo di lavoro) — ASS.ING E ASP 0h VALGONO SEMPRE LA QUOTA DEL GIORNO, SENZA COMPENSAZIONE** (Christian:
   «Nel report le assenze ingiustificate o l'Asp 0h deve valere le ore contrattuali: se io ho 18 ore settimanali un Asp 0h o un Ass ing
   deve valere 3», e alla domanda: **«Sì, nessuna compensazione»**). Prima (ver182) si tratteneva `min(ore mancanti, ore ASS.ING/ASP)`:
