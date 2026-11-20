@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver195 · 20nov26 — approvata da Christian e portata su `main` il 20/11/2026 insieme alla ver194** («Main»). `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver196 · 20nov26 — sul ramo di lavoro, da approvare** (su `main` c'è la ver195, approvata il 20/11/2026 insieme alla ver194). `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -37,6 +37,20 @@ Banca ore, tetto annuo, contratti e export.
   Corretto anche un difetto **preesistente** che la nuova navigazione rendeva visibile: nella
   testata, in vista Anagrafica, compariva "📅 undefined 2026" (perché `mese` è `null` fuori dalle
   viste mensili); ora mostra "📇 Anagrafica".
+- ✂️ **ver196 (20/11/2026, ramo di lavoro) — ASS.ING E ASP 0h VALGONO SEMPRE LA QUOTA DEL GIORNO, SENZA COMPENSAZIONE** (Christian:
+  «Nel report le assenze ingiustificate o l'Asp 0h deve valere le ore contrattuali: se io ho 18 ore settimanali un Asp 0h o un Ass ing
+  deve valere 3», e alla domanda: **«Sì, nessuna compensazione»**). Prima (ver182) si tratteneva `min(ore mancanti, ore ASS.ING/ASP)`:
+  le ore fatte in più negli altri giorni coprivano l'assenza (misurato: 18 h/sett., ASS.ING il 12 e 6 h il 13 → nel report «0,00»;
+  ASP 0h il 12 e 5 h il 13 → «1,00»). Ora, **solo nei mesi a busta mensilizzata** (`meseCedolinoTetto`), in `oreSuppPeriodo`:
+  `tratt` = ore ASS.ING/ASP 0h **intere** (giorni × quota del giorno), la soglia delle supplementari scende di quelle ore
+  (`supp = max(0, rese − (lav − nrOre))`) e `sotto = max(0, mancanti − nrOre)`. Esempi: ASS.ING + 6 h il giorno dopo → da trattenere
+  3, supplementari 3; ASP 0h + 5 h → da trattenere 3, supplementari 2; solo ASS.ING → come prima. Seguono da soli il report per le
+  paghe, il riquadro «Da inserire a cedolino», `cedOre` per USOINT, il Costo orario e il massimale. **Il «Risultato del mese» del
+  Tabellone resta il vero** (`bancaMeseA` non toccata); nel suo riquadro la pastiglia «da trattenere» compare anche col mese in pari e
+  dice «a cedolino supplementari X h (le ASS.ING / ASP 0h non si compensano con le ore in più)». Nel riquadro e nel box la riga delle
+  supplementari aggiunge la stessa parentesi. ⚠️ Diciture nuove, scritte da Claude: quelle due parentesi. Fuori dai mesi mensilizzati
+  (criterio orario) **niente cambia**. **Sui dati veri (backup del 19/11) nessuna cella ASS.ING/ASP 0h: nessun numero cambia oggi.**
+  **Provato**: `collaudo/ver196.cjs` **17/0** (confronto con la ver195 congelata).
 - 🚫 **ver195 (20/11/2026, su `main` dal 20/11/2026) — NEL REPORT PER LE PAGHE MAI ORE SUI GIORNI AN** (Christian: «Perché mi segni
   su AN le ore nel report? AN = giorno lavorativo a 0 ore», poi alla domanda: **«Mai su AN»**). In `esportaPDFPaghe`, quando il
   cedolino mensilizzato paga più ore ordinarie di quelle lavorate (ore sotto l'orario non trattenute), la differenza andava sui
