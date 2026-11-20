@@ -1,4 +1,4 @@
-/* Collaudo ver189 (dati INVENTATI): «🖨️ Report PDF A4 per le paghe» a tre per pagina, A4 orizzontale, senza legende,
+/* Collaudo ver189/ver190 (dati INVENTATI): «🖨️ Report PDF A4 per le paghe» a tre per pagina, A4 orizzontale, senza legende,
    righe in ORE,MINUTI e TOTALE in centesimi (Christian, 20/11/2026: «nei report le ore vanno in sessantesimi»).
    Rifà sul formato nuovo i controlli numerici di ver183 (P6, P8, P9, P10, P11), che leggevano il formato vecchio.
    Prima: bash collaudo/prepara-banco.sh ver188. Poi: node collaudo/ver189.cjs */
@@ -18,7 +18,7 @@ const ST={ anni:[2026], dipendenti:[
   {id:'e',nome:'PROVA CINQUE',oreSett:20,livello:'C1',tipoContratto:'indeterminato',mensilizzato:true,mensilizzatoDal:'01/10/2026',dataAssunzione:'01/01/2020',ana:{ggSettCosto:'5'}},
   {id:'p',nome:'PROVA QUINDICI',oreSett:15,livello:'D1',tipoContratto:'indeterminato',mensilizzato:true,mensilizzatoDal:'01/10/2026',dataAssunzione:'01/01/2020'},
   {id:'o',nome:'PROVA ORARIO',oreSett:15,livello:'D1',tipoContratto:'indeterminato',mensilizzato:false,dataAssunzione:'01/01/2020'}],
-  dati:{'2026-10':{ a:{giorni:ottA()}, b:{giorni:ottB()}, c:{giorni:ottC()}, e:{giorni:{1:'4',2:'4'}}, p:{giorni:ottP()}, o:{giorni:ottP()} }, '2026-09':{ b:{giorni:{1:'3'}}, p:{giorni:{1:'3',2:'1'}} }}, costoComune:{} };
+  dati:{'2026-10':{ a:{giorni:ottA()}, b:{giorni:ottB()}, c:{giorni:ottC()}, e:{giorni:{1:'4',2:'4'}}, p:{giorni:ottP()}, o:{giorni:ottP(), permessi:{6:{ore:1.5,tipo:'EXF'}}} }, '2026-09':{ b:{giorni:{1:'3'}}, p:{giorni:{1:'3',2:'1'}} }}, costoComune:{} };
 async function apri(br,url,w){ const ctx=await br.newContext({viewport:{width:w||1500,height:1100},acceptDownloads:true}); const pg=await ctx.newPage(); const E=[]; pg.on('pageerror',e=>E.push(e.message.slice(0,200)));
   await pg.addInitScript(x=>{ if(!sessionStorage.getItem('_s')){ localStorage.setItem('spazioireos_reportore_v1',JSON.stringify(x)); sessionStorage.setItem('_s','1'); } },ST); await pg.goto(url,{waitUntil:'domcontentloaded'}); await pg.waitForTimeout(4500);
   const pins=pg.locator('input[type=password]'); if(await pins.count()>=2){ await pins.nth(0).fill('1234'); await pins.nth(1).fill('1234'); await pg.getByRole('button',{name:/Crea PIN/i}).first().click(); await pg.waitForTimeout(1800); }
@@ -65,6 +65,7 @@ const hm=s=>{ const m=/^(-?)(\d+),(\d{2})$/.exec(s); if(!m) return NaN; return (
   const S=await pdf(pg,'🖨️ Report PDF A4 per le paghe',9);
   T('Q13 settembre (prima della base mensile): lo dice, nessun foglio', S.dl && /Nessun dipendente mensilizzato/.test(S.flat));
   const H2=await pdf(pg,'🖨️ Report PDF A4',10); T('Q14 il Report PDF A4 storico si genera ancora, ore in ore,minuti', H2.dl && /Report Ore/.test(H2.flat) && /\b\d+,[0-5]\d\b/.test(H2.flat));
+  T('Q16 Report storico: il permesso di 1,5 h si scrive «Aggiungere 1,30 ore» (ver190: ore,minuti anche in calce)', /Aggiungere 1,30 ore di permesso \(EXF\)/.test(H2.flat) && !/Aggiungere 1,50/.test(H2.flat), (H2.flat.match(/Aggiungere [\d,]+ ore[^)]*\)/)||[''])[0]);
   if(R.out) sh('pdftoppm -r 80 -png -f 1 -l 1 '+JSON.stringify(R.out)+' '+JSON.stringify(__dirname+'/out/ver189-p1'));
   T('Q15 zero errori di pagina', E.length===0, E.join(' | '));
   console.log('\nver189: '+P+' superati, '+F+' falliti'); await br.close(); })();

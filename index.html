@@ -518,7 +518,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver189";
+const APP_VER = "ver190";
 const APP_DATA = "20nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -2261,7 +2261,7 @@ function esportaPDF(state, pairs, opz){
           if (deb <= 0.0005) return;
           const rec = (bm > 0) ? Math.min(bm, deb) : 0;
           const nuo = R2((bm - rec),3);
-          recupLines.push(dp.nome + " — debito pregresso " + fmt3(deb) + " h: recupero " + fmt3(R2(rec,3)) + " h, ore nuove " + fmt3(nuo) + " h");
+          recupLines.push(dp.nome + " — debito pregresso " + pdfHM(deb) + " h: recupero " + pdfHM(R2(rec,3)) + " h, ore nuove " + pdfHM(nuo) + " h");   /* ver190: in ore,minuti (Christian, 20/11/2026: «in sessantesimi vanno i report a4 in dipendenti») */
         });
         if (recupLines.length > 0){
           ensureY(8);
@@ -2302,7 +2302,7 @@ function esportaPDF(state, pairs, opz){
           doc.text("Permessi orari (segnalati con ***, non inclusi nel TOT):", 14, yy); yy += 3.6; doc.setFont(undefined,"normal");
           doc.setFontSize(6.5); doc.setTextColor(70,70,70);
           permMese.forEach(function(pp){
-            const riga = pp.nome + " — giorno " + pp.giorno + ": Aggiungere " + fmt2(pp.ore) + " ore di permesso (" + pp.tipo + ")";
+            const riga = pp.nome + " — giorno " + pp.giorno + ": Aggiungere " + pdfHM(pp.ore) + " ore di permesso (" + pp.tipo + ")";   /* ver190: in ore,minuti */
             const ls = doc.splitTextToSize("•  " + riga, 269); ensureY(ls.length * 3.2); doc.text(ls, 14, yy); yy += ls.length * 3.2; });
         }
         if (orfani.length > 0){

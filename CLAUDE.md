@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver189 · 20nov26, IN ANTEPRIMA sul ramo di lavoro, da approvare** (su `main` c'è la ver187 · 19nov26, approvata il 20/11/2026: «main Fogli ore rev 19 e Dipendenti ver187»). `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver190 · 20nov26, IN ANTEPRIMA sul ramo di lavoro, da approvare** (su `main` c'è la ver187 · 19nov26, approvata il 20/11/2026: «main Fogli ore rev 19 e Dipendenti ver187»). `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -37,6 +37,11 @@ Banca ore, tetto annuo, contratti e export.
   Corretto anche un difetto **preesistente** che la nuova navigazione rendeva visibile: nella
   testata, in vista Anagrafica, compariva "📅 undefined 2026" (perché `mese` è `null` fuori dalle
   viste mensili); ora mostra "📇 Anagrafica".
+- 🕐 **ver190 (20/11/2026, IN ANTEPRIMA)** — Christian: «Intendo che in sessantesimi vanno i report a4 in dipendenti». Nel
+  **Report PDF A4 storico** anche le due righe in calce che erano in decimali passano a **ore,minuti** (`pdfHM`): «Aggiungere 1,30 ore
+  di permesso» (era 1,50) e il blocco RECUPERO / ORE NUOVE. Le celle lo erano già (ver87). **Restano in centesimi i TOTALI** dei due
+  report A4, come chiesto nella ver87 («il totale finale deve essere però in centesimi»). I report non più richiamati dalla ver183
+  (`esportaPDFMens`, `esportaPDFConto`, `esportaPDFOrdExtra`, ramo LUL) non sono stati toccati. Provato: `ver189.cjs` 28/0 (Q16).
 - 🔧 **ver189 (20/11/2026, IN ANTEPRIMA, da approvare; risposte di Christian al collaudo integrato)**, sopra la ver188 (mai pubblicata):
   1. **«1, ti ricordi che nei report le ore vanno in sessantesimi??»** — nel «🖨️ Report PDF A4 per le paghe» le **righe** sono ora in
      **ORE,MINUTI** con `pdfHM` (3,1731 h → «3,10»), come il Report storico dalla ver87; il **TOTALE** resta in **centesimi** (`fmt2`),
