@@ -37,6 +37,10 @@ Banca ore, tetto annuo, contratti e export.
   Corretto anche un difetto **preesistente** che la nuova navigazione rendeva visibile: nella
   testata, in vista Anagrafica, compariva "📅 undefined 2026" (perché `mese` è `null` fuori dalle
   viste mensili); ora mostra "📇 Anagrafica".
+- 🚫 **FERIE A ORE: SI USA SOLO EXF** (decisione di Christian del 20/11/2026: «Lasciamo solo exf»). Le ferie di qualche ora si
+  segnano col **permesso orario di tipo EXF** (ferie ed ex festività sono un unico monte di 30 giorni): contano nel Risultato del
+  mese, nel saldo ferie (ver129) e nel massimale. ⚠️ Nel riquadro «Da inserire a cedolino» finiscono sotto «di cui permessi
+  retribuiti», non sotto «di cui ferie»: **accettato**. **Non aggiungere** «FERIE» ai tipi del permesso orario e **non riproporlo**.
 - 🏷️ **ver193 (20/11/2026, sul ramo, da approvare) — DUE DICITURE CAMBIATE DA CHRISTIAN** (testuale: «In dipendenti ore
   contrattuali diviene ore mensili e ORE DA FAR RISULTARE NEL TOTALE PER AVERE LE ORE CONTRATTUALI diviene ORE CHE DEVONO
   RISULTARE NEL TOTALE TEORICO MENSILE PER AVERE LE ORE CONTRATTUALI»). Cambiano **solo le scritte**, nei punti della ver185:
