@@ -518,7 +518,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver194";
+const APP_VER = "ver195";
 const APP_DATA = "20nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -2990,8 +2990,9 @@ function esportaPDFPaghe(state, pairs){
       let D = ORD - sV;
       if (D < 0 && sV > 0){ const k = ORD / sV; for (let i = 0; i < oV.length; i++) oV[i] = oV[i] * k; D = 0; }
       if (D > 0){
-        [ function(x){ return x.base > 0 && x.h === 0 && x.ret.length === 0 && !x.nr && x.nota === ""; },
-          function(x){ return x.base > 0 && x.h === 0 && x.ret.length === 0 && !x.nr && x.nota === "AN"; } ].forEach(function(cond){
+        /* ver195 (Christian, 20/11/2026: «AN = giorno lavorativo a 0 ore» → «Mai su AN»): la differenza va sui giorni
+           vuoti dell'orario e, se non bastano, in proporzione sui giorni lavorati (qui sotto). I giorni AN restano vuoti. */
+        [ function(x){ return x.base > 0 && x.h === 0 && x.ret.length === 0 && !x.nr && x.nota === ""; } ].forEach(function(cond){
           if (D <= 0.00001) return;
           const idx = []; rows.forEach(function(x, i){ if (cond(x)) idx.push(i); });
           if (!idx.length) return;

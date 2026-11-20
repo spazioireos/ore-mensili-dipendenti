@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver194 · 20nov26, sul ramo di lavoro, da approvare** (su `main` c'è la ver193 · 20nov26, approvata il 20/11/2026: «main»). `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver195 · 20nov26, sul ramo di lavoro, da approvare** (su `main` c'è la ver193 · 20nov26, approvata il 20/11/2026: «main»; la ver194 è sul ramo). `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -37,6 +37,15 @@ Banca ore, tetto annuo, contratti e export.
   Corretto anche un difetto **preesistente** che la nuova navigazione rendeva visibile: nella
   testata, in vista Anagrafica, compariva "📅 undefined 2026" (perché `mese` è `null` fuori dalle
   viste mensili); ora mostra "📇 Anagrafica".
+- 🚫 **ver195 (20/11/2026, sul ramo, da approvare) — NEL REPORT PER LE PAGHE MAI ORE SUI GIORNI AN** (Christian: «Perché mi segni
+  su AN le ore nel report? AN = giorno lavorativo a 0 ore», poi alla domanda: **«Mai su AN»**). In `esportaPDFPaghe`, quando il
+  cedolino mensilizzato paga più ore ordinarie di quelle lavorate (ore sotto l'orario non trattenute), la differenza andava sui
+  giorni vuoti dell'orario e **poi sui giorni AN** (regola ver183). Tolta la seconda condizione: ora va sui giorni vuoti e, se non
+  bastano, **in proporzione sui giorni lavorati** (il ramo che c'era già). I giorni AN restano sempre vuoti. **Totali identici.**
+  ⚠️ Scrivere «0» al posto di AN **non** serve: un giorno a 0 ore conta come vuoto e riceve le ore **per primo**; nel Tabellone AN
+  e 0 contano uguale nelle ore che devono risultare, ma AN dice perché quel giorno è vuoto e serve alla regola del mese non pagato.
+  **Provato**: `collaudo/ver195.cjs` **6/0** (confronto con la ver194 congelata: lì 3,25 h su ogni sabato AN, qui zero; totale
+  ordinarie 82,50 identico; due martedì vuoti ricevono la differenza per primi), `ver194` 37/0, `a06` 23/0, `a02` 50/0.
 - 🕐 **ver194 (20/11/2026, sul ramo, da approvare) — NEI DUE REPORT A4 LE ORE SI SCRIVONO ANCHE A PAROLE** (Christian: «Nel report
   devi precisare che parli in sessantesimi: non 4,50 ma "4,50 (4 h e 50 min)"», e alla domanda sullo spazio: **«Per intero
   ovunque»**). Funzioni nuove accanto a `pdfHM`: **`pdfHMparole`** («4 h e 50 min»; con zero minuti «4 h», con zero ore
