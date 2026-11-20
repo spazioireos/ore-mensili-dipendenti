@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver187 · 19nov26, IN ANTEPRIMA sul ramo di lavoro, da approvare** (su `main` c'è la ver186 · 19nov26, con ver184 e ver185, approvata da Christian il 19/11/2026: «main per le tre app»). `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver187 · 19nov26, approvata da Christian e portata su `main` il 20/11/2026** («main Fogli ore rev 19 e Dipendenti ver187»; prima su `main` c'era la ver186). `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -37,7 +37,7 @@ Banca ore, tetto annuo, contratti e export.
   Corretto anche un difetto **preesistente** che la nuova navigazione rendeva visibile: nella
   testata, in vista Anagrafica, compariva "📅 undefined 2026" (perché `mese` è `null` fuori dalle
   viste mensili); ora mostra "📇 Anagrafica".
-- 📨 **ver187 (19/11/2026, IN ANTEPRIMA, da approvare; «Nu\*» di Christian): FOGLI ORE SA CHI È DIPENDENTE, E IL TABELLONE
+- 📨 **ver187 (19/11/2026, su `main` dal 20/11/2026; «Nu\*» di Christian): FOGLI ORE SA CHI È DIPENDENTE, E IL TABELLONE
   MOSTRA LA CHIUSURA DEL MESE E LA RISPOSTA SUL COMPLETAMENTO.** Lavoro gemello di **Fogli ore rev 19** (altra persona): dal 1°
   del mese dopo ogni operatore chiude il mese, e ai DIPENDENTI viene chiesto «Se non avessi raggiunto con le ore dichiarate
   lavorate in questo mese il dovuto contrattuale, vuoi che ti siano assegnati ferie/permessi a completamento o lasci così?».
