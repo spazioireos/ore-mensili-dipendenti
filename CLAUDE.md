@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver193 · 20nov26, sul ramo di lavoro, da approvare** (su `main` c'è la ver192 · 20nov26, approvata il 20/11/2026: «Main»). `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver193 · 20nov26 — approvata da Christian e portata su `main` il 20/11/2026** («main»). `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -41,7 +41,7 @@ Banca ore, tetto annuo, contratti e export.
   segnano col **permesso orario di tipo EXF** (ferie ed ex festività sono un unico monte di 30 giorni): contano nel Risultato del
   mese, nel saldo ferie (ver129) e nel massimale. ⚠️ Nel riquadro «Da inserire a cedolino» finiscono sotto «di cui permessi
   retribuiti», non sotto «di cui ferie»: **accettato**. **Non aggiungere** «FERIE» ai tipi del permesso orario e **non riproporlo**.
-- 🏷️ **ver193 (20/11/2026, sul ramo, da approvare) — DUE DICITURE CAMBIATE DA CHRISTIAN** (testuale: «In dipendenti ore
+- 🏷️ **ver193 (20/11/2026, su `main` dal 20/11/2026) — DUE DICITURE CAMBIATE DA CHRISTIAN** (testuale: «In dipendenti ore
   contrattuali diviene ore mensili e ORE DA FAR RISULTARE NEL TOTALE PER AVERE LE ORE CONTRATTUALI diviene ORE CHE DEVONO
   RISULTARE NEL TOTALE TEORICO MENSILE PER AVERE LE ORE CONTRATTUALI»). Cambiano **solo le scritte**, nei punti della ver185:
   «ORE CONTRATTUALI» → **«ORE MENSILI»** (pillola del Tabellone, riga del box «Da inserire a cedolino», sua spiegazione
