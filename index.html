@@ -518,8 +518,8 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver187";
-const APP_DATA = "19nov26";
+const APP_VER = "ver188";
+const APP_DATA = "20nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
 const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
@@ -2875,7 +2875,7 @@ function distCentesimi(pesi, totale){
 function esportaPDFPaghe(state, pairs){
   ggComuneAggiorna(state);
   const JsPDF = window.jspdf.jsPDF;
-  const doc = new JsPDF({ orientation:"portrait", unit:"mm", format:"a4" });
+  const doc = new JsPDF({ orientation:"landscape", unit:"mm", format:"a4" });   /* ver188: tre dipendenti per pagina, affiancati */
   const dips = dipSorted(state);
   const fh = function(x){ return fmtH(x); };
   let first = true, prodotto = false;
@@ -2885,6 +2885,7 @@ function esportaPDFPaghe(state, pairs){
     const fset = festivitaSet(anno), nd = daysInMonth(anno, m);
     const dipsMese = dips.filter(function(dp){ return meseCedolinoTetto(dp, anno, m) && meseFrazione(dp, anno, m) > 0; });
     const senzaDati = [];
+    let posto = 0;                                   /* ver188: posto della tabella nella pagina (0, 1, 2) */
     dipsMese.forEach(function(dp){
       const rec = getRecFrom(state, anno, m, dp.id);
       if (!recHasData(rec)){ senzaDati.push(dp.nome); return; }
@@ -2969,61 +2970,41 @@ function esportaPDFPaghe(state, pairs){
       const body = rows.map(function(x){
         const retT = x.ret.map(function(a, j){ return a + " " + fh(x.retH[j] || 0); }).join(" · ");
         const nrT = x.nr ? (x.nr + " " + fh(x.nrH)) : vuoto;
-        return [ x.label + (x.nota ? "  " + x.nota : ""), x.o > 0.004 ? fh(x.o) + (x.d - 1 === rigaScarto ? " †" : "") : vuoto, x.s > 0.004 ? fh(x.s) : vuoto, retT, nrT ];
+        return [ x.label + (x.nota ? "  " + x.nota : ""), x.o > 0.004 ? fh(x.o) : vuoto, x.s > 0.004 ? fh(x.s) : vuoto, retT, nrT ];
       });
       const sumCol = function(fn){ return R2(rows.reduce(function(a, x){ return a + fn(x); }, 0), 3); };   /* ver185: totali a tre decimali (si scrivono così) */
       const tO = sumCol(function(x){ return x.o; }), tS = sumCol(function(x){ return x.s; });
       const tR = sumCol(function(x){ return x.retH.reduce(function(a, v){ return a + (v || 0); }, 0); }), tN = sumCol(function(x){ return x.nrH; });
-      nuovaPagina(); prodotto = true;
-      doc.setFontSize(13); doc.setFont(undefined, "bold"); doc.setTextColor(15,39,64);
-      doc.text("Spazio Ireos — Ore da riportare a cedolino (mensilizzato)", 14, 14);
-      doc.setFontSize(11.5); doc.setFont(undefined, "normal");
-      doc.text(dp.nome + "   ·   " + MONTH_LABEL[m-1] + " " + anno, 14, 21);
-      doc.setFontSize(8.5); doc.setTextColor(70,70,70);
-      doc.text("Ore settimanali " + fh(oreSettAt(dp, anno, m)) + " · quota del giorno " + fh(q) + " h. Le ore di ogni giorno sono quelle da riportare sul cedolino mensilizzato: i totali delle colonne sono le voci del cedolino, da non ricalcolare. Le ore realmente lavorate sono nel Report PDF A4. Minuti: ,167 = 10 · ,250 = 15 · ,333 = 20 · ,500 = 30 · ,667 = 40 · ,750 = 45 · ,833 = 50.", 14, 26, { maxWidth: 182 });
+      /* ver188 (Christian, 20/11/2026): tre dipendenti per pagina A4 orizzontale; intestazione solo con nominativo e
+         mese; niente legende, niente riquadro «DA INSERIRE A CEDOLINO», niente segni † e *. I numeri non cambiano. */
+      const LARG = 89, SPAZIO = 5.5, SX = 8;
+      if (posto % 3 === 0) nuovaPagina();
+      prodotto = true;
+      const x0 = SX + (posto % 3) * (LARG + SPAZIO);
+      posto++;
+      doc.setFontSize(11); doc.setFont(undefined, "bold"); doc.setTextColor(15,39,64);
+      doc.text(doc.splitTextToSize(dp.nome, LARG)[0], x0, 11);
+      doc.setFontSize(10); doc.setFont(undefined, "normal");
+      doc.text(MONTH_LABEL[m-1] + " " + anno, x0, 16);
       const rosse = []; rows.forEach(function(x, i){ if (x.rosso) rosse.push(i); });
       doc.autoTable({
-        startY: 35,
+        startY: 19,
         head: [["Giorno", "Ordinarie", "Supplementari", "Assenze retribuite", "Non retribuite (ASS.ING / ASP 0h)"]],
         body: body,
-        foot: [["TOTALE", fh(tO) + (ordSenzaGiorni ? " *" : ""), fh(tS), fh(tR), fh(tN)]],
-        styles:{ fontSize:8, cellPadding:1.05, valign:"middle", lineColor:[214,214,214], lineWidth:0.1 },
-        headStyles:{ fillColor:[15,39,64], textColor:[255,255,255], fontSize:8.5, fontStyle:"bold", halign:"center" },
+        foot: [["TOTALE", fh(tO), fh(tS), fh(tR), fh(tN)]],
+        styles:{ fontSize:7.5, cellPadding:0.75, valign:"middle", lineColor:[214,214,214], lineWidth:0.1, overflow:"linebreak" },
+        headStyles:{ fillColor:[15,39,64], textColor:[255,255,255], fontSize:7, fontStyle:"bold", halign:"center" },
         footStyles:{ fillColor:[234,240,250], textColor:[15,39,64], fontStyle:"bold", halign:"center" },
-        columnStyles:{ 0:{ halign:"left", cellWidth:36 }, 1:{ halign:"center", cellWidth:26 }, 2:{ halign:"center", cellWidth:28 }, 3:{ halign:"left", cellWidth:52 }, 4:{ halign:"left" } },
-        margin:{ left:14, right:14 },
+        columnStyles:{ 0:{ halign:"left", cellWidth:16 }, 1:{ halign:"center", cellWidth:14 }, 2:{ halign:"center", cellWidth:20 }, 3:{ halign:"left", cellWidth:20 }, 4:{ halign:"left", cellWidth:19 } },
+        tableWidth: LARG,
+        margin:{ left:x0, right: 297 - x0 - LARG, top: 19, bottom: 6 },
+        pageBreak: "avoid",
         didParseCell: function(data){
           if (data.section === "body" && rosse.indexOf(data.row.index) !== -1) data.cell.styles.fillColor = [252,238,238];
           if (data.section === "body" && data.column.index === 2 && String(data.cell.raw || "") !== "") data.cell.styles.textColor = [176,42,42];
           if (data.section === "body" && data.column.index === 4 && String(data.cell.raw || "") !== "") data.cell.styles.textColor = [154,52,18];
         }
       });
-      let y = doc.lastAutoTable.finalY + 6;
-      if (y > 250){ doc.addPage(); y = 18; }
-      const voci = [];
-      [TS.ferie].concat(TS.altre).forEach(function(v){ if (v.gg > 0) voci.push(v.cod + " " + v.gg + " gg = " + fh(v.ore) + " h"); });
-      if (TS.fest.gg > 0) voci.push("festività godute " + TS.fest.gg + " gg = " + fh(TS.fest.ore) + " h");
-      TS.permTipi.forEach(function(v){ voci.push("permessi " + v.cod + " " + fh(v.ore) + " h"); });
-      const ngG = TS.nonGod.gg;
-      const ngO = TS.nonGod.ore;
-      const righe = [
-        "ORE CONTRATTUALI (stipendio fisso): " + fh(TS.monte) + " h  =  ordinarie " + fh(tO) + "  +  assenze retribuite " + fh(tR) + "  +  da trattenere " + fh(tN),
-        "SUPPLEMENTARI da pagare: " + (tS > 0.004 ? fh(tS) + " h" : "nessuna"),
-        "DA TRATTENERE: " + (tN > 0.004 ? fh(tN) + " h (solo assenze ingiustificate ASS.ING e aspettative non pagate ASP 0h)" : "nessuna: lo stipendio fisso è intero"),
-        "FESTIVITÀ NON GODUTE da pagare in più: " + (ngG > 0 ? ngG + " gg = " + fh(ngO) + " h" : "nessuna"),
-        "Assenze retribuite: " + (voci.length ? voci.join(" · ") : "nessuna")
-      ];
-      if (ordSenzaGiorni) righe.push("* ore ordinarie a cedolino senza giorni lavorati nel mese: vanno nel totale.");
-      if (rigaScarto >= 0 && Math.abs(scarto) >= 0.005) righe.push("† le ordinarie del giorno " + rows[rigaScarto].d + " comprendono " + (scarto > 0 ? "+" : "") + fh(scarto) + " h perché il totale torni con le ORE CONTRATTUALI (" + fh(TS.monte) + "), che sono il valore del contratto.");
-      doc.setFontSize(9.5); doc.setTextColor(15,39,64);
-      let hB = 5 + 4.6 + 1.5;
-      const linee = righe.map(function(t){ const ls = doc.splitTextToSize(t, 176); hB += ls.length * 4.6; return ls; });
-      if (doc.setDrawColor) doc.setDrawColor(90,156,226);
-      if (doc.setFillColor) doc.setFillColor(248,251,255);
-      if (doc.roundedRect) doc.roundedRect(14, y, 182, hB, 2, 2, "FD"); else if (doc.rect) doc.rect(14, y, 182, hB, "FD");
-      doc.setFont(undefined, "bold"); doc.text("DA INSERIRE A CEDOLINO", 17, y + 5); doc.setFont(undefined, "normal");
-      let yy = y + 5;
-      linee.forEach(function(ls){ doc.text(ls, 17, yy + 4.6); yy += ls.length * 4.6; });
     });
     if (dipsMese.length > 0 && senzaDati.length === dipsMese.length){
       nuovaPagina(); prodotto = true;

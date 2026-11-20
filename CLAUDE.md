@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver187 · 19nov26, approvata da Christian e portata su `main` il 20/11/2026** («main Fogli ore rev 19 e Dipendenti ver187»; prima su `main` c'era la ver186). `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver188 · 20nov26, IN ANTEPRIMA sul ramo di lavoro, da approvare** (su `main` c'è la ver187 · 19nov26, approvata il 20/11/2026: «main Fogli ore rev 19 e Dipendenti ver187»). `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -37,6 +37,21 @@ Banca ore, tetto annuo, contratti e export.
   Corretto anche un difetto **preesistente** che la nuova navigazione rendeva visibile: nella
   testata, in vista Anagrafica, compariva "📅 undefined 2026" (perché `mese` è `null` fuori dalle
   viste mensili); ora mostra "📇 Anagrafica".
+- 🖨️ **ver188 (20/11/2026, IN ANTEPRIMA, da approvare): IL «🖨️ Report PDF A4 per le paghe» CON TRE DIPENDENTI PER PAGINA**
+  (Christian: «Nel report a4 per le paghe, togli le legende e l'intestazione deve riportare solo nominativo e mese di
+  riferimento. Ogni pagina contenga 3 dipendenti»; sue scelte: **A4 orizzontale**, riquadro «DA INSERIRE A CEDOLINO»
+  **tolto**, segni † e * **tolti con le loro note**).
+  - **Solo `esportaPDFPaghe`**: pagina A4 **orizzontale**, tre tabelle affiancate da 89 mm (`LARG`, `SPAZIO` 5,5, margine
+    8), contatore `posto` per mese (ogni mese parte su una pagina nuova); sopra ogni tabella **solo** «NOMINATIVO» e
+    «Mese Anno». Tolti: il titolo «Spazio Ireos — Ore da riportare a cedolino (mensilizzato)», la riga con ore settimanali,
+    quota del giorno e legenda dei minuti, il riquadro «DA INSERIRE A CEDOLINO», il «†» sull'ultima riga delle ordinarie e
+    il «*» sul TOTALE con le loro note. Carattere 7,5 pt (intestazione delle colonne 7 pt), colonne 16·14·20·20·19 mm.
+  - ⚠️ **Nessun numero cambia**: righe, distribuzione sui giorni (`distPassi`), scarto delle ORE CONTRATTUALI sull'ultima
+    riga delle ordinarie e totali sono quelli della ver187 (misurato sui 5 casi inventati di `ver183.cjs`: CINQUE 86,840 ·
+    INGIUST 75,160 + 3,000 · MALATTIA 57,167 / 41,333 / 25,333 · QUINDICI 65,130 · SOTTO 73,820). Intestazioni delle
+    colonne, messaggi di pagina vuota e nome del file **invariati**. Il Report PDF A4 storico **non è toccato**.
+  - ⚠️ Prove: `ver183.cjs` legge una persona per pagina e la sua riga «ORE MESE» (ora tolta): le sue attese vanno
+    **aggiornate** prima della consegna. Anteprima PNG mostrata a Christian.
 - 📨 **ver187 (19/11/2026, su `main` dal 20/11/2026; «Nu\*» di Christian): FOGLI ORE SA CHI È DIPENDENTE, E IL TABELLONE
   MOSTRA LA CHIUSURA DEL MESE E LA RISPOSTA SUL COMPLETAMENTO.** Lavoro gemello di **Fogli ore rev 19** (altra persona): dal 1°
   del mese dopo ogni operatore chiude il mese, e ai DIPENDENTI viene chiesto «Se non avessi raggiunto con le ore dichiarate
