@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver193 · 20nov26 — approvata da Christian e portata su `main` il 20/11/2026** («main»). `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver194 · 20nov26, sul ramo di lavoro, da approvare** (su `main` c'è la ver193 · 20nov26, approvata il 20/11/2026: «main»). `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -37,6 +37,27 @@ Banca ore, tetto annuo, contratti e export.
   Corretto anche un difetto **preesistente** che la nuova navigazione rendeva visibile: nella
   testata, in vista Anagrafica, compariva "📅 undefined 2026" (perché `mese` è `null` fuori dalle
   viste mensili); ora mostra "📇 Anagrafica".
+- 🕐 **ver194 (20/11/2026, sul ramo, da approvare) — NEI DUE REPORT A4 LE ORE SI SCRIVONO ANCHE A PAROLE** (Christian: «Nel report
+  devi precisare che parli in sessantesimi: non 4,50 ma "4,50 (4 h e 50 min)"», e alla domanda sullo spazio: **«Per intero
+  ovunque»**). Funzioni nuove accanto a `pdfHM`: **`pdfHMparole`** («4 h e 50 min»; con zero minuti «4 h», con zero ore
+  «50 min», stesso arrotondamento di `pdfHM`) e **`pdfHMx`** («4,50 (4 h e 50 min)»).
+  - **«🖨️ Report PDF A4 per le paghe»**: ogni cella di ore è «4,50 (4 h e 50 min)» (anche «MAL 3,10 (3 h e 10 min)» e
+    «ASS.ING 3,00 (3 h)»); il TOTALE è «86,84 (86,50 = 86 h e 50 min)». Per farci stare le parole: **UNA persona per
+    pagina** (era tre, ver188), colonne 28·55·55·77·66 mm, carattere 9 pt; nominativo 13 pt, mese 11 pt. Righe, colonne,
+    intestazioni e numeri **identici**.
+  - **«🖨️ Report PDF A4» (storico)**: sotto ogni numero, in piccolo (6,5 pt, si stringe fino a 4,6 pt se la colonna è
+    stretta) e in grigio scuro, le parole «(2 h e 45 min)» (`scriviParole`, che rilegge il numero come ore,minuti — la prima
+    stesura lo leggeva come decimale e scriveva «2,45 (2 h e 27 min)»: trovato dalla misura e corretto). Il «,00» sbiadito e
+    i «***» del permesso restano; la cella col permesso porta anche le parole. Righe più alte (`minCellHeight` 7,4; 12,8 col
+    permesso): il report **va su più pagine** e dalla seconda il titolo si ripete con **«(segue)»** (dicitura nuova, di
+    Claude). TOT ORE RESE: «101,50» e sotto «(101,30 = 101 h e 30 min)».
+  - In calce allo storico: «Aggiungere 1,30 ore (1 h e 30 min) di permesso (EXF)» e il blocco RECUPERO con le parole.
+    ⚠️ Le parole di Christian «Aggiungere … ore di permesso» restano, si inserisce solo la parentesi.
+  - ⚠️ Non toccati i report non più richiamati (`esportaPDFMens`, `esportaPDFConto`, `esportaPDFOrdExtra`, ramo LUL), il
+    Tabellone, gli Excel. **Nessun numero cambia.**
+  - **Provato** (jsPDF veri, `pdftotext`): `collaudo/ver194.cjs` **37/0** (nato da `ver189.cjs`, che resta come storia e ora
+    fallisce di proposito sul formato vecchio: tre per pagina, totale senza parole), `a06` **23/0** (attese aggiornate:
+    storico su più pagine con «(segue)», paghe una per pagina, totali con le parole).
 - 🚫 **FERIE A ORE: SI USA SOLO EXF** (decisione di Christian del 20/11/2026: «Lasciamo solo exf»). Le ferie di qualche ora si
   segnano col **permesso orario di tipo EXF** (ferie ed ex festività sono un unico monte di 30 giorni): contano nel Risultato del
   mese, nel saldo ferie (ver129) e nel massimale. ⚠️ Nel riquadro «Da inserire a cedolino» finiscono sotto «di cui permessi

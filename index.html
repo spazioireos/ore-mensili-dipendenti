@@ -518,7 +518,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver193";
+const APP_VER = "ver194";
 const APP_DATA = "20nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -2077,6 +2077,19 @@ function pdfHM(v){
   if (mm === 60){ h += 1; mm = 0; }
   return (neg ? "-" : "") + h + "," + (mm < 10 ? "0" : "") + mm;
 }
+/* ver194 (20/11/2026, Christian: «Nel report devi precisare che parli in sessantesimi: non 4,50 ma "4,50 (4 h e 50 min)"»,
+   e alla domanda «Per intero ovunque»): le ore in ore,minuti si scrivono anche a parole. Stesso arrotondamento di pdfHM.
+   pdfHMparole(4.8333) = «4 h e 50 min»; con zero minuti «4 h», con zero ore «50 min». pdfHMx = «4,50 (4 h e 50 min)». */
+function pdfHMparole(v){
+  const n = parseFloat(String(v == null ? "" : v).replace(",", "."));
+  if (isNaN(n)) return "";
+  const neg = n < 0; const a = Math.abs(n);
+  let h = Math.floor(a); let mm = Math.round((a - h) * 60);
+  if (mm === 60){ h += 1; mm = 0; }
+  const t = (h > 0 && mm > 0) ? (h + " h e " + mm + " min") : (h > 0 ? (h + " h") : (mm + " min"));
+  return (neg && (h > 0 || mm > 0) ? "-" : "") + t;
+}
+function pdfHMx(v){ return pdfHM(v) + " (" + pdfHMparole(v) + ")"; }
 function esportaPDF(state, pairs, opz){
   ggComuneAggiorna(state);
   /* ver177 (15/11/2026, Christian: «dobbiamo indicare le ore per giornata perché deve inserirle nel lul,
@@ -2117,6 +2130,18 @@ function esportaPDF(state, pairs, opz){
     dipsMese.forEach(function(dp){ const rec = getRecFrom(state, anno, m, dp.id); const vl = vociLines(rec); if (vl.length > 0) noteMese.push({ nome: dp.nome, righe: vl }); });
     // larghezza colonna UNICA per tutte le pagine (basata sul blocco più grande = min(dip, MAXCOL)+1 colonne)
     const colW = Math.round((269 / (2 + Math.min(Math.max(dipsMese.length,1), MAXCOL))) * 100) / 100;
+    /* ver194: le ore a parole, piccole, sotto il numero; il carattere si stringe finché entra nella colonna */
+    const scriviParole = function(val, cx, y, w){
+      /* val è già scritto in ore,minuti («2,45» = 2 h e 45 min): si rilegge come tale, non come decimale */
+      const mHM = /^(-?)(\d+),(\d{2})$/.exec(String(val));
+      const dec = mHM ? (mHM[1] ? -1 : 1) * (Number(mHM[2]) + Number(mHM[3]) / 60) : val;
+      const t = "(" + pdfHMparole(dec) + ")";
+      let f = 6.5; doc.setFont(undefined, "normal"); doc.setFontSize(f);
+      while (doc.getTextWidth(t) > w - 1 && f > 4.6){ f = Math.round((f - 0.3) * 10) / 10; doc.setFontSize(f); }
+      doc.setTextColor(55, 65, 81);
+      doc.text(t, cx, y, { align:"center", baseline:"middle" });
+      doc.setFont(undefined, "bold");
+    };
 
     chunks.forEach(function(chunk, ci){
       if (!first) doc.addPage();
@@ -2158,7 +2183,7 @@ function esportaPDF(state, pairs, opz){
         body.push(row);
       }
       /* ver87: il totale finale resta in CENTESIMI (numero decimale vero), non in ore,minuti. */
-      const totRow = ["TOT ORE RESE"].concat(tot.map(function(t){ return fmt2(R2(t)) + " (" + pdfHM(R2(t, 3)) + ")"; })).concat(["TOT ORE RESE"]);   /* ver191: centesimi e, fra parentesi, ore,minuti (Christian, 20/11/2026) */
+      const totRow = ["TOT ORE RESE"].concat(tot.map(function(t){ return fmt2(R2(t)) + "\n(" + pdfHM(R2(t, 3)) + " = " + pdfHMparole(R2(t, 3)) + ")"; })).concat(["TOT ORE RESE"]);   /* ver194: anche a parole */   /* ver191: centesimi e, fra parentesi, ore,minuti (Christian, 20/11/2026) */
       body.push(totRow);
       const ncols = 2 + chunk.length;
       const lastIdx = chunk.length + 1;
@@ -2166,6 +2191,8 @@ function esportaPDF(state, pairs, opz){
         /* ver93: numeri piu' grandi (Christian: "i numeri sono molto piccoli nel report, a
            prova di aquila") e margine basso stretto, per far stare le 33 righe in una pagina. */
         head: head, body: body, startY: 16, theme:"grid", margin:{ left:14, right:14, top:16, bottom:8 }, tableWidth: ncols*colW,
+        /* ver194: con le parole sotto i numeri la tabella va su più pagine: il titolo si ripete con «(segue)» */
+        didDrawPage: function(data){ if (data.pageNumber > 1){ doc.setFontSize(12); doc.setTextColor(15,39,64); doc.setFont(undefined,"bold"); doc.text(titolo + "   (segue)", 14, 12); doc.setFont(undefined,"normal"); } },
         styles:{ fontSize:7.5, cellPadding:0.8, halign:"center", valign:"middle", lineColor:[210,210,210], lineWidth:0.1, overflow:"linebreak", cellWidth:colW, fontStyle:"bold" },
         headStyles:{ fillColor:[15,39,64], textColor:[255,255,255], fontSize:6.5, valign:"middle", fontStyle:"bold", cellWidth:colW },
         columnStyles:(function(){ const cs={ 0:{ halign:"left", fontStyle:"bold", cellWidth:colW } }; cs[lastIdx]={ halign:"left", fontStyle:"bold", cellWidth:colW }; return cs; })(),
@@ -2182,9 +2209,14 @@ function esportaPDF(state, pairs, opz){
           /* ver87: lo sbiadito del ",00" vale solo per le celle dei giorni, non per la riga
              del TOTALE, che ormai e' un numero decimale vero.
              ver91: se la cella ha un permesso, se ne occupa il disegno dei tre asterischi. */
-          if (!isDayCol && isPerm && ri !== nd){ data.cell.__perm3 = true; data.cell.text = [""]; data.cell.styles.minCellHeight = 10.5; }
-          else if (!isDayCol && isWhole && ri !== nd){ data.cell.__hm00 = true; data.cell.text = [""]; }
-          if (ri === nd){ data.cell.styles.fontStyle = "bold"; data.cell.styles.fillColor = [238,242,255]; if (!isDayCol) data.cell.styles.fontSize = 9; return; }
+          /* ver194: sotto ogni numero si scrive a parole (4 h e 50 min): la riga si alza (minCellHeight) e il report
+             va su più pagine, come scelto da Christian («Per intero ovunque»). */
+          const valP = raw.replace(/\*\*\*$/, "");
+          const conVal = /^-?\d+,\d{2}$/.test(valP);
+          if (!isDayCol && isPerm && ri !== nd){ data.cell.__perm3 = true; data.cell.text = [""]; data.cell.styles.minCellHeight = conVal ? 12.8 : 10.5; }
+          else if (!isDayCol && isWhole && ri !== nd){ data.cell.__hm00 = true; data.cell.text = [""]; data.cell.styles.minCellHeight = 7.4; }
+          else if (!isDayCol && isNum && ri !== nd){ data.cell.__hmw = true; data.cell.text = [""]; data.cell.styles.minCellHeight = 7.4; }
+          if (ri === nd){ data.cell.styles.fontStyle = "bold"; data.cell.styles.fillColor = [238,242,255]; if (!isDayCol) data.cell.styles.fontSize = 8; return; }
           const day = ri + 1;
           if (isDayCol){
             if (isRosso(fset, anno, m, day)){ data.cell.styles.fillColor = [178,34,34]; data.cell.styles.textColor = [255,255,255]; }
@@ -2216,11 +2248,24 @@ function esportaPDF(state, pairs, opz){
             doc.setFont(undefined, "bold");
             const tc = data.cell.styles.textColor;
             if (Array.isArray(tc)) doc.setTextColor(tc[0], tc[1], tc[2]); else doc.setTextColor(17, 24, 39);
-            if (val){ doc.setFontSize(fs); y += fs * 0.3528 * 0.8; doc.text(val, cx, y, { align:"center", baseline:"middle" }); }
+            if (val){ doc.setFontSize(fs); y += fs * 0.3528 * 0.8; doc.text(val, cx, y, { align:"center", baseline:"middle" });
+              if (/^-?\d+,\d{2}$/.test(val)){ y += 2.6; scriviParole(val, cx, y, data.cell.width); } }
             doc.setTextColor(109, 40, 217);
             doc.setFontSize(6);
             y += 2.4; doc.text("+ aggiunta", cx, y, { align:"center", baseline:"middle" });
             y += 2.4; doc.text("come sotto ***", cx, y, { align:"center", baseline:"middle" });
+            return;
+          }
+          if (data.cell.__hmw){
+            const rawW = String(data.cell.raw || "").trim();
+            const fsW = data.cell.styles.fontSize || 9;
+            const cxW = data.cell.x + data.cell.width / 2;
+            const yW = data.cell.y + data.cell.height / 2 - 1.3;
+            doc.setFontSize(fsW); doc.setFont(undefined, "bold");
+            const tcW = data.cell.styles.textColor;
+            if (Array.isArray(tcW)) doc.setTextColor(tcW[0], tcW[1], tcW[2]); else doc.setTextColor(17, 24, 39);
+            doc.text(rawW, cxW, yW, { align:"center", baseline:"middle" });
+            scriviParole(rawW, cxW, yW + 3.0, data.cell.width);
             return;
           }
           if (!data.cell.__hm00) return;
@@ -2232,13 +2277,14 @@ function esportaPDF(state, pairs, opz){
           doc.setFontSize(fs); doc.setFont(undefined, "bold");
           const w1 = doc.getTextWidth(p1); const w2 = doc.getTextWidth(p2);
           const cx = data.cell.x + data.cell.width / 2;
-          const cy = data.cell.y + data.cell.height / 2;
+          const cy = data.cell.y + data.cell.height / 2 - 1.3;   /* ver194: il numero sale, sotto le parole */
           const sx = cx - (w1 + w2) / 2;
           const tc = data.cell.styles.textColor;
           if (Array.isArray(tc)) doc.setTextColor(tc[0], tc[1], tc[2]); else doc.setTextColor(17, 24, 39);
           doc.text(p1, sx, cy, { baseline:"middle" });
           doc.setTextColor(180, 180, 180);
           doc.text(p2, sx + w1, cy, { baseline:"middle" });
+          scriviParole(p1 + ",00", cx, cy + 3.0, data.cell.width);   /* ver194 */
         }
       });
 
@@ -2261,7 +2307,7 @@ function esportaPDF(state, pairs, opz){
           if (deb <= 0.0005) return;
           const rec = (bm > 0) ? Math.min(bm, deb) : 0;
           const nuo = R2((bm - rec),3);
-          recupLines.push(dp.nome + " — debito pregresso " + pdfHM(deb) + " h: recupero " + pdfHM(R2(rec,3)) + " h, ore nuove " + pdfHM(nuo) + " h");   /* ver190: in ore,minuti (Christian, 20/11/2026: «in sessantesimi vanno i report a4 in dipendenti») */
+          recupLines.push(dp.nome + " — debito pregresso " + pdfHM(deb) + " h (" + pdfHMparole(deb) + "): recupero " + pdfHM(R2(rec,3)) + " h (" + pdfHMparole(R2(rec,3)) + "), ore nuove " + pdfHM(nuo) + " h (" + pdfHMparole(nuo) + ")");   /* ver194: anche a parole */   /* ver190: in ore,minuti (Christian, 20/11/2026: «in sessantesimi vanno i report a4 in dipendenti») */
         });
         if (recupLines.length > 0){
           ensureY(8);
@@ -2302,7 +2348,7 @@ function esportaPDF(state, pairs, opz){
           doc.text("Permessi orari (segnalati con ***, non inclusi nel TOT):", 14, yy); yy += 3.6; doc.setFont(undefined,"normal");
           doc.setFontSize(6.5); doc.setTextColor(70,70,70);
           permMese.forEach(function(pp){
-            const riga = pp.nome + " — giorno " + pp.giorno + ": Aggiungere " + pdfHM(pp.ore) + " ore di permesso (" + pp.tipo + ")";   /* ver190: in ore,minuti */
+            const riga = pp.nome + " — giorno " + pp.giorno + ": Aggiungere " + pdfHM(pp.ore) + " ore (" + pdfHMparole(pp.ore) + ") di permesso (" + pp.tipo + ")";   /* ver194: anche a parole */   /* ver190: in ore,minuti */
             const ls = doc.splitTextToSize("•  " + riga, 269); ensureY(ls.length * 3.2); doc.text(ls, 14, yy); yy += ls.length * 3.2; });
         }
         if (orfani.length > 0){
@@ -2877,8 +2923,8 @@ function esportaPDFPaghe(state, pairs){
   const JsPDF = window.jspdf.jsPDF;
   const doc = new JsPDF({ orientation:"landscape", unit:"mm", format:"a4" });   /* ver188: tre dipendenti per pagina, affiancati */
   const dips = dipSorted(state);
-  const fh = function(x){ return pdfHM(R2(x, 3)); };   /* ver188: righe in ORE,MINUTI (sessantesimi), come il Report storico */
-  const ft = function(x){ return fmt2(x) + " (" + pdfHM(R2(x, 3)) + ")"; };   /* ver191: centesimi e, fra parentesi, ore,minuti (Christian, 20/11/2026) */          /* ver188: il TOTALE in centesimi, come il Report storico (ver87) */
+  const fh = function(x){ return pdfHMx(R2(x, 3)); };   /* ver188: righe in ORE,MINUTI (sessantesimi); ver194: anche a parole, «4,50 (4 h e 50 min)» */
+  const ft = function(x){ return fmt2(x) + " (" + pdfHM(R2(x, 3)) + " = " + pdfHMparole(R2(x, 3)) + ")"; };   /* ver194: «101,50 (101,30 = 101 h e 30 min)» */   /* ver191: centesimi e, fra parentesi, ore,minuti (Christian, 20/11/2026) */          /* ver188: il TOTALE in centesimi, come il Report storico (ver87) */
   let first = true, prodotto = false;
   const nuovaPagina = function(){ if (!first) doc.addPage(); first = false; };
   pairs.forEach(function(pr){
@@ -2978,14 +3024,16 @@ function esportaPDFPaghe(state, pairs){
       const tR = sumCol(function(x){ return x.retH.reduce(function(a, v){ return a + (v || 0); }, 0); }), tN = sumCol(function(x){ return x.nrH; });
       /* ver188 (Christian, 20/11/2026): tre dipendenti per pagina A4 orizzontale; intestazione solo con nominativo e
          mese; niente legende, niente riquadro «DA INSERIRE A CEDOLINO», niente segni † e *. I numeri non cambiano. */
-      const LARG = 89, SPAZIO = 5.5, SX = 8;
-      if (posto % 3 === 0) nuovaPagina();
+      /* ver194 (Christian, 20/11/2026: «Per intero ovunque»): con le ore scritte anche a parole UNA persona per pagina,
+         colonne larghe e carattere più grande. Il resto (intestazione, colonne, numeri) è quello della ver188. */
+      const LARG = 281, SX = 8;
+      nuovaPagina();
       prodotto = true;
-      const x0 = SX + (posto % 3) * (LARG + SPAZIO);
+      const x0 = SX;
       posto++;
-      doc.setFontSize(11); doc.setFont(undefined, "bold"); doc.setTextColor(15,39,64);
+      doc.setFontSize(13); doc.setFont(undefined, "bold"); doc.setTextColor(15,39,64);
       doc.text(doc.splitTextToSize(dp.nome, LARG)[0], x0, 11);
-      doc.setFontSize(10); doc.setFont(undefined, "normal");
+      doc.setFontSize(11); doc.setFont(undefined, "normal");
       doc.text(MONTH_LABEL[m-1] + " " + anno, x0, 16);
       const rosse = []; rows.forEach(function(x, i){ if (x.rosso) rosse.push(i); });
       doc.autoTable({
@@ -2993,10 +3041,10 @@ function esportaPDFPaghe(state, pairs){
         head: [["Giorno", "Ordinarie", "Supplementari", "Assenze retribuite", "Non retribuite (ASS.ING / ASP 0h)"]],
         body: body,
         foot: [["TOTALE", ft(tO), ft(tS), ft(tR), ft(tN)]],
-        styles:{ fontSize:7.5, cellPadding:0.75, valign:"middle", lineColor:[214,214,214], lineWidth:0.1, overflow:"linebreak" },
-        headStyles:{ fillColor:[15,39,64], textColor:[255,255,255], fontSize:7, fontStyle:"bold", halign:"center" },
+        styles:{ fontSize:9, cellPadding:0.75, valign:"middle", lineColor:[214,214,214], lineWidth:0.1, overflow:"linebreak" },
+        headStyles:{ fillColor:[15,39,64], textColor:[255,255,255], fontSize:9, fontStyle:"bold", halign:"center" },
         footStyles:{ fillColor:[234,240,250], textColor:[15,39,64], fontStyle:"bold", halign:"center" },
-        columnStyles:{ 0:{ halign:"left", cellWidth:16 }, 1:{ halign:"center", cellWidth:14 }, 2:{ halign:"center", cellWidth:20 }, 3:{ halign:"left", cellWidth:20 }, 4:{ halign:"left", cellWidth:19 } },
+        columnStyles:{ 0:{ halign:"left", cellWidth:28 }, 1:{ halign:"center", cellWidth:55 }, 2:{ halign:"center", cellWidth:55 }, 3:{ halign:"left", cellWidth:77 }, 4:{ halign:"left", cellWidth:66 } },
         tableWidth: LARG,
         margin:{ left:x0, right: 297 - x0 - LARG, top: 19, bottom: 6 },
         pageBreak: "avoid",

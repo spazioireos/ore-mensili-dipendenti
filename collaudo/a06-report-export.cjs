@@ -3,29 +3,32 @@ const K=require('./a00-comune.cjs'); const R=K.contatore('a06-report-export'); c
 const XLSX=require(__dirname+'/.strumenti/node_modules/xlsx');
 const ver=process.argv[2]||'dip';
 const NOMEF=/^Spazio Ireos .+ - \d{2}[a-z]{3}\d{2} - ver\d+ - \d{2}\.\d{2}\.(pdf|xlsx)$/;
-const fmtT=v=>{ const c=v.toFixed(2).replace('.',','); const h=Math.floor(v+1e-9), mm=Math.round((v-h)*60); return {c, h: h+','+String(mm).padStart(2,'0')}; };
+const fmtT=v=>{ const c=v.toFixed(2).replace('.',','); const h=Math.floor(v+1e-9), mm=Math.round((v-h)*60); return {c, h: h+','+String(mm).padStart(2,'0'), p: (h>0&&mm>0)?(h+' h e '+mm+' min'):(h>0?(h+' h'):(mm+' min'))}; };   /* ver194: anche a parole */
 const n=s=>parseFloat(String(s).replace(/\./g,'').replace(',','.'));
 (async()=>{ const br=await K.chromium.launch({args:['--no-sandbox']});
   const {ctx,pg,E}=await K.apri(br,{ver}); await K.vai(pg,'Ott');
   const genera=async(btn,mese,anno)=>{ await pg.getByRole('button',{name:btn,exact:true}).click(); await pg.waitForTimeout(400); const s=pg.locator('.modal select'); await s.nth(0).selectOption(String(mese)); await s.nth(1).selectOption(String(anno||2026));
     return await K.scarica(pg,()=>pg.locator('.modal .modal-actions button').last().click(),30000); };
-  const info=(f)=>({pag:+(/^Pages:\s+(\d+)/m.exec(K.sh('pdfinfo '+JSON.stringify(f)))||[0,0])[1], txt:K.sh('pdftotext -layout '+JSON.stringify(f)+' -')});
+  const info=(f)=>({pag:+(/^Pages:\s+(\d+)/m.exec(K.sh('pdfinfo '+JSON.stringify(f)))||[0,0])[1], txt:K.sh('pdftotext -layout '+JSON.stringify(f)+' -'), raw:K.sh('pdftotext -raw '+JSON.stringify(f)+' -')});
   const eng=await pg.evaluate(()=>{ const st=JSON.parse(localStorage.getItem('spazioireos_reportore_v1')); const o={}; st.dipendenti.forEach(dp=>{ const r=(st.dati['2026-10']||{})[dp.id]; o[dp.nome]=r?totOfRec(r,2026,10):0; }); return o; });
   /* storico */
   let d=await genera('🖨️ Report PDF A4',10); let I=d&&info(d.f);
   T('A06.01 «🖨️ Report PDF A4» ottobre: si genera, nome secondo convenzione', d && NOMEF.test(d.nome) && /Report Ore mensile/.test(d.nome), d&&d.nome);
-  T('A06.02 storico: 1 pagina (3 persone)', I&&I.pag===1, I&&I.pag);
-  const tot=/TOT ORE RESE([^\n]*)/.exec(I.txt); const vals=tot?tot[1].trim().split(/\s+/).map(n).filter(x=>!isNaN(x)):[];
-  T('A06.03 storico: riga «TOT ORE RESE» = totOfRec del motore per le 3 persone (in centesimi)', vals.length===3 && ['ALFA PROVA','BETA PROVA','GAMMA PROVA'].every(nm=>vals.some(v=>Math.abs(v-eng[nm])<0.006)), JSON.stringify(vals)+' vs '+JSON.stringify(eng));
+  /* ver194: sotto ogni numero le ore a parole, le righe sono più alte e il report va su più pagine: il titolo si ripete con «(segue)» */
+  T('A06.02 storico (ver194): una o più pagine, dalla seconda il titolo con «(segue)»', I && I.pag>=1 && (I.pag===1 || (I.txt.match(/\(segue\)/g)||[]).length===I.pag-1), I&&I.pag);
+  const rawS=I.raw.replace(/\s+/g,' ');
+  const vals=['ALFA PROVA','BETA PROVA','GAMMA PROVA'].map(nm=>{ const f=fmtT(eng[nm]); return new RegExp(f.c+' \\('+f.h+' = '+f.p+'\\)').test(rawS) ? f.c : null; });
+  T('A06.03 storico: riga «TOT ORE RESE» = totOfRec del motore per le 3 persone, «centesimi (ore,minuti = h e min)» (ver194)', vals.every(Boolean), JSON.stringify(vals)+' vs '+JSON.stringify(eng));
+  T('A06.03b storico (ver194): ogni ora,minuti ha sotto le sue parole giuste (es. «6,30» → «(6 h e 30 min)»)', (()=>{ const m=[...rawS.matchAll(/(\d+),(\d{2}) \(((\d+) h)?( e )?((\d+) min)?\)/g)]; return m.length>20 && m.every(x=>(+(x[4]||0))===+x[1] && (+(x[7]||0))===+x[2]); })(), (rawS.match(/\d+,\d{2} \([^)]*\)/g)||[]).slice(0,4).join(' · '));
   T('A06.04 storico: ore in «ore,minuti» (6,30 = 6 h 30 min) e nessuna legenda (ver95)', /6,30/.test(I.txt) && !/Legenda/i.test(I.txt));
   /* paghe */
   d=await genera('🖨️ Report PDF A4 per le paghe',10); I=d&&info(d.f);
   T('A06.05 «🖨️ Report PDF A4 per le paghe» ottobre: nome «Ore da riportare a cedolino - …» secondo convenzione', d && NOMEF.test(d.nome) && /Ore da riportare a cedolino/.test(d.nome), d&&d.nome);
-  T('A06.06 paghe (ver189: tre per pagina, A4 orizzontale): ALFA e BETA sulla stessa pagina, GAMMA non mensilizzata assente', I.pag===1 && /ALFA PROVA/.test(I.txt) && /BETA PROVA/.test(I.txt) && !/GAMMA PROVA/.test(I.txt), I.pag);
+  T('A06.06 paghe (ver194: UNA persona per pagina, A4 orizzontale): ALFA e BETA su due pagine, GAMMA non mensilizzata assente', I.pag===2 && /ALFA PROVA/.test(I.txt) && /BETA PROVA/.test(I.txt) && !/GAMMA PROVA/.test(I.txt), I.pag);
   const pA=I.txt.split('\f').find(p=>/ALFA PROVA/.test(p)).replace(/\s+/g,' ');
   const box=await pg.evaluate(()=>{ const st=JSON.parse(localStorage.getItem('spazioireos_reportore_v1')); const r={}; st.dipendenti.filter(d=>d.id!=='c').forEach(dp=>{ const B=cedolinoBox(st,dp,2026,10); r[dp.nome]={ordC:B.ordC,supp:B.supp,ced:B.ced,ced2:cedOrePubblica(st)['2026-10'][dp.id]}; }); return r; });
   const oT=fmtT(box['ALFA PROVA'].ordC), sT=fmtT(box['ALFA PROVA'].supp);   /* ver191: TOTALE «centesimi (ore,minuti)»; le tre tabelle sono affiancate, quindi si cerca la coppia giusta nel testo della pagina */
-  const mT=(new RegExp(oT.c.replace('.','\\.')+'[\\s\\S]*\\('+oT.h+'\\)').test(pA) && new RegExp(sT.c+' \\('+sT.h+'\\)').test(pA)) ? [null,oT.c,sT.c] : null;
+  const mT=(new RegExp(oT.c+' \\('+oT.h+' = '+oT.p+'\\)').test(pA) && new RegExp(sT.c+' \\('+sT.h+' = '+sT.p+'\\)').test(pA)) ? [null,oT.c,sT.c] : null;   /* ver194: «146,00 (146,00 = 146 h)» */
   T('A06.07 paghe ALFA: TOTALE ordinarie e supplementari = box del Tabellone (146,00 · 4,00) = cedOre (150,00)', mT && Math.abs(n(mT[1])-box['ALFA PROVA'].ordC)<0.006 && Math.abs(n(mT[2])-box['ALFA PROVA'].supp)<0.006 && Math.abs(box['ALFA PROVA'].ced-box['ALFA PROVA'].ced2)<0.006, mT&&mT.slice(1).join('/')+' '+JSON.stringify(box['ALFA PROVA']));
   const pB=I.txt.split('\f').find(p=>/BETA PROVA/.test(p)).replace(/\s+/g,' ');
   T('A06.08 paghe BETA: ASS.ING del 12 fra le non retribuite, con le ore in ore,minuti (ver189: il riquadro «DA TRATTENERE» non c\'è più)', /12 lun.*ASS\.ING \d+,[0-5]\d/.test(I.txt) && !/DA TRATTENERE/.test(pB), (I.txt.match(/ASS\.ING \d+,\d+/)||[''])[0]);
@@ -35,7 +38,7 @@ const n=s=>parseFloat(String(s).replace(/\./g,'').replace(',','.'));
   await pg.getByRole('button',{name:'🖨️ Report PDF A4 per le paghe',exact:true}).click(); await pg.waitForTimeout(300);
   const s=pg.locator('.modal select'); await pg.locator('.modal input[type=radio]').nth(1).check(); await s.nth(2).selectOption('10'); await s.nth(3).selectOption('2026'); await s.nth(4).selectOption('11'); await s.nth(5).selectOption('2026');
   d=await K.scarica(pg,()=>pg.locator('.modal .modal-actions button').last().click(),30000); I=d&&info(d.f);
-  T('A06.10 paghe ottobre→novembre: ALFA ha anche novembre (ver189: 2 pagine, ottobre con ALFA e BETA, novembre con ALFA)', d && I.pag===2, d&&I.pag);
+  T('A06.10 paghe ottobre→novembre: ALFA ha anche novembre (ver194: una persona per pagina, ottobre ALFA e BETA, novembre ALFA = 3 pagine)', d && I.pag===3, d&&I.pag);
   /* Excel del mese */
   d=await genera('📊 Excel',10); let wb=d&&XLSX.readFile(d.f);
   T('A06.11 📊 Excel del mese: .xlsx, nome «Report Ore mensile - … - '+K.APPV+'», autore Christian', d && NOMEF.test(d.nome) && /Report Ore mensile/.test(d.nome) && wb.Props && wb.Props.Author==='Christian', d&&d.nome+' '+JSON.stringify(wb&&wb.Props).slice(0,80));
