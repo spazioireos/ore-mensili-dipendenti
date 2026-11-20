@@ -518,7 +518,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver190";
+const APP_VER = "ver191";
 const APP_DATA = "20nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -2158,7 +2158,7 @@ function esportaPDF(state, pairs, opz){
         body.push(row);
       }
       /* ver87: il totale finale resta in CENTESIMI (numero decimale vero), non in ore,minuti. */
-      const totRow = ["TOT ORE RESE"].concat(tot.map(function(t){ return fmt2(R2(t)); })).concat(["TOT ORE RESE"]);
+      const totRow = ["TOT ORE RESE"].concat(tot.map(function(t){ return fmt2(R2(t)) + " (" + pdfHM(R2(t, 3)) + ")"; })).concat(["TOT ORE RESE"]);   /* ver191: centesimi e, fra parentesi, ore,minuti (Christian, 20/11/2026) */
       body.push(totRow);
       const ncols = 2 + chunk.length;
       const lastIdx = chunk.length + 1;
@@ -2878,7 +2878,7 @@ function esportaPDFPaghe(state, pairs){
   const doc = new JsPDF({ orientation:"landscape", unit:"mm", format:"a4" });   /* ver188: tre dipendenti per pagina, affiancati */
   const dips = dipSorted(state);
   const fh = function(x){ return pdfHM(R2(x, 3)); };   /* ver188: righe in ORE,MINUTI (sessantesimi), come il Report storico */
-  const ft = function(x){ return fmt2(x); };          /* ver188: il TOTALE in centesimi, come il Report storico (ver87) */
+  const ft = function(x){ return fmt2(x) + " (" + pdfHM(R2(x, 3)) + ")"; };   /* ver191: centesimi e, fra parentesi, ore,minuti (Christian, 20/11/2026) */          /* ver188: il TOTALE in centesimi, come il Report storico (ver87) */
   let first = true, prodotto = false;
   const nuovaPagina = function(){ if (!first) doc.addPage(); first = false; };
   pairs.forEach(function(pr){

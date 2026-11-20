@@ -1,4 +1,4 @@
-/* Collaudo ver189/ver190 (dati INVENTATI): «🖨️ Report PDF A4 per le paghe» a tre per pagina, A4 orizzontale, senza legende,
+/* Collaudo ver189/ver190/ver191 (dati INVENTATI): «🖨️ Report PDF A4 per le paghe» a tre per pagina, A4 orizzontale, senza legende,
    righe in ORE,MINUTI e TOTALE in centesimi (Christian, 20/11/2026: «nei report le ore vanno in sessantesimi»).
    Rifà sul formato nuovo i controlli numerici di ver183 (P6, P8, P9, P10, P11), che leggevano il formato vecchio.
    Prima: bash collaudo/prepara-banco.sh ver188. Poi: node collaudo/ver189.cjs */
@@ -52,8 +52,14 @@ const hm=s=>{ const m=/^(-?)(\d+),(\d{2})$/.exec(s); if(!m) return NaN; return (
   const W=+larg[1], H=+larg[2]; const col=(p,k)=>sh('pdftotext -layout -f '+p+' -l '+p+' -x '+Math.round(k*W/3*96/72)+' -y 0 -W '+Math.round(W/3*96/72)+' -H '+Math.round(H*96/72)+' -r 96 '+JSON.stringify(R.out)+' -');
   const blocchi={}; mens.forEach((n,i)=>{ blocchi[n]=col(1+Math.floor(i/3), i%3); });
   mens.forEach(n=>{ const b=blocchi[n]; const f=b.replace(/\s+/g,' '); const e=eng[n];
-    const m=/TOTALE ([\d.]+,\d{2}) ([\d.]+,\d{2}) ([\d.]+,\d{2}) ([\d.]+,\d{2})/.exec(f);
-    T('Q7 '+n+': TOTALE in centesimi = voci del cedolino (ord. '+e.ord+' · suppl. '+e.supp+' · retr. '+e.ret+' · tratt. '+e.tr+')', m && Math.abs(num(m[1])-e.ord)<0.006 && Math.abs(num(m[2])-e.supp)<0.006 && Math.abs(num(m[3])-e.ret)<0.006 && Math.abs(num(m[4])-e.tr)<0.006, m?m.slice(1).join(' / '):f.slice(-120));
+    /* ver191: il TOTALE è «centesimi (ore,minuti)»; nella colonna stretta delle ordinarie va su due righe, quindi la riga
+       del piede si legge dalle ultime righe del blocco: «86,84» / «TOTALE 0,00 (0,00) …» / «(86,50)» */
+    const piede=b.split('\n').map(x=>x.trim()).filter(Boolean); const iT=piede.findIndex(x=>/^TOTALE/.test(x)); const zona=piede.slice(Math.max(0,iT-1)).join(' ');
+    const cent=(zona.match(/(?<![(\d,])\d[\d.]*,\d{2}(?!\))/g)||[]).map(num); const sess=(zona.match(/\((\d+,\d{2})\)/g)||[]).map(x=>x.slice(1,-1));
+    const m=cent.length===4 && sess.length===4 ? [null].concat(cent) : null;
+    const coppie=m ? [[cent[0],sess[3]],[cent[1],sess[0]],[cent[2],sess[1]],[cent[3],sess[2]]] : [];
+    T('Q7 '+n+': TOTALE in centesimi = voci del cedolino (ord. '+e.ord+' · suppl. '+e.supp+' · retr. '+e.ret+' · tratt. '+e.tr+')', m && Math.abs(cent[0]-e.ord)<0.006 && Math.abs(cent[1]-e.supp)<0.006 && Math.abs(cent[2]-e.ret)<0.006 && Math.abs(cent[3]-e.tr)<0.006, zona);
+    T('Q7b '+n+': fra parentesi lo stesso totale in ore,minuti (ver191)', m && coppie.every(c=>Math.abs(hm(c[1])-c[0])<=1/60+0.006), coppie.map(c=>c[0]+' ('+c[1]+')').join(' · '));
     const righe=b.split('\n').filter(r=>/^\s*\d{1,2} (lun|mar|mer|gio|ven|sab|dom)/.test(r));
     let ord=0, okmin=true; righe.forEach(r=>{ const t=r.replace(/^\s*\d{1,2} \w{3}\s+/,'').trim().split(/\s{2,}/); const v=t[0]; if(/^\d+,\d{2}$/.test(v)){ const mm=+v.split(',')[1]; if(mm>59) okmin=false; ord+=hm(v); } });
     T('Q8 '+n+': righe in ORE,MINUTI (minuti fra 00 e 59) e la loro somma torna al totale delle ordinarie (± 1 minuto per riga)', okmin && m && Math.abs(ord-e.ord)*60 <= righe.length+1, righe.length+' righe, somma '+ord.toFixed(3)+' h contro '+e.ord);
@@ -61,10 +67,11 @@ const hm=s=>{ const m=/^(-?)(\d+),(\d{2})$/.exec(s); if(!m) return NaN; return (
   });
   T('Q10 MALATTIA: 8 giorni «MAL 3,10» (3 h 10 min = 3,1731 h), le domeniche «R»', (blocchi['PROVA MALATTIA'].match(/MAL 3,10/g)||[]).length===8 && /dom\s+R/.test(blocchi['PROVA MALATTIA']), (blocchi['PROVA MALATTIA'].match(/MAL \d+,\d+/g)||[]).slice(0,3).join(' '));
   T('Q11 INGIUST: il 12 «ASS.ING 3,00» fra le non retribuite', /12 lun.*ASS\.ING 3,00/.test(blocchi['PROVA INGIUST']));
-  T('Q12 QUINDICI (63 h lavorate, stipendio intero): TOTALE ordinarie 65,13, niente da trattenere', /TOTALE 65,13 0,00 [\d,]+ 0,00/.test(blocchi['PROVA QUINDICI'].replace(/\s+/g,' ')));
+  { const z=blocchi['PROVA QUINDICI'].replace(/\s+/g,' '); T('Q12 QUINDICI (63 h lavorate, stipendio intero): TOTALE ordinarie 65,13 (65,08), niente da trattenere', /65,13 TOTALE 0,00 \(0,00\) [\d,]+ \([\d,]+\) 0,00 \(0,00\) \(65,08\)/.test(z), z.slice(-80)); }
   const S=await pdf(pg,'🖨️ Report PDF A4 per le paghe',9);
   T('Q13 settembre (prima della base mensile): lo dice, nessun foglio', S.dl && /Nessun dipendente mensilizzato/.test(S.flat));
   const H2=await pdf(pg,'🖨️ Report PDF A4',10); T('Q14 il Report PDF A4 storico si genera ancora, ore in ore,minuti', H2.dl && /Report Ore/.test(H2.flat) && /\b\d+,[0-5]\d\b/.test(H2.flat));
+  { const tt=/TOT ORE RESE([^\n]*)/.exec(H2.txt); T('Q17 Report storico: TOT ORE RESE in centesimi con le ore,minuti fra parentesi (ver191: 101,50 (101,30))', tt && /101,50 \(101,30\)/.test(tt[1]) && /72,50 \(72,30\)/.test(tt[1]), tt&&tt[1].trim().slice(0,90)); }
   T('Q16 Report storico: il permesso di 1,5 h si scrive «Aggiungere 1,30 ore» (ver190: ore,minuti anche in calce)', /Aggiungere 1,30 ore di permesso \(EXF\)/.test(H2.flat) && !/Aggiungere 1,50/.test(H2.flat), (H2.flat.match(/Aggiungere [\d,]+ ore[^)]*\)/)||[''])[0]);
   if(R.out) sh('pdftoppm -r 80 -png -f 1 -l 1 '+JSON.stringify(R.out)+' '+JSON.stringify(__dirname+'/out/ver189-p1'));
   T('Q15 zero errori di pagina', E.length===0, E.join(' | '));

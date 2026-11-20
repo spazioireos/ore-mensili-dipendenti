@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver190 · 20nov26, IN ANTEPRIMA sul ramo di lavoro, da approvare** (su `main` c'è la ver187 · 19nov26, approvata il 20/11/2026: «main Fogli ore rev 19 e Dipendenti ver187»). `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver191 · 20nov26 — approvata da Christian e portata su `main` il 20/11/2026** («Main per tutto»; contiene le ver188-190, mai pubblicate da sole). `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -37,12 +37,16 @@ Banca ore, tetto annuo, contratti e export.
   Corretto anche un difetto **preesistente** che la nuova navigazione rendeva visibile: nella
   testata, in vista Anagrafica, compariva "📅 undefined 2026" (perché `mese` è `null` fuori dalle
   viste mensili); ora mostra "📇 Anagrafica".
-- 🕐 **ver190 (20/11/2026, IN ANTEPRIMA)** — Christian: «Intendo che in sessantesimi vanno i report a4 in dipendenti». Nel
+- ➕ **ver191 (20/11/2026, su `main`)** — Christian: «Il totale va bene in centesimi ma aggiungi fra parentesi anche i sessantesimi».
+  Nei due report A4 il **TOTALE** è ora «**101,50 (101,30)**»: centesimi e, fra parentesi, ore,minuti (`pdfHM`). Nella colonna stretta
+  delle ordinarie del report paghe il totale va su due righe (misurato, leggibile). Prove: `ver189.cjs` 34/0 (Q7b, Q17), `a02` 50/0,
+  `a04` 30/0, `a06` 22/0 (A06.07 aggiornato al formato nuovo), `a07` 64/0 (targhetta a tre cifre).
+- 🕐 **ver190 (20/11/2026, su `main` dentro la ver191)** — Christian: «Intendo che in sessantesimi vanno i report a4 in dipendenti». Nel
   **Report PDF A4 storico** anche le due righe in calce che erano in decimali passano a **ore,minuti** (`pdfHM`): «Aggiungere 1,30 ore
   di permesso» (era 1,50) e il blocco RECUPERO / ORE NUOVE. Le celle lo erano già (ver87). **Restano in centesimi i TOTALI** dei due
   report A4, come chiesto nella ver87 («il totale finale deve essere però in centesimi»). I report non più richiamati dalla ver183
   (`esportaPDFMens`, `esportaPDFConto`, `esportaPDFOrdExtra`, ramo LUL) non sono stati toccati. Provato: `ver189.cjs` 28/0 (Q16).
-- 🔧 **ver189 (20/11/2026, IN ANTEPRIMA, da approvare; risposte di Christian al collaudo integrato)**, sopra la ver188 (mai pubblicata):
+- 🔧 **ver189 (20/11/2026, su `main` dentro la ver191; risposte di Christian al collaudo integrato)**, sopra la ver188 (mai pubblicata):
   1. **«1, ti ricordi che nei report le ore vanno in sessantesimi??»** — nel «🖨️ Report PDF A4 per le paghe» le **righe** sono ora in
      **ORE,MINUTI** con `pdfHM` (3,1731 h → «3,10»), come il Report storico dalla ver87; il **TOTALE** resta in **centesimi** (`fmt2`),
      come lì. Nessun numero cambia: cambia come si scrive (misurato: totali identici alla ver187/188 sui 5 casi inventati).
@@ -53,7 +57,7 @@ Banca ore, tetto annuo, contratti e export.
      ⚠️ Christian aveva nominato trasformazione e massimale: proroga e periodo sono lo stesso tipo di ✕ e il §10.1 la chiede per tutte.
   4. **«4, metti il tetto»** — il **permesso orario** rifiuta più di **13 ore** (`ORE_MAX_GIORNO`) con lo stesso avviso delle celle.
   ⚠️ **Diciture nuove, scritte da Claude**: le quattro conferme. Provato: `collaudo/ver189.cjs` (report), batteria `a01`…`a08`.
-- 🖨️ **ver188 (20/11/2026, IN ANTEPRIMA, da approvare): IL «🖨️ Report PDF A4 per le paghe» CON TRE DIPENDENTI PER PAGINA**
+- 🖨️ **ver188 (20/11/2026, su `main` dentro la ver191): IL «🖨️ Report PDF A4 per le paghe» CON TRE DIPENDENTI PER PAGINA**
   (Christian: «Nel report a4 per le paghe, togli le legende e l'intestazione deve riportare solo nominativo e mese di
   riferimento. Ogni pagina contenga 3 dipendenti»; sue scelte: **A4 orizzontale**, riquadro «DA INSERIRE A CEDOLINO»
   **tolto**, segni † e * **tolti con le loro note**).

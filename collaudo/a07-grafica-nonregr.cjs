@@ -28,6 +28,6 @@ async function giro(br,ver,w){ const {ctx,pg,E}=await K.apri(br,{ver,w}); const 
     }
     T('A07 '+w+'px zero errori di pagina (ver183)', a.E.length===0, a.E.join('|'));
     if(w===1280){ const ha=a.head.replace(/\s+/g,' '), hb=b.head.replace(/\s+/g,' ');
-      T('A07 testata: rispetto alla ver182 cambiano SOLO targhetta e pulsanti dei report', ha.replace(/ver18\d · \d+nov26/,'').replace(/🖨️ Report PDF A4[^💾⬇⬆📊🔑]*/g,'')===hb.replace(/ver18\d · \d+nov26/,'').replace(/🖨️ Report PDF A4[^💾⬇⬆📊🔑]*/g,''), ha+' // '+hb); }
+      T('A07 testata: rispetto alla ver182 cambiano SOLO targhetta e pulsanti dei report', ha.replace(/ver1\d\d · \d+nov26/,'').replace(/🖨️ Report PDF A4[^💾⬇⬆📊🔑]*/g,'')===hb.replace(/ver1\d\d · \d+nov26/,'').replace(/🖨️ Report PDF A4[^💾⬇⬆📊🔑]*/g,''), ha+' // '+hb); }
   }
   R.fine(); await br.close(); })().catch(e=>{ console.error(e); process.exit(1); });

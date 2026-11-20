@@ -3,6 +3,7 @@ const K=require('./a00-comune.cjs'); const R=K.contatore('a06-report-export'); c
 const XLSX=require(__dirname+'/.strumenti/node_modules/xlsx');
 const ver=process.argv[2]||'dip';
 const NOMEF=/^Spazio Ireos .+ - \d{2}[a-z]{3}\d{2} - ver\d+ - \d{2}\.\d{2}\.(pdf|xlsx)$/;
+const fmtT=v=>{ const c=v.toFixed(2).replace('.',','); const h=Math.floor(v+1e-9), mm=Math.round((v-h)*60); return {c, h: h+','+String(mm).padStart(2,'0')}; };
 const n=s=>parseFloat(String(s).replace(/\./g,'').replace(',','.'));
 (async()=>{ const br=await K.chromium.launch({args:['--no-sandbox']});
   const {ctx,pg,E}=await K.apri(br,{ver}); await K.vai(pg,'Ott');
@@ -23,7 +24,8 @@ const n=s=>parseFloat(String(s).replace(/\./g,'').replace(',','.'));
   T('A06.06 paghe (ver189: tre per pagina, A4 orizzontale): ALFA e BETA sulla stessa pagina, GAMMA non mensilizzata assente', I.pag===1 && /ALFA PROVA/.test(I.txt) && /BETA PROVA/.test(I.txt) && !/GAMMA PROVA/.test(I.txt), I.pag);
   const pA=I.txt.split('\f').find(p=>/ALFA PROVA/.test(p)).replace(/\s+/g,' ');
   const box=await pg.evaluate(()=>{ const st=JSON.parse(localStorage.getItem('spazioireos_reportore_v1')); const r={}; st.dipendenti.filter(d=>d.id!=='c').forEach(dp=>{ const B=cedolinoBox(st,dp,2026,10); r[dp.nome]={ordC:B.ordC,supp:B.supp,ced:B.ced,ced2:cedOrePubblica(st)['2026-10'][dp.id]}; }); return r; });
-  const mT=/TOTALE ([\d.,]+)(?: \*)? ([\d.,]+)/.exec(pA);
+  const oT=fmtT(box['ALFA PROVA'].ordC), sT=fmtT(box['ALFA PROVA'].supp);   /* ver191: TOTALE «centesimi (ore,minuti)»; le tre tabelle sono affiancate, quindi si cerca la coppia giusta nel testo della pagina */
+  const mT=(new RegExp(oT.c.replace('.','\\.')+'[\\s\\S]*\\('+oT.h+'\\)').test(pA) && new RegExp(sT.c+' \\('+sT.h+'\\)').test(pA)) ? [null,oT.c,sT.c] : null;
   T('A06.07 paghe ALFA: TOTALE ordinarie e supplementari = box del Tabellone (146,00 · 4,00) = cedOre (150,00)', mT && Math.abs(n(mT[1])-box['ALFA PROVA'].ordC)<0.006 && Math.abs(n(mT[2])-box['ALFA PROVA'].supp)<0.006 && Math.abs(box['ALFA PROVA'].ced-box['ALFA PROVA'].ced2)<0.006, mT&&mT.slice(1).join('/')+' '+JSON.stringify(box['ALFA PROVA']));
   const pB=I.txt.split('\f').find(p=>/BETA PROVA/.test(p)).replace(/\s+/g,' ');
   T('A06.08 paghe BETA: ASS.ING del 12 fra le non retribuite, con le ore in ore,minuti (ver189: il riquadro «DA TRATTENERE» non c\'è più)', /12 lun.*ASS\.ING \d+,[0-5]\d/.test(I.txt) && !/DA TRATTENERE/.test(pB), (I.txt.match(/ASS\.ING \d+,\d+/)||[''])[0]);
