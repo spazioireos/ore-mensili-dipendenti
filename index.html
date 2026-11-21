@@ -587,6 +587,7 @@ const CODICI = [
   { c:"MAT-ANT",l:"Maternità anticipata",               pay:true,  bg:"#FF66CC" },
   { c:"ASP 0h", l:"Aspettativa non pagata",             pay:false, bg:"#FF0066" },
   { c:"ASS.ING",l:"Assenza ingiustificata",             pay:false, bg:"#F4B183" },  /* ver168 (Christian 15/11/2026): non retribuita, come ASP 0h */
+  { c:"SCIOP",  l:"Sciopero",                           pay:false, ero:true, bg:"#B0BEC5" },  /* ver204 (Christian 21/11/2026: «la voce SCIOP che equivale a zero ore lavorate», «come ass ing, ma erode»): non retribuito, si trattiene sempre per intero, ma ERODE il massimale (ero:true) */
   { c:"CASSA",  l:"Cassa integrazione o simili",        pay:true,  bg:"#CC3300" }   /* ver151: retribuita (Christian) */
 ];
 const CODE_SET = {};
@@ -1151,7 +1152,7 @@ function eroOn(rec,d){ return !(rec && rec.ero && rec.ero[d] === false); }   // 
 /* ver169 (Christian, 15/11/2026): «l'assenza non retribuita AN o ASS.ING non deve erodere il massimale:
    la correzione tocca anche ASP 0h». Erode solo l'assenza RETRIBUITA (pay:true): -- e AN erano già fuori,
    ora anche ogni codice pay:false (ASP 0h, ASS.ING). È il punto unico: lo usa anche il numerino cliccabile. */
-function isAbsCell(v){ const c=String(v==null?"":v).trim(); const k=CODE_SET[c]; return !!(k && c!=="--" && c!=="AN" && k.pay!==false); }
+function isAbsCell(v){ const c=String(v==null?"":v).trim(); const k=CODE_SET[c]; return !!(k && c!=="--" && c!=="AN" && (k.pay!==false || k.ero===true)); }   /* ver204: anche SCIOP (non retribuito ma erosivo, ero:true) */
 /* ver99 (05/11/2026, Christian: «potrebbe essere di un giorno durante le vacanze natalizie in
    luogo del giorno di ferie, quindi e' erosivo o non erosivo anche esso»): ore di permesso
    RETRIBUITO delle sole giornate EROSIVE. Il contrassegno e' quello del GIORNO (`rec.ero[d]`),
@@ -1304,6 +1305,7 @@ function tsDaRiga(state, dp, y, m, r){
   const g = rec.giorni || {};
   const voci = {};                                    /* codice che copre le ore -> {gg, ggE, giorni} */
   const nonRetr = {}; const nrGiorni = []; let an = 0, festng = 0;
+  const nrE = {};                                     /* ver204: giorni non retribuiti ma EROSIVI (SCIOP), non spenti col clic */
   for (let d = 1; d <= nd; d++){
     const cv = String(g[d]==null ? "" : g[d]).trim();
     if (cv === "AN"){ an++; continue; }
@@ -1312,7 +1314,7 @@ function tsDaRiga(state, dp, y, m, r){
     if (copreOre(cv)){
       const t = voci[cv] || (voci[cv] = { gg:0, ggE:0, giorni:[] });
       t.gg++; t.giorni.push(d); if (eroOn(rec, d)) t.ggE++;
-    } else { nonRetr[cv] = (nonRetr[cv]||0) + 1; nrGiorni.push(d); }
+    } else { nonRetr[cv] = (nonRetr[cv]||0) + 1; nrGiorni.push(d); if (CODE_SET[cv].ero === true && eroOn(rec, d)) nrE[cv] = (nrE[cv]||0) + 1; }
   }
   const voce = function(cod, gg, ggE, giorni, qq){
     const ore = alPasso(gg * qq), oreE = alPasso(ggE * qq);
@@ -1361,14 +1363,15 @@ function tsDaRiga(state, dp, y, m, r){
     trattNL = Math.max(0, R2(monte - assTot - trattNR - ordC, 6));
     tratt = R2(trattNR + trattNL, 6);
   }
-  const eroTot = ferie.oreE + altreTot.oreE + fest.oreE + permTot.oreE;
+  const nrEro = Object.keys(nrE).reduce(function(a, k){ return a + alPasso(nrE[k] * q); }, 0);   /* ver204: scioperi erosivi */
+  const eroTot = ferie.oreE + altreTot.oreE + fest.oreE + permTot.oreE + nrEro;
   return {
     monte: monte, parziale: fr < 0.9999, fr: fr, q: q, qF: qF,
     ferie: ferie, altre: altre, altreTot: altreTot, fest: fest, perm: permTot, permTipi: perm,
     ordC: ordC, ordCPasso: alPasso(ordC), tratt: tratt, trattNR: trattNR, trattNL: trattNL, sotto: sotto, supp: supp, assTot: assTot,
     nonGod: { gg:festNon.length, ore:alPasso(festNon.length * q), giorni:festNon },
     nonRetr: Object.keys(nonRetr).sort().map(function(k){ return { cod:k, gg:nonRetr[k], ore:alPasso(nonRetr[k] * q) }; }), nrGiorni: nrGiorni,
-    an: an, festng: festng, ced: ordC + supp, eroTot: eroTot
+    an: an, festng: festng, ced: ordC + supp, eroTot: eroTot, nrEro: nrEro
   };
 }
 /* il TS del mese (null se il mese non è a cedolino mensilizzato o non ha dati) */
@@ -1406,18 +1409,18 @@ function cedolinoBox(state, dp, y, m){
     nonGod: { gg:T.nonGod.gg, ore:v2(T.nonGod.ore), giorni:T.nonGod.giorni },
     nonRetr: T.nonRetr.map(function(x){ return { cod:x.cod, gg:x.gg, ore:v2(x.ore) }; }),
     an: T.an, festng: T.festng, note: vociLines(rec),
-    ced: v2(T.ced), eroTot: v2(T.eroTot), rend: v2(T.ced + T.eroTot)
+    ced: v2(T.ced), eroTot: v2(T.eroTot), nrEro: v2(T.nrEro || 0), rend: v2(T.ced + T.eroTot)
   };
 }
 /* ver203: le due frasi del box che dipendono dalla regola del cedolino (soglia = ore mensili, B). Diciture di Claude. */
 function cedTrattDesc(B, h){
   const p = [];
-  if (B.trattNR > 0.004) p.push("assenze ingiustificate / aspettative non pagate (ASS.ING / ASP 0h) " + h(B.trattNR));
+  if (B.trattNR > 0.004) p.push("assenze ingiustificate / aspettative non pagate / scioperi (ASS.ING / ASP 0h / SCIOP) " + h(B.trattNR));
   if (B.trattNL > 0.004) p.push("ore non lavorate sotto le ore mensili " + h(B.trattNL));
   return p.join(" · ");
 }
 function cedSuppDesc(B, h){
-  if (B.supp > 0.004) return "ore oltre le ore mensili, da pagare in più, maggiorate" + (B.nonRetr.length ? " (le ASS.ING / ASP 0h non si compensano con le ore in più)" : "");
+  if (B.supp > 0.004) return "ore oltre le ore mensili, da pagare in più, maggiorate" + (B.nonRetr.length ? " (le ASS.ING / ASP 0h / SCIOP non si compensano con le ore in più)" : "");
   if (B.trattNL > 0.004) return "nessuna: le ore lavorate e pagate non arrivano alle ore mensili (" + h(B.monte) + ")";
   return "nessuna";
 }
@@ -3127,7 +3130,7 @@ function esportaPDFPaghe(state, pairs){
       sch.push(["   di cui festività godute", ft(TS.fest.ore), TS.fest.gg ? TS.fest.gg + " gg (" + TS.fest.giorni.join(", ") + ")" : ""]);
       TS.altre.forEach(function(a){ sch.push(["   di cui " + a.cod, ft(a.ore), a.gg + " gg"]); });
       if (TS.perm.ore > 0.004) sch.push(["   di cui permessi retribuiti", ft(TS.perm.ore), TS.permTipi.map(function(v){ return v.cod; }).join(", ")]);
-      if (TS.trattNR > 0.004) sch.push(["   di cui da TRATTENERE: ASS.ING / ASP 0h", ft(TS.trattNR), TS.nonRetr.map(function(z){ return z.cod + " " + z.gg + " gg"; }).join(" · ")]);
+      if (TS.trattNR > 0.004) sch.push(["   di cui da TRATTENERE: ASS.ING / ASP 0h / SCIOP", ft(TS.trattNR), TS.nonRetr.map(function(z){ return z.cod + " " + z.gg + " gg"; }).join(" · ")]);
       if (TS.trattNL > 0.004) sch.push(["   di cui da TRATTENERE: ore non lavorate", ft(TS.trattNL), "mancano alle ore dovute"]);
       sch.push(["ORE SUPPLEMENTARI, maggiorate del " + magg, ft(TS.supp), TS.supp > 0.004 ? "da pagare in più: ore oltre le ore dovute" : "nessuna"]);
       sch.push(["FESTIVITÀ NON GODUTE, a parte", ft(TS.nonGod.ore), TS.nonGod.gg ? TS.nonGod.gg + " gg (" + TS.nonGod.giorni.join(", ") + "), da pagare in più" : "nessuna"]);
@@ -3149,7 +3152,7 @@ function esportaPDFPaghe(state, pairs){
       const rosse = []; rows.forEach(function(x, i){ if (x.rosso) rosse.push(i); });
       const optT = function(fs, pad){ return {
         startY: 19,
-        head: [["Giorno", "Ordinarie", "Supplementari", "Assenze retribuite", "Non retribuite (ASS.ING / ASP 0h)"]],
+        head: [["Giorno", "Ordinarie", "Supplementari", "Assenze retribuite", "Non retribuite (ASS.ING / ASP 0h / SCIOP)"]],
         body: body,
         foot: [["TOTALE", ft(tO), ft(tS), ft(tR), ft(tN)]],
         styles:{ fontSize:fs, cellPadding:pad, valign:"middle", lineColor:[214,214,214], lineWidth:0.1, overflow:"linebreak" },
@@ -3815,7 +3818,7 @@ function EmployeeCard(props){
                     /* ver203 (Christian: «il finanziatore prende in mano il cedolino, guarda la prima riga (retribuzione) e toglie le ore
                        trattenute eventualmente presenti a cedolino, poi guarda le assenze retribuite escludendo le festività non godute e
                        ciò che non è erosivo»): la didascalia dice il conto con le sue parole. */
-                    return <span>= prima riga del cedolino, ore mensili (B) <b>{fmtH(Bx.monte)}</b> − ore trattenute a cedolino <b>{fmtH(Bx.tratt)}</b> + supplementari <b>{fmtH(Bx.supp)}</b> − assenze retribuite non erosive <b>{fmtH(NE)}</b> (le festività non godute restano fuori). Il dettaglio è nel riquadro «🧾 DA INSERIRE A CEDOLINO» qui sotto.{Math.abs(dG) > 0.0005 ? <span> Differisce da G di <b>{(dG > 0 ? "+" : "") + fmt3(dG)}</b> perché a cedolino le ore si scrivono ai minuti ammessi.</span> : <span> Questo mese coincide con G.</span>}</span>; })()
+                    return <span>= prima riga del cedolino, ore mensili (B) <b>{fmtH(Bx.monte)}</b> − ore trattenute a cedolino <b>{fmtH(Bx.tratt)}</b> + supplementari <b>{fmtH(Bx.supp)}</b> − assenze retribuite non erosive <b>{fmtH(NE)}</b>{Bx.nrEro > 0.0005 ? <span> + scioperi (SCIOP, trattenuti ma erosivi) <b>{fmtH(Bx.nrEro)}</b></span> : null} (le festività non godute restano fuori). Il dettaglio è nel riquadro «🧾 DA INSERIRE A CEDOLINO» qui sotto.{Math.abs(dG) > 0.0005 ? <span> Differisce da G di <b>{(dG > 0 ? "+" : "") + fmt3(dG)}</b> perché a cedolino le ore si scrivono ai minuti ammessi.</span> : <span> Questo mese coincide con G.</span>}</span>; })()
                 : <span>Qui il cedolino paga le ore fatte (non è un mese a busta mensilizzata), quindi H = G.</span>}</div>
             </div>; })()}
         </div>
@@ -3912,11 +3915,11 @@ function EmployeeCard(props){
               {/* ver182 (Christian, «2a»): delle ore in meno si trattengono SOLO ASS.ING e ASP 0h */}
               {/* ver196 (Christian: «nessuna compensazione»): nei mesi mensilizzati ASS.ING e ASP 0h si trattengono sempre per intero */}
               {/* ver203 (Christian: «Oltre B, come le paghe»): nei mesi mensilizzati il cedolino guarda solo le ore mensili (B): qui se ne mostrano trattenute e supplementari */}
-              {(meseCedolinoTetto(dp, y, m) && props.cedBox) ? ((props.cedBox.tratt > 0.0005 || props.cedBox.supp > 0.0005) ? <span className="cong-chip">a cedolino (soglia: ore mensili B {fmt3(R2(monteFissoMese(dp, y, m) * meseFrazione(dp, y, m), 3))}): supplementari <b>{fmt3(props.cedBox.supp)} h</b> · da trattenere <b>{fmt3(props.cedBox.tratt)} h</b>{props.cedBox.trattNR > 0.0005 ? <span> (di cui ASS.ING / ASP 0h {fmt3(props.cedBox.trattNR)} h)</span> : null}</span> : null) :
-              (delta < -0.0005 || (meseCedolinoTetto(dp, y, m) && am.nonRetr.ore > 0.0005)) ? (function(){ const fisse = meseCedolinoTetto(dp, y, m); const tr = fisse ? am.nonRetr.ore : Math.min(-delta, am.nonRetr.ore), so = Math.max(0, -delta - am.nonRetr.ore), sp = fisse ? Math.max(0, delta + am.nonRetr.ore) : 0; return <span className="cong-chip">da trattenere (ASS.ING / ASP 0h): <b>{fmt3(tr)} h</b> · sotto l'orario, non trattenute: <b>{fmt3(so)} h</b>{sp > 0.0005 ? <span> · a cedolino supplementari <b>{fmt3(sp)} h</b> (le ASS.ING / ASP 0h non si compensano con le ore in più)</span> : null}</span>; })() : null}
+              {(meseCedolinoTetto(dp, y, m) && props.cedBox) ? ((props.cedBox.tratt > 0.0005 || props.cedBox.supp > 0.0005) ? <span className="cong-chip">a cedolino (soglia: ore mensili B {fmt3(R2(monteFissoMese(dp, y, m) * meseFrazione(dp, y, m), 3))}): supplementari <b>{fmt3(props.cedBox.supp)} h</b> · da trattenere <b>{fmt3(props.cedBox.tratt)} h</b>{props.cedBox.trattNR > 0.0005 ? <span> (di cui ASS.ING / ASP 0h / SCIOP {fmt3(props.cedBox.trattNR)} h)</span> : null}</span> : null) :
+              (delta < -0.0005 || (meseCedolinoTetto(dp, y, m) && am.nonRetr.ore > 0.0005)) ? (function(){ const fisse = meseCedolinoTetto(dp, y, m); const tr = fisse ? am.nonRetr.ore : Math.min(-delta, am.nonRetr.ore), so = Math.max(0, -delta - am.nonRetr.ore), sp = fisse ? Math.max(0, delta + am.nonRetr.ore) : 0; return <span className="cong-chip">da trattenere (ASS.ING / ASP 0h / SCIOP): <b>{fmt3(tr)} h</b> · sotto l'orario, non trattenute: <b>{fmt3(so)} h</b>{sp > 0.0005 ? <span> · a cedolino supplementari <b>{fmt3(sp)} h</b> (le ASS.ING / ASP 0h / SCIOP non si compensano con le ore in più)</span> : null}</span>; })() : null}
             </div>
             <div className="cong-res">
-              Ogni mese fa storia a sé. <b>A cedolino</b> (mensilizzati) conta solo le ore mensili (B): le ore oltre B si pagano maggiorate, quelle che mancano a B si trattengono (ASS.ING e ASP 0h sempre per intero). <b>Niente si riporta</b> al mese dopo. Il totale annuo per persona è nella <b>Query personale → ⚡ Straordinario</b>.
+              Ogni mese fa storia a sé. <b>A cedolino</b> (mensilizzati) conta solo le ore mensili (B): le ore oltre B si pagano maggiorate, quelle che mancano a B si trattengono (ASS.ING, ASP 0h e SCIOP sempre per intero). <b>Niente si riporta</b> al mese dopo. Il totale annuo per persona è nella <b>Query personale → ⚡ Straordinario</b>.
               <div style={{ fontSize:"11px", color:"#9a3412", marginTop:"2px" }}>{meseCedolinoTetto(dp, y, m) ? "Base = ore previste del mese (C) = ore mensili (B), in proporzione se il mese è parziale, come il cedolino. Numeri a 3 decimali." : "Base = ore previste del mese (C): ore mensili (B) ÷ 26 × giorni non domenicali in forza. Numeri a 3 decimali."}</div>
             </div>
           </div>;
@@ -3948,7 +3951,7 @@ function EmployeeCard(props){
               B.festng ? "FESTNG " + B.festng + " gg (si paga in più)" : null,
               B.perm.altre > 0.004 ? "permessi scritti a mano " + h(B.perm.altre) + " (non contati)" : null
             ].concat(B.note).filter(Boolean).join(" · ") || "nessuna"}</div>
-            <div className="ced-rend">Per il rendiconto: ore a cedolino ordinarie e supplementari {fmtH(B.ced)} + ore retribuite erosive {fmtH(B.eroTot)} = {fmtH(B.rend)} tolte dal massimale e per il finanziatore che paga le erosive.</div>
+            <div className="ced-rend">Per il rendiconto: ore a cedolino ordinarie e supplementari {fmtH(B.ced)} + ore retribuite erosive {fmtH(B.eroTot)}{B.nrEro > 0.0005 ? " (di cui scioperi SCIOP, non pagati ma erosivi, " + fmtH(B.nrEro) + ")" : ""} = {fmtH(B.rend)} tolte dal massimale e per il finanziatore che paga le erosive.</div>
           </div>;
         })()}
         {(function(){

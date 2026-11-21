@@ -1,6 +1,6 @@
 /* Collaudo ver204 (21/11/2026, Christian: «2, Mettere C uguale a B»): nei mesi a busta mensilizzata (da ottobre 2026) le
    «ORE CHE DEVONO RISULTARE …» (C) = ore mensili (B), in proporzione se il mese è parziale, come il cedolino della ver203.
-   Dati INVENTATI. Prima: python3 collaudo/rigenera.py ver203. Poi: node collaudo/ver204.cjs   (PORTA=8300 di serie) */
+   Più il codice SCIOP (sciopero: «come ass ing, ma erode»). Dati INVENTATI. Prima: python3 collaudo/rigenera.py ver203. Poi: node collaudo/ver204.cjs   (PORTA=8300 di serie) */
 const { chromium } = (function(){ try { return require('playwright'); } catch(e) { return require('/opt/node-tools/node_modules/playwright'); } })();
 const PORTA=process.env.PORTA||'8300';
 let P=0,F=0; const T=(n,c,d)=>{(c?P++:F++);console.log((c?'  OK  ':'  NO  ')+n+(d!==undefined?'  -> '+d:''));};
@@ -20,7 +20,8 @@ async function leggi(br,dir,S,anno,mese,w){ const ctx=await br.newContext({viewp
     const h=q('.foot-fin');
     return { C:pc?(pc.innerText.match(/([\d.,]+)\s*$/)||[])[1]:null, Ctit:pc?pc.title:'', ris:(c.innerText.match(/Risultato del mese: ([+\-−]?[\d.,]+) h/)||[])[1],
       anc:t('.foot-ancora'), cosaE:t('.cosa-e'), base:(c.innerText.match(/Base = [^\n]*/)||[''])[0], chip:[...c.querySelectorAll('.cong-chip')].map(x=>x.innerText.replace(/\s+/g,' ')).filter(x=>/a cedolino/.test(x)).join(' | '),
-      H:h?(h.querySelector('.foot-fin-r b')||{}).innerText:null, G:t('.foot-teor:not(.foot-noner) > b'), tetto:(c.innerText.match(/Già usate[^\d]*([\d.,]+)/)||[])[1], box:t('.ced-box'), ced:JSON.stringify(ced), pw:document.documentElement.scrollWidth }; });
+      rossi:c.querySelectorAll('.cell-in.ignota').length, numerini:c.querySelectorAll('.teor-abs').length, ced12:(c.querySelector('.ced-box')||{}).innerText||'',
+      H:h?(h.querySelector('.foot-fin-r b')||{}).innerText:null, Htxt:h?h.innerText.replace(/\s+/g,' '):'', G:t('.foot-teor:not(.foot-noner) > b'), tetto:(c.innerText.match(/Già usate[^\d]*([\d.,]+)/)||[])[1], box:t('.ced-box'), ced:JSON.stringify(ced), pw:document.documentElement.scrollWidth }; });
   r.err=E.length; r.errs=E; await ctx.close(); return r; }
 (async()=>{ const br=await chromium.launch({args:['--no-sandbox']});
   let j=0; const A=seme(2026,10,lunSab(2026,10,d=>(j++===0)?'MAL':'3,25'),{oreLav:'85'});      // ottobre 27 gg, 84,5 rese + 1 MAL
@@ -31,6 +32,18 @@ async function leggi(br,dir,S,anno,mese,w){ const ctx=await br.newContext({viewp
   let s9=0; const S9=seme(2026,9,lunSab(2026,9,d=>(s9++<20)?'4':null));                         // settembre 2026, prima della base mensile
   const R={}; for (const [nm,S,an,me] of [['A',A,2026,10],['B',B,2026,11],['C',C,2027,1],['D',D,2026,10],['E',E,2026,12],['S9',S9,2026,9]]) { R[nm]=await leggi(br,'dip',S,an,me); R[nm+'v']=await leggi(br,'ver203',S,an,me); }
   const t=await leggi(br,'dip',A,2026,10,390);
+  /* SCIOP: ottobre 2026 a 19 h, sciopero lunedì 12, gli altri 26 giorni da 3,5 h = 91 rese */
+  const SC=seme(2026,10,lunSab(2026,10,d=>d===12?'SCIOP':'3,5'));
+  R.SC=await leggi(br,'dip',SC,2026,10); R.SCv=await leggi(br,'ver203',SC,2026,10);
+  const SCne=seme(2026,10,lunSab(2026,10,d=>d===12?'SCIOP':'3,5')); SCne.dati['2026-10'].a.ero={12:false}; R.SCne=await leggi(br,'dip',SCne,2026,10);
+  /* SCIOP battuto a mano in minuscolo nella cella del 13 ottobre */
+  const ctx2=await br.newContext({viewport:{width:1500,height:1100}}); const pg2=await ctx2.newPage(); const E2=[]; pg2.on('pageerror',e=>E2.push(e.message));
+  await pg2.addInitScript(x=>{ if(!sessionStorage.getItem('_s')){ localStorage.setItem('spazioireos_reportore_v1',JSON.stringify(x)); sessionStorage.setItem('_s','1'); } },A);
+  await pg2.goto('http://127.0.0.1:'+PORTA+'/dip/index.html'); await pg2.waitForTimeout(4500);
+  const pins=pg2.locator('input[type=password]'); if(await pins.count()>=2){ await pins.nth(0).fill('1234'); await pins.nth(1).fill('1234'); await pg2.getByRole('button',{name:/Crea PIN/i}).first().click(); await pg2.waitForTimeout(1800); }
+  const tb=await pg2.locator('.tabs .tab').allInnerTexts(); await pg2.locator('.tabs .tab').nth(tb.findIndex(x=>x.trim().toUpperCase().startsWith('OTT'))).click(); await pg2.waitForTimeout(1000);
+  const cel=pg2.locator('.emp-card input.cell-in').nth(12); await cel.click(); await pg2.keyboard.type('sciop'); await pg2.keyboard.press('Tab'); await pg2.waitForTimeout(600);
+  const battuto=await cel.inputValue(); const rossoB=await cel.evaluate(e=>e.classList.contains('ignota')); await ctx2.close();
   console.log(JSON.stringify(Object.fromEntries(Object.entries(R).map(([k,v])=>[k,[v.C,v.ris,v.anc,v.H,v.G,v.tetto]]))));
   T('T01 ottobre 27 gg: C = B = 82,500 (ver203: 85,673)', R.A.C==='82,500' && R.Av.C==='85,673', R.A.C+' / '+R.Av.C);
   T('T02 ottobre: Risultato del mese +5,167 = supplementari a cedolino (ver203 su C: +1,994)', R.A.ris==='+5,167' && R.Av.ris==='+1,994' && /supplementari 5,167 h/.test(R.A.chip), R.A.ris+' / '+R.Av.ris+' · '+R.A.chip);
@@ -46,6 +59,14 @@ async function leggi(br,dir,S,anno,mese,w){ const ctx=await br.newContext({viewp
   T('T12 settembre 2026 (prima della base mensile): C identica alla ver203', R.S9.C===R.S9v.C && R.S9.C!=null, R.S9.C);
   T('T13 suggerimento di C: «= B (ore mensili), in proporzione … come il cedolino mensilizzato»', /= B \(ore mensili\), in proporzione/.test(R.A.Ctit) && /÷ 26/.test(R.E.Ctit), R.A.Ctit.slice(0,120));
   T('T14 riga «Base = …» del riquadro dice C = B nei mesi mensilizzati', /Base = ore previste del mese \(C\) = ore mensili \(B\)/.test(R.A.base), R.A.base);
+  T('T17 SCIOP: Risultato del mese 91 − B 82,5 = +8,500', R.SC.ris==='+8,500', R.SC.ris);
+  T('T18 SCIOP a cedolino come ASS.ING: da trattenere 3,167 (il giorno intero) e supplementari 11,667 (91 − 79,333), senza compensazione', /supplementari 11,667 h · da trattenere 3,167 h \(di cui ASS\.ING \/ ASP 0h \/ SCIOP 3,167 h\)/.test(R.SC.chip), R.SC.chip);
+  T('T19 SCIOP nel riquadro «Da inserire a cedolino»: fra le trattenute, «scioperi (ASS.ING / ASP 0h / SCIOP) 3,167»', /scioperi \(ASS\.ING \/ ASP 0h \/ SCIOP\) 3,167/.test(R.SC.box), (R.SC.box.match(/di cui ore non fatte[^\n]{0,160}/)||[''])[0]);
+  T('T20 SCIOP erode: numerino sotto la cella, H = G = massimale = 91,000 + 3,167 = 94,167', R.SC.numerini===1 && R.SC.H==='94,167' && R.SC.G==='94,167' && R.SC.tetto==='94,167', R.SC.numerini+' '+R.SC.H+' '+R.SC.G+' '+R.SC.tetto);
+  T('T20b SCIOP: rendiconto «(di cui scioperi SCIOP, non pagati ma erosivi, 3,167)» e didascalia di H «+ scioperi (SCIOP, trattenuti ma erosivi) 3,167»', /di cui scioperi SCIOP, non pagati ma erosivi, 3,167/.test(R.SC.box) && /\+ scioperi \(SCIOP, trattenuti ma erosivi\) 3,167/.test(R.SC.Htxt||''), (R.SC.box.match(/Per il rendiconto[^\n]{0,200}/)||[''])[0]);
+  T('T20c SCIOP spento col clic (servizio chiuso): non erode, H = G = 91,000, ma resta trattenuto 3,167', R.SCne.H==='91,000' && R.SCne.G==='91,000' && /da trattenere 3,167 h/.test(R.SCne.chip), R.SCne.H+' '+R.SCne.G+' · '+R.SCne.chip);
+  T('T21 SCIOP riconosciuto (nessuna cella rossa); nella ver203 era una scritta sconosciuta', R.SC.rossi===0 && R.SCv.rossi===1, R.SC.rossi+' / '+R.SCv.rossi);
+  T('T22 «sciop» battuto in minuscolo diventa SCIOP e non è rosso', battuto==='SCIOP' && !rossoB && E2.length===0, battuto+' '+rossoB+' '+E2.join(';'));
   T('T15 390px senza scorrimento laterale', t.pw===390, t.pw);
   T('T16 zero errori di pagina', Object.values(R).concat([t]).every(x=>x.err===0), Object.values(R).map(x=>x.errs.join(';')).join('|'));
   console.log('\nRISULTATO: '+P+' superati, '+F+' falliti'); await br.close(); process.exit(F?1:0); })();
