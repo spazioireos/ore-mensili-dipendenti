@@ -45,7 +45,10 @@ async function apriMese(br,url,tab,w){ const {ctx,pg,E}=await apri(br,url,w,tab)
   T('W07 novembre: F = G (niente NON ER)', nv.fTot===nv.teor && nv.teor===R.vnov1500.teor, nv.fTot+' / '+nv.teor);
   T('W08 linguette: «E» sulle erosive, «NON ER» sulle non erosive', n.tabs.length>=6 && n.tabs.every(t=> t.ne ? /^NON ER\s*\d/.test(t.t) : /^E\s*\d/.test(t.t)), n.tabs.map(t=>t.t).join(' | '));
   T('W09 nessuna linguetta «NE» rimasta', !n.tabs.some(t=>/^NE\s*\d/.test(t.t)));
-  T('W10 Tetto annuo identico alla ver197 (le NON ER non erodono)', n.tetto===v.tetto, n.tetto+' vs '+v.tetto);
+  { const nt=parseFloat(String(n.tetto).replace(/\./g,'').replace(',','.')), vt=parseFloat(String(v.tetto).replace(/\./g,'').replace(',','.'));
+    /* ver203: a dicembre il cedolino paga le ore fatte (75) + le erosive, quindi il massimale scende un po' meno della ver197 (lì la
+       busta mensilizzata pagava 78,158 − ASS.ING); le NON ER restano fuori dal massimale (F ≠ G qui sopra) */
+    T('W10 Tetto annuo: dalla ver203 di poco più basso della ver197 (il cedolino paga le ore fatte), NON ER sempre fuori', nt < vt && vt - nt < 0.5, n.tetto+' vs '+v.tetto); }
   T('W11 riga di spiegazione con «NON ER»', /diventa NON ER/.test(n.leg||''), (n.leg||'').slice(0,160));
   T('W13 tabella del mese non più larga della ver197 (1500px)', n.tw<=v.tw, n.tw+' vs '+v.tw);
   T('W14 390px: niente scorrimento laterale', R.ndic390.pw<=390 && R.nnov390.pw<=390, R.ndic390.pw+' / '+R.nnov390.pw);

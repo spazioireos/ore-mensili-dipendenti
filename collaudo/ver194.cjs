@@ -40,7 +40,7 @@ const hm=s=>{ const m=/^(-?)(\d+),(\d{2})$/.exec(s); if(!m) return NaN; return (
 (async()=>{ const br=await chromium.launch({args:['--no-sandbox']});
   const {ctx,pg,E}=await apri(br,'http://127.0.0.1:8300/dip/index.html');
   T('Q1 targhetta '+APPV, (await pg.locator('.app-rev').first().innerText()).indexOf(APPV)!==-1);
-  const eng=await pg.evaluate(()=>{ const st=JSON.parse(localStorage.getItem('spazioireos_reportore_v1')); const o={}; st.dipendenti.forEach(dp=>{ const r=oreSuppPeriodo(st,dp,[{y:2026,m:10}],null,null,0).righe[0]; if(r) o[dp.nome]={ord:R2(r.ordCed,2),supp:R2(r.supp,2),ret:R2(r.ass+r.fest,2),tr:R2(r.tratt,2),ced:cedOrePubblica(st)['2026-10'][dp.id]}; }); return o; });
+  const eng=await pg.evaluate(()=>{ const st=JSON.parse(localStorage.getItem('spazioireos_reportore_v1')); const o={}; st.dipendenti.forEach(dp=>{ const r=oreSuppPeriodo(st,dp,[{y:2026,m:10}],null,null,0).righe[0]; if(r) o[dp.nome]={ord:R2(r.ordCed,2),supp:R2(r.supp,2),ret:R2(r.ass+r.fest,2),tr:R2((r.ts?r.ts.trattNR:r.tratt),2),trNL:R2((r.ts?r.ts.trattNL:0),2),ced:cedOrePubblica(st)['2026-10'][dp.id]}; }); return o; });
   const R=await pdf(pg,'🖨️ Report PDF A4 per le paghe',10);
   T('Q2 il report per le paghe si genera, nome invariato', R.dl && new RegExp('^Spazio Ireos Ore da riportare a cedolino - \\d{2}[a-z]{3}\\d{2} - '+APPV+' - \\d{2}\\.\\d{2}\\.pdf$').test(R.nome||''), R.nome);
   const info=sh('pdfinfo '+JSON.stringify(R.out)); const larg=/Page size:\s+([\d.]+) x ([\d.]+)/.exec(info);
@@ -48,7 +48,7 @@ const hm=s=>{ const m=/^(-?)(\d+),(\d{2})$/.exec(s); if(!m) return NaN; return (
   const mens=['PROVA CINQUE','PROVA INGIUST','PROVA MALATTIA','PROVA QUINDICI','PROVA SOTTO'];
   const pag=(R.txt||'').split('\f').filter(p=>p.trim());
   T('Q4 una persona per pagina, solo nominativo e mese in testa', pag.length===5 && mens.every((n,i)=>pag[i].indexOf(n)!==-1 && (pag[i].match(/PROVA \w+/g)||[]).length===1 && (pag[i].match(/Ottobre 2026/g)||[]).length===1), pag.map(p=>(p.match(/PROVA \w+/g)||[]).join(',')).join(' / '));
-  T('Q5 nessuna legenda, nessun riquadro «DA INSERIRE A CEDOLINO», nessun † o *', !/DA INSERIRE|ORE CONTRATTUALI|ORE MENSILI|legenda|†|\*/i.test(R.txt), (R.txt.match(/DA INSERIRE|ORE CONTRATTUALI|†|\*/g)||[]).join(','));
+  T('Q5 nessuna legenda, nessun riquadro «DA INSERIRE A CEDOLINO», nessun † o *; dalla ver203 lo «SCHEMA DEL CEDOLINO» per ogni persona', !/DA INSERIRE|ORE CONTRATTUALI|legenda|†|\*/i.test(R.txt) && (R.txt.match(/SCHEMA DEL CEDOLINO/g)||[]).length===5, (R.txt.match(/DA INSERIRE|ORE CONTRATTUALI|†|\*/g)||[]).join(','));
   const par=[...R.flat.matchAll(/(\d+),(\d{2}) \(((\d+) h)?( e )?((\d+) min)?\)/g)];
   T('Q5b ver194: ogni ora,minuti è seguita dalle sue parole giuste («3,50 (3 h e 50 min)», «4,00 (4 h)»)', par.length>100 && par.every(x=>(+(x[4]||0))===+x[1] && (+(x[7]||0))===+x[2]), par.length+' · '+par.slice(0,3).map(x=>x[0]).join(' · '));
   T('Q6 nessun numero a tre decimali (le ore non sono più in millesimi)', !/\d,\d{3}\b/.test(R.txt), (R.txt.match(/\d+,\d{3}\b/g)||[]).slice(0,5).join(' '));
@@ -63,7 +63,8 @@ const hm=s=>{ const m=/^(-?)(\d+),(\d{2})$/.exec(s); if(!m) return NaN; return (
     const cent=gr.map(x=>num(x[1])), sess=gr.map(x=>x[2]);
     const m=gr.length===4 ? [null].concat(cent) : null;
     const coppie=m ? gr.map(x=>[num(x[1]),x[2],x[3]]) : [];
-    T('Q7 '+n+': TOTALE in centesimi = voci del cedolino (ord. '+e.ord+' · suppl. '+e.supp+' · retr. '+e.ret+' · tratt. '+e.tr+')', m && Math.abs(cent[0]-e.ord)<0.006 && Math.abs(cent[1]-e.supp)<0.006 && Math.abs(cent[2]-e.ret)<0.006 && Math.abs(cent[3]-e.tr)<0.006, zona);
+    T('Q7 '+n+': TOTALE in centesimi = voci del cedolino (ord. '+e.ord+' · suppl. '+e.supp+' · retr. '+e.ret+' · tratt. ASS.ING/ASP '+e.tr+')', m && Math.abs(cent[0]-e.ord)<0.006 && Math.abs(cent[1]-e.supp)<0.006 && Math.abs(cent[2]-e.ret)<0.006 && Math.abs(cent[3]-e.tr)<0.006, zona);
+    { const sn=(f.match(/da TRATTENERE: ore non lavorate ([\d.]+,\d{2})/)||[])[1]; T('Q7c '+n+': ver203 — nello schema le ore non lavorate trattenute ('+e.trNL+')', e.trNL>0.004 ? (sn && Math.abs(num(sn)-e.trNL)<0.011) : !sn, sn||'(nessuna riga)'); }
     T('Q7b '+n+': fra parentesi lo stesso totale in ore,minuti e a parole (ver194)', m && coppie.every(c=>{ const mm=/^(\d+),(\d{2})$/.exec(c[1]); const pw=/^((\d+) h)?( e )?((\d+) min)?$/.exec(c[2]); return Math.abs(hm(c[1])-c[0])<=1/60+0.006 && mm && pw && (+(pw[2]||0))===+mm[1] && (+(pw[5]||0))===+mm[2]; }), coppie.map(c=>c[0]+' ('+c[1]+' = '+c[2]+')').join(' · '));
     const righe=b.split('\n').filter(r=>/^\s*\d{1,2} (lun|mar|mer|gio|ven|sab|dom)/.test(r));
     let ord=0, okmin=true; righe.forEach(r=>{ const t=r.replace(/^\s*\d{1,2} \w{3}\s+/,'').trim().split(/\s{2,}/); const v=(t[0]||'').replace(/ \(.*\)$/,''); if(/^\d+,\d{2}$/.test(v)){ const mm=+v.split(',')[1]; if(mm>59) okmin=false; ord+=hm(v); } });
@@ -72,7 +73,7 @@ const hm=s=>{ const m=/^(-?)(\d+),(\d{2})$/.exec(s); if(!m) return NaN; return (
   });
   T('Q10 MALATTIA: 8 giorni «MAL 3,10 (3 h e 10 min)» (= 3,1731 h), le domeniche «R»', (blocchi['PROVA MALATTIA'].match(/MAL 3,10 \(3 h e 10 min\)/g)||[]).length===8 && /dom\s+R/.test(blocchi['PROVA MALATTIA']), (blocchi['PROVA MALATTIA'].match(/MAL \d+,\d+[^·\n]*/g)||[]).slice(0,2).join(' | '));
   T('Q11 INGIUST: il 12 «ASS.ING 3,00 (3 h)» fra le non retribuite', /12 lun.*ASS\.ING 3,00 \(3 h\)/.test(blocchi['PROVA INGIUST']));
-  { const z=(blocchi['PROVA QUINDICI'].match(/TOTALE[^\n]*/)||[''])[0].replace(/\s+/g,' '); T('Q12 QUINDICI (63 h lavorate, stipendio intero): TOTALE ordinarie 65,13 (65,08 = 65 h e 8 min), niente da trattenere', /TOTALE 65,13 \(65,08 = 65 h e 8 min\) 0,00 \(0,00 = 0 min\) [\d,]+ \([^)]*\) 0,00 \(0,00 = 0 min\)/.test(z), z); }
+  { const z=(blocchi['PROVA QUINDICI'].match(/TOTALE[^\n]*/)||[''])[0].replace(/\s+/g,' '); T('Q12 QUINDICI (63 h lavorate): dalla ver203 ordinarie 63,00 e nello schema 2,13 di ore non lavorate trattenute (ver194: 65,13 pagate intere)', /TOTALE 63,00 \(63,00 = 63 h\) 0,00 \(0,00 = 0 min\) [\d,]+ \([^)]*\) 0,00 \(0,00 = 0 min\)/.test(z) && /da TRATTENERE: ore non lavorate 2,13/.test(blocchi['PROVA QUINDICI'].replace(/\s+/g,' ')), z); }
   const S=await pdf(pg,'🖨️ Report PDF A4 per le paghe',9);
   T('Q13 settembre (prima della base mensile): lo dice, nessun foglio', S.dl && /Nessun dipendente mensilizzato/.test(S.flat));
   const H2=await pdf(pg,'🖨️ Report PDF A4',10); T('Q14 il Report PDF A4 storico si genera ancora, ore in ore,minuti', H2.dl && /Report Ore/.test(H2.flat) && /\b\d+,[0-5]\d\b/.test(H2.flat));

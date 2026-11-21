@@ -53,13 +53,13 @@ const n=s=>parseFloat(String(s).replace(/\./g,'').replace(',','.'));
   await ab.click(); await pg.waitForTimeout(300); T('A02.25 secondo clic: torna erosivo', Math.abs(n(await A.locator('.foot-teor:not(.foot-noner) b').innerText())-teor)<0.002);
   /* box cedolino */
   const box=(await A.locator('.ced-box').innerText()).replace(/\s+/g,' ');
-  const bm=/ORE MENSILI ([\d.,]+) h.*di cui ferie ([\d.,]+) h.*altre assenze retribuite ([\d.,]+) h.*festività godute ([\d.,]+) h.*permessi retribuiti ([\d.,]+) h.*ore lavorate ordinarie ([\d.,]+) h.*ORE SUPPLEMENTARI \(Risultato del mese\) \+?([\d.,]+) h/.exec(box);
-  T('A02.26 box cedolino ALFA: ORE MESE 165 = ferie + altre + festività + permessi + ordinarie; supplementari = Risultato al passo (3,654 → 3,667)', bm && Math.abs(n(bm[1])-165)<0.01 && Math.abs(n(bm[2])+n(bm[3])+n(bm[4])+n(bm[5])+n(bm[6])-165)<0.015 && Math.abs(n(bm[7])-3.667)<0.005, bm&&bm.slice(1).join('/'));
+  const bm=/ORE MENSILI ([\d.,]+) h.*di cui ferie ([\d.,]+) h.*altre assenze retribuite ([\d.,]+) h.*festività godute ([\d.,]+) h.*permessi retribuiti ([\d.,]+) h.*ore lavorate ordinarie ([\d.,]+) h.*ORE SUPPLEMENTARI \(oltre le ore mensili\) \+?([\d.,]+) h/.exec(box);
+  T('A02.26 box cedolino ALFA: ORE MESE 165 = ferie + altre + festività + permessi + ordinarie; supplementari oltre le ore mensili (ver203: 175 − 165 = 10,000; il Risultato vero su C resta +3,654)', bm && Math.abs(n(bm[1])-165)<0.01 && Math.abs(n(bm[2])+n(bm[3])+n(bm[4])+n(bm[5])+n(bm[6])-165)<0.015 && Math.abs(n(bm[7])-10)<0.005, bm&&bm.slice(1).join('/'));
   T('A02.27 box: FESTIVITÀ NON GODUTE 1 gg (il 4, domenica)', /FESTIVITÀ NON GODUTE, a sé [\d,]+ h 1 gg/.test(box), box.slice(box.indexOf('FESTIVITÀ NON'),box.indexOf('FESTIVITÀ NON')+60));
   T('A02.28 nessun box per GAMMA (non mensilizzata)', await K.carta(pg,'GAMMA PROVA').locator('.ced-box').count()===0);
   /* BETA: 19 h su 6 gg, sabati vuoti (non AN), ASS.ING il 12 */
   const B=K.carta(pg,'BETA PROVA'); const congB=(await B.locator('.cong').first().innerText()).replace(/\s+/g,' ');
-  T('A02.29 BETA: «da trattenere (ASS.ING / ASP 0h)» presente col Risultato negativo', /da trattenere \(ASS\.ING \/ ASP 0h\): [\d,]+ h/.test(congB) && /Risultato del mese: -/.test(congB), congB.slice(0,300));
+  T('A02.29 BETA: «a cedolino (soglia: ore mensili B …): … da trattenere … (di cui ASS.ING / ASP 0h …)» col Risultato negativo (ver203)', /a cedolino \(soglia: ore mensili B [\d,]+\): supplementari [\d,]+ h · da trattenere [\d,]+ h \(di cui ASS\.ING \/ ASP 0h [\d,]+ h\)/.test(congB) && /Risultato del mese: -/.test(congB), congB.slice(0,300));
   /* Tetto annuo */
   const txtA=(await A.innerText()).replace(/\s+/g,' ');
   const eng=await pg.evaluate(()=>{ const st=window.__st; return null; });

@@ -44,10 +44,12 @@ const hm=s=>{ const m=/^(-?)(\d+),(\d{2})$/.exec(s); if(!m) return NaN; return (
   const nA=leggi(pagA[0]), nB=leggi(pagB[0]), vB=leggi(pagB[1]);
   T('V01 ver194 congelata: PROVA SABATI aveva ore ordinarie sui sabati AN (il difetto)', nA.filter(x=>x.an && x.v>0).length===5, nA.filter(x=>x.an).map(x=>x.d+':'+x.v.toFixed(2)).join(' '));
   T('V02 ver195: PROVA SABATI non ha ore su nessun giorno AN', nB.filter(x=>x.an).length===5 && nB.filter(x=>x.an && x.v>0).length===0, nB.filter(x=>x.an).map(x=>x.d+':'+x.v.toFixed(2)).join(' '));
-  const sB=nB.reduce((a,x)=>a+x.v,0);
-  T('V03 ver195: la differenza va sui giorni lavorati e il totale delle ordinarie resta quello del cedolino ('+B.eng['PROVA SABATI']+')', Math.abs(sB-B.eng['PROVA SABATI'])*60<=nB.length+1 && nB.filter(x=>!x.an && x.v>3.001).length>0, sB.toFixed(3));
-  T('V04 ver195: PROVA VUOTI — la differenza va prima sui due martedì vuoti (6 e 13), i sabati AN restano vuoti', vB.filter(x=>x.an && x.v>0).length===0 && [6,13].every(d=>(vB.find(x=>x.d===d)||{}).v>0), vB.filter(x=>x.d===6||x.d===13||x.an).map(x=>x.d+':'+x.v.toFixed(2)).join(' '));
+  const sB=nB.reduce((a,x)=>a+x.v,0), sV=vB.reduce((a,x)=>a+x.v,0);
+  /* ver203 (Christian: «Oltre B, come le paghe»): il cedolino paga le ore fatte e trattiene quelle che mancano alle ore mensili,
+     quindi non c'è più nessuna differenza da mettere su giorni non lavorati: V03-V05 aggiornate alla regola nuova */
+  T('V03 ver203: PROVA SABATI — ordinarie = ore lavorate (66) e nessun giorno sopra le 3 ore', Math.abs(sB-66)<0.02 && Math.abs(B.eng['PROVA SABATI']-66)<0.006 && nB.filter(x=>!x.an && x.v>3.001).length===0, sB.toFixed(3)+' / '+B.eng['PROVA SABATI']);
+  T('V04 ver203: PROVA VUOTI — i due martedì vuoti (6 e 13) e i sabati AN restano vuoti, ordinarie 60', vB.filter(x=>x.an && x.v>0).length===0 && [6,13].every(d=>(vB.find(x=>x.d===d)||{}).v===0) && Math.abs(sV-60)<0.02, vB.filter(x=>x.d===6||x.d===13||x.an).map(x=>x.d+':'+x.v.toFixed(2)).join(' ')+' · '+sV.toFixed(2));
   const tot=(p)=>((p.match(/TOTALE[^\n]*/)||[''])[0]).replace(/\s+/g,' ');
-  T('V05 i TOTALI sono identici alla ver194 (nessun numero cambia)', tot(pagA[0])===tot(pagB[0]) && tot(pagA[1])===tot(pagB[1]), tot(pagB[0]));
+  T('V05 ver203: i TOTALI cambiano di proposito (ver194 82,50 → 66,00) e lo schema trattiene 16,50 ore non lavorate', /TOTALE 82,50/.test(tot(pagA[0])) && /TOTALE 66,00/.test(tot(pagB[0])) && /da TRATTENERE: ore non lavorate 16,50/.test(pagB[0].replace(/\s+/g,' ')), tot(pagA[0])+' | '+tot(pagB[0]));
   T('V06 zero errori di pagina', A.E.length===0 && B.E.length===0, A.E.concat(B.E).join(' | '));
   console.log('\nver195: '+P+' superati, '+F+' falliti'); await br.close(); })();

@@ -33,7 +33,7 @@ async function giro(br,url,tag){ const {ctx,pg,E}=await apri(br,url); pg.__tag=t
   const R=await pdf(pg,'🖨️ Report PDF A4 per le paghe',10); out.pag={};
   R.txt.split('\f').filter(p=>p.trim()).forEach(p=>{ const n=(p.match(/PROVA \w+/)||[''])[0]; const r={}; p.split('\n').forEach(l=>{ const t=l.replace(/\s+/g,' ').trim(); const m=/^(1[23]|TOTALE)\b/.exec(t); if(m) r[m[1]]=t; }); out.pag[n]=r; });
   await ctx.close(); return out; }
-const sup=b=>{ const m=/ORE SUPPLEMENTARI \(Risultato del mese\)\s*\+?([\d,]+) h/.exec(b||''); return m?m[1]:'?'; };
+const sup=b=>{ const m=/ORE SUPPLEMENTARI \((?:Risultato del mese|oltre le ore mensili)\)\s*\+?([\d,]+) h/.exec(b||''); return m?m[1]:'?'; };
 const trt=b=>{ const m=/da trattenere\s*([\d,]+) h/.exec(b||''); return m?m[1]:'0'; };
 (async()=>{ const br=await chromium.launch({args:['--no-sandbox']});
   const N=await giro(br,'http://127.0.0.1:8300/dip/index.html','n'); const V=await giro(br,'http://127.0.0.1:8300/ver195/index.html','v');
@@ -41,15 +41,19 @@ const trt=b=>{ const m=/da trattenere\s*([\d,]+) h/.exec(b||''); return m?m[1]:'
   T('Z01 ver195: ASS.ING compensata dal giorno con 6 h → 0,00 nel report', /12 lun ASS\.ING 0,00/.test(V.pag['PROVA COMPENSA']['12']||''), V.pag['PROVA COMPENSA']['12']);
   T('Z02 ver195: ASP 0h compensata in parte → 1,00', /12 lun ASP 0h 1,00/.test(V.pag['PROVA PARZIALE']['12']||''), V.pag['PROVA PARZIALE']['12']);
   for(const n of ['PROVA SOLA','PROVA COMPENSA','PROVA PARZIALE']) T('Z03 ver196 '+n+': il giorno 12 vale 3,00 (3 h)', /12 lun (ASS\.ING|ASP 0h) 3,00 \(3 h\)/.test(N.pag[n]['12']||''), N.pag[n]['12']);
-  T('Z04 COMPENSA: le 3 h in più del 13 sono supplementari nel report', /13 mar 2,50 \(2 h e 50 min\) 3,00 \(3 h\)/.test(N.pag['PROVA COMPENSA']['13']||''), N.pag['PROVA COMPENSA']['13']);
-  T('Z05 COMPENSA TOTALE: ordinarie 75,16 · supplementari 3,00 · non retribuite 3,00', /TOTALE 75,16 .* 3,00 \(3,00 = 3 h\) 0,00 .* 3,00 \(3,00 = 3 h\)/.test(N.pag['PROVA COMPENSA'].TOTALE||''), N.pag['PROVA COMPENSA'].TOTALE);
-  T('Z06 PARZIALE TOTALE: supplementari 2,00 · non retribuite 3,00', /TOTALE 75,16 .* 2,00 \(2,00 = 2 h\) 0,00 .* 3,00/.test(N.pag['PROVA PARZIALE'].TOTALE||''), N.pag['PROVA PARZIALE'].TOTALE);
-  T('Z07 SOLA: identica alla ver195 (niente da compensare)', N.pag['PROVA SOLA'].TOTALE===V.pag['PROVA SOLA'].TOTALE && N['PROVA SOLA'].box===V['PROVA SOLA'].box.replace(/ver195/g,'ver196'), N.pag['PROVA SOLA'].TOTALE);
-  T('Z08 box COMPENSA: da trattenere 3,000 e supplementari +3,000', trt(N['PROVA COMPENSA'].box)==='3,000' && sup(N['PROVA COMPENSA'].box)==='3,000', trt(N['PROVA COMPENSA'].box)+' / '+sup(N['PROVA COMPENSA'].box));
-  T('Z09 box PARZIALE: da trattenere 3,000 e supplementari +2,000', trt(N['PROVA PARZIALE'].box)==='3,000' && sup(N['PROVA PARZIALE'].box)==='2,000', trt(N['PROVA PARZIALE'].box)+' / '+sup(N['PROVA PARZIALE'].box));
+  /* ver203 (Christian: «Oltre B, come le paghe»): le supplementari a cedolino partono dalle ore mensili (B 78,158), non da C (81 in
+     ottobre); le ASS.ING / ASP 0h restano trattenute per intero (ver196). Attese ricalcolate a mano:
+     SOLA 78 h → 78 − (78,158 − 3) = 2,842 → al passo 2,83 · COMPENSA 81 → 5,83 · PARZIALE 80 → 4,83 · NIENTE 84 → 5,83 */
+  T('Z04 COMPENSA: il 13 porta 3 h ordinarie e le sue ore in più fra le supplementari', /^13 mar 3,00 \(3 h\) /.test(N.pag['PROVA COMPENSA']['13']||'') || /^13 mar \d+,\d{2} \([^)]*\) \d+,\d{2}/.test(N.pag['PROVA COMPENSA']['13']||''), N.pag['PROVA COMPENSA']['13']);
+  T('Z05 COMPENSA TOTALE: ordinarie 75,16 · supplementari 5,83 · non retribuite 3,00', /TOTALE 75,16 .* 5,83 \(5,50 = 5 h e 50 min\) 0,00 .* 3,00 \(3,00 = 3 h\)/.test(N.pag['PROVA COMPENSA'].TOTALE||''), N.pag['PROVA COMPENSA'].TOTALE);
+  T('Z06 PARZIALE TOTALE: supplementari 4,83 · non retribuite 3,00', /TOTALE 75,16 .* 4,83 \(4,50 = 4 h e 50 min\) 0,00 .* 3,00/.test(N.pag['PROVA PARZIALE'].TOTALE||''), N.pag['PROVA PARZIALE'].TOTALE);
+  T('Z07 SOLA: supplementari 2,83 oltre B (ver195: 0 su C), ASS.ING 3,00', /TOTALE 75,16 .* 2,83 \(2,50 = 2 h e 50 min\) 0,00 .* 3,00/.test(N.pag['PROVA SOLA'].TOTALE||''), N.pag['PROVA SOLA'].TOTALE);
+  T('Z08 box COMPENSA: da trattenere 3,000 e supplementari +5,833', trt(N['PROVA COMPENSA'].box)==='3,000' && sup(N['PROVA COMPENSA'].box)==='5,833', trt(N['PROVA COMPENSA'].box)+' / '+sup(N['PROVA COMPENSA'].box));
+  T('Z09 box PARZIALE: da trattenere 3,000 e supplementari +4,833', trt(N['PROVA PARZIALE'].box)==='3,000' && sup(N['PROVA PARZIALE'].box)==='4,833', trt(N['PROVA PARZIALE'].box)+' / '+sup(N['PROVA PARZIALE'].box));
   T('Z10 box: la frase sul perché', /non si compensano con le ore in più/.test(N['PROVA COMPENSA'].box||''));
-  T('Z11 Tabellone: il Risultato del mese resta il vero (0,000 · −1,000)', /Risultato del mese: 0,000 ore/.test(N['PROVA COMPENSA'].cong) && /Risultato del mese: -1,000 ore/.test(N['PROVA PARZIALE'].cong), '');
-  T('Z12 Tabellone COMPENSA: «da trattenere 3,000» e «a cedolino supplementari 3,000»', /da trattenere \(ASS\.ING \/ ASP 0h\): 3,000 h/.test(N['PROVA COMPENSA'].cong) && /a cedolino supplementari 3,000 h/.test(N['PROVA COMPENSA'].cong), (N['PROVA COMPENSA'].cong.match(/da trattenere.{0,160}/)||[''])[0]);
-  T('Z13 senza ASS.ING: box e report identici alla ver195', N.pag['PROVA NIENTE'].TOTALE===V.pag['PROVA NIENTE'].TOTALE && N['PROVA NIENTE'].box===V['PROVA NIENTE'].box && N['PROVA NIENTE'].cong===V['PROVA NIENTE'].cong, N.pag['PROVA NIENTE'].TOTALE);
-  T('Z14 non mensilizzato: niente box, riquadro identico alla ver195', !N['PROVA ORARIO'].box && N['PROVA ORARIO'].cong===V['PROVA ORARIO'].cong, (N['PROVA ORARIO'].cong.match(/Risultato del mese: [^)]*\)/)||[''])[0]);
+  /* dalla ver201 C = B ÷ 26 × 27 = 81,164: il Risultato vero (su C) di COMPENSA è 81 − 81,164 e di PARZIALE 80 − 81,164 */
+  T('Z11 Tabellone: il Risultato del mese resta il vero su C (−0,164 · −1,164)', /Risultato del mese: -0,164 ore/.test(N['PROVA COMPENSA'].cong) && /Risultato del mese: -1,164 ore/.test(N['PROVA PARZIALE'].cong), (N['PROVA COMPENSA'].cong.match(/Risultato del mese: [^)]*\)/)||[''])[0]);
+  T('Z12 Tabellone COMPENSA: «a cedolino (soglia: ore mensili B …): supplementari 5,833 h · da trattenere 3,000 h»', /a cedolino \(soglia: ore mensili B 78,158\): supplementari 5,833 h · da trattenere 3,000 h \(di cui ASS\.ING \/ ASP 0h 3,000 h\)/.test(N['PROVA COMPENSA'].cong), (N['PROVA COMPENSA'].cong.match(/a cedolino.{0,140}/)||[''])[0]);
+  T('Z13 senza ASS.ING: a cedolino supplementari 5,83 oltre B (ver195: 3,00 su C)', /TOTALE 78,16 .* 5,83 \(5,50 = 5 h e 50 min\) 0,00 .* 0,00/.test(N.pag['PROVA NIENTE'].TOTALE||'') && /TOTALE 78,16 .* 3,00 \(3,00 = 3 h\)/.test(V.pag['PROVA NIENTE'].TOTALE||''), N.pag['PROVA NIENTE'].TOTALE+' | '+V.pag['PROVA NIENTE'].TOTALE);
+  T('Z14 non mensilizzato: niente box e niente pastiglia «a cedolino», Risultato su C (−0,164)', !N['PROVA ORARIO'].box && !/a cedolino/.test(N['PROVA ORARIO'].cong) && /Risultato del mese: -0,164 ore/.test(N['PROVA ORARIO'].cong), (N['PROVA ORARIO'].cong.match(/Risultato del mese: [^)]*\)/)||[''])[0]);
   console.log('\n'+P+' superati, '+F+' falliti'); await br.close(); process.exit(F?1:0); })();

@@ -57,9 +57,17 @@ Banca ore, tetto annuo, contratti e export.
     dummies dell'ufficio paghe: ore dovute, di cui ore effettuate/lavorate, di cui ferie, di cui festivi etc, poi ore supplementari
     27%»): per ogni persona, sotto la tabella dei giorni o su una pagina sua se non c'è posto (con 31 righe va sulla seconda pagina),
     ORE DOVUTE → di cui lavorate · ferie · festività godute · ogni altra assenza per codice · permessi · da TRATTENERE (ASS.ING / ASP
-    0h e ore non lavorate) → ORE SUPPLEMENTARI maggiorate del 27% (15% sul minimo a 38 h/sett., come il Costo orario) → FESTIVITÀ
-    NON GODUTE a parte. I «di cui» sommano esatti alle ore dovute al centesimo (il centesimo va sulle ore non lavorate trattenute,
-    altrimenti sulle lavorate). Supera la scelta della ver188 di togliere il riquadro. ⚠️ Diciture di Claude.
+    0h e ore non lavorate) → ORE SUPPLEMENTARI maggiorate del 27% (15% sul minimo a 38 h/sett., come il Costo orario: Christian
+    «1 come costo orario») → FESTIVITÀ NON GODUTE a parte. I «di cui» sommano esatti alle ore dovute al centesimo (il centesimo va
+    sulle ore non lavorate trattenute, altrimenti sulle lavorate). **Tabella dei giorni e schema nella stessa pagina** (Christian:
+    «2 no, riduci»): si prova il carattere della tabella dei giorni da 9 a 6,5 pt su una pagina di prova (jsPDF vero) e si tiene il
+    più grande con cui ci stanno tutti e due; solo se nessuno basta lo schema va su una pagina sua. Nei casi provati: 7,5 pt, una
+    pagina. Supera la scelta della ver188 di togliere il riquadro. ⚠️ Diciture di Claude.
+  - 📌 **PUNTO DI RIPRISTINO DA TENERE (Christian, 21/11/2026: «tieni comunque in memoria la precedente versione, che sfodereremo
+    in caso di necessità. Ricordamelo»)**: la **ver202** = la regola della ver182 (le ore sotto l'orario **non** si trattengono, lo
+    stipendio fisso resta intero; supplementari su C). Sta su `main` (commit `278463e`, CLAUDE.md `cbacd5d`) finché la ver203 non
+    ci va, poi resta nella storia di git e nel Drive («App Dipendenti - 21nov26 - ver202 - 10.28.html»). **Ricordarlo a Christian
+    quando si parla di cedolini, trattenute o di tornare indietro.**
   - ⚠️ **Il «Risultato del mese» del Tabellone, C, la capsula e «COSA DEVE RISULTARE IN E» NON cambiano** (restano su C): Christian,
     21/11/2026: «1, va bene ancorché non sia la vera mensilizzazione legittima; prova a lasciare». Accettata anche l'oscillazione fra
     mesi da 25 e 27 giorni (un giorno di supplementari o di trattenute a chi fa tutto il suo orario). Prima del criterio mensilizzato (non mensilizzati, prima di ottobre 2026) niente cambia.
