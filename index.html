@@ -129,6 +129,12 @@
   .foot-line .tot-righe { display:flex; flex-direction:column; align-items:flex-start; gap:4px; }
   .foot-line .foot-teor.foot-noner { color:#1f4e82; background:#eef5fc; border-color:#5a9ce2; }
   .foot-line .foot-teor.foot-noner b { color:#1f4e82; }
+  /* ver202: riga H, ben visibile (giallo con bordo ambra) */
+  .foot-line .foot-fin { border:2px solid #f59e0b; background:#fff8e1; border-radius:10px; padding:6px 10px; color:#7c2d12; max-width:760px; }
+  .foot-line .foot-fin-r { font-size:16px; font-weight:800; }
+  .foot-line .foot-fin-r b { font-size:20px; color:#7c2d12; }
+  .foot-line .foot-fin-m { font-size:13px; font-weight:700; color:#9a3412; }
+  .foot-line .foot-fin-d { font-size:13px; font-weight:500; color:#431407; margin-top:2px; line-height:1.35; }
   td.tot-v .tot-teor { font-size:12.5px; font-weight:800; color:#7c2d12; line-height:1.15; margin-top:1px; white-space:nowrap; }
   .foot-line label { font-size:12px; color:#64748b; font-weight:700; }
   .dich-in { width:80px; border:2px solid #f59e0b; background:#fffde7; border-radius:6px; padding:4px 6px; font-family:inherit; font-size:14px; font-weight:800; text-align:center; }
@@ -545,7 +551,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver201";
+const APP_VER = "ver202";
 const APP_DATA = "21nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -3699,6 +3705,15 @@ function EmployeeCard(props){
           <span className="foot-tot">E) Tot ore inserite a mano: <b>{fmtH(tot)}</b></span>
           <span className="foot-teor foot-noner" title={TEOR_NONER_TITLE}>F) Tot teorico con NON ER: <b>{fmt3(totConNonEr)}</b></span>
           <span className="foot-teor" title={TEOR_TITLE}>G) Tot teorico con ER: <b>{fmt3(totTeor)}</b></span>
+          {/* ver202 (21/11/2026, Christian: «è GIUSTA LA VER 174 … me lo descrivi meglio in didascalia ben visibile?» → «H deve comparire
+              anche se uguale a G»): H = quello che scende dal massimale (prodottoMese), sempre visibile quando il mese ha dati. */}
+          {(function(){ const H = props.oreFin; if (H == null) return null; const Bx = props.cedBox; const dG = R2(H - totTeor, 3);
+            return <div className="foot-fin">
+              <div className="foot-fin-r">H) Ore che paga il finanziatore (cedolino + erosive): <b>{fmt3(H)}</b> <span className="foot-fin-m">← scendono dal massimale</span></div>
+              <div className="foot-fin-d">{Bx
+                ? <span>= ore scritte a cedolino, ordinarie e supplementari <b>{fmtH(Bx.ced)}</b> + ore retribuite erosive <b>{fmtH(Bx.eroTot)}</b>. Il dettaglio è nel riquadro «🧾 DA INSERIRE A CEDOLINO» qui sotto.{Math.abs(dG) > 0.0005 ? <span> Differisce da G di <b>{(dG > 0 ? "+" : "") + fmt3(dG)}</b> perché il cedolino paga le ore mensili fisse (B), non le ore fatte nel mese.</span> : <span> Questo mese coincide con G.</span>}</span>
+                : <span>Qui il cedolino paga le ore fatte (non è un mese a busta mensilizzata), quindi H = G.</span>}</div>
+            </div>; })()}
         </div>
         {/* ver197 (20/11/2026, Christian): «aggiungi la capsula "Devi riempire ancora per" e ci scrivi il risultato positivo o
             negativo dato da ORE CHE DEVONO RISULTARE NEL TOTALE TEORICO MENSILE PER AVERE LE ORE CONTRATTUALI meno quel TOT teorico» */}
@@ -9227,6 +9242,7 @@ function App(){
                   festErose={festOreEroseMese(state, dp, anno, mese)}   /* ver173: festività godute erosive (consumano il Tetto) */
                   festNonErose={festOreNonEroseMese(state, dp, anno, mese)}   /* ver198: festività godute NON ER, solo per il TOT teorico */
                   cedBox={cedolinoBox(state, dp, anno, mese)}   /* ver175: box «Da inserire a cedolino» */
+                  oreFin={prodottoMese(recDp, dp, anno, mese, state)}   /* ver202: H = ore che paga il finanziatore = consumo del massimale */
                   banca={bancaMeseA(state, dp, anno, mese)}   /* ver151: un solo numero per il Risultato del mese */
                   onEditDip={apriScheda} onDelDip={askDelDip} onAvviso={showToast} />;
               })

@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver201 · 21nov26 — sul ramo di lavoro, da approvare insieme alla ver199 e alla ver200** (su `main` c'è la ver197, approvata il 21/11/2026 insieme alla ver196). ⚠️ La **ver198** fu fatta e **annullata** il 21/11/2026 («stai fermo alla ver197»: Christian aveva solo fatto una domanda); i suoi tre totali E/F/G e la sigla «NON ER» sono poi stati **chiesti esplicitamente** e stanno nella ver199. `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver202 · 21nov26 — sul ramo di lavoro, da approvare insieme alle ver199, ver200 e ver201** (su `main` c'è la ver197, approvata il 21/11/2026 insieme alla ver196). ⚠️ La **ver198** fu fatta e **annullata** il 21/11/2026 («stai fermo alla ver197»: Christian aveva solo fatto una domanda); i suoi tre totali E/F/G e la sigla «NON ER» sono poi stati **chiesti esplicitamente** e stanno nella ver199. `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -37,6 +37,16 @@ Banca ore, tetto annuo, contratti e export.
   Corretto anche un difetto **preesistente** che la nuova navigazione rendeva visibile: nella
   testata, in vista Anagrafica, compariva "📅 undefined 2026" (perché `mese` è `null` fuori dalle
   viste mensili); ora mostra "📇 Anagrafica".
+- 🟨 **ver202 (21/11/2026, ramo di lavoro) — RIGA H «ORE CHE PAGA IL FINANZIATORE (CEDOLINO + EROSIVE)»** (Christian: «è GIUSTA LA VER 174, ma
+  non capisco dove lo vedo nel tabellone quanto avrà scritto il cedolino + l'erosivo. me lo descrivi meglio in didascalia ben visibile?»,
+  poi dopo l'anteprima: «va bene tutto, ma H deve comparire anche se uguale a G»). Sotto E/F/G, riquadro giallo con bordo ambra (`.foot-fin`,
+  numero a 20px, scritte ≥13px): **H = `prodottoMese`**, cioè esattamente ciò che scende dal massimale (prop `oreFin` da `App`), **sempre
+  visibile** quando il mese ha dati. Didascalia: per i mesi a busta mensilizzata «= ore scritte a cedolino, ordinarie e supplementari X + ore
+  retribuite erosive Y. Il dettaglio è nel riquadro «🧾 DA INSERIRE A CEDOLINO» qui sotto.» più «Differisce da G di ±Z perché il cedolino
+  paga le ore mensili fisse (B), non le ore fatte nel mese.» oppure «Questo mese coincide con G.»; negli altri mesi «Qui il cedolino paga le
+  ore fatte (non è un mese a busta mensilizzata), quindi H = G.» ⚠️ **Diciture nuove, scritte da Claude**, approvate dopo l'anteprima.
+  **Nessun calcolo cambia** (la regola ver174 resta). Esempi (19 h): gennaio 2027, 26 gg → H = G = 85,667; ottobre 2026, 27 gg, 84,5 h + 1 MAL →
+  G 87,667, H 84,500 (un giorno intero in meno); gennaio 2027 con sole 70 h → G 73,167, H 79,333. **Provato**: `collaudo/ver202.cjs` 13/0.
 - 📐 **ver201 (21/11/2026, ramo di lavoro) — C = B ÷ 26 × GIORNI NON DOMENICALI** (Christian: «Il giorno valga B diviso 26», e alla
   domanda «solo per C o anche per assenze e festività?»: **«Solo per C»**). Funzione nuova **`quotaC(dp,y,m)` = `monteFissoMese ÷ 26`**;
   `oreRetribuibili` = `quotaC × giorniRetribuibiliInForza(…, 6)` (lun-sab in forza, qualunque sia il numero di giorni a settimana: il 26
