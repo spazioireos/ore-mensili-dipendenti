@@ -551,7 +551,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver204";
+const APP_VER = "ver205";
 const APP_DATA = "21nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -1350,7 +1350,7 @@ function tsDaRiga(state, dp, y, m, r){
   const somma = function(arr, k){ return arr.reduce(function(a, x){ return a + x[k]; }, 0); };
   const permTot = { ore:somma(perm, "ore"), oreE:somma(perm, "oreE"), oreNE:somma(perm, "oreNE"), altre:permAltre };
   const altreTot = { gg:somma(altre, "gg"), ore:somma(altre, "ore"), oreE:somma(altre, "oreE"), oreNE:somma(altre, "oreNE") };
-  const monte = R2(r.monteP, 2);                      /* ORE MESE: valore del contratto, NON si arrotonda */
+  const monte = R2(r.monteP, 3);                      /* ORE MESE: valore del contratto, NON si arrotonda (ver205: al millesimo, come la pastiglia B) */
   let tratt = alPasso(r.tratt); const supp = alPasso(r.supp), sotto = alPasso(r.sotto);
   /* ver203: delle trattenute, quelle sui giorni ASS.ING / ASP 0h e quelle delle ore non lavorate sotto le ore mensili */
   let trattNR = Math.min(tratt, alPasso(r.trattNR || 0)), trattNL = Math.max(0, R2(tratt - trattNR, 6));
@@ -1929,8 +1929,10 @@ const LS_TIMBRO = LS_KEY + "__timbro";
    NON cambia, e non serve premere 💾. ⚠️ Vale per questo browser. */
 const LS_RESPUB = LS_KEY + "__residuipub";
 function respubLeggi(){ try { const v = localStorage.getItem(LS_RESPUB); const o = v ? JSON.parse(v) : null; return (o && typeof o === "object") ? o : null; } catch (e){ return null; } }
-function respubScrivi(valori){
-  const o = { quando: Date.now(), valori: valori || {} };
+function respubScrivi(valori, saltati){
+  /* ver205 (collaudo B2-08): si ricordano anche le persone SALTATE perché senza account in Fogli ore,
+     così il promemoria non le chiama «(nuovo)» dopo ogni pubblicazione: non si possono pubblicare. */
+  const o = { quando: Date.now(), valori: valori || {}, saltati: saltati || {} };
   try { localStorage.setItem(LS_RESPUB, JSON.stringify(o)); } catch (e){}
   return o;
 }
@@ -1962,7 +1964,7 @@ function getRecFrom(state, y, m, dipId){
 function totOfRec(rec, y, m){
   let t = 0; const nd = daysInMonth(y, m);
   for (let d = 1; d <= nd; d++) t += parseHour(rec.giorni[d]);
-  return Math.round(t * 100) / 100;
+  return R2(t, 3);   /* ver205 (Christian: «sistema»): al millesimo, come si mostra; era al centesimo (75,990 invece di 75,993 con le celle in sesti) */
 }
 function saldoPrec(state, anno, mese, dipId){
   const months = [];
@@ -3799,8 +3801,8 @@ function EmployeeCard(props){
           </tr>
         </tbody></table>
       </div>
-      {(oreErose > 0 || Object.keys(rec.giorni || {}).some(function(k){ const v = String(rec.giorni[k]||"").trim(); return CODE_SET[v] && v !== "--" && v !== "AN" && copreOre(v); }) || (props.festQuota > 0 && (props.festGG||0) > 0))
-        ? <div className="ero-legenda">🎯 <b>Erosione del massimale:</b> sotto ogni assenza retribuita e festività goduta c'è la linguetta <span className="e">E</span> = erosiva (consuma il massimale). <b>Cliccala</b> se quel giorno il servizio era chiuso: diventa <span className="ne">NON ER</span> = non erosiva. Per un permesso orario: nella sua finestra, spunta «Quel giorno il servizio era chiuso». Serve 💾 per salvare.</div>
+      {(oreErose > 0 || Object.keys(rec.giorni || {}).some(function(k){ const v = String(rec.giorni[k]||"").trim(); return CODE_SET[v] && v !== "--" && v !== "AN" && (copreOre(v) || CODE_SET[v].ero === true); }) || (props.festQuota > 0 && (props.festGG||0) > 0))
+        ? <div className="ero-legenda">🎯 <b>Erosione del massimale:</b> sotto ogni assenza retribuita, festività goduta e sciopero (SCIOP, non pagato ma erosivo) c'è la linguetta <span className="e">E</span> = erosiva (consuma il massimale). <b>Cliccala</b> se quel giorno il servizio era chiuso: diventa <span className="ne">NON ER</span> = non erosiva. Per un permesso orario: nella sua finestra, spunta «Quel giorno il servizio era chiuso». Serve 💾 per salvare.</div>
         : null}
       <div className="foot-line">
         {/* ver198 (21/11/2026, Christian): i tre totali su tre righe, coi nomi suoi: E) F) G) */}
@@ -6892,7 +6894,7 @@ function CostoOrario(props){
                         (ore rese, ferie, permessi) e la soglia dello straordinario sono le «ore corrette
                         da dare». Dicitura di Christian. */}
                     {d.fonte === "riepiloghi"
-                      ? <div style={{ textAlign:"center", marginTop:"7px" }}><span style={{ background:"#15803d", color:"#fff", borderRadius:"999px", padding:"3px 12px", fontSize:"13px", fontWeight:800 }}>costo orario rispecchiante l'effettivo</span></div>
+                      ? <div style={{ textAlign:"center", marginTop:"7px" }}><span style={{ background:"#15803d", color:"#fff", borderRadius:"999px", padding:"3px 12px", fontSize:"13px", fontWeight:800 }}>costo orario sulle ore pagate a cedolino</span></div>
                       : null}
                   </div>
                 )}
@@ -9032,7 +9034,7 @@ function App(){
         const haTetto = !isNaN(tetto) && tetto > 0;
         if (!haTetto){ if (prima !== null && !tettiList(dp).length) diversi.push(dp.nome + " (massimale tolto)"); return; }
         const ora = R2(tetto - consumoTetto(state, dp, anno, mese), 3);
-        if (prima === null) diversi.push(dp.nome + " (nuovo)");
+        if (prima === null){ if (pubTimbro.saltati && pubTimbro.saltati[k]) return; diversi.push(dp.nome + " (nuovo)"); }   /* ver205: senza account in Fogli ore, non si può pubblicare */
         else if (Math.abs(prima - ora) > 0.0005) diversi.push(dp.nome);
       });
       return diversi.length ? diversi : null;
@@ -9075,13 +9077,13 @@ function App(){
          residuo di uno finirebbe addosso all'altro, in silenzio. */
       const ambFo = foOmonimiUtenti(utenti), ambDip = dipOmonimi(state);
       const ambiguo = function(nm){ const k = foChiave(nm); return !!(ambFo[k] || ambDip[k]); };
-      const daScrivere = [], senzaAccount = [], omonimi = [];
+      const daScrivere = [], senzaAccount = [], omonimi = [], omonimiK = [];   /* ver205: omonimiK per il promemoria */
       righe.forEach(function(r){
         /* ver158 (TR-03): chi ha l'account AGGANCIATO non passa dal nome, quindi l'omonimia
            non lo riguarda: si scrive diritti sul suo documento. */
         if (r.foUid && utenti[r.foUid]){ daScrivere.push(Object.assign({ uid:r.foUid }, r)); return; }
         if (ambiguo(r.nome)){
-          const k = foChiave(r.nome);
+          const k = foChiave(r.nome); omonimiK.push(k);
           omonimi.push(r.nome + (ambFo[k] ? (" \u2014 " + ambFo[k].length + " account in Fogli ore") : "") +
                                 (ambDip[k] ? (" \u2014 " + ambDip[k].length + " schede qui") : ""));
           return;
@@ -9116,10 +9118,10 @@ function App(){
             if (dd && dd.dip === true) togliDip.push({ uid:d.id, nome:aggDi[d.id].nome }); }
         });
         soloDip.forEach(function(x){ if (x.sostituisci && conNumeri[x.uid]) x.toltoResiduo = true; });
-        return { daScrivere:daScrivere, senzaAccount:senzaAccount, omonimi:omonimi, daTogliere:daTogliere, altri:altri, lettoElenco:true, soloDip:soloDip, togliDip:togliDip, aggDi:aggDi };
+        return { daScrivere:daScrivere, senzaAccount:senzaAccount, omonimi:omonimi, omonimiK:omonimiK, daTogliere:daTogliere, altri:altri, lettoElenco:true, soloDip:soloDip, togliDip:togliDip, aggDi:aggDi };
       }).catch(function(e){
         console.error("residui (elenco)", e);
-        return { daScrivere:daScrivere, senzaAccount:senzaAccount, omonimi:omonimi, daTogliere:[], altri:[], lettoElenco:false, soloDip:soloDip, togliDip:[], aggDi:aggDi };
+        return { daScrivere:daScrivere, senzaAccount:senzaAccount, omonimi:omonimi, omonimiK:omonimiK, daTogliere:[], altri:[], lettoElenco:false, soloDip:soloDip, togliDip:[], aggDi:aggDi };
       });
     }).then(function(pl){
       const daScrivere = pl.daScrivere, senzaAccount = pl.senzaAccount, daTogliere = pl.daTogliere;
@@ -9192,7 +9194,9 @@ function App(){
         if (!ko.length){
           const val = {};
           daScrivere.forEach(function(r){ val[foChiave(r.nome)] = r.restano; });
-          setPubTimbro(respubScrivi(val));
+          const salt = {}; (senzaAccount || []).forEach(function(n){ salt[foChiave(n)] = true; });   /* ver205 */
+          (pl.omonimiK || []).forEach(function(k){ salt[k] = true; });   /* ver205: anche gli omonimi, saltati */
+          setPubTimbro(respubScrivi(val, salt));
         }
         const codaTog = nTog ? ("\nTolto il residuo a " + nTog + (nTog===1?" persona":" persone") + " senza massimale.") : "";
         const codaDip = nDipTot ? ("\nSegnalati a Fogli ore come dipendenti: " + nDipTot + ".") : "";   /* ver187. ⚠ Dicitura nuova, scritta da Claude. */

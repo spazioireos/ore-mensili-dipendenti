@@ -31,12 +31,12 @@ const n=s=>parseFloat(String(s).replace(/\./g,'').replace(',','.'));
   /* tre fonti */
   const radio=pg.locator('input[type=radio][name^="fonte-"]');
   await radio.nth(2).check(); await pg.waitForTimeout(400); const gT=await grande();
-  T('A05.08 ore «Teoriche»: un €/h c\'è e la pastiglia «rispecchiante l\'effettivo» sparisce', gT.eh && gT.eh!=='non calcolabile' && !/rispecchiante/.test(gT.t), gT.eh);
+  T('A05.08 ore «Teoriche»: un €/h c\'è e la pastiglia «sulle ore pagate a cedolino» sparisce', gT.eh && gT.eh!=='non calcolabile' && !/sulle ore pagate a cedolino/.test(gT.t), gT.eh);
   await radio.nth(1).check(); await pg.waitForTimeout(400); const gM=await grande();
   T('A05.09 ore «a mano» senza numero: «non calcolabile» con il motivo', gM.eh==='non calcolabile' && /scritte a mano/.test(gM.t), gM.t.slice(0,160));
   const L2=await lista(); T('A05.10 anche l\'elenco dice «non calcolabile» per ALFA (ver180)', L2.find(x=>/ALFA/.test(x)).indexOf('non calcolabile')!==-1, L2.join('|'));
   await radio.nth(0).check(); await pg.waitForTimeout(400); g=await grande();
-  T('A05.11 tornando a «dai Riepiloghi» i numeri sono quelli di prima e c\'è «rispecchiante l\'effettivo»', g.eh===base.eh && /rispecchiante/.test(g.t), g.eh);
+  T('A05.11 tornando a «dai Riepiloghi» i numeri sono quelli di prima e c\'è «sulle ore pagate a cedolino»', g.eh===base.eh && /sulle ore pagate a cedolino/.test(g.t), g.eh);
   /* persona senza ore nel periodo: GAMMA prima del 2026? usa gennaio 2025 */
   await periodo(1,2025,6,2025); const L3=await lista();
   T('A05.12 periodo senza ore (gen→giu 2025): l\'elenco dice «non calcolabile» invece di un numero', L3.every(x=>/non calcolabile/.test(x)), L3.join(' | '));
