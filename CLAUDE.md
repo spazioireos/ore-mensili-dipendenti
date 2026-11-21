@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver199 · 21nov26 — sul ramo di lavoro, da approvare** (su `main` c'è la ver197, approvata il 21/11/2026 insieme alla ver196). ⚠️ La **ver198** fu fatta e **annullata** il 21/11/2026 («stai fermo alla ver197»: Christian aveva solo fatto una domanda); i suoi tre totali E/F/G e la sigla «NON ER» sono poi stati **chiesti esplicitamente** e stanno nella ver199. `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver200 · 21nov26 — sul ramo di lavoro, da approvare insieme alla ver199** (su `main` c'è la ver197, approvata il 21/11/2026 insieme alla ver196). ⚠️ La **ver198** fu fatta e **annullata** il 21/11/2026 («stai fermo alla ver197»: Christian aveva solo fatto una domanda); i suoi tre totali E/F/G e la sigla «NON ER» sono poi stati **chiesti esplicitamente** e stanno nella ver199. `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -37,6 +37,19 @@ Banca ore, tetto annuo, contratti e export.
   Corretto anche un difetto **preesistente** che la nuova navigazione rendeva visibile: nella
   testata, in vista Anagrafica, compariva "📅 undefined 2026" (perché `mese` è `null` fuori dalle
   viste mensili); ora mostra "📇 Anagrafica".
+- 🎯 **ver200 (21/11/2026, ramo di lavoro) — C NON È PIÙ ARROTONDATO AL CENTESIMO** (Christian: «Perché C è più basso di B?» →
+  «Correggi» → alla domanda «solo la scritta o anche il conto?»: **«Anche il conto»**). `oreRetribuibili` (C, le ore che devono risultare)
+  faceva `R2(…,2)`: a 19 h su 6 giorni in un mese da 26 giorni dava **82,330** invece di 82,333. Ora `R2(…,6)`. ⚠️ Perché C < B: B = 165/38 ×
+  ore sett. = 4,342 settimane, C = ore sett./giorni a settimana × giorni non domenicali (26 gg = 4,333 settimane): coincidono solo a ~26,05 giorni.
+  - **Che cosa segue da sé**: pastiglia C, riga «COSA DEVE RISULTARE IN E», Risultato del mese (`bancaMeseA`), capsula «Devi riempire ancora
+    per», le ore lavorabili del Costo orario. Esempio (gen 2027, 19 h, 82,5 h lavorate, 1/1 ER e 6/1 NON ER): C 82,330 → **82,333**, Risultato
+    +6,503 → **+6,500** (= le supplementari del box), capsula −3,337 → **−3,334** (resta un millesimo: G e le festività sono a 3 decimali).
+  - **Non cambiano**: B, E, F, G, il Tetto / massimale (85,833), il riquadro «Da inserire a cedolino», il TS e il report per le paghe, `cedOre`.
+    Con un giorno tondo (18 h o 15 h su 6 giorni) **nessun numero si muove**.
+  - **Sui dati veri (backup del 19/11)**: su 217 schede-mese cambiano C e Risultato del mese in **57**, al massimo di **0,004 h**; Tetto **0**
+    differenze, TS e report identici (cambiano solo due valori interni «vero» del TS), `cedOre` identico; Costo orario: 11 schede si muovono di
+    centesimi di euro (gen→ott 2026 151.194,82 → 151.195,22 €, gen→dic 2025 +0,09 €), **nessun €/h cambia** a due decimali.
+  - **Provato**: `collaudo/ver200.cjs` **9/0** (confronto con la ver199 congelata).
 - 🔤 **ver199 (21/11/2026, ramo di lavoro) — LETTERE A…G, LA CASELLA D E LA RIGA «COSA DEVE RISULTARE IN E»** (Christian: «Facciamo un
   renaming con lettera identificativa: A ore sett · B ore mensili · C ore che devono risultare etc. · D (nuova) ore lavorate da inserire,
   seguite da cella gialla compilabile. Poi, come prima annunciato, E Tot. ore inserite a mano · F Tot teorico con NON ER · G Tot teorico

@@ -545,7 +545,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver199";
+const APP_VER = "ver200";
 const APP_DATA = "21nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -929,7 +929,7 @@ function quotaGiorno(dp,y,m){ return oreSettAt(dp,y,m) / ggSettPersona(dp); }   
 /* ver182: con 6 giorni a settimana (tutti oggi) si contano da lunedì a sabato, come prima; con 5 da lunedì
    a venerdì, così «quota × giorni» resta l'orario del mese e non lo gonfia di un giorno in più ogni settimana. */
 function giorniRetribuibiliInForza(dp,y,m,rec){ let n=0, nd=daysInMonth(y,m); const a=assunzInt(dp), e=effEndInt(dp); const gs=Math.max(1, Math.round(ggSettPersona(dp))); for(let d=1; d<=nd; d++){ const wd=weekdayOf(y,m,d); if(wd===0 || wd>gs) continue; const D=y*10000+m*100+d; if((!a||a<=D)&&(!e||e>=D)) n++; } return n; }
-function oreRetribuibili(dp,y,m,rec){ return R2(quotaGiorno(dp,y,m)*giorniRetribuibiliInForza(dp,y,m,rec),2); }
+function oreRetribuibili(dp,y,m,rec){ return R2(quotaGiorno(dp,y,m)*giorniRetribuibiliInForza(dp,y,m,rec),6); }   // ver200: non più arrotondato al centesimo (82,333 e non 82,330)
 function mensDalYM(dp){ const v=ymdIt(dp && dp.mensilizzatoDal); return v?Math.floor(v/100):0; } // YM di decorrenza mensilizzazione (0 = da sempre)
 /* ===== ver151 (11/11/2026) — CHE COSA COPRE LE ORE DOVUTE DEL MESE ===========
    Regole date da Christian l'11/11/2026:
