@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver197 · 20nov26 — approvata da Christian e portata su `main` il 21/11/2026 insieme alla ver196** («Intanto main ver 197»). ⚠️ Una ver198 (tre totali E/F/G e sigla «NON ER») è stata fatta e **annullata** il 21/11/2026 («stai fermo alla ver197»): non riproporla senza una sua richiesta esplicita. `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver199 · 21nov26 — sul ramo di lavoro, da approvare** (su `main` c'è la ver197, approvata il 21/11/2026 insieme alla ver196). ⚠️ La **ver198** fu fatta e **annullata** il 21/11/2026 («stai fermo alla ver197»: Christian aveva solo fatto una domanda); i suoi tre totali E/F/G e la sigla «NON ER» sono poi stati **chiesti esplicitamente** e stanno nella ver199. `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -37,6 +37,31 @@ Banca ore, tetto annuo, contratti e export.
   Corretto anche un difetto **preesistente** che la nuova navigazione rendeva visibile: nella
   testata, in vista Anagrafica, compariva "📅 undefined 2026" (perché `mese` è `null` fuori dalle
   viste mensili); ora mostra "📇 Anagrafica".
+- 🔤 **ver199 (21/11/2026, ramo di lavoro) — LETTERE A…G, LA CASELLA D E LA RIGA «COSA DEVE RISULTARE IN E»** (Christian: «Facciamo un
+  renaming con lettera identificativa: A ore sett · B ore mensili · C ore che devono risultare etc. · D (nuova) ore lavorate da inserire,
+  seguite da cella gialla compilabile. Poi, come prima annunciato, E Tot. ore inserite a mano · F Tot teorico con NON ER · G Tot teorico
+  con ER. Sotto la riga con A, B, C, D serve una riga ben evidenziata con pt grandi … che chiamiamo COSA DEVE RISULTARE IN E»; alle due
+  domande: D è **«un dato nuovo, separato»** e la linguetta diventa **«NON ER»**).
+  - **Intestazione della scheda**: «A) ORE SETT», «B) ORE MENSILI», «C) ORE CHE DEVONO RISULTARE … CONTRATTUALI» (cambia solo la lettera
+    davanti) e la pastiglia nuova **«D) ORE LAVORATE DA INSERIRE:»** con una casella gialla bordata ambra (`.orelav-in`, alta 34px).
+    Il dato è nuovo: **`dati[mese][dipId].oreLav`** (testo, solo cifre, virgola e punto: meno e lettere non entrano; `onOreLav` in `App`).
+    ⚠️ **NON è** «Ore dichiarate (uso interno)» (`rec.dich`, che alimenta il Conguaglio ore): quella casella resta dov'era, separata.
+    Come ogni modifica, D si salva **solo col 💾**. Campo facoltativo in più: lo schema del backup non cambia.
+  - **Riga «COSA DEVE RISULTARE IN E»** (`.cosa-e`, sotto l'intestazione, fondo blu `#1f4e82`, etichetta 18px, numero 30px su bianco):
+    **B + (D − C)**, cioè D > C → B + (D − C); D = C → B; D < C → B − (C − D) (le tre formule sue, che coincidono). Sotto, quale dei tre
+    casi e i numeri. D vuota → «—» e «scrivi D (ore lavorate da inserire) per calcolarlo». **Non entra in nessun altro calcolo.**
+  - **I tre totali in fondo, uno sotto l'altro** (`.tot-righe`): **E) Tot ore inserite a mano** (il «TOT calcolato» di prima), **F) Tot
+    teorico con NON ER** (= G + assenze, festività godute e permessi retribuiti dei giorni NON ER; in blu, `.foot-noner`; funzioni
+    `oreNonEroseMese`, `permOreNonEroseMese`, `festOreNonEroseMese`, prop `festNonErose`), **G) Tot teorico con ER** (il «TOT teorico» di
+    prima, identico). ⚠️ Restano come prima: il «teor.» nella cella TOT (= G), la capsula «Devi riempire ancora per» (C − G), il Tetto.
+  - Linguetta del giorno non erosivo: **«NON ER»** sopra il numero (`.ero-tag.lungo`), tabella del mese non più larga (2253 px).
+  - **Perché il TOT teorico (oggi G) conta solo le erosive**: nasce nella ver97 (05/11/2026) da una sua richiesta letterale («…comprendente
+    le assenze retribuite erosive»), per leggerlo accanto al Tetto annuo; dalla ver174 i due non coincidono più per i mensilizzati.
+  - ⚠️ Diciture: A…G, «D) ORE LAVORATE DA INSERIRE», «COSA DEVE RISULTARE IN E» sono di Christian; la frase sotto il risultato, i
+    suggerimenti e «NON ER» nella riga di spiegazione sono di Claude.
+  - **Provato**: `collaudo/ver199.cjs` **29/0** (confronto con la ver197 congelata: dicembre 2026, 18 h/sett., B 78,158 e C 81 → D 85 dà
+    82,158, D 81 dà 78,158, D 70,5 dà 67,658; D vuota «—»; «-5x» entra come «5»; 💾 → `oreLav` «85» nei dati e ancora lì dopo il
+    ricaricamento; E 60 · F 81 · G 75, capsula +6 e Tetto identici; 390px senza scorrimento laterale; zero errori).
 - 🎯 **ver197 (20/11/2026, su `main` dal 21/11/2026) — LA CAPSULA «DEVI RIEMPIRE ANCORA PER» E L'EROSIONE BEN VISIBILE** (Christian:
   «L'erosione dove la segno? Rendi più visibile» e «aggiungi la capsula "Devi riempire ancora per" e ci scrivi il risultato positivo o
   negativo dato da ORE CHE DEVONO RISULTARE NEL TOTALE TEORICO MENSILE PER AVERE LE ORE CONTRATTUALI meno quel TOT teorico»).
