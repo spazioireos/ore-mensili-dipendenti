@@ -118,10 +118,6 @@
      di Christian del 05/11/2026). Due posti: la riga in fondo e la cella del TOT. */
   .foot-line .foot-teor { font-size:12px; color:#7c2d12; font-weight:700; background:#fff7ed; border:1px solid #fdba74; border-radius:6px; padding:2px 8px; }
   .foot-line .foot-teor b { font-size:17px; font-weight:900; color:#7c2d12; }
-  /* ver198: i tre totali E) F) G) uno sotto l'altro; F) (con NON ER) in blu per distinguerlo da G) (con ER) */
-  .foot-line .tot-righe { display:flex; flex-direction:column; align-items:flex-start; gap:4px; }
-  .foot-line .foot-teor.foot-noner { color:#1f4e82; background:#eef5fc; border-color:#5a9ce2; }
-  .foot-line .foot-teor.foot-noner b { color:#1f4e82; }
   td.tot-v .tot-teor { font-size:12.5px; font-weight:800; color:#7c2d12; line-height:1.15; margin-top:1px; white-space:nowrap; }
   .foot-line label { font-size:12px; color:#64748b; font-weight:700; }
   .dich-in { width:80px; border:2px solid #f59e0b; background:#fffde7; border-radius:6px; padding:4px 6px; font-family:inherit; font-size:14px; font-weight:800; text-align:center; }
@@ -146,7 +142,6 @@
   table.cal .teor-abs:hover { background:#fdba74; }  table.cal .teor-fest:hover { background:#bfdbfe; }
   table.cal .teor-abs.no-ero, table.cal .teor-fest.no-ero { border:1.5px dashed #94a3b8; background:#f1f5f9; color:#64748b; box-shadow:none; }
   .ero-tag { font-weight:900; margin-right:2px; }
-  table.cal .ero-tag.lungo { display:block; margin:0; line-height:1.05; }   /* ver198: «NON ER» sopra il numero, così la colonna non si allarga */
   .ero-legenda { font-size:12.5px; color:#7c2d12; background:#fff7ed; border:1px solid #fdba74; border-radius:6px; padding:4px 9px; margin:4px 14px 0; line-height:1.35; }
   .ero-legenda .e { display:inline-block; font-size:12.5px; font-weight:900; border:1.5px solid #ea580c; background:#ffedd5; color:#7c2d12; border-radius:4px; padding:0 4px; }
   .ero-legenda .ne { display:inline-block; font-size:12.5px; font-weight:900; border:1.5px dashed #94a3b8; background:#f1f5f9; color:#64748b; border-radius:4px; padding:0 4px; }
@@ -538,8 +533,8 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver198";
-const APP_DATA = "21nov26";
+const APP_VER = "ver197";
+const APP_DATA = "20nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
 const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
@@ -1203,38 +1198,6 @@ function festOreEroseMese(state, dp, y, m){
   /* un mese tutto NON retribuito (ASP 0h / ASS.ING / AN, ver170) non ha busta paga: la festività non e' pagata e non erode */
   if (meseTuttoAN(state, dp, y, m)) return 0;
   return R2(festGoduteErosiveGiorni(state, dp, y, m).length * (oreSettAt(dp, y, m) / ggSettDi(state, dp)), 3);
-}
-/* ver198 (21/11/2026, Christian: «il tot teorico segni tutto anche le NE (usa però l'acronimo NON ER)»): le parti NON
-   EROSIVE (giorni spenti col clic: servizio chiuso) delle assenze retribuite, dei permessi retribuiti e delle festività godute.
-   Servono SOLO al TOT teorico del Tabellone; il Tetto annuo (prodottoMese) continua a non contarle. */
-function oreNonEroseMese(rec,dp,y,m){
-  if(!rec||!rec.giorni) return 0;
-  const q=quotaGiorno(dp,y,m); const nd=daysInMonth(y,m); let days=0;
-  for(let d=1; d<=nd; d++){ if(isAbsCell(rec.giorni[d]) && !eroOn(rec,d)) days++; }
-  return R2(days*q,3);
-}
-function permOreNonEroseMese(rec){
-  const P = (rec && rec.permessi) ? rec.permessi : {}; let pag = 0;
-  Object.keys(P).forEach(function(d){
-    if (eroOn(rec,d)) return;
-    const v = P[d]; const o = Number(v && v.ore) || 0; if (!(o > 0)) return;
-    if (PERM_CODES.indexOf(String((v && v.tipo) || "").trim().toUpperCase()) !== -1) pag += o;
-  });
-  return R2(pag,3);
-}
-function festOreNonEroseMese(state, dp, y, m){
-  const rec = getRecFrom(state, y, m, dp.id);
-  if (!recHasData(rec)) return 0;
-  if (meseTuttoAN(state, dp, y, m)) return 0;
-  const f = festivitaSet(y), nd = daysInMonth(y, m); let n = 0;
-  for (let d = 1; d <= nd; d++){
-    if (!isFestivo(f, m, d) || weekdayOf(y, m, d) === 0 || !inForceAt(dp, y*10000 + m*100 + d)) continue;
-    const cv = String((rec.giorni && rec.giorni[d] != null) ? rec.giorni[d] : "").trim();
-    if (CODE_SET[cv] && cv !== "--" && cv !== "AN") continue;
-    if (eroOn(rec, d)) continue;
-    n++;
-  }
-  return R2(n * (oreSettAt(dp, y, m) / ggSettDi(state, dp)), 3);
 }
 function prodottoMese(rec,dp,y,m,state){                                   // ore che consumano il tetto: ore rese + assenze EROSIVE + festività godute EROSIVE (ver173) + permessi retribuiti
   if(!rec || !recHasData(rec)) return null;
@@ -3458,15 +3421,8 @@ function EmployeeCard(props){
   const oreErose = useMemo(function(){ return oreEroseMese(rec, dp, y, m); }, [rec, dp, y, m]);
   const permPag  = useMemo(function(){ return permOreEroseMese(rec); }, [rec]);   /* ver99: solo le giornate erosive */
   const festErose = Number(props.festErose) || 0;                    /* ver173: festività godute EROSIVE, da App (festOreEroseMese) */
-  /* ver198 (Christian: «il tot teorico segni tutto anche le NE»): dentro anche le parti NON EROSIVE */
-  const oreNonEr = useMemo(function(){ return R2(oreNonEroseMese(rec, dp, y, m) + permOreNonEroseMese(rec), 3); }, [rec, dp, y, m]);
-  const festNonEr = Number(props.festNonErose) || 0;
-  const nonEr = R2(oreNonEr + festNonEr, 3);
   const totTeor = R2(tot + oreErose + permPag + festErose, 3);      /* ver98: dentro anche i permessi retribuiti; ver173: e le festività godute erosive */
-  /* ver198 (21/11/2026, Christian: «Lasciamo come era, ma aggiungi un ulteriore riga con anche le ore» NON ER): il totale con TUTTO */
-  const totConNonEr = R2(totTeor + nonEr, 3);
   const TEOR_TITLE = "Totale teorico = ore effettive + ore delle giornate di assenza EROSIVE (ferie, malattia e simili non barrate col clic) + ore delle FESTIVITÀ GODUTE erosive (non barrate col clic) + ore di permesso retribuito (i cinque tipi della tendina). Fino a settembre 2026, o per chi non è mensilizzato, è lo stesso numero che consuma il Tetto annuo; per i mensilizzati da ottobre 2026 il Tetto scende invece delle ore pagate a cedolino (vedi il riquadro del Tetto annuo). I permessi con il tipo scritto a mano non sono compresi.";
-  const TEOR_NONER_TITLE = "Totale teorico con NON ER = come il totale con ER, più le ore delle assenze retribuite, delle festività godute e dei permessi retribuiti dei giorni NON ER (non erosivi: spenti col clic, servizio chiuso). Il Tetto annuo non le conta.";
 
   const mLocked = props.mLocked;
   const cellStyle = function(val, festivo, blocked){
@@ -3635,7 +3591,7 @@ function EmployeeCard(props){
                         : ("Giornata NON erosiva (servizio chiuso): non brucia niente. Clic per rimetterla erosiva.")}
                       onClick={function(){ if(!blocked) props.onEro(dp.id, d, !ero); }}
                       onKeyDown={function(e){ if(!blocked && (e.key==="Enter"||e.key===" ")){ e.preventDefault(); props.onEro(dp.id, d, !ero); } }}
-                      >{<span className={"ero-tag" + (ero ? "" : " lungo")}>{ero ? "E" : "NON ER"}</span>}{fmt3(quotaDay)}</div>;
+                      >{<span className="ero-tag">{ero ? "E" : "NE"}</span>}{fmt3(quotaDay)}</div>;
                   })() : null}
                   {/* ver172 (15/11/2026, Christian: «scrivi sempre le ore in piccolo sotto le assenze retribuite perché
                       concorrono a formare le ore dovute mensili»): anche la FESTIVITÀ GODUTA — giorno rosso non domenicale,
@@ -3654,7 +3610,7 @@ function EmployeeCard(props){
                             : ("Festività goduta NON erosiva (servizio chiuso): concorre alle ore dovute del mese ma non brucia niente dal Tetto annuo. Clic per rimetterla erosiva.")}
                           onClick={function(){ if(!blocked) props.onEro(dp.id, d, !ero); }}
                           onKeyDown={function(e){ if(!blocked && (e.key==="Enter"||e.key===" ")){ e.preventDefault(); props.onEro(dp.id, d, !ero); } }}
-                          >{<span className={"ero-tag" + (ero ? "" : " lungo")}>{ero ? "E" : "NON ER"}</span>}{fmt3(props.festQuota)}</div>;
+                          >{<span className="ero-tag">{ero ? "E" : "NE"}</span>}{fmt3(props.festQuota)}</div>;
                       })()
                     : null}
                 </td>
@@ -3665,15 +3621,11 @@ function EmployeeCard(props){
         </tbody></table>
       </div>
       {(oreErose > 0 || Object.keys(rec.giorni || {}).some(function(k){ const v = String(rec.giorni[k]||"").trim(); return CODE_SET[v] && v !== "--" && v !== "AN" && copreOre(v); }) || (props.festQuota > 0 && (props.festGG||0) > 0))
-        ? <div className="ero-legenda">🎯 <b>Erosione del massimale:</b> sotto ogni assenza retribuita e festività goduta c'è la linguetta <span className="e">E</span> = erosiva (consuma il massimale). <b>Cliccala</b> se quel giorno il servizio era chiuso: diventa <span className="ne">NON ER</span> = non erosiva. Per un permesso orario: nella sua finestra, spunta «Quel giorno il servizio era chiuso». Serve 💾 per salvare.</div>
+        ? <div className="ero-legenda">🎯 <b>Erosione del massimale:</b> sotto ogni assenza retribuita e festività goduta c'è la linguetta <span className="e">E</span> = erosiva (consuma il massimale). <b>Cliccala</b> se quel giorno il servizio era chiuso: diventa <span className="ne">NE</span> = non erosiva. Per un permesso orario: nella sua finestra, spunta «Quel giorno il servizio era chiuso». Serve 💾 per salvare.</div>
         : null}
       <div className="foot-line">
-        {/* ver198 (21/11/2026, Christian): i tre totali su tre righe, coi nomi suoi: E) F) G) */}
-        <div className="tot-righe">
-          <span className="foot-tot">E) Tot ore inserite a mano: <b>{fmtH(tot)}</b></span>
-          <span className="foot-teor foot-noner" title={TEOR_NONER_TITLE}>F) Tot teorico con NON ER: <b>{fmt3(totConNonEr)}</b></span>
-          <span className="foot-teor" title={TEOR_TITLE}>G) Tot teorico con ER: <b>{fmt3(totTeor)}</b></span>
-        </div>
+        <span className="foot-tot">TOT calcolato: <b>{fmtH(tot)}</b></span>
+        <span className="foot-teor" title={TEOR_TITLE}>TOT teorico (assenze e festività godute erosive + permessi retribuiti): <b>{fmt3(totTeor)}</b></span>
         {/* ver197 (20/11/2026, Christian): «aggiungi la capsula "Devi riempire ancora per" e ci scrivi il risultato positivo o
             negativo dato da ORE CHE DEVONO RISULTARE NEL TOTALE TEORICO MENSILE PER AVERE LE ORE CONTRATTUALI meno quel TOT teorico» */}
         {(function(){ const dov = oreRetribuibili(dp, y, m, rec); if (!(dov > 0)) return null; const r = R2(dov - totTeor, 3);
@@ -9198,7 +9150,6 @@ function App(){
                   festOre={festGoduteMese(state, dp, anno, mese, null).ore} festGG={festGoduteMese(state, dp, anno, mese, null).gg}
                   festQuota={R2(oreSettAt(dp, anno, mese) / ggSettDi(state, dp), 4)}   /* ver172: quota della singola festività goduta */
                   festErose={festOreEroseMese(state, dp, anno, mese)}   /* ver173: festività godute erosive (consumano il Tetto) */
-                  festNonErose={festOreNonEroseMese(state, dp, anno, mese)}   /* ver198: festività godute NON ER, solo per il TOT teorico */
                   cedBox={cedolinoBox(state, dp, anno, mese)}   /* ver175: box «Da inserire a cedolino» */
                   banca={bancaMeseA(state, dp, anno, mese)}   /* ver151: un solo numero per il Risultato del mese */
                   onEditDip={apriScheda} onDelDip={askDelDip} onAvviso={showToast} />;

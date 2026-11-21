@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver198 · 21nov26 — sul ramo di lavoro, da approvare insieme alla ver196 e alla ver197** (su `main` c'è la ver195, approvata il 20/11/2026 insieme alla ver194). `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver197 · 20nov26 — sul ramo di lavoro, da approvare insieme alla ver196** (su `main` c'è la ver195, approvata il 20/11/2026 insieme alla ver194). `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -37,25 +37,6 @@ Banca ore, tetto annuo, contratti e export.
   Corretto anche un difetto **preesistente** che la nuova navigazione rendeva visibile: nella
   testata, in vista Anagrafica, compariva "📅 undefined 2026" (perché `mese` è `null` fuori dalle
   viste mensili); ora mostra "📇 Anagrafica".
-- 🧮 **ver198 (21/11/2026, ramo di lavoro) — TRE TOTALI IN FONDO ALLA SCHEDA: E) F) G), E LA SIGLA «NON ER»** (Christian: «il tot
-  teorico segni tutto anche le NE (usa però l'acronimo NON ER)», poi, a lavoro in corso: «Lasciamo come era, ma aggiungi un ulteriore
-  riga con anche le ore ER. Dopodiché ribattezza le tre righe dei totali così: E) Tot ore inserite a mano · F) Tot teorico con NON ER
-  · G) Tot teorico con ER»).
-  - **Tre righe, una sotto l'altra** (`.tot-righe`), con i nomi suoi: **E)** = il «TOT calcolato» di prima (ore scritte nelle celle);
-    **F)** = G + le parti **NON ER** (assenze retribuite, festività godute e permessi retribuiti dei giorni spenti col clic), in blu
-    (`.foot-noner`); **G)** = il «TOT teorico» di prima, **identico** (solo erosive). Funzioni nuove accanto a `prodottoMese`:
-    `oreNonEroseMese`, `permOreNonEroseMese`, `festOreNonEroseMese` (prop `festNonErose` da `App`). Servono **solo** a F.
-  - ⚠️ **Restano come prima, di proposito**: il «teor.» nella cella TOT (= G), la capsula «Devi riempire ancora per» (= ore che devono
-    risultare − **G**, la sua formula della ver197), il **Tetto annuo** (non conta le NON ER) e tutti i calcoli.
-  - La linguetta «NE» sotto le celle diventa **«NON ER»**, scritta **sopra** il numero (`.ero-tag.lungo`), così la colonna non si
-    allarga (misurato: tabella 2253 px come la ver197; in una riga sola sarebbe diventata 2265). Anche la riga di spiegazione dice «NON ER».
-  - **Perché il TOT teorico contava solo le erosive** (domanda di Christian): nasce nella **ver97** (05/11/2026) da una sua richiesta
-    letterale, «sotto il totale delle effettive mettimi anche il totale teorico comprendente le assenze retribuite **erosive**», per
-    leggerlo accanto al **Tetto annuo**, che consuma solo le erosive (regola ver77: «se stai in ferie a Natale no»). Dalla ver174, per i
-    mensilizzati da ottobre 2026, il Tetto segue invece le ore a cedolino e i due numeri non coincidono più.
-  - ⚠️ Diciture: E) F) G) sono di Christian; il suggerimento di F e «NON ER» nella riga di spiegazione sono scritti da Claude.
-  - **Provato**: `collaudo/ver198.cjs` **15/0** (confronto con la ver197 congelata: dicembre 2026 con una ferie e Santo Stefano NON ER →
-    E 60,000 · F 81,000 · G 75,000, capsula +6,000 come prima, Tetto 150,320 identico).
 - 🎯 **ver197 (20/11/2026, ramo di lavoro) — LA CAPSULA «DEVI RIEMPIRE ANCORA PER» E L'EROSIONE BEN VISIBILE** (Christian:
   «L'erosione dove la segno? Rendi più visibile» e «aggiungi la capsula "Devi riempire ancora per" e ci scrivi il risultato positivo o
   negativo dato da ORE CHE DEVONO RISULTARE NEL TOTALE TEORICO MENSILE PER AVERE LE ORE CONTRATTUALI meno quel TOT teorico»).
