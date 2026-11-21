@@ -28,7 +28,7 @@ const ver=process.argv[2]||'dip';
   T('A03.07 il 💾 scrive il timbro (ver144) in una chiave a parte', !!timbro1 && !JSON.stringify(ls1).includes('__timbro'));
   /* cedOre (ver176) = box */
   const box=await pg2.evaluate(()=>{ const st=JSON.parse(localStorage.getItem('spazioireos_reportore_v1')); const dp=st.dipendenti.find(d=>d.id==='a'); const B=cedolinoBox(st,dp,2026,10); return {ced:B.ced, pub:(st.cedOre||{})['2026-10']}; });
-  T('A03.08 cedOre pubblicato al 💾: ottobre ALFA = box «ordinarie + supplementari» (150,00); GAMMA non mensilizzata assente', box.pub && Math.abs(box.pub.a-box.ced)<0.006 && Math.abs(box.ced-150)<0.006 && box.pub.c===undefined, JSON.stringify(box));
+  T('A03.08 cedOre pubblicato al 💾: ottobre ALFA = box «ordinarie + supplementari» (146 + 3,667 = 149,67; ver201: C = B ÷ 26); GAMMA non mensilizzata assente', box.pub && Math.abs(box.pub.a-box.ced)<0.006 && Math.abs(box.ced-149.667)<0.006 && box.pub.c===undefined, JSON.stringify(box));
   T('A03.09 cedOre: settembre (prima della base mensile) non pubblicato', !(ls1.cedOre||{})['2026-09']);
   await pg2.reload(); await pg2.waitForSelector('.login-box'); await K.entraPin(pg2,'1234'); await K.vai(pg2,'Ott');
   T('A03.10 dopo il ricaricamento il valore salvato c\'è', (await K.cella(pg2,'GAMMA PROVA',1).inputValue())==='7,250');   /* ver185: tre decimali */

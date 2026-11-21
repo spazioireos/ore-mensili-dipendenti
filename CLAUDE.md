@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver200 · 21nov26 — sul ramo di lavoro, da approvare insieme alla ver199** (su `main` c'è la ver197, approvata il 21/11/2026 insieme alla ver196). ⚠️ La **ver198** fu fatta e **annullata** il 21/11/2026 («stai fermo alla ver197»: Christian aveva solo fatto una domanda); i suoi tre totali E/F/G e la sigla «NON ER» sono poi stati **chiesti esplicitamente** e stanno nella ver199. `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver201 · 21nov26 — sul ramo di lavoro, da approvare insieme alla ver199 e alla ver200** (su `main` c'è la ver197, approvata il 21/11/2026 insieme alla ver196). ⚠️ La **ver198** fu fatta e **annullata** il 21/11/2026 («stai fermo alla ver197»: Christian aveva solo fatto una domanda); i suoi tre totali E/F/G e la sigla «NON ER» sono poi stati **chiesti esplicitamente** e stanno nella ver199. `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -37,6 +37,21 @@ Banca ore, tetto annuo, contratti e export.
   Corretto anche un difetto **preesistente** che la nuova navigazione rendeva visibile: nella
   testata, in vista Anagrafica, compariva "📅 undefined 2026" (perché `mese` è `null` fuori dalle
   viste mensili); ora mostra "📇 Anagrafica".
+- 📐 **ver201 (21/11/2026, ramo di lavoro) — C = B ÷ 26 × GIORNI NON DOMENICALI** (Christian: «Il giorno valga B diviso 26», e alla
+  domanda «solo per C o anche per assenze e festività?»: **«Solo per C»**). Funzione nuova **`quotaC(dp,y,m)` = `monteFissoMese ÷ 26`**;
+  `oreRetribuibili` = `quotaC × giorniRetribuibiliInForza(…, 6)` (lun-sab in forza, qualunque sia il numero di giorni a settimana: il 26
+  vale per tutti). ⚠️ **`quotaGiorno` NON cambia** (resta ore sett. ÷ giorni, ver182): assenze, festività godute e non godute valgono come
+  prima, come nei cedolini veri (8 MAL a 19 h = 25,33). Torna, per la sola C, la regola della ver166 («82,5/26×27 = 85,67»).
+  - **Esempio** (gennaio 2027, 26 giorni, 19 h, 82,5 h lavorate, 1/1 ER e 6/1 NON ER): C 82,333 → **82,500 = B**, Risultato +6,500 →
+    **+6,333**, capsula −3,334 → **−3,167**, massimale 85,833 → **85,667 = G** (nei mesi da 26 giorni Tetto e G ora coincidono).
+    Con 27 giorni C = B ÷ 26 × 27 (85,673 invece di 85,500); con 25 giorni 79,327 invece di 79,167.
+  - **Seguono da sé**: Risultato del mese, supplementari e «sotto l'orario» del box e del TS/report per le paghe, `cedOre` per USOINT,
+    massimale dei mensilizzati, Costo orario. Due frasi di Claude adattate: il suggerimento della pastiglia C e la riga «Base = …» del
+    riquadro del Risultato. ⚠️ **Chi lavora 5 giorni**: C conta lo stesso lun-sab (scelta di Claude, dichiarata; nei dati veri sono tutti a 6).
+  - **Sui dati veri (backup del 19/11)**: C e Risultato cambiano in **211 schede-mese su 217**, al massimo di **0,346 h**; Tetto in **5**
+    (ottobre/novembre 2026, fino a −0,334); `cedOre` di ottobre/novembre in 5 (es. 98,50 → 98,33); Costo orario gen→ott 2026 151.195,22 →
+    **150.950,51 €**, gen→dic 2025 144.893,75 → **144.683,42 €**, €/h al più +0,10. ⚠️ **I residui pubblicati vanno rifatti con 📤.**
+  - **Provato**: `collaudo/ver201.cjs` **10/0** (confronto con la ver200 congelata); attese ricalcolate in `ver199`, `a02`, `a03`.
 - 🎯 **ver200 (21/11/2026, ramo di lavoro) — C NON È PIÙ ARROTONDATO AL CENTESIMO** (Christian: «Perché C è più basso di B?» →
   «Correggi» → alla domanda «solo la scritta o anche il conto?»: **«Anche il conto»**). `oreRetribuibili` (C, le ore che devono risultare)
   faceva `R2(…,2)`: a 19 h su 6 giorni in un mese da 26 giorni dava **82,330** invece di 82,333. Ora `R2(…,6)`. ⚠️ Perché C < B: B = 165/38 ×
