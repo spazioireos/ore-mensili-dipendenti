@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale sul ramo di lavoro: ver205 · 21nov26 — NON ancora approvata, NON su `main`** (sopra la ver204, anche lei in attesa) (su `main` c'è la ver203, approvata il 21/11/2026: «main»; prima la ver202, approvata lo stesso giorno insieme alle ver199, ver200 e ver201: «MAIN»). ⚠️ La **ver198** fu fatta e **annullata** il 21/11/2026 («stai fermo alla ver197»: Christian aveva solo fatto una domanda); i suoi tre totali E/F/G e la sigla «NON ER» sono poi stati **chiesti esplicitamente** e stanno nella ver199. `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver205 · 21nov26 — approvata da Christian e portata su `main` il 21/11/2026 («Main»), insieme alla ver204** (prima su `main` la ver203, approvata il 21/11/2026: «main»; prima la ver202, approvata lo stesso giorno insieme alle ver199, ver200 e ver201: «MAIN»). ⚠️ La **ver198** fu fatta e **annullata** il 21/11/2026 («stai fermo alla ver197»: Christian aveva solo fatto una domanda); i suoi tre totali E/F/G e la sigla «NON ER» sono poi stati **chiesti esplicitamente** e stanno nella ver199. `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -37,7 +37,7 @@ Banca ore, tetto annuo, contratti e export.
   Corretto anche un difetto **preesistente** che la nuova navigazione rendeva visibile: nella
   testata, in vista Anagrafica, compariva "📅 undefined 2026" (perché `mese` è `null` fuori dalle
   viste mensili); ora mostra "📇 Anagrafica".
-- 🔧 **ver205 (21/11/2026, solo sul ramo, in attesa) — CORREZIONI DAL COLLAUDO INTEGRATO** (Christian: «3,4,5 sistema»; sulla
+- 🔧 **ver205 (21/11/2026, su `main` dal 21/11/2026: «Main») — CORREZIONI DAL COLLAUDO INTEGRATO** (Christian: «3,4,5 sistema»; sulla
   pastiglia: «Cambia la scritta»).
   1. **B2-08** — dopo 📤 Pubblica i residui, il promemoria non chiama più «(nuovo)» chi è stato saltato perché **senza account in
      Fogli ore** o perché **omonimo** (non si può pubblicare): `respubScrivi(valori, saltati)` tiene da parte anche quelle chiavi
@@ -50,7 +50,7 @@ Banca ore, tetto annuo, contratti e export.
   - **Sui dati veri (backup del 19/11)**, contro la ver204: C identico in 217 schede-mese su 217; Risultato del mese diverso in
     **5** (al più 0,003 h), Tetto in **8** (al più 0,005 h), costo orario in **8** schede di qualche centesimo (gen→ott 2026
     151.094,99 → 151.095,03 €; 2025 144.683,42 → 144.683,47 €), nessun €/h cambia a due decimali, `cedOre` **identico**.
-- 🟰 **ver204 (21/11/2026, solo sul ramo, in attesa) — C = B NEI MESI MENSILIZZATI, E IL CODICE SCIOP** (Christian: alla domanda
+- 🟰 **ver204 (21/11/2026, su `main` dal 21/11/2026: «Main») — C = B NEI MESI MENSILIZZATI, E IL CODICE SCIOP** (Christian: alla domanda
   «le ore che devono risultare … con il nuovo sistema sono uguali alle ore mensili?» → «2, Mettere C uguale a B. Sarà la vecchia versione
   conservata a ragionare non in questo modo»; poi «aggiungiamo anche la voce SCIOP che equivale a zero ore lavorate», «Come ASS.ING» e
   «come ass ing, ma erode»).
