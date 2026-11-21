@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver197 · 20nov26 — sul ramo di lavoro, da approvare insieme alla ver196** (su `main` c'è la ver195, approvata il 20/11/2026 insieme alla ver194). `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver197 · 20nov26 — approvata da Christian e portata su `main` il 21/11/2026 insieme alla ver196** («Intanto main ver 197»). ⚠️ Una ver198 (tre totali E/F/G e sigla «NON ER») è stata fatta e **annullata** il 21/11/2026 («stai fermo alla ver197»): non riproporla senza una sua richiesta esplicita. `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -37,7 +37,7 @@ Banca ore, tetto annuo, contratti e export.
   Corretto anche un difetto **preesistente** che la nuova navigazione rendeva visibile: nella
   testata, in vista Anagrafica, compariva "📅 undefined 2026" (perché `mese` è `null` fuori dalle
   viste mensili); ora mostra "📇 Anagrafica".
-- 🎯 **ver197 (20/11/2026, ramo di lavoro) — LA CAPSULA «DEVI RIEMPIRE ANCORA PER» E L'EROSIONE BEN VISIBILE** (Christian:
+- 🎯 **ver197 (20/11/2026, su `main` dal 21/11/2026) — LA CAPSULA «DEVI RIEMPIRE ANCORA PER» E L'EROSIONE BEN VISIBILE** (Christian:
   «L'erosione dove la segno? Rendi più visibile» e «aggiungi la capsula "Devi riempire ancora per" e ci scrivi il risultato positivo o
   negativo dato da ORE CHE DEVONO RISULTARE NEL TOTALE TEORICO MENSILE PER AVERE LE ORE CONTRATTUALI meno quel TOT teorico»).
   - **Capsula** `.foot-ancora` accanto al TOT teorico, nella riga in fondo alla scheda: `oreRetribuibili(dp,y,m,rec) − totTeor`, a 3
@@ -54,7 +54,7 @@ Banca ore, tetto annuo, contratti e export.
     di Christian). La linguetta sta a 10px **dentro la griglia** (eccezione dichiarata); la tabella del mese non si allarga (2253 px,
     misurato), a 390px niente scorrimento laterale.
   - **Provato**: `collaudo/ver197.cjs` **15/0** (confronto con la ver196 congelata).
-- ✂️ **ver196 (20/11/2026, ramo di lavoro) — ASS.ING E ASP 0h VALGONO SEMPRE LA QUOTA DEL GIORNO, SENZA COMPENSAZIONE** (Christian:
+- ✂️ **ver196 (20/11/2026, su `main` dal 21/11/2026) — ASS.ING E ASP 0h VALGONO SEMPRE LA QUOTA DEL GIORNO, SENZA COMPENSAZIONE** (Christian:
   «Nel report le assenze ingiustificate o l'Asp 0h deve valere le ore contrattuali: se io ho 18 ore settimanali un Asp 0h o un Ass ing
   deve valere 3», e alla domanda: **«Sì, nessuna compensazione»**). Prima (ver182) si tratteneva `min(ore mancanti, ore ASS.ING/ASP)`:
   le ore fatte in più negli altri giorni coprivano l'assenza (misurato: 18 h/sett., ASS.ING il 12 e 6 h il 13 → nel report «0,00»;
