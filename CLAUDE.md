@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver203 · 21nov26 — approvata da Christian e portata su `main` il 21/11/2026** («main»; prima, su `main`, la ver202, approvata lo stesso giorno insieme alle ver199, ver200 e ver201: «MAIN»). ⚠️ La **ver198** fu fatta e **annullata** il 21/11/2026 («stai fermo alla ver197»: Christian aveva solo fatto una domanda); i suoi tre totali E/F/G e la sigla «NON ER» sono poi stati **chiesti esplicitamente** e stanno nella ver199. `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale sul ramo di lavoro: ver204 · 21nov26 — NON ancora approvata, NON su `main`** (su `main` c'è la ver203, approvata il 21/11/2026: «main»; prima la ver202, approvata lo stesso giorno insieme alle ver199, ver200 e ver201: «MAIN»). ⚠️ La **ver198** fu fatta e **annullata** il 21/11/2026 («stai fermo alla ver197»: Christian aveva solo fatto una domanda); i suoi tre totali E/F/G e la sigla «NON ER» sono poi stati **chiesti esplicitamente** e stanno nella ver199. `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -37,6 +37,30 @@ Banca ore, tetto annuo, contratti e export.
   Corretto anche un difetto **preesistente** che la nuova navigazione rendeva visibile: nella
   testata, in vista Anagrafica, compariva "📅 undefined 2026" (perché `mese` è `null` fuori dalle
   viste mensili); ora mostra "📇 Anagrafica".
+- 🟰 **ver204 (21/11/2026, solo sul ramo, in attesa) — C = B NEI MESI MENSILIZZATI, E IL CODICE SCIOP** (Christian: alla domanda
+  «le ore che devono risultare … con il nuovo sistema sono uguali alle ore mensili?» → «2, Mettere C uguale a B. Sarà la vecchia versione
+  conservata a ragionare non in questo modo»; poi «aggiungiamo anche la voce SCIOP che equivale a zero ore lavorate», «Come ASS.ING» e
+  «come ass ing, ma erode»).
+  - **C = B**: `oreRetribuibili` nei mesi a busta mensilizzata (`meseCedolinoTetto`, da ottobre 2026) torna
+    `R2(monteFissoMese × meseFrazione, 3)`, cioè lo stesso `monteP` del cedolino della ver203 (in proporzione ai giorni di calendario
+    in forza se il mese è parziale). Fuori da quei mesi resta la regola della ver201 (B ÷ 26 × giorni non domenicali). **Supera la
+    scelta «prova a lasciare» della ver203**: ora Risultato del mese, capsula «Devi riempire ancora per», «COSA DEVE RISULTARE IN E» e
+    cedolino dicono lo stesso numero (es. ottobre 2026 a 19 h: C 85,673 → **82,500**, Risultato +1,994 → **+5,167** = supplementari a
+    cedolino; novembre 79,327 → 82,500, +0,673 → **−2,500** = da trattenere). Adattate due frasi di Claude: il suggerimento della
+    pastiglia C e la riga «Base = …» del riquadro. ⚠️ **Nessun altro numero cambia**: cedolino, H, massimale, `cedOre`, Costo orario,
+    report per le paghe identici (misurato).
+  - **SCIOP** («Sciopero», `pay:false, ero:true`, colore `#B0BEC5`): vale 0 ore, **non retribuito** e a cedolino **trattenuto sempre
+    per intero** (ore sett. ÷ giorni) come ASS.ING, senza compensazione con le ore in più, ma **ERODE il massimale**: ha il numerino
+    E/NE cliccabile (`isAbsCell` accetta `ero:true`), entra in G (e in F se spento), nel Tetto e in H (`tsDaRiga` → `nrEro` dentro
+    `eroTot`). Spento col clic (servizio chiuso) resta trattenuto ma non erode. Nel box la riga delle trattenute dice «… / scioperi
+    (ASS.ING / ASP 0h / SCIOP)», il rendiconto «(di cui scioperi SCIOP, non pagati ma erosivi, X)», la didascalia di H «+ scioperi
+    (SCIOP, trattenuti ma erosivi) X»; nel report per le paghe la colonna «Non retribuite (ASS.ING / ASP 0h / SCIOP)» e la riga dello
+    schema. ⚠️ Diciture nuove o adattate, scritte da Claude. Nei report non più richiamati la scritta «ASS.ING / ASP 0h» non è stata
+    toccata. Sui dati veri non c'è nessun SCIOP (codice nuovo).
+  - **Sui dati veri (backup del 19/11)**: C e Risultato del mese cambiano in **14 schede-mese** (ottobre e novembre 2026, fino a
+    6,346 h); Tetto, Costo orario (gen→ott 2026 151.094,99 €, 2025 144.683,42 €), `cedOre` e numeri del TS **identici**.
+  - 📌 La **ver202** resta il punto di ripristino (vedi sotto); la ver203 (C su B/26) sta su `main` finché la ver204 non ci va.
+  - **Provato**: `collaudo/ver204.cjs` **24/0** (confronto con la ver203 congelata). `ver203.cjs` T04/T06 aggiornati (Risultato su B).
 - 🧾 **ver203 (21/11/2026, su `main` dal 21/11/2026: «main») — IL CEDOLINO GUARDA SOLO LE ORE MENSILI (B), COME LE PAGHE** (Christian: «Il
   finanziatore prende in mano il cedolino, guarda la prima riga (retribuzione) e toglie le ore trattenute eventualmente presenti a
   cedolino, poi guarda le assenze retribuite escludendo le festività non godute e ciò che non è erosivo», poi «B, Sì SUPPLEMENTARI» e
@@ -68,7 +92,7 @@ Banca ore, tetto annuo, contratti e export.
     stipendio fisso resta intero; supplementari su C). Dal 21/11/2026 su `main` c'è la ver203; la ver202 resta nella
     storia di git (commit `278463e`, CLAUDE.md `cbacd5d`) e nel Drive («App Dipendenti - 21nov26 - ver202 - 10.28.html»). **Ricordarlo a Christian
     quando si parla di cedolini, trattenute o di tornare indietro.**
-  - ⚠️ **Il «Risultato del mese» del Tabellone, C, la capsula e «COSA DEVE RISULTARE IN E» NON cambiano** (restano su C): Christian,
+  - ⚠️ ~~**Il «Risultato del mese» del Tabellone, C, la capsula e «COSA DEVE RISULTARE IN E» NON cambiano**~~ — **superato dalla ver204** (C = B nei mesi mensilizzati, «2, Mettere C uguale a B»). Testo di allora: (restano su C): Christian,
     21/11/2026: «1, va bene ancorché non sia la vera mensilizzazione legittima; prova a lasciare». Accettata anche l'oscillazione fra
     mesi da 25 e 27 giorni (un giorno di supplementari o di trattenute a chi fa tutto il suo orario). Prima del criterio mensilizzato (non mensilizzati, prima di ottobre 2026) niente cambia.
   - **Provato**: `collaudo/ver203.cjs` **19/0** (confronto con la ver202 congelata: dicembre 29 h con ASS.ING 28-31 → H 106,587 →

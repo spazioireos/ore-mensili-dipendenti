@@ -39,17 +39,17 @@ const n=s=>parseFloat(String(s).replace(/\./g,'').replace(',','.'));
   T('A02.18 TOT calcolato = somma delle celle a video', Math.abs((await totV('GAMMA'))-somma)<0.005, (await totV('GAMMA'))+' vs '+somma);
   /* ALFA ottobre: numeri attesi ricalcolati a mano (38 h/6 gg = 6,3333; 27 gg non domenicali; 24 gg × 6,5 = 156; 3 assenze = 19) */
   const A=K.carta(pg,'ALFA PROVA'); const headA=await A.locator('.emp-head').innerText();
-  T('A02.19 pillola ORE CHE DEVONO RISULTARE NEL TOTALE TEORICO MENSILE PER AVERE LE ORE CONTRATTUALI ALFA = 165/26×27 = 171,346 (ver201: B ÷ 26)', /ORE CHE DEVONO RISULTARE NEL TOTALE TEORICO MENSILE PER AVERE LE ORE CONTRATTUALI: 171,346( |$)/.test(headA.replace(/\s+/g,' ')), headA.replace(/\s+/g,' ').slice(0,200));
+  T('A02.19 pillola ORE CHE DEVONO RISULTARE NEL TOTALE TEORICO MENSILE PER AVERE LE ORE CONTRATTUALI ALFA = B = 165,000 (ver204: nei mesi mensilizzati C = B; nella ver201 165/26×27 = 171,346)', /ORE CHE DEVONO RISULTARE NEL TOTALE TEORICO MENSILE PER AVERE LE ORE CONTRATTUALI: 165,000( |$)/.test(headA.replace(/\s+/g,' ')), headA.replace(/\s+/g,' ').slice(0,200));
   T('A02.20 ORE MENSILI ALFA 165', /ORE MENSILI: 165,000/.test(headA));
   T('A02.21 TOT calcolato ALFA = 156,00', (await totV('ALFA'))===156);
   const teor=n((await A.locator('.foot-teor:not(.foot-noner) b').innerText()));
   T('A02.22 TOT teorico ALFA = 156 + 3 × 6,333 = 175,000', Math.abs(teor-175)<0.002, teor);
   const congA=(await A.locator('.cong').first().innerText()).replace(/\s+/g,' ');
-  T('A02.23 Risultato del mese ALFA = 156 + 19 − 171,346 = +3,654', /Risultato del mese: \+3,654/.test(congA), congA.slice(0,250));
+  T('A02.23 Risultato del mese ALFA = 156 + 19 − 165 = +10,000 (ver204: su C = B)', /Risultato del mese: \+10,000/.test(congA), congA.slice(0,250));
   /* numerino erosivo */
   const ab=A.locator('.teor-abs').first(); await ab.click(); await pg.waitForTimeout(300);
   const teor2=n((await A.locator('.foot-teor:not(.foot-noner) b').innerText())); const cong2=(await A.locator('.cong').first().innerText()).replace(/\s+/g,' ');
-  T('A02.24 clic sul numerino: barrato, TOT teorico −6,333, Risultato invariato', /no-ero/.test(await ab.getAttribute('class')) && Math.abs(teor-teor2-6.333)<0.002 && /\+3,654/.test(cong2), teor2);
+  T('A02.24 clic sul numerino: barrato, TOT teorico −6,333, Risultato invariato', /no-ero/.test(await ab.getAttribute('class')) && Math.abs(teor-teor2-6.333)<0.002 && /\+10,000/.test(cong2), teor2);
   await ab.click(); await pg.waitForTimeout(300); T('A02.25 secondo clic: torna erosivo', Math.abs(n(await A.locator('.foot-teor:not(.foot-noner) b').innerText())-teor)<0.002);
   /* box cedolino */
   const box=(await A.locator('.ced-box').innerText()).replace(/\s+/g,' ');
@@ -59,7 +59,7 @@ const n=s=>parseFloat(String(s).replace(/\./g,'').replace(',','.'));
   T('A02.28 nessun box per GAMMA (non mensilizzata)', await K.carta(pg,'GAMMA PROVA').locator('.ced-box').count()===0);
   /* BETA: 19 h su 6 gg, sabati vuoti (non AN), ASS.ING il 12 */
   const B=K.carta(pg,'BETA PROVA'); const congB=(await B.locator('.cong').first().innerText()).replace(/\s+/g,' ');
-  T('A02.29 BETA: «a cedolino (soglia: ore mensili B …): … da trattenere … (di cui ASS.ING / ASP 0h …)» col Risultato negativo (ver203)', /a cedolino \(soglia: ore mensili B [\d,]+\): supplementari [\d,]+ h · da trattenere [\d,]+ h \(di cui ASS\.ING \/ ASP 0h [\d,]+ h\)/.test(congB) && /Risultato del mese: -/.test(congB), congB.slice(0,300));
+  T('A02.29 BETA: «a cedolino (soglia: ore mensili B …): … da trattenere … (di cui ASS.ING / ASP 0h / SCIOP …)» (ver203; ver204: Risultato su C = B, 84 − 82,5 = +1,500)', /a cedolino \(soglia: ore mensili B [\d,]+\): supplementari [\d,]+ h · da trattenere [\d,]+ h \(di cui ASS\.ING \/ ASP 0h \/ SCIOP [\d,]+ h\)/.test(congB) && /Risultato del mese: \+1,500/.test(congB), congB.slice(0,300));
   /* Tetto annuo */
   const txtA=(await A.innerText()).replace(/\s+/g,' ');
   const eng=await pg.evaluate(()=>{ const st=window.__st; return null; });

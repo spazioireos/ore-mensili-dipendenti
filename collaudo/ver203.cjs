@@ -1,6 +1,6 @@
 /* Collaudo ver203 (21/11/2026, Christian: «Il finanziatore prende in mano il cedolino, guarda la prima riga (retribuzione) e toglie
    le ore trattenute …», «B, Sì SUPPLEMENTARI», «Oltre B, come le paghe»): nei mesi mensilizzati il cedolino guarda solo le ore
-   mensili (B). Dati INVENTATI. Prima: python3 collaudo/rigenera.py ver202. Poi: node collaudo/ver203.cjs   (PORTA=8300 di serie) */
+   mensili (B). ⚠️ Dalla ver204 C = B nei mesi mensilizzati: T04 e T06 aggiornati (attese ricalcolate a mano). Dati INVENTATI. Prima: python3 collaudo/rigenera.py ver202. Poi: node collaudo/ver203.cjs   (PORTA=8300 di serie) */
 const { chromium } = (function(){ try { return require('playwright'); } catch(e) { return require('/opt/node-tools/node_modules/playwright'); } })();
 const PORTA=process.env.PORTA||'8300';
 let P=0,F=0; const T=(n,c,d)=>{(c?P++:F++);console.log((c?'  OK  ':'  NO  ')+n+(d!==undefined?'  -> '+d:''));};
@@ -38,9 +38,9 @@ const n=x=>parseFloat(String(x).replace(/\./g,'').replace(',','.'));
   T('T01 ottobre: la riga «ORE SUPPLEMENTARI (oltre le ore mensili)» c\'è', !!a.rows['ORE SUPPLEMENTARI (oltre le ore mensili)'], JSON.stringify(a.rows['ORE SUPPLEMENTARI (oltre le ore mensili)']));
   T('T02 ottobre: supplementari = 5,167 h (oltre B), nessuna trattenuta', /\+5,167/.test((a.rows['ORE SUPPLEMENTARI (oltre le ore mensili)']||{}).n||'') && !a.rows['di cui ore non fatte, da trattenere']);
   T('T03 ottobre: H = G = 87,667 (cedolino = ore vere) e = «Già usate»', a.H==='87,667' && a.G==='87,667' && a.tetto==='87,667', a.H+' / '+a.G+' / '+a.tetto);
-  T('T04 ottobre: Risultato del mese del Tabellone resta il vero su C (87,667 − 85,673 = +1,994)', a.ris==='+1,994', a.ris);
+  T('T04 ottobre: Risultato del mese del Tabellone (dalla ver204 su C = B: 87,667 − 82,500 = +5,167; nella ver203 su C +1,994)', a.ris==='+5,167', a.ris);
   T('T05 novembre 25 gg, 80 ore: a cedolino trattenute 2,500 e supplementari 0', /supplementari 0,000 h · da trattenere 2,500 h/.test(b.chip), b.chip);
-  T('T06 novembre: Tabellone vero +0,673 su C (80 − 79,327), invariato rispetto alla ver202', b.ris==='+0,673' && b2.ris==='+0,673', b.ris+' / '+b2.ris);
+  T('T06 novembre: Tabellone (dalla ver204 su C = B: 80 − 82,500 = −2,500; nella ver202 su C +0,673)', /^[−-]2,500$/.test(b.ris) && b2.ris==='+0,673', b.ris+' / '+b2.ris);
   T('T07 novembre: box «da trattenere» dice ore non lavorate sotto le ore mensili 2,500', /ore non lavorate sotto le ore mensili 2,500/.test((b.rows['di cui ore non fatte, da trattenere']||{}).d||''), JSON.stringify(b.rows['di cui ore non fatte, da trattenere']));
   T('T08 novembre: H = G = 80,000 (ver202: 83,167 = B + 0,673 di supplementari su C)', b.H==='80,000' && b.G==='80,000' && b2.H==='83,167', b.H+' / '+b2.H);
   T('T09 gennaio 70 ore: H = G = 73,167 (era 79,333)', c.H==='73,167' && c.G==='73,167', c.H+' / '+c.G);
