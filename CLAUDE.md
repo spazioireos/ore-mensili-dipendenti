@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale sul ramo di lavoro: ver203 · 21nov26 — NON ancora approvata, NON su `main`** (su `main` c'è la ver202, approvata il 21/11/2026 insieme alle ver199, ver200 e ver201: «MAIN»). ⚠️ La **ver198** fu fatta e **annullata** il 21/11/2026 («stai fermo alla ver197»: Christian aveva solo fatto una domanda); i suoi tre totali E/F/G e la sigla «NON ER» sono poi stati **chiesti esplicitamente** e stanno nella ver199. `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver203 · 21nov26 — approvata da Christian e portata su `main` il 21/11/2026** («main»; prima, su `main`, la ver202, approvata lo stesso giorno insieme alle ver199, ver200 e ver201: «MAIN»). ⚠️ La **ver198** fu fatta e **annullata** il 21/11/2026 («stai fermo alla ver197»: Christian aveva solo fatto una domanda); i suoi tre totali E/F/G e la sigla «NON ER» sono poi stati **chiesti esplicitamente** e stanno nella ver199. `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -37,7 +37,7 @@ Banca ore, tetto annuo, contratti e export.
   Corretto anche un difetto **preesistente** che la nuova navigazione rendeva visibile: nella
   testata, in vista Anagrafica, compariva "📅 undefined 2026" (perché `mese` è `null` fuori dalle
   viste mensili); ora mostra "📇 Anagrafica".
-- 🧾 **ver203 (21/11/2026, solo sul ramo, in attesa) — IL CEDOLINO GUARDA SOLO LE ORE MENSILI (B), COME LE PAGHE** (Christian: «Il
+- 🧾 **ver203 (21/11/2026, su `main` dal 21/11/2026: «main») — IL CEDOLINO GUARDA SOLO LE ORE MENSILI (B), COME LE PAGHE** (Christian: «Il
   finanziatore prende in mano il cedolino, guarda la prima riga (retribuzione) e toglie le ore trattenute eventualmente presenti a
   cedolino, poi guarda le assenze retribuite escludendo le festività non godute e ciò che non è erosivo», poi «B, Sì SUPPLEMENTARI» e
   «Oltre B, come le paghe»; e a lavoro in corso: «ore dovute mensili contrattuali x, ore effettuate y (incluse le assenze retribuite),
@@ -65,8 +65,8 @@ Banca ore, tetto annuo, contratti e export.
     pagina. Supera la scelta della ver188 di togliere il riquadro. ⚠️ Diciture di Claude.
   - 📌 **PUNTO DI RIPRISTINO DA TENERE (Christian, 21/11/2026: «tieni comunque in memoria la precedente versione, che sfodereremo
     in caso di necessità. Ricordamelo»)**: la **ver202** = la regola della ver182 (le ore sotto l'orario **non** si trattengono, lo
-    stipendio fisso resta intero; supplementari su C). Sta su `main` (commit `278463e`, CLAUDE.md `cbacd5d`) finché la ver203 non
-    ci va, poi resta nella storia di git e nel Drive («App Dipendenti - 21nov26 - ver202 - 10.28.html»). **Ricordarlo a Christian
+    stipendio fisso resta intero; supplementari su C). Dal 21/11/2026 su `main` c'è la ver203; la ver202 resta nella
+    storia di git (commit `278463e`, CLAUDE.md `cbacd5d`) e nel Drive («App Dipendenti - 21nov26 - ver202 - 10.28.html»). **Ricordarlo a Christian
     quando si parla di cedolini, trattenute o di tornare indietro.**
   - ⚠️ **Il «Risultato del mese» del Tabellone, C, la capsula e «COSA DEVE RISULTARE IN E» NON cambiano** (restano su C): Christian,
     21/11/2026: «1, va bene ancorché non sia la vera mensilizzazione legittima; prova a lasciare». Accettata anche l'oscillazione fra
