@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver202 · 21nov26 — approvata da Christian e portata su `main` il 21/11/2026 insieme alle ver199, ver200 e ver201** («MAIN»). ⚠️ La **ver198** fu fatta e **annullata** il 21/11/2026 («stai fermo alla ver197»: Christian aveva solo fatto una domanda); i suoi tre totali E/F/G e la sigla «NON ER» sono poi stati **chiesti esplicitamente** e stanno nella ver199. `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale sul ramo di lavoro: ver203 · 21nov26 — NON ancora approvata, NON su `main`** (su `main` c'è la ver202, approvata il 21/11/2026 insieme alle ver199, ver200 e ver201: «MAIN»). ⚠️ La **ver198** fu fatta e **annullata** il 21/11/2026 («stai fermo alla ver197»: Christian aveva solo fatto una domanda); i suoi tre totali E/F/G e la sigla «NON ER» sono poi stati **chiesti esplicitamente** e stanno nella ver199. `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -37,6 +37,27 @@ Banca ore, tetto annuo, contratti e export.
   Corretto anche un difetto **preesistente** che la nuova navigazione rendeva visibile: nella
   testata, in vista Anagrafica, compariva "📅 undefined 2026" (perché `mese` è `null` fuori dalle
   viste mensili); ora mostra "📇 Anagrafica".
+- 🧾 **ver203 (21/11/2026, solo sul ramo, in attesa) — IL CEDOLINO GUARDA SOLO LE ORE MENSILI (B), COME LE PAGHE** (Christian: «Il
+  finanziatore prende in mano il cedolino, guarda la prima riga (retribuzione) e toglie le ore trattenute eventualmente presenti a
+  cedolino, poi guarda le assenze retribuite escludendo le festività non godute e ciò che non è erosivo», poi «B, Sì SUPPLEMENTARI» e
+  «Oltre B, come le paghe»; e a lavoro in corso: «ore dovute mensili contrattuali x, ore effettuate y (incluse le assenze retribuite),
+  tutto ciò che è sopra x si paga come supplementare z e tutto ciò che è sotto si trattiene. Ferme restano le erosioni»).
+  - **Supera la regola ver182** («ore sotto l'orario non trattenute») **per i mesi a busta mensilizzata** (`meseCedolinoTetto`): in
+    `oreSuppPeriodo` coperte = rese + assenze pagate + festività godute; dovute = B (pro-rata) − ASS.ING/ASP 0h (sempre trattenute,
+    ver196); sopra → `supp`, sotto → `tratt` (= `trattNR` ASS.ING/ASP 0h + ore non lavorate); `sotto` = 0. Quindi ordinarie +
+    supplementari a cedolino = **ore rese** e **H = G** (salvo arrotondamenti ai minuti). In `tsDaRiga`, se ci sono ore non lavorate
+    trattenute, le ordinarie sono le ore lavorate al passo e la trattenuta assorbe lo scarto di B (`trattNR`, `trattNL`).
+  - **Seguono**: box «Da inserire a cedolino» (righe «di cui ore non fatte, da trattenere» con il dettaglio e «ORE SUPPLEMENTARI
+    (oltre le ore mensili)», funzioni `cedTrattDesc`/`cedSuppDesc`), Report PDF per le paghe (colonna «Non retribuite» = solo
+    ASS.ING/ASP 0h; le ore non lavorate trattenute scritte in testa alla pagina), `cedOre` per USOINT, Costo orario (supplementari e
+    trattenute), massimale (H), pastiglia «a cedolino (soglia: ore mensili B …)» nel riquadro del Risultato, frase del riquadro,
+    didascalia di H con le parole di Christian («prima riga del cedolino, ore mensili (B) − ore trattenute a cedolino + supplementari −
+    assenze retribuite non erosive»). ⚠️ **Diciture nuove o adattate, scritte da Claude.**
+  - ⚠️ **Il «Risultato del mese» del Tabellone, C, la capsula e «COSA DEVE RISULTARE IN E» NON cambiano** (restano su C): chiesto a
+    Christian se togliere C anche lì. Prima del criterio mensilizzato (non mensilizzati, prima di ottobre 2026) niente cambia.
+  - **Provato**: `collaudo/ver203.cjs` **19/0** (confronto con la ver202 congelata: dicembre 29 h con ASS.ING 28-31 → H 106,587 →
+    **94,333 = G**; novembre 25 gg con 80 h → trattenute 2,500, H 80,000). `ver202.cjs` ora fallisce **di proposito** in H03/H04/H06/H12
+    (attese della regola vecchia). Batteria completa e numeri sui dati veri: **da fare prima della consegna**.
 - 🟨 **ver202 (21/11/2026, su `main` dal 21/11/2026) — RIGA H «ORE CHE PAGA IL FINANZIATORE (CEDOLINO + EROSIVE)»** (Christian: «è GIUSTA LA VER 174, ma
   non capisco dove lo vedo nel tabellone quanto avrà scritto il cedolino + l'erosivo. me lo descrivi meglio in didascalia ben visibile?»,
   poi dopo l'anteprima: «va bene tutto, ma H deve comparire anche se uguale a G»). Sotto E/F/G, riquadro giallo con bordo ambra (`.foot-fin`,

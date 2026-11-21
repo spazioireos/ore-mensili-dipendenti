@@ -551,7 +551,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver202";
+const APP_VER = "ver203";
 const APP_DATA = "21nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -1345,14 +1345,23 @@ function tsDaRiga(state, dp, y, m, r){
   const permTot = { ore:somma(perm, "ore"), oreE:somma(perm, "oreE"), oreNE:somma(perm, "oreNE"), altre:permAltre };
   const altreTot = { gg:somma(altre, "gg"), ore:somma(altre, "ore"), oreE:somma(altre, "oreE"), oreNE:somma(altre, "oreNE") };
   const monte = R2(r.monteP, 2);                      /* ORE MESE: valore del contratto, NON si arrotonda */
-  const tratt = alPasso(r.tratt), supp = alPasso(r.supp), sotto = alPasso(r.sotto);
+  let tratt = alPasso(r.tratt); const supp = alPasso(r.supp), sotto = alPasso(r.sotto);
+  /* ver203: delle trattenute, quelle sui giorni ASS.ING / ASP 0h e quelle delle ore non lavorate sotto le ore mensili */
+  let trattNR = Math.min(tratt, alPasso(r.trattNR || 0)), trattNL = Math.max(0, R2(tratt - trattNR, 6));
   const assTot = ferie.ore + altreTot.ore + fest.ore + permTot.ore;
-  const ordC = recHasData(rec) ? Math.max(0, monte - assTot - tratt) : 0;
+  let ordC = recHasData(rec) ? Math.max(0, monte - assTot - tratt) : 0;
+  /* ver203: quando a cedolino si trattengono ore non lavorate, le ORDINARIE sono le ore lavorate (al passo) e la
+     trattenuta assorbe lo scarto delle ore mensili (che non sono al passo), così cedolino = ore vere, senza minuti in più o in meno */
+  if (recHasData(rec) && (Number(r.tratt) || 0) - (Number(r.trattNR) || 0) > 0.0005){
+    ordC = Math.max(0, alPasso(Math.max(0, monte - assTot - (Number(r.tratt) || 0))));
+    trattNL = Math.max(0, R2(monte - assTot - trattNR - ordC, 6));
+    tratt = R2(trattNR + trattNL, 6);
+  }
   const eroTot = ferie.oreE + altreTot.oreE + fest.oreE + permTot.oreE;
   return {
     monte: monte, parziale: fr < 0.9999, fr: fr, q: q, qF: qF,
     ferie: ferie, altre: altre, altreTot: altreTot, fest: fest, perm: permTot, permTipi: perm,
-    ordC: ordC, ordCPasso: alPasso(ordC), tratt: tratt, sotto: sotto, supp: supp, assTot: assTot,
+    ordC: ordC, ordCPasso: alPasso(ordC), tratt: tratt, trattNR: trattNR, trattNL: trattNL, sotto: sotto, supp: supp, assTot: assTot,
     nonGod: { gg:festNon.length, ore:alPasso(festNon.length * q), giorni:festNon },
     nonRetr: Object.keys(nonRetr).sort().map(function(k){ return { cod:k, gg:nonRetr[k], ore:alPasso(nonRetr[k] * q) }; }), nrGiorni: nrGiorni,
     an: an, festng: festng, ced: ordC + supp, eroTot: eroTot
@@ -1388,13 +1397,25 @@ function cedolinoBox(state, dp, y, m){
     altreTot: { gg:T.altreTot.gg, ore:v2(T.altreTot.ore), oreE:v2(T.altreTot.oreE), oreNE:v2(T.altreTot.oreNE) },
     fest: Object.assign(vv(T.fest), { giorni:T.fest.giorni }),
     perm: { ore:v2(T.perm.ore), oreE:v2(T.perm.oreE), oreNE:v2(T.perm.oreNE), altre:v2(T.perm.altre) },
-    ordC: v2(T.ordC), tratt: v2(T.tratt), sotto: v2(T.sotto), previste: oreRetribuibili(dp, y, m, rec),   /* ver182: trattenute solo ASS.ING / ASP 0h */
+    ordC: v2(T.ordC), tratt: v2(T.tratt), trattNR: v2(T.trattNR), trattNL: v2(T.trattNL), sotto: v2(T.sotto), previste: oreRetribuibili(dp, y, m, rec),   /* ver203: trattenute = ASS.ING / ASP 0h + ore non lavorate sotto le ore mensili */
     supp: v2(T.supp), risultato: (T.supp > 0.0005) ? R2(T.supp,3) : R2(inMeno,3),
     nonGod: { gg:T.nonGod.gg, ore:v2(T.nonGod.ore), giorni:T.nonGod.giorni },
     nonRetr: T.nonRetr.map(function(x){ return { cod:x.cod, gg:x.gg, ore:v2(x.ore) }; }),
     an: T.an, festng: T.festng, note: vociLines(rec),
     ced: v2(T.ced), eroTot: v2(T.eroTot), rend: v2(T.ced + T.eroTot)
   };
+}
+/* ver203: le due frasi del box che dipendono dalla regola del cedolino (soglia = ore mensili, B). Diciture di Claude. */
+function cedTrattDesc(B, h){
+  const p = [];
+  if (B.trattNR > 0.004) p.push("assenze ingiustificate / aspettative non pagate (ASS.ING / ASP 0h) " + h(B.trattNR));
+  if (B.trattNL > 0.004) p.push("ore non lavorate sotto le ore mensili " + h(B.trattNL));
+  return p.join(" · ");
+}
+function cedSuppDesc(B, h){
+  if (B.supp > 0.004) return "ore oltre le ore mensili, da pagare in più, maggiorate" + (B.nonRetr.length ? " (le ASS.ING / ASP 0h non si compensano con le ore in più)" : "");
+  if (B.trattNL > 0.004) return "nessuna: le ore lavorate e pagate non arrivano alle ore mensili (" + h(B.monte) + ")";
+  return "nessuna";
 }
 /* ver176 (15/11/2026, Christian: «in usoint devono andare le ore pagate come da cedolino e quelle deve
    leggere. Lascia correre le retribuite erosive»). A ogni 💾 si calcolano le ORE A CEDOLINO (ordinarie a
@@ -2451,8 +2472,8 @@ function esportaPDF(state, pairs, opz){
                 ["   di cui permessi retribuiti", h(B.perm.ore), B.perm.ore > 0.004 ? "" : "nessuno"],
                 ["   di cui ore lavorate ordinarie", h(B.ordC), "ore mensili meno le assenze pagate" + (B.tratt > 0.004 ? " e le ore da trattenere" : "")]
               ];
-              if (B.tratt > 0.004) body.push(["   di cui ore non fatte, da trattenere", h(B.tratt), "solo assenze ingiustificate (ASS.ING) e aspettative non pagate (ASP 0h)"]);
-              body.push(["ORE SUPPLEMENTARI (Risultato del mese)", B.supp > 0.004 ? "+" + h(B.supp) : h(0), B.supp > 0.004 ? "da pagare in più, maggiorate" + (B.nonRetr.length ? " (le ASS.ING / ASP 0h non si compensano con le ore in più)" : "") : ((B.tratt + B.sotto) > 0.004 ? "nessuna: mancano " + h(B.tratt + B.sotto) + " alle ore previste (" + h(B.previste) + ")" : "in pari")]);
+              if (B.tratt > 0.004) body.push(["   di cui ore non fatte, da trattenere", h(B.tratt), cedTrattDesc(B, h)]);
+              body.push(["ORE SUPPLEMENTARI (oltre le ore mensili)", B.supp > 0.004 ? "+" + h(B.supp) : h(0), cedSuppDesc(B, h)]);
               if (B.sotto > 0.004) body.push(["ORE SOTTO L'ORARIO, non trattenute", h(B.sotto), "mancano alle ore previste del mese, ma senza una causa (ASS.ING / ASP 0h) non si trattengono: lo stipendio fisso resta intero"]);
               body.push(["FESTIVITÀ NON GODUTE, a sé", h(B.nonGod.ore), B.nonGod.gg ? B.nonGod.gg + " gg × " + fmt3(B.q) + " h (" + gl(B.nonGod.giorni) + ") — da pagare in più" : "nessuna"]);
               const note = [B.an ? "AN " + B.an + " gg" : null,
@@ -3076,8 +3097,9 @@ function esportaPDFPaghe(state, pairs){
         for (let i = rows.length - 1; i >= 0; i--) if (rows[i].o > 0 && rows[i].o + scarto >= 0){ rigaScarto = i; break; }
         if (rigaScarto >= 0) rows[rigaScarto].o += scarto;
       }
-      /* 4) da trattenere (solo ASS.ING / ASP 0h) sui loro giorni */
-      const TR = TS.tratt;
+      /* 4) da trattenere sui giorni ASS.ING / ASP 0h; ver203: le ore non lavorate sotto le ore mensili (TS.trattNL)
+         non hanno un giorno: si scrivono a parte, in testa alla pagina */
+      const TR = TS.trattNR;
       const nDist = distPassi(rows.map(function(x){ return x.nr ? q : 0; }), TR);
       rows.forEach(function(x, i){ x.nrH = nDist[i]; });
       const vuoto = "";
@@ -3102,6 +3124,9 @@ function esportaPDFPaghe(state, pairs){
       doc.text(doc.splitTextToSize(dp.nome, LARG)[0], x0, 11);
       doc.setFontSize(11); doc.setFont(undefined, "normal");
       doc.text(MONTH_LABEL[m-1] + " " + anno, x0, 16);
+      if (TS.trattNL > 0.004){ doc.setFont(undefined, "bold"); doc.setTextColor(154,52,18);
+        doc.text("Ore non lavorate da trattenere (mancano alle ore mensili " + fmt2(TS.monte) + "): " + ft(TS.trattNL), x0 + LARG, 16, { align:"right" });
+        doc.setFont(undefined, "normal"); doc.setTextColor(15,39,64); }
       const rosse = []; rows.forEach(function(x, i){ if (x.rosso) rosse.push(i); });
       doc.autoTable({
         startY: 19,
@@ -3711,7 +3736,11 @@ function EmployeeCard(props){
             return <div className="foot-fin">
               <div className="foot-fin-r">H) Ore che paga il finanziatore (cedolino + erosive): <b>{fmt3(H)}</b> <span className="foot-fin-m">← scendono dal massimale</span></div>
               <div className="foot-fin-d">{Bx
-                ? <span>= ore scritte a cedolino, ordinarie e supplementari <b>{fmtH(Bx.ced)}</b> + ore retribuite erosive <b>{fmtH(Bx.eroTot)}</b>. Il dettaglio è nel riquadro «🧾 DA INSERIRE A CEDOLINO» qui sotto.{Math.abs(dG) > 0.0005 ? <span> Differisce da G di <b>{(dG > 0 ? "+" : "") + fmt3(dG)}</b> perché il cedolino paga le ore mensili fisse (B), non le ore fatte nel mese.</span> : <span> Questo mese coincide con G.</span>}</span>
+                ? (function(){ const NE = R2(Bx.ferie.oreNE + Bx.altreTot.oreNE + Bx.fest.oreNE + Bx.perm.oreNE, 3);
+                    /* ver203 (Christian: «il finanziatore prende in mano il cedolino, guarda la prima riga (retribuzione) e toglie le ore
+                       trattenute eventualmente presenti a cedolino, poi guarda le assenze retribuite escludendo le festività non godute e
+                       ciò che non è erosivo»): la didascalia dice il conto con le sue parole. */
+                    return <span>= prima riga del cedolino, ore mensili (B) <b>{fmtH(Bx.monte)}</b> − ore trattenute a cedolino <b>{fmtH(Bx.tratt)}</b> + supplementari <b>{fmtH(Bx.supp)}</b> − assenze retribuite non erosive <b>{fmtH(NE)}</b> (le festività non godute restano fuori). Il dettaglio è nel riquadro «🧾 DA INSERIRE A CEDOLINO» qui sotto.{Math.abs(dG) > 0.0005 ? <span> Differisce da G di <b>{(dG > 0 ? "+" : "") + fmt3(dG)}</b> perché a cedolino le ore si scrivono ai minuti ammessi.</span> : <span> Questo mese coincide con G.</span>}</span>; })()
                 : <span>Qui il cedolino paga le ore fatte (non è un mese a busta mensilizzata), quindi H = G.</span>}</div>
             </div>; })()}
         </div>
@@ -3807,10 +3836,12 @@ function EmployeeCard(props){
               <span className="cong-status">{esito}</span>
               {/* ver182 (Christian, «2a»): delle ore in meno si trattengono SOLO ASS.ING e ASP 0h */}
               {/* ver196 (Christian: «nessuna compensazione»): nei mesi mensilizzati ASS.ING e ASP 0h si trattengono sempre per intero */}
-              {(delta < -0.0005 || (meseCedolinoTetto(dp, y, m) && am.nonRetr.ore > 0.0005)) ? (function(){ const fisse = meseCedolinoTetto(dp, y, m); const tr = fisse ? am.nonRetr.ore : Math.min(-delta, am.nonRetr.ore), so = Math.max(0, -delta - am.nonRetr.ore), sp = fisse ? Math.max(0, delta + am.nonRetr.ore) : 0; return <span className="cong-chip">da trattenere (ASS.ING / ASP 0h): <b>{fmt3(tr)} h</b> · sotto l'orario, non trattenute: <b>{fmt3(so)} h</b>{sp > 0.0005 ? <span> · a cedolino supplementari <b>{fmt3(sp)} h</b> (le ASS.ING / ASP 0h non si compensano con le ore in più)</span> : null}</span>; })() : null}
+              {/* ver203 (Christian: «Oltre B, come le paghe»): nei mesi mensilizzati il cedolino guarda solo le ore mensili (B): qui se ne mostrano trattenute e supplementari */}
+              {(meseCedolinoTetto(dp, y, m) && props.cedBox) ? ((props.cedBox.tratt > 0.0005 || props.cedBox.supp > 0.0005) ? <span className="cong-chip">a cedolino (soglia: ore mensili B {fmt3(props.cedBox.monte)}): supplementari <b>{fmt3(props.cedBox.supp)} h</b> · da trattenere <b>{fmt3(props.cedBox.tratt)} h</b>{props.cedBox.trattNR > 0.0005 ? <span> (di cui ASS.ING / ASP 0h {fmt3(props.cedBox.trattNR)} h)</span> : null}</span> : null) :
+              (delta < -0.0005 || (meseCedolinoTetto(dp, y, m) && am.nonRetr.ore > 0.0005)) ? (function(){ const fisse = meseCedolinoTetto(dp, y, m); const tr = fisse ? am.nonRetr.ore : Math.min(-delta, am.nonRetr.ore), so = Math.max(0, -delta - am.nonRetr.ore), sp = fisse ? Math.max(0, delta + am.nonRetr.ore) : 0; return <span className="cong-chip">da trattenere (ASS.ING / ASP 0h): <b>{fmt3(tr)} h</b> · sotto l'orario, non trattenute: <b>{fmt3(so)} h</b>{sp > 0.0005 ? <span> · a cedolino supplementari <b>{fmt3(sp)} h</b> (le ASS.ING / ASP 0h non si compensano con le ore in più)</span> : null}</span>; })() : null}
             </div>
             <div className="cong-res">
-              Ogni mese fa storia a sé: le <b>ore in più</b> si pagano maggiorate (straordinario), delle <b>ore in meno</b> si tolgono solo le assenze ingiustificate (ASS.ING) e le aspettative non pagate (ASP 0h). <b>Niente si riporta</b> al mese dopo. Il totale annuo per persona è nella <b>Query personale → ⚡ Straordinario</b>.
+              Ogni mese fa storia a sé. <b>A cedolino</b> (mensilizzati) conta solo le ore mensili (B): le ore oltre B si pagano maggiorate, quelle che mancano a B si trattengono (ASS.ING e ASP 0h sempre per intero). <b>Niente si riporta</b> al mese dopo. Il totale annuo per persona è nella <b>Query personale → ⚡ Straordinario</b>.
               <div style={{ fontSize:"11px", color:"#9a3412", marginTop:"2px" }}>Base = ore previste del mese (C): ore mensili (B) ÷ 26 × giorni non domenicali in forza. Numeri a 3 decimali.</div>
             </div>
           </div>;
@@ -3831,8 +3862,8 @@ function EmployeeCard(props){
               <tr className="sub"><td className="l">di cui festività godute</td><td className="n">{h(B.fest.ore)}</td><td className="d">{B.fest.gg ? B.fest.gg + " gg × " + fmt3(B.qF) + " h (" + gl(B.fest.giorni) + ") — " + ene(B.fest.oreE, B.fest.oreNE) : "nessuna"}</td></tr>
               <tr className="sub"><td className="l">di cui permessi retribuiti</td><td className="n">{h(B.perm.ore)}</td><td className="d">{B.perm.ore > 0.004 ? ene(B.perm.oreE, B.perm.oreNE) : "nessuno"}</td></tr>
               <tr className="sub"><td className="l">di cui ore lavorate ordinarie</td><td className="n">{h(B.ordC)}</td><td className="d">ore mensili meno le assenze pagate{B.tratt > 0.004 ? " e le ore da trattenere" : ""}</td></tr>
-              {B.tratt > 0.004 ? <tr className="sub"><td className="l">di cui ore non fatte, da trattenere</td><td className="n">{h(B.tratt)}</td><td className="d">solo assenze ingiustificate (ASS.ING) e aspettative non pagate (ASP 0h)</td></tr> : null}
-              <tr className="top"><td className="l">ORE SUPPLEMENTARI (Risultato del mese)</td><td className="n">{B.supp > 0.004 ? "+" + h(B.supp) : h(0)}</td><td className="d">{B.supp > 0.004 ? "da pagare in più, maggiorate" + (B.nonRetr.length ? " (le ASS.ING / ASP 0h non si compensano con le ore in più)" : "") : ((B.tratt + B.sotto) > 0.004 ? "nessuna: mancano " + h(B.tratt + B.sotto) + " alle ore previste (" + h(B.previste) + ")" : "in pari")}</td></tr>
+              {B.tratt > 0.004 ? <tr className="sub"><td className="l">di cui ore non fatte, da trattenere</td><td className="n">{h(B.tratt)}</td><td className="d">{cedTrattDesc(B, h)}</td></tr> : null}
+              <tr className="top"><td className="l">ORE SUPPLEMENTARI (oltre le ore mensili)</td><td className="n">{B.supp > 0.004 ? "+" + h(B.supp) : h(0)}</td><td className="d">{cedSuppDesc(B, h)}</td></tr>
               {B.sotto > 0.004 ? <tr className="top"><td className="l">ORE SOTTO L'ORARIO, non trattenute</td><td className="n">{h(B.sotto)}</td><td className="d">mancano alle ore previste del mese, ma senza una causa (ASS.ING / ASP 0h) non si trattengono: lo stipendio fisso resta intero</td></tr> : null}
               <tr className="top"><td className="l">FESTIVITÀ NON GODUTE, a sé</td><td className="n">{h(B.nonGod.ore)}</td><td className="d">{B.nonGod.gg ? B.nonGod.gg + " gg × " + fmt3(B.q) + " h (" + gl(B.nonGod.giorni) + ") — da pagare in più" : "nessuna"}</td></tr>
             </tbody></table>
@@ -5021,11 +5052,27 @@ function oreSuppPeriodo(state, dp, pairs, c, escludi, sottoSoglia){
     /* ⚠️ Vale per i mesi in cui la busta è MENSILIZZATA (mensilizzato a quella data, da ottobre 2026: lo
        stesso confine del box e del massimale, meseCedolinoTetto). Prima, col criterio orario, la busta
        pagava le ore fatte: lì le ore mancanti restano tutte trattenute, come dalla ver176. */
-    const tratt  = meseCedolinoTetto(dp, pr.y, pr.m) ? (nrFisse ? nrOre : 0) : manca;   /* ore trattenute (ver196: le ASS.ING / ASP 0h sempre intere) */
-    const sotto  = meseCedolinoTetto(dp, pr.y, pr.m) ? R2(Math.max(0, manca - nrOre), 3) : 0;   /* ore sotto l'orario, NON trattenute */
+    let tratt  = meseCedolinoTetto(dp, pr.y, pr.m) ? (nrFisse ? nrOre : 0) : manca;   /* ore trattenute (ver196: le ASS.ING / ASP 0h sempre intere) */
+    let sotto  = meseCedolinoTetto(dp, pr.y, pr.m) ? R2(Math.max(0, manca - nrOre), 3) : 0;   /* ore sotto l'orario, NON trattenute */
+    let suppC  = supp, trattNR = meseCedolinoTetto(dp, pr.y, pr.m) ? (nrFisse ? nrOre : 0) : 0;
+    /* ver203 (21/11/2026, Christian: «Il finanziatore prende in mano il cedolino, guarda la prima riga
+       (retribuzione) e toglie le ore trattenute eventualmente presenti a cedolino …», poi «B, Sì
+       SUPPLEMENTARI» e «Oltre B, come le paghe»): nei mesi a busta MENSILIZZATA il cedolino guarda SOLO le
+       ore mensili (B), come fa l'ufficio paghe: sotto B si trattiene ogni ora non coperta (lavoro, assenze
+       pagate, festività godute), sopra B si pagano supplementari. Il calendario (C) non conta. Le ASS.ING /
+       ASP 0h restano trattenute sempre per intero (ver196). Supera la regola ver182 («ore sotto l'orario non
+       trattenute»). ⚠️ Il «Risultato del mese» del Tabellone (bancaMeseA, su C) NON cambia: resta il vero. */
+    if (meseCedolinoTetto(dp, pr.y, pr.m) && recHasData(rec)){
+      const cop = R2(rese + (Number(sottoSoglia)||0) + ass + fg.ore, 3);   /* ore coperte: lavoro + assenze pagate + festività godute */
+      const dov = R2(monteP - trattNR, 3);                                 /* ore mensili meno le ASS.ING / ASP 0h (sempre trattenute) */
+      suppC = R2(Math.max(0, cop - dov), 3);
+      tratt = R2(trattNR + Math.max(0, dov - cop), 3);
+      sotto = 0;
+      tot += suppC - supp;
+    }
     /* un mese SENZA dati nel Tabellone non sa niente del cedolino: vale 0, come le ore rese di prima */
     const ordCed = recHasData(rec) ? R2(Math.max(0, monteP - ass - fg.ore - tratt), 3) : 0;
-    const ced    = R2(R2(ordCed, 2) + R2(supp, 2), 2);   /* somma dei due addendi gia' al centesimo: a video torna */
+    const ced    = R2(R2(ordCed, 2) + R2(suppC, 2), 2);   /* somma dei due addendi gia' al centesimo: a video torna */
     /* ver124 (06/11/2026, Christian: «spacchettami bene le assenze indicandone le voci che le
        compongono»): quante giornate per ciascun codice, piu' le ore di permesso retribuito.
        ⚠️ Solo per farlo vedere: i numeri del conto restano quelli di `coverAbsHours`. */
@@ -5045,17 +5092,17 @@ function oreSuppPeriodo(state, dp, pairs, c, escludi, sottoSoglia){
        quello che la busta non paga. */
     /* ver182: `tratt` è calcolato sopra (nei mesi mensilizzati comprende SOLO ASS.ING e ASP 0h). */
     let riga = { y:pr.y, m:pr.m, lav:lav, rese:rese, ass:ass, perm:perm,
-                 fest:fg.ore, festGG:fg.gg, det:det, supp:supp, monteP:monteP, ordCed:ordCed, ced:ced, tratt:tratt, sotto:sotto };
+                 fest:fg.ore, festGG:fg.gg, det:det, supp:suppC, monteP:monteP, ordCed:ordCed, ced:ced, tratt:tratt, sotto:sotto, trattNR:trattNR };
     /* ver184 (Christian: «sì, ovunque gli stessi numeri del TS»): nei mesi a cedolino MENSILIZZATO le ore
        della persona (supplementari, trattenute, ore sotto l'orario) si portano al passo ammesso e le
        ordinarie a cedolino diventano ORE MESE − assenze − trattenute AL PASSO, cioè i numeri del TS
        (tsDaRiga). Gli altri mesi NON cambiano di un millesimo. `vero` tiene i numeri di prima. */
     if (meseCedolinoTetto(dp, pr.y, pr.m) && recHasData(rec)){
       const t = tsDaRiga(state, dp, pr.y, pr.m, riga);
-      riga = Object.assign({}, riga, { vero:{ supp:supp, ordCed:ordCed, tratt:tratt, sotto:sotto, ced:ced },
+      riga = Object.assign({}, riga, { vero:{ supp:suppC, ordCed:ordCed, tratt:tratt, sotto:sotto, ced:ced },
         supp:t.supp, ordCed:t.ordC, tratt:t.tratt, sotto:t.sotto, ced:R2(t.ordC + t.supp, 2), ts:t });
     }
-    tot += riga.supp - supp;
+    tot += riga.supp - suppC;
     righe.push(riga);
   });
   return { ore: R2(tot,3), righe: righe };
