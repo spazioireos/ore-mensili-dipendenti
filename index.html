@@ -551,7 +551,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver203";
+const APP_VER = "ver204";
 const APP_DATA = "21nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -936,7 +936,11 @@ function quotaGiorno(dp,y,m){ return oreSettAt(dp,y,m) / ggSettPersona(dp); }   
    a venerdì, così «quota × giorni» resta l'orario del mese e non lo gonfia di un giorno in più ogni settimana. */
 function giorniRetribuibiliInForza(dp,y,m,rec,gsFisso){ let n=0, nd=daysInMonth(y,m); const a=assunzInt(dp), e=effEndInt(dp); const gs=gsFisso ? gsFisso : Math.max(1, Math.round(ggSettPersona(dp))); for(let d=1; d<=nd; d++){ const wd=weekdayOf(y,m,d); if(wd===0 || wd>gs) continue; const D=y*10000+m*100+d; if((!a||a<=D)&&(!e||e>=D)) n++; } return n; }
 function quotaC(dp,y,m){ return monteFissoMese(dp,y,m) / 26; }   // ver201 (Christian, 21/11/2026: «Il giorno valga B diviso 26»): solo per C
-function oreRetribuibili(dp,y,m,rec){ return R2(quotaC(dp,y,m)*giorniRetribuibiliInForza(dp,y,m,rec,6),6); }   // ver200: non arrotondato al centesimo · ver201: B ÷ 26 × giorni non domenicali in forza
+function oreRetribuibili(dp,y,m,rec){
+  /* ver204 (Christian, 21/11/2026: «2, Mettere C uguale a B»): nei mesi a busta mensilizzata (da ottobre 2026) C = B, in
+     proporzione se il mese è parziale: lo stesso numero (monteP) che il cedolino usa dalla ver203. Prima, la regola della ver201. */
+  if (meseCedolinoTetto(dp, y, m)) return R2(monteFissoMese(dp, y, m) * meseFrazione(dp, y, m), 3);
+  return R2(quotaC(dp,y,m)*giorniRetribuibiliInForza(dp,y,m,rec,6),6); }   // ver200: non arrotondato al centesimo · ver201: B ÷ 26 × giorni non domenicali in forza
 function mensDalYM(dp){ const v=ymdIt(dp && dp.mensilizzatoDal); return v?Math.floor(v/100):0; } // YM di decorrenza mensilizzazione (0 = da sempre)
 /* ===== ver151 (11/11/2026) — CHE COSA COPRE LE ORE DOVUTE DEL MESE ===========
    Regole date da Christian l'11/11/2026:
@@ -3617,7 +3621,7 @@ function EmployeeCard(props){
         {livelloAt(dp,y,m) ? <span className="pill">Liv. {livelloAt(dp,y,m)}</span> : null}
         <span className="pill">A) ORE SETT: {fmtH(oreSettAt(dp,y,m))}</span>
         <span className="pill" title="Monte ore mensile: 165 h per chi fa 38 h/settimana, in proporzione per gli altri">B) ORE MENSILI: {fmtH(monteFissoMese(dp,y,m))}</span>
-        <span className="pill" style={{ background:"#fde047", color:"#12324f", fontWeight:800 }} title={"Ore che devono risultare nel totale teorico mensile per avere le ore contrattuali, nel mese = B (ore mensili) ÷ 26 (" + fmt3(quotaC(dp,y,m)) + " h al giorno) × giorni non domenicali in forza (" + giorniRetribuibiliInForza(dp,y,m,rec,6) + "). È la soglia: lo straordinario è solo ciò che la supera."}>C) ORE CHE DEVONO RISULTARE NEL TOTALE TEORICO MENSILE PER AVERE LE ORE CONTRATTUALI: {fmtH(oreRetribuibili(dp,y,m,rec))}</span>
+        <span className="pill" style={{ background:"#fde047", color:"#12324f", fontWeight:800 }} title={meseCedolinoTetto(dp,y,m) ? "Ore che devono risultare nel totale teorico mensile per avere le ore contrattuali, nel mese = B (ore mensili), in proporzione se il contratto copre solo una parte del mese: come il cedolino mensilizzato. È la soglia: lo straordinario è solo ciò che la supera." : ("Ore che devono risultare nel totale teorico mensile per avere le ore contrattuali, nel mese = B (ore mensili) ÷ 26 (" + fmt3(quotaC(dp,y,m)) + " h al giorno) × giorni non domenicali in forza (" + giorniRetribuibiliInForza(dp,y,m,rec,6) + "). È la soglia: lo straordinario è solo ciò che la supera.")}>C) ORE CHE DEVONO RISULTARE NEL TOTALE TEORICO MENSILE PER AVERE LE ORE CONTRATTUALI: {fmtH(oreRetribuibili(dp,y,m,rec))}</span>
         {/* ver199 (21/11/2026, Christian): «D (nuova) ore lavorate da inserire, seguite da cella gialla compilabile» — un dato NUOVO
             e separato dalle «Ore dichiarate (uso interno)» (sua scelta), salvato in rec.oreLav; non entra in nessun altro calcolo */}
         <span className="pill pill-d">D) ORE LAVORATE DA INSERIRE: <input className="orelav-in" value={rec.oreLav || ""} placeholder="—" disabled={mLocked}
@@ -3913,7 +3917,7 @@ function EmployeeCard(props){
             </div>
             <div className="cong-res">
               Ogni mese fa storia a sé. <b>A cedolino</b> (mensilizzati) conta solo le ore mensili (B): le ore oltre B si pagano maggiorate, quelle che mancano a B si trattengono (ASS.ING e ASP 0h sempre per intero). <b>Niente si riporta</b> al mese dopo. Il totale annuo per persona è nella <b>Query personale → ⚡ Straordinario</b>.
-              <div style={{ fontSize:"11px", color:"#9a3412", marginTop:"2px" }}>Base = ore previste del mese (C): ore mensili (B) ÷ 26 × giorni non domenicali in forza. Numeri a 3 decimali.</div>
+              <div style={{ fontSize:"11px", color:"#9a3412", marginTop:"2px" }}>{meseCedolinoTetto(dp, y, m) ? "Base = ore previste del mese (C) = ore mensili (B), in proporzione se il mese è parziale, come il cedolino. Numeri a 3 decimali." : "Base = ore previste del mese (C): ore mensili (B) ÷ 26 × giorni non domenicali in forza. Numeri a 3 decimali."}</div>
             </div>
           </div>;
         })()}
