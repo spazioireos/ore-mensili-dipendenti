@@ -3124,9 +3124,6 @@ function esportaPDFPaghe(state, pairs){
       doc.text(doc.splitTextToSize(dp.nome, LARG)[0], x0, 11);
       doc.setFontSize(11); doc.setFont(undefined, "normal");
       doc.text(MONTH_LABEL[m-1] + " " + anno, x0, 16);
-      if (TS.trattNL > 0.004){ doc.setFont(undefined, "bold"); doc.setTextColor(154,52,18);
-        doc.text("Ore non lavorate da trattenere (mancano alle ore mensili " + fmt2(TS.monte) + "): " + ft(TS.trattNL), x0 + LARG, 16, { align:"right" });
-        doc.setFont(undefined, "normal"); doc.setTextColor(15,39,64); }
       const rosse = []; rows.forEach(function(x, i){ if (x.rosso) rosse.push(i); });
       doc.autoTable({
         startY: 19,
@@ -3144,6 +3141,52 @@ function esportaPDFPaghe(state, pairs){
           if (data.section === "body" && rosse.indexOf(data.row.index) !== -1) data.cell.styles.fillColor = [252,238,238];
           if (data.section === "body" && data.column.index === 2 && String(data.cell.raw || "") !== "") data.cell.styles.textColor = [176,42,42];
           if (data.section === "body" && data.column.index === 4 && String(data.cell.raw || "") !== "") data.cell.styles.textColor = [154,52,18];
+        }
+      });
+      /* ver203 (21/11/2026, Christian: «dobbiamo dare però uno schema chiaro nel report per le dummies dell'ufficio paghe: ore
+         dovute, di cui ore effettuate/lavorate, di cui ferie, di cui festivi etc, poi ore supplementari 27%»): sotto la tabella dei
+         giorni (o su una pagina sua, se non c'è posto), lo schema del cedolino. Gli stessi numeri del TS e del box «Da inserire a
+         cedolino». La maggiorazione è quella del Costo orario: 27%, 15% sul minimo a 38 h/sett. Diciture di Claude. */
+      const magg = (oreSettAt(dp, anno, m) >= 38) ? "15% sul minimo" : "27%";
+      const sch = [];
+      sch.push(["ORE DOVUTE (ore mensili del contratto)", ft(TS.monte), TS.parziale ? "mese parziale: contratto in piedi per " + fmt2(TS.fr*100) + "% del mese" : "lo stipendio fisso del mese"]);
+      sch.push(["   di cui ore lavorate", ft(TS.ordC), TS.supp > 0.004 ? "fino alle ore dovute (le altre sono supplementari, qui sotto)" : ""]);
+      sch.push(["   di cui ferie", ft(TS.ferie.ore), TS.ferie.gg ? TS.ferie.gg + " gg" : ""]);
+      sch.push(["   di cui festività godute", ft(TS.fest.ore), TS.fest.gg ? TS.fest.gg + " gg (" + TS.fest.giorni.join(", ") + ")" : ""]);
+      TS.altre.forEach(function(a){ sch.push(["   di cui " + a.cod, ft(a.ore), a.gg + " gg"]); });
+      if (TS.perm.ore > 0.004) sch.push(["   di cui permessi retribuiti", ft(TS.perm.ore), TS.permTipi.map(function(v){ return v.cod; }).join(", ")]);
+      if (TS.trattNR > 0.004) sch.push(["   di cui da TRATTENERE: ASS.ING / ASP 0h", ft(TS.trattNR), TS.nonRetr.map(function(z){ return z.cod + " " + z.gg + " gg"; }).join(" · ")]);
+      if (TS.trattNL > 0.004) sch.push(["   di cui da TRATTENERE: ore non lavorate", ft(TS.trattNL), "mancano alle ore dovute"]);
+      sch.push(["ORE SUPPLEMENTARI, maggiorate del " + magg, ft(TS.supp), TS.supp > 0.004 ? "da pagare in più: ore oltre le ore dovute" : "nessuna"]);
+      sch.push(["FESTIVITÀ NON GODUTE, a parte", ft(TS.nonGod.ore), TS.nonGod.gg ? TS.nonGod.gg + " gg (" + TS.nonGod.giorni.join(", ") + "), da pagare in più" : "nessuna"]);
+      /* i «di cui» devono sommare ESATTI alle ore dovute anche al centesimo: il centesimo che resta va sulla riga che assorbe lo
+         scarto delle ore mensili (le ore non lavorate trattenute, se ci sono, altrimenti le ore lavorate) */
+      (function(){ const idx = []; sch.forEach(function(r, i){ if (/^ {3}di cui/.test(r[0])) idx.push(i); });
+        const val = { }; const v2 = function(x){ return Math.round(R2(x, 3) * 100) / 100; };
+        const raw = [TS.ordC, TS.ferie.ore, TS.fest.ore].concat(TS.altre.map(function(a){ return a.ore; }))
+          .concat(TS.perm.ore > 0.004 ? [TS.perm.ore] : []).concat(TS.trattNR > 0.004 ? [TS.trattNR] : []).concat(TS.trattNL > 0.004 ? [TS.trattNL] : []);
+        if (raw.length !== idx.length) return;
+        const r2 = raw.map(v2); const diff = Math.round((v2(TS.monte) - r2.reduce(function(a, b){ return a + b; }, 0)) * 100) / 100;
+        if (Math.abs(diff) > 0 && Math.abs(diff) <= 0.05){ const k = (TS.trattNL > 0.004) ? r2.length - 1 : 0; r2[k] = Math.round((r2[k] + diff) * 100) / 100; }
+        idx.forEach(function(i, n){ sch[i][1] = ft(r2[n]); }); })();
+      let ySch = doc.lastAutoTable.finalY + 5;
+      const altSch = 7 + sch.length * 5.6;
+      if (ySch + altSch > 204){ doc.addPage(); doc.setFontSize(13); doc.setFont(undefined, "bold"); doc.setTextColor(15,39,64); doc.text(doc.splitTextToSize(dp.nome, LARG)[0], x0, 11);
+        doc.setFontSize(11); doc.setFont(undefined, "normal"); doc.text(MONTH_LABEL[m-1] + " " + anno + " — schema del cedolino", x0, 16); ySch = 21; }
+      doc.autoTable({
+        startY: ySch,
+        head: [["SCHEMA DEL CEDOLINO", "Ore", "Note"]],
+        body: sch,
+        styles:{ fontSize:10, cellPadding:1, valign:"middle", lineColor:[214,214,214], lineWidth:0.1, overflow:"linebreak" },
+        headStyles:{ fillColor:[15,39,64], textColor:[255,255,255], fontSize:10, fontStyle:"bold" },
+        columnStyles:{ 0:{ halign:"left", cellWidth:95 }, 1:{ halign:"center", cellWidth:75 }, 2:{ halign:"left", cellWidth:111 } },
+        tableWidth: LARG, margin:{ left:x0, right: 297 - x0 - LARG, bottom: 6 }, pageBreak: "avoid",
+        didParseCell: function(data){
+          if (data.section !== "body") return;
+          const l = String(data.row.raw[0] || "");
+          if (!/^ {3}/.test(l)){ data.cell.styles.fontStyle = "bold"; data.cell.styles.fillColor = [234,240,250]; }
+          if (/TRATTENERE/.test(l)) data.cell.styles.textColor = [154,52,18];
+          if (/^ORE SUPPLEMENTARI/.test(l) && TS.supp > 0.004) data.cell.styles.textColor = [176,42,42];
         }
       });
     });

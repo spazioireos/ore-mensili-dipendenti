@@ -53,8 +53,16 @@ Banca ore, tetto annuo, contratti e export.
     trattenute), massimale (H), pastiglia «a cedolino (soglia: ore mensili B …)» nel riquadro del Risultato, frase del riquadro,
     didascalia di H con le parole di Christian («prima riga del cedolino, ore mensili (B) − ore trattenute a cedolino + supplementari −
     assenze retribuite non erosive»). ⚠️ **Diciture nuove o adattate, scritte da Claude.**
-  - ⚠️ **Il «Risultato del mese» del Tabellone, C, la capsula e «COSA DEVE RISULTARE IN E» NON cambiano** (restano su C): chiesto a
-    Christian se togliere C anche lì. Prima del criterio mensilizzato (non mensilizzati, prima di ottobre 2026) niente cambia.
+  - 📋 **Schema del cedolino nel Report PDF per le paghe** (Christian: «dobbiamo dare però uno schema chiaro nel report per le
+    dummies dell'ufficio paghe: ore dovute, di cui ore effettuate/lavorate, di cui ferie, di cui festivi etc, poi ore supplementari
+    27%»): per ogni persona, sotto la tabella dei giorni o su una pagina sua se non c'è posto (con 31 righe va sulla seconda pagina),
+    ORE DOVUTE → di cui lavorate · ferie · festività godute · ogni altra assenza per codice · permessi · da TRATTENERE (ASS.ING / ASP
+    0h e ore non lavorate) → ORE SUPPLEMENTARI maggiorate del 27% (15% sul minimo a 38 h/sett., come il Costo orario) → FESTIVITÀ
+    NON GODUTE a parte. I «di cui» sommano esatti alle ore dovute al centesimo (il centesimo va sulle ore non lavorate trattenute,
+    altrimenti sulle lavorate). Supera la scelta della ver188 di togliere il riquadro. ⚠️ Diciture di Claude.
+  - ⚠️ **Il «Risultato del mese» del Tabellone, C, la capsula e «COSA DEVE RISULTARE IN E» NON cambiano** (restano su C): Christian,
+    21/11/2026: «1, va bene ancorché non sia la vera mensilizzazione legittima; prova a lasciare». Accettata anche l'oscillazione fra
+    mesi da 25 e 27 giorni (un giorno di supplementari o di trattenute a chi fa tutto il suo orario). Prima del criterio mensilizzato (non mensilizzati, prima di ottobre 2026) niente cambia.
   - **Provato**: `collaudo/ver203.cjs` **19/0** (confronto con la ver202 congelata: dicembre 29 h con ASS.ING 28-31 → H 106,587 →
     **94,333 = G**; novembre 25 gg con 80 h → trattenute 2,500, H 80,000). `ver202.cjs` ora fallisce **di proposito** in H03/H04/H06/H12
     (attese della regola vecchia). Batteria completa e numeri sui dati veri: **da fare prima della consegna**.
