@@ -19,7 +19,7 @@ async function leggi(pg){ return pg.evaluate(()=>{ const c=document.querySelecto
   const tabs=[...c.querySelectorAll('.teor-abs,.teor-fest')].map(x=>({t:x.innerText.trim(), ne:x.classList.contains('no-ero'), cls:x.className}));
   const st=x=>{ const s=getComputedStyle(x); return s.borderTopStyle+' '+s.borderTopColor+' '+s.backgroundColor; };
   const e=c.querySelector('.teor-abs:not(.no-ero)'), ne=c.querySelector('.teor-abs.no-ero');
-  return { pill, teor:(q('.foot-teor b')||{}).innerText, anc:q('.foot-ancora')?q('.foot-ancora').innerText:null, ancCls:q('.foot-ancora')?q('.foot-ancora').className:'',
+  return { pill, teor:(q('.foot-teor:not(.foot-noner) b')||q('.foot-teor b')||{}).innerText, anc:q('.foot-ancora')?q('.foot-ancora').innerText:null, ancCls:q('.foot-ancora')?q('.foot-ancora').className:'',
     leg:q('.ero-legenda')?q('.ero-legenda').innerText:null, tabs, stE:e?st(e):'', stNE:ne?st(ne):'', fsE:e?getComputedStyle(e).fontSize:'',
     tw:(q('table.cal')||{}).scrollWidth, pw:document.documentElement.scrollWidth }; }); }
 async function apriMese(br,url,tab,w){ const {ctx,pg,E}=await apri(br,url,w,tab); return {ctx,pg,E}; }
@@ -38,8 +38,8 @@ async function apriMese(br,url,tab,w){ const {ctx,pg,E}=await apri(br,url,w,tab)
   const nv=R.nnov1500; const ancN=num((nv.anc||'').replace(/^.*:\s*/,'')); const dovN=num((nv.pill.match(/([\d.,]+)\s*$/)||[])[1]);
   T('V04 novembre (25 gg × 3 h = 75, dovute '+dovN+'): valore e colore', Math.abs(ancN-(dovN-num(nv.teor)))<0.0015 && (ancN>0.0005 ? !/fatto/.test(nv.ancCls) : /fatto/.test(nv.ancCls)), nv.anc+' · '+nv.ancCls);
   T('V05 ver196: nessuna capsula', v.anc===null);
-  T('V06 linguette E sulle erosive, NE sulle non erosive', n.tabs.length>=6 && n.tabs.every(t=> t.ne ? /^NE\s*\d/.test(t.t) : /^E\s*\d/.test(t.t)), n.tabs.map(t=>t.t).join(' | '));
-  T('V07 numeri delle linguette identici alla ver196 (solo la sigla in più)', JSON.stringify(n.tabs.map(t=>t.t.replace(/^N?E\s*/,''))) === JSON.stringify(v.tabs.map(t=>t.t)), v.tabs.map(t=>t.t).join(' | '));
+  T('V06 linguette E sulle erosive, NE sulle non erosive', n.tabs.length>=6 && n.tabs.every(t=> t.ne ? /^(NE|NON ER)\s*\d/.test(t.t) : /^E\s*\d/.test(t.t)), n.tabs.map(t=>t.t).join(' | '));
+  T('V07 numeri delle linguette identici alla ver196 (solo la sigla in più)', JSON.stringify(n.tabs.map(t=>t.t.replace(/^(NON ER|N?E)\s*/,''))) === JSON.stringify(v.tabs.map(t=>t.t)), v.tabs.map(t=>t.t).join(' | '));
   T('V08 E arancio pieno, NE grigia tratteggiata', /solid rgb\(234, 88, 12\) rgb\(255, 237, 213\)/.test(n.stE) && /dashed/.test(n.stNE), n.stE+' / '+n.stNE);
   T('V09 sigla a 10px (dentro la griglia, eccezione dichiarata)', n.fsE==='10px', n.fsE);
   T('V10 riga che spiega dove si segna l\'erosione', /Erosione del massimale/.test(n.leg||'') && /Cliccala/.test(n.leg||''), (n.leg||'').slice(0,90));

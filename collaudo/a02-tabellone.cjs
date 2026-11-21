@@ -42,15 +42,15 @@ const n=s=>parseFloat(String(s).replace(/\./g,'').replace(',','.'));
   T('A02.19 pillola ORE CHE DEVONO RISULTARE NEL TOTALE TEORICO MENSILE PER AVERE LE ORE CONTRATTUALI ALFA = 38/6×27 = 171,000', /ORE CHE DEVONO RISULTARE NEL TOTALE TEORICO MENSILE PER AVERE LE ORE CONTRATTUALI: 171,000( |$)/.test(headA.replace(/\s+/g,' ')), headA.replace(/\s+/g,' ').slice(0,200));
   T('A02.20 ORE MENSILI ALFA 165', /ORE MENSILI: 165,000/.test(headA));
   T('A02.21 TOT calcolato ALFA = 156,00', (await totV('ALFA'))===156);
-  const teor=n((await A.locator('.foot-teor b').innerText()));
+  const teor=n((await A.locator('.foot-teor:not(.foot-noner) b').innerText()));
   T('A02.22 TOT teorico ALFA = 156 + 3 × 6,333 = 175,000', Math.abs(teor-175)<0.002, teor);
   const congA=(await A.locator('.cong').first().innerText()).replace(/\s+/g,' ');
   T('A02.23 Risultato del mese ALFA = 156 + 19 − 171 = +4,000', /Risultato del mese: \+4,000/.test(congA), congA.slice(0,250));
   /* numerino erosivo */
   const ab=A.locator('.teor-abs').first(); await ab.click(); await pg.waitForTimeout(300);
-  const teor2=n((await A.locator('.foot-teor b').innerText())); const cong2=(await A.locator('.cong').first().innerText()).replace(/\s+/g,' ');
+  const teor2=n((await A.locator('.foot-teor:not(.foot-noner) b').innerText())); const cong2=(await A.locator('.cong').first().innerText()).replace(/\s+/g,' ');
   T('A02.24 clic sul numerino: barrato, TOT teorico −6,333, Risultato invariato', /no-ero/.test(await ab.getAttribute('class')) && Math.abs(teor-teor2-6.333)<0.002 && /\+4,000/.test(cong2), teor2);
-  await ab.click(); await pg.waitForTimeout(300); T('A02.25 secondo clic: torna erosivo', Math.abs(n(await A.locator('.foot-teor b').innerText())-teor)<0.002);
+  await ab.click(); await pg.waitForTimeout(300); T('A02.25 secondo clic: torna erosivo', Math.abs(n(await A.locator('.foot-teor:not(.foot-noner) b').innerText())-teor)<0.002);
   /* box cedolino */
   const box=(await A.locator('.ced-box').innerText()).replace(/\s+/g,' ');
   const bm=/ORE MENSILI ([\d.,]+) h.*di cui ferie ([\d.,]+) h.*altre assenze retribuite ([\d.,]+) h.*festività godute ([\d.,]+) h.*permessi retribuiti ([\d.,]+) h.*ore lavorate ordinarie ([\d.,]+) h.*ORE SUPPLEMENTARI \(Risultato del mese\) \+?([\d.,]+) h/.exec(box);
