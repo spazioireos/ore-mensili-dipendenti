@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver205 · 21nov26 — approvata da Christian e portata su `main` il 21/11/2026 («Main»), insieme alla ver204** (prima su `main` la ver203, approvata il 21/11/2026: «main»; prima la ver202, approvata lo stesso giorno insieme alle ver199, ver200 e ver201: «MAIN»). ⚠️ La **ver198** fu fatta e **annullata** il 21/11/2026 («stai fermo alla ver197»: Christian aveva solo fatto una domanda); i suoi tre totali E/F/G e la sigla «NON ER» sono poi stati **chiesti esplicitamente** e stanno nella ver199. `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver206 · 21nov26 — sul ramo di lavoro, da approvare** (su `main` la ver205, approvata da Christian il 21/11/2026 («Main») insieme alla ver204; prima su `main` la ver203, approvata il 21/11/2026: «main»; prima la ver202, approvata lo stesso giorno insieme alle ver199, ver200 e ver201: «MAIN»). ⚠️ La **ver198** fu fatta e **annullata** il 21/11/2026 («stai fermo alla ver197»: Christian aveva solo fatto una domanda); i suoi tre totali E/F/G e la sigla «NON ER» sono poi stati **chiesti esplicitamente** e stanno nella ver199. `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -37,6 +37,27 @@ Banca ore, tetto annuo, contratti e export.
   Corretto anche un difetto **preesistente** che la nuova navigazione rendeva visibile: nella
   testata, in vista Anagrafica, compariva "📅 undefined 2026" (perché `mese` è `null` fuori dalle
   viste mensili); ora mostra "📇 Anagrafica".
+- 🎯 **ver206 (21/11/2026, sul ramo di lavoro) — IL CONSUMO DEI MASSIMALI MESE PER MESE** (Christian: «Esiste un riepilogativo con le
+  ore erose suddivise di ogni mese da chi ha i massimali?» → no → proposta → «1b, 2a e 2b, 3b» → anteprima → «Nu\*»).
+  - **Solo lettura, nessun calcolo nuovo**: `consumoMassimaleMese(state,dp,y,m)` (accanto a `consumoTetto`) dà `{ced, ero, h}`:
+    `h` = `prodottoMese` (la riga H del Tabellone, quanto scende dal massimale); `ced` = ore a cedolino del TS (`tsMese().ced`,
+    ordinarie + supplementari) nei mesi a busta mensilizzata (`meseCedolinoTetto`), le ore fatte (`totOfRec`) negli altri;
+    `ero` = `h − ced`, così le due righe sommano esatte a H. `consumoMassimaleRighe(state,dp,pairs)` le somma sul periodo.
+  - **Riepiloghi (2a)**: riquadro «🎯 Massimali — consumo mese per mese (periodo)» subito sotto «Riepilogo per mese», solo chi ha
+    un massimale, **due righe per persona** («a cedolino», «erosive», 1b) sui mesi del periodo scelto, più «Nel periodo».
+    ⚠️ Niente Massimo e Restano lì, di proposito: il periodo dei Riepiloghi può non coincidere con quello del massimale.
+  - **Query personale (2b)**: pulsante nuovo «🎯 Massimali»: dipendente e periodo del massimale (a.s. o anno civile, dal suo
+    `tettoPeriodo`), pastiglie Massimo · Già usate · Restano, una riga per mese (A cedolino · Erosive · Totale (H) · Usate fin
+    qui · Restano), «Come è diviso» se ci sono le voci (assegnazione, non consumo per servizio). Periodo senza massimale →
+    «nessun massimale», senza colonna Restano.
+  - **Excel: no (3b)**, l'Excel dei Riepiloghi non cambia. ⚠️ **Diciture nuove, scritte da Claude** (titoli, spiegazioni,
+    «Nessun dipendente ha un massimale.»), approvate con l'anteprima. Classi CSS nuove `.max-nota`, `.max-tab`, `.max-lbl`,
+    `.max-ced`, `.max-ero`.
+  - **Provato**: `collaudo/ver206.cjs` **23/0** (confronto con la ver205: riga H identica in 9 schede-mese; per ogni mese
+    a cedolino + erosive = H; «Nel periodo» = somma; «Già usate» = riquadro 🎯; periodo civile; nessun massimale; 390 e 1280px
+    senza scorrimento laterale; zero errori). **Sui dati veri (backup del 19/11)**: 217 schede-mese, C, Risultato, Tetto, TS,
+    costo orario e `cedOre` **identici alla ver205**; per le 2 persone con massimale, 6 periodi e 42 mesi, ogni mese torna
+    esatto a H e ogni totale a `consumoTetto`.
 - 🔧 **ver205 (21/11/2026, su `main` dal 21/11/2026: «Main») — CORREZIONI DAL COLLAUDO INTEGRATO** (Christian: «3,4,5 sistema»; sulla
   pastiglia: «Cambia la scritta»).
   1. **B2-08** — dopo 📤 Pubblica i residui, il promemoria non chiama più «(nuovo)» chi è stato saltato perché **senza account in

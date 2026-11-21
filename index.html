@@ -250,6 +250,12 @@
   table.rep th, table.rep td { border:1px solid #e2e8f0; padding:7px 10px; text-align:center; }
   table.rep th { background:#2f6fae; color:#fff; font-size:13px; }
   table.rep td.name { text-align:left; font-weight:700; white-space:nowrap; }
+  /* ver206: tabella dei massimali (Riepiloghi e Query personale) */
+  .max-nota { font-size:13px; color:#334155; line-height:1.45; margin:0 0 8px; }
+  table.rep.max-tab td.max-lbl { text-align:left; font-weight:700; color:#1f4e82; white-space:nowrap; }
+  table.rep.max-tab tr.max-ced td { background:#ffffff; border-top:2px solid #94a3b8; }
+  table.rep.max-tab tr.max-ero td { background:#fff4e5; }
+  table.rep.max-tab tr.max-ero td.max-lbl { color:#b45309; }
   table.rep tr:nth-child(even) td { background:#f8fafc; }
   table.rep td.tot { font-weight:800; background:#eef5fc; }
   .rep-scroll { overflow-x:auto; }
@@ -551,7 +557,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver205";
+const APP_VER = "ver206";
 const APP_DATA = "21nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -1471,6 +1477,24 @@ function consumoTetto(state,dp,anno,mese){                                 // so
   const w=tettoWindow(per,anno,mese); let s=0;
   Object.keys(state.dati||{}).forEach(function(k){ const mm=k.match(/^(\d{4})-(\d{1,2})$/); if(!mm) return; const y=parseInt(mm[1],10), mo=parseInt(mm[2],10); const ym=y*100+mo; if(ym<w.fromYM||ym>w.toYM) return; const rec=state.dati[k][dp.id]; if(!rec) return; const p=prodottoMese(rec,dp,y,mo,state); if(p!=null) s+=p; });   /* ver173: con state, per le festività godute erosive */
   return R2(s,3);
+}
+/* ver206 (21/11/2026, Christian: «1b, 2a e 2b, 3b»): il consumo del massimale di UN mese, diviso in ore a cedolino ed
+   erosive. Solo LEGGE: il totale è prodottoMese (la riga H del Tabellone, quanto scende dal massimale); le ore a cedolino sono
+   quelle del TS (ordinarie + supplementari) nei mesi a busta mensilizzata e le ore fatte negli altri; le erosive sono la
+   differenza, così le due righe sommano esatte al totale. null = mese senza dati. */
+function consumoMassimaleMese(state, dp, y, m){
+  const rec = getRecFrom(state, y, m, dp.id);
+  if (!recHasData(rec)) return null;
+  const p = prodottoMese(rec, dp, y, m, state); if (p == null) return null;
+  const h = R2(p, 3); let ced;
+  if (meseCedolinoTetto(dp, y, m)){ const T = tsMese(state, dp, y, m); ced = T ? R2(T.ced, 3) : 0; }
+  else ced = R2(totOfRec(rec, y, m), 3);
+  return { ced:ced, ero:R2(h - ced, 3), h:h };
+}
+function consumoMassimaleRighe(state, dp, pairs){
+  let c = 0, e = 0, h = 0;
+  const mesi = pairs.map(function(pr){ const x = consumoMassimaleMese(state, dp, pr.y, pr.m); if (x){ c += x.ced; e += x.ero; h += x.h; } return x; });
+  return { mesi:mesi, ced:R2(c,3), ero:R2(e,3), h:R2(h,3) };
 }
 /* ===== Base mensile (ore in più / in meno del mese, no accumulo) — per tutti dal 01/10/2026 ===== */
 const BM_DAL_YM = 202610;   // decorrenza globale base mensile = ottobre 2026
@@ -7418,6 +7442,9 @@ function QueryPanel(props){
   const [sToM, setSToM] = useState(String(now.getMonth()+1));
   const [sToY, setSToY] = useState(String(now.getFullYear()));
   const [fAnno, setFAnno] = useState(String(now.getFullYear()-1));
+  const dipsMax = dipSorted(state).filter(function(dp){ return tettiList(dp).length > 0; });   /* ver206 */
+  const [mDip, setMDip] = useState(dipsMax.length ? dipsMax[0].id : "");
+  const [mAnno, setMAnno] = useState("");
   const dips = dipSorted(state);
   const tipoLabel = function(t){ return String(t)==="determinato" ? "Determinato" : "Indeterminato"; };
   const nomeOf = function(dp){ return dp.nome || (dp.ana ? ((dp.ana.cognome||"")+" "+(dp.ana.nome||"")).trim() : ""); };
@@ -7485,6 +7512,7 @@ function QueryPanel(props){
         {modeBtn("movimenti","🔄 Movimenti nell'anno")}
         {modeBtn("strao","⚡ Straordinario")}
         {modeBtn("ferie","🏖️ Ferie da smaltire")}
+        {modeBtn("massimali","🎯 Massimali")}
       </div>
 
       {mode==="forza" ? (
@@ -7595,6 +7623,49 @@ function QueryPanel(props){
            </div>}
         </div>
       ) : null}
+
+      {mode==="massimali" ? (function(){
+        const dp = dipsMax.filter(function(d){ return d.id===mDip; })[0] || dipsMax[0];
+        if (!dp) return <div style={{ color:"#64748b", fontSize:"13px" }}>Nessun dipendente ha un massimale.</div>;
+        const civ = dp.tettoPeriodo === "civile";
+        const syDef = tettoStartYear(dp, now.getFullYear(), now.getMonth()+1);
+        const sy = parseInt(mAnno,10) || syDef;
+        const pairs = []; if (civ){ for (let m=1;m<=12;m++) pairs.push({ y:sy, m:m }); } else { for (let m=9;m<=12;m++) pairs.push({ y:sy, m:m }); for (let m=1;m<=8;m++) pairs.push({ y:sy+1, m:m }); }
+        const massimo = tettoForPeriod(dp, pairs[0].y, pairs[0].m);
+        const R = consumoMassimaleRighe(state, dp, pairs);
+        const ent = tettoEntryForPeriod(dp, pairs[0].y, pairs[0].m); const voci = tettoVoci(ent);
+        const perLbl = civ ? ("anno " + sy) : ("a.s. " + sy + "/" + String((sy+1)%100).padStart(2,"0"));
+        const anniOpt = []; for (let y=syDef-3; y<=syDef+1; y++) anniOpt.push(y);
+        let prog = 0;
+        return <div>
+          <div style={{ fontSize:"12px", color:"#334155", background:"#fff7ed", border:"1px dashed #fb923c", borderRadius:"8px", padding:"8px 12px", marginBottom:"12px", lineHeight:1.5 }}>
+            Il massimale di una persona, mese per mese: <b>a cedolino</b> (ore ordinarie e supplementari scritte a cedolino; prima di ottobre 2026, o per chi non è mensilizzato, le ore fatte) ed <b>erosive</b> (ore retribuite senza lavoro nei giorni in cui il servizio era aperto). Il <b>totale</b> è la riga H del Tabellone, cioè quanto scende dal massimale: i numeri sono gli stessi del riquadro 🎯 Tetto annuo.
+          </div>
+          <div style={{ display:"flex", alignItems:"flex-end", gap:"10px", flexWrap:"wrap", marginBottom:"12px" }}>
+            <div><div style={{ fontSize:"12px", fontWeight:700, marginBottom:"3px" }}>Dipendente</div><select value={dp.id} onChange={function(e){ setMDip(e.target.value); setMAnno(""); }} style={yInput}>{dipsMax.map(function(d){ return <option key={d.id} value={d.id}>{nomeOf(d)}</option>; })}</select></div>
+            <div><div style={{ fontSize:"12px", fontWeight:700, marginBottom:"3px" }}>Periodo del massimale</div><select value={String(sy)} onChange={function(e){ setMAnno(e.target.value); }} style={yInput}>{anniOpt.map(function(y){ return <option key={y} value={String(y)}>{civ ? ("anno "+y) : ("a.s. "+y+"/"+String((y+1)%100).padStart(2,"0"))}</option>; })}</select></div>
+          </div>
+          <div style={{ display:"flex", gap:"10px", flexWrap:"wrap", marginBottom:"10px" }}>
+            <div style={{ background:"#2f6fae", color:"#fff", padding:"8px 14px", borderRadius:"8px", fontWeight:700 }}>Massimo {perLbl}: {massimo>0 ? fmtH(massimo)+" h" : "nessun massimale"}</div>
+            <div style={{ background:"#475569", color:"#fff", padding:"8px 14px", borderRadius:"8px", fontWeight:700 }}>Già usate: {fmtH(R.h)} h</div>
+            {massimo>0 ? <div style={{ background:(massimo-R.h)<0?"#dc2626":"#15803d", color:"#fff", padding:"8px 14px", borderRadius:"8px", fontWeight:700 }}>Restano: {fmtH(R2(massimo-R.h,3))} h</div> : null}
+          </div>
+          {voci.length ? <div style={{ fontSize:"12.5px", color:"#475569", marginBottom:"8px" }}>Come è diviso: {voci.map(function(v){ return v.nome+" "+fmtH(v.ore)+" h"; }).join(" · ")} (assegnazione: il consumo per servizio l'app non lo sa)</div> : null}
+          <div style={{ overflowX:"auto", border:"1px solid #e2e8f0", borderRadius:"8px" }}>
+            <table style={{ borderCollapse:"collapse", width:"100%", minWidth:"560px" }}>
+              <thead><tr><th style={th}>Mese</th><th style={Object.assign({},th,{textAlign:"right"})}>A cedolino</th><th style={Object.assign({},th,{textAlign:"right"})}>Erosive</th><th style={Object.assign({},th,{textAlign:"right"})}>Totale (H)</th><th style={Object.assign({},th,{textAlign:"right"})}>Usate fin qui</th>{massimo>0 ? <th style={Object.assign({},th,{textAlign:"right"})}>Restano</th> : null}</tr></thead>
+              <tbody>{pairs.map(function(pr,i){ const x = R.mesi[i]; if (x) prog = R2(prog + x.h, 3);
+                const tdR = Object.assign({},td,{textAlign:"right"});
+                return <tr key={i}><td style={Object.assign({},td,{fontWeight:700})}>{mLabelY(pr.y,pr.m)}</td>
+                  <td style={tdR}>{x ? fmtH(x.ced) : ""}</td><td style={Object.assign({},tdR,{color:"#b45309"})}>{x ? fmtH(x.ero) : ""}</td>
+                  <td style={Object.assign({},tdR,{fontWeight:800})}>{x ? fmtH(x.h) : <span style={{color:"#64748b"}}>nessun dato</span>}</td>
+                  <td style={tdR}>{x ? fmtH(prog) : ""}</td>{massimo>0 ? <td style={tdR}>{x ? fmtH(R2(massimo-prog,3)) : ""}</td> : null}</tr>; })}
+                <tr><td style={Object.assign({},td,{fontWeight:800,background:"#eef5fc"})}>TOTALE</td><td style={Object.assign({},td,{textAlign:"right",fontWeight:800,background:"#eef5fc"})}>{fmtH(R.ced)}</td><td style={Object.assign({},td,{textAlign:"right",fontWeight:800,background:"#eef5fc",color:"#b45309"})}>{fmtH(R.ero)}</td><td style={Object.assign({},td,{textAlign:"right",fontWeight:800,background:"#eef5fc"})}>{fmtH(R.h)}</td><td style={Object.assign({},td,{background:"#eef5fc"})}></td>{massimo>0 ? <td style={Object.assign({},td,{textAlign:"right",fontWeight:800,background:"#eef5fc"})}>{fmtH(R2(massimo-R.h,3))}</td> : null}</tr>
+              </tbody>
+            </table>
+          </div>
+        </div>;
+      })() : null}
 
       {mode==="ferie" ? (
         <div>
@@ -7955,6 +8026,7 @@ function Riepiloghi(props){
     if (tot>0) tabVoci.push({ dp:dp.nome, mese:mLabelY(pr.y,pr.m), counts:counts, tot:tot });
   }); });
 
+  const tabMax = dips.filter(function(dp){ return tettiList(dp).length > 0; }).map(function(dp){ return Object.assign({ dp:dp }, consumoMassimaleRighe(state, dp, scopePairs)); });   /* ver206 */
   const esportaRiepiloghi = function(){
     const wb = XLSX.utils.book_new();
     wb.Props = { Title:"Riepiloghi", Author:"Christian", Company:"Spazio Ireos Società Cooperativa Sociale", CreatedDate:new Date() };
@@ -8009,6 +8081,23 @@ function Riepiloghi(props){
           {tabPeriodo.map(function(r){ return <tr key={r.dp.id}><td className="name" style={{ borderLeft:"7px solid " + (r.dp.colore || "#94a3b8") }}>{r.dp.nome}</td>
             {r.perMese.map(function(v,i){ return <td key={i}>{v===0?"":fmtH(v)}</td>; })}<td className="tot">{fmtH(r.tot)}</td></tr>; })}
         </tbody></table></div>
+      </div>
+
+      <div className="rep-box">
+        <h3>🎯 Massimali — consumo mese per mese ({periodoLabel})</h3>
+        <div className="max-nota">Solo chi ha un massimale. Ogni mese ha due righe: <b>a cedolino</b> (ore ordinarie e supplementari scritte a cedolino; prima di ottobre 2026, o per chi non è mensilizzato, le ore fatte) ed <b>erosive</b> (ore retribuite senza lavoro nei giorni in cui il servizio era aperto: assenze, permessi, festività godute). Insieme fanno la riga <b>H</b> del Tabellone, cioè quanto scende dal massimale. Massimo, già usate e restano: <b>Query personale → 🎯 Massimali</b>.</div>
+        {tabMax.length === 0 ? <div className="max-nota">Nessun dipendente ha un massimale.</div> :
+        <div className="rep-scroll"><table className="rep max-tab"><thead><tr>
+          <th style={{textAlign:"left"}}>Dipendente</th><th style={{textAlign:"left"}}>Ore</th>{scopePairs.map(function(pr,i){ return <th key={i}>{mAbbrY(pr.y,pr.m)}</th>; })}<th>Nel periodo</th>
+        </tr></thead><tbody>
+          {tabMax.map(function(r){
+            const riga = function(lbl, campo, cls){ return <tr key={r.dp.id+campo} className={cls}>
+              {campo==="ced" ? <td className="name" rowSpan={2} style={{ borderLeft:"7px solid " + (r.dp.colore || "#94a3b8") }}>{r.dp.nome}</td> : null}
+              <td className="max-lbl">{lbl}</td>
+              {r.mesi.map(function(x,i){ return <td key={i}>{x ? fmtH(x[campo]) : ""}</td>; })}<td className="tot">{fmtH(r[campo])}</td></tr>; };
+            return [riga("a cedolino","ced","max-ced"), riga("erosive","ero","max-ero")];
+          })}
+        </tbody></table></div>}
       </div>
 
       <div className="rep-box">
