@@ -41,7 +41,7 @@ async function apriMese(br,url,tab,w){ const {ctx,pg,E}=await apri(br,url,w,tab)
   T('W04 E) Tot ore inserite a mano = 60,000 (il TOT calcolato di prima)', /^E\) Tot ore inserite a mano: 60,000$/.test(n.eTxt||'') && /TOT calcolato: 60,000/.test(v.teorTxt||''), n.eTxt);
   T('W04b tre righe, in ordine E F G, una sotto l\'altra', n.ordine==='E)F)G)' && n.tops[0]<n.tops[1] && n.tops[1]<n.tops[2], n.ordine+' '+n.tops.join(','));
   T('W05 «teor.» nella cella TOT resta 75,000 (con ER)', /75,000/.test(n.cellTeor||'') && n.cellTeor===v.cellTeor, n.cellTeor);
-  T('W06 capsula: C 81,164 − G 75 = +6,164 (ver201: C = B ÷ 26 × 27; nella ver197 era 81 − 75 = +6,000)', /\+6,164/.test(n.anc||'') && /\+6,000/.test(v.anc||''), n.anc);
+  T('W06 capsula: C 78,158 − G 75 = +3,158 (ver204: C = B nei mesi mensilizzati; nella ver197 era 81 − 75 = +6,000)', /\+3,158/.test(n.anc||'') && /\+6,000/.test(v.anc||''), n.anc);
   T('W07 novembre: F = G (niente NON ER)', nv.fTot===nv.teor && nv.teor===R.vnov1500.teor, nv.fTot+' / '+nv.teor);
   T('W08 linguette: «E» sulle erosive, «NON ER» sulle non erosive', n.tabs.length>=6 && n.tabs.every(t=> t.ne ? /^NON ER\s*\d/.test(t.t) : /^E\s*\d/.test(t.t)), n.tabs.map(t=>t.t).join(' | '));
   T('W09 nessuna linguetta «NE» rimasta', !n.tabs.some(t=>/^NE\s*\d/.test(t.t)));
@@ -55,26 +55,26 @@ async function apriMese(br,url,tab,w){ const {ctx,pg,E}=await apri(br,url,w,tab)
   // ---- D e «COSA DEVE RISULTARE IN E» ----
   { const {ctx,pg,E}=await apri(br,'http://127.0.0.1:'+PORTA+'/dip/index.html',1500,11); const L=async()=>await leggi(pg); const inp=pg.locator('.orelav-in').first();
     let x=await L();
-    T('X01 etichette A) B) C) D) nell\'intestazione', /^A\) ORE SETT: 18,000$/.test(x.pills.find(t=>/ORE SETT/.test(t))||'') && /^B\) ORE MENSILI: 78,158$/.test(x.pills.find(t=>/ORE MENSILI/.test(t))||'') && /^C\) ORE CHE DEVONO RISULTARE NEL TOTALE TEORICO MENSILE PER AVERE LE ORE CONTRATTUALI: 81,164$/.test(x.pills.find(t=>/DEVONO/.test(t))||'') && x.pills.some(t=>/^D\) ORE LAVORATE DA INSERIRE:/.test(t)), x.pills.join(' | '));
+    T('X01 etichette A) B) C) D) nell\'intestazione', /^A\) ORE SETT: 18,000$/.test(x.pills.find(t=>/ORE SETT/.test(t))||'') && /^B\) ORE MENSILI: 78,158$/.test(x.pills.find(t=>/ORE MENSILI/.test(t))||'') && /^C\) ORE CHE DEVONO RISULTARE NEL TOTALE TEORICO MENSILE PER AVERE LE ORE CONTRATTUALI: 78,158$/.test(x.pills.find(t=>/DEVONO/.test(t))||'') && x.pills.some(t=>/^D\) ORE LAVORATE DA INSERIRE:/.test(t)), x.pills.join(' | '));
     T('X02 casella D gialla col bordo ambra', x.dIn && /rgb\(255, 253, 231\) rgb\(245, 158, 11\)/.test(x.dBg), x.dBg);
     T('X03 D vuota: «COSA DEVE RISULTARE IN E» dice «—» e chiede D', x.cosaVal==='—' && /scrivi D/.test(x.cosa||''), x.cosa);
     T('X04 la riga è ben visibile: etichetta ≥18px', parseFloat(x.cosaFs)>=18, x.cosaFs);
     await inp.click(); await inp.fill('85'); await pg.waitForTimeout(300); x=await L();
-    T('X05 D 85 > C 81,164: B + (D − C) = 78,158 + 3,836 = 81,994', x.cosaVal==='81,994' && /D > C/.test(x.cosa), x.cosa);
-    await inp.fill('81,164'); await pg.waitForTimeout(300); x=await L();
+    T('X05 D 85 > C 78,158 (ver204: C = B): B + (D − C) = 78,158 + 6,842 = 85,000', x.cosaVal==='85,000' && /D > C/.test(x.cosa), x.cosa);
+    await inp.fill('78,158'); await pg.waitForTimeout(300); x=await L();
     T('X06 D = C: risultato = B = 78,158', x.cosaVal==='78,158' && /D = C/.test(x.cosa), x.cosa);
     await inp.fill('70,5'); await pg.waitForTimeout(300); x=await L();
-    T('X07 D 70,5 < C 81,164: B − (C − D) = 78,158 − 10,664 = 67,494', x.cosaVal==='67,494' && /D < C/.test(x.cosa), x.cosa);
+    T('X07 D 70,5 < C 78,158: B − (C − D) = 78,158 − 7,658 = 70,500', x.cosaVal==='70,500' && /D < C/.test(x.cosa), x.cosa);
     await inp.fill('-5x'); await pg.waitForTimeout(300);
     T('X08 il meno e le lettere non entrano in D', (await inp.inputValue())==='5', await inp.inputValue());
     x=await L();
-    T('X09 D non tocca E, F, G e la capsula', /^E\) Tot ore inserite a mano: 60,000$/.test(x.eTxt||'') && x.fTot==='81,000' && x.teor==='75,000' && /\+6,164/.test(x.anc||''), x.eTxt+' · '+x.fTot+' · '+x.teor+' · '+x.anc);
+    T('X09 D non tocca E, F, G e la capsula', /^E\) Tot ore inserite a mano: 60,000$/.test(x.eTxt||'') && x.fTot==='81,000' && x.teor==='75,000' && /\+3,158/.test(x.anc||''), x.eTxt+' · '+x.fTot+' · '+x.teor+' · '+x.anc);
     T('X10 scrivendo D si accende il 💾 (niente si salva da solo)', await pg.evaluate(()=>{ const b=[...document.querySelectorAll('button')].find(b=>/💾/.test(b.innerText)); return !!b && !b.disabled; }));
     T('X11 «Ore dichiarate (uso interno)» resta al suo posto e vuota (D è un dato separato)', await pg.locator('.dich-in').first().inputValue()==='', await pg.locator('.dich-in').first().inputValue());
     await inp.fill('85'); await pg.waitForTimeout(200); await pg.evaluate(()=>{ const b=[...document.querySelectorAll('button')].find(b=>/💾/.test(b.innerText)); b.click(); }); await pg.waitForTimeout(1500);
     const sv=await pg.evaluate(()=>{ try{ const st=JSON.parse(localStorage.getItem('spazioireos_reportore_v1')); return (st.dati['2026-12'].a||{}).oreLav; }catch(e){ return 'ERR '+e.message; } });
     T('X13 col 💾 D finisce nei dati (rec.oreLav = «85»)', sv==='85', sv);
     await pg.reload({waitUntil:'domcontentloaded'}); await pg.waitForTimeout(4500); { const pw=pg.locator('input[type=password]'); if(await pw.count()===1){ await pw.fill('1234'); await pw.press('Enter'); await pg.waitForTimeout(1800); } } await pg.locator('.tabs .tab').nth(11).click(); await pg.waitForTimeout(900);
-    T('X14 dopo il ricaricamento D è ancora 85 e il risultato 81,994', (await pg.locator('.orelav-in').first().inputValue())==='85' && (await pg.locator('.cosa-e-val').first().innerText())==='81,994', await pg.locator('.orelav-in').first().inputValue());
+    T('X14 dopo il ricaricamento D è ancora 85 e il risultato 85,000', (await pg.locator('.orelav-in').first().inputValue())==='85' && (await pg.locator('.cosa-e-val').first().innerText())==='85,000', await pg.locator('.orelav-in').first().inputValue());
     T('X12 zero errori di pagina', E.length===0, E.join('|')); await ctx.close(); }
   console.log('\n'+P+' superati, '+F+' falliti'); await br.close(); process.exit(F?1:0); })();

@@ -60,7 +60,13 @@ Banca ore, tetto annuo, contratti e export.
   - **Sui dati veri (backup del 19/11)**: C e Risultato del mese cambiano in **14 schede-mese** (ottobre e novembre 2026, fino a
     6,346 h); Tetto, Costo orario (gen→ott 2026 151.094,99 €, 2025 144.683,42 €), `cedOre` e numeri del TS **identici**.
   - 📌 La **ver202** resta il punto di ripristino (vedi sotto); la ver203 (C su B/26) sta su `main` finché la ver204 non ci va.
-  - **Provato**: `collaudo/ver204.cjs` **24/0** (confronto con la ver203 congelata). `ver203.cjs` T04/T06 aggiornati (Risultato su B).
+  - **Provato**: `collaudo/ver204.cjs` **24/0** (confronto con la ver203 congelata). Batteria sulla ver204: `a01` 32/0 · `a02` 50/0 ·
+    `a03` 27/0 · `a04` 30/0 · `a05` 28/0 · `a06` 23/0 · `a07` 61/3 (i tre storici, confronto col testo della ver182) · `a08` 10/0 ·
+    `ver186` 20/0 · `ver194` 42/0 · `ver195` 6/0 · `ver196` 17/0 · `ver197` 15/0 · `ver199` 29/0 · `ver201` 10/0 · `ver202` 13/0 ·
+    `ver203` 19/0. ⚠️ **Attese aggiornate, non aggirate**, con i valori ricalcolati a mano su C = B: `a02` (A02.19, A02.23, A02.24,
+    A02.29), `ver196` (Z11, Z12), `ver199` (W06, X01, X05-X07, X09, X14; X06 ora scrive D = 78,158), `ver203` (T04, T06, T12).
+    Interconnessioni sulla ver204 (banco comune): b1 14/16 · b2 15/17 · b2b 16/16 · b3 20/21 · b6 8/8 · b8 11/11 · b10 26/26 ·
+    b8b 9/9, identiche alla ver203. `ver187` 31/1 (V29 confronta i numeri con la ver186: invecchiato dalla ver201, come sulla ver203).
 - 🧾 **ver203 (21/11/2026, su `main` dal 21/11/2026: «main») — IL CEDOLINO GUARDA SOLO LE ORE MENSILI (B), COME LE PAGHE** (Christian: «Il
   finanziatore prende in mano il cedolino, guarda la prima riga (retribuzione) e toglie le ore trattenute eventualmente presenti a
   cedolino, poi guarda le assenze retribuite escludendo le festività non godute e ciò che non è erosivo», poi «B, Sì SUPPLEMENTARI» e
