@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver207 · 22nov26 — approvata da Christian e portata su `main` il 22/11/2026 («Main») insieme alla ver206** (prima su `main` la ver205, approvata da Christian il 21/11/2026 («Main») insieme alla ver204; prima su `main` la ver203, approvata il 21/11/2026: «main»; prima la ver202, approvata lo stesso giorno insieme alle ver199, ver200 e ver201: «MAIN»). ⚠️ La **ver198** fu fatta e **annullata** il 21/11/2026 («stai fermo alla ver197»: Christian aveva solo fatto una domanda); i suoi tre totali E/F/G e la sigla «NON ER» sono poi stati **chiesti esplicitamente** e stanno nella ver199. `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver208 · 22nov26 — sul ramo di lavoro, da approvare** (su `main` la ver207, approvata da Christian il 22/11/2026 («Main») insieme alla ver206; prima su `main` la ver205, approvata da Christian il 21/11/2026 («Main») insieme alla ver204; prima su `main` la ver203, approvata il 21/11/2026: «main»; prima la ver202, approvata lo stesso giorno insieme alle ver199, ver200 e ver201: «MAIN»). ⚠️ La **ver198** fu fatta e **annullata** il 21/11/2026 («stai fermo alla ver197»: Christian aveva solo fatto una domanda); i suoi tre totali E/F/G e la sigla «NON ER» sono poi stati **chiesti esplicitamente** e stanno nella ver199. `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -37,6 +37,27 @@ Banca ore, tetto annuo, contratti e export.
   Corretto anche un difetto **preesistente** che la nuova navigazione rendeva visibile: nella
   testata, in vista Anagrafica, compariva "📅 undefined 2026" (perché `mese` è `null` fuori dalle
   viste mensili); ora mostra "📇 Anagrafica".
+- 🖨️ **ver208 (22/11/2026, sul ramo di lavoro) — IL REPORT PER LE PAGHE MOSTRA LE ORE SCRITTE, E DUE PERSONE PER FOGLIO**
+  (Christian: «perché se su [una dipendente] ti ho scritto 3 ore il 30 novembre tu scrivi 2,58?» → «30 resta 3,00 e i 2 minuti vanno
+  su una riga a parte in testa al foglio … Ogni giorno mostra quello che hai scritto e il totale torna con B», «per le supplementari
+  rispetta per quanto possibile il mio inserimento a tabellone … se c'è un surplus rispetto al dovuto mensile, questo stia in colonna
+  supplementari», «su ogni A4 stiano per quanto possibile 3 persone» → con le parole in ogni cella: **«2 per pagina, parole per intero»**).
+  - **Solo `esportaPDFPaghe`, nessun calcolo toccato** (TS, box, `cedOre`, Costo orario, massimale identici).
+  - **Ogni giorno = le ore scritte nel Tabellone**: ordinarie del giorno = ore del giorno − supplementari del giorno. Tolti il
+    riempimento dei giorni vuoti e il riproporzionamento (servivano quando il cedolino pagava più o meno delle ore fatte; dalla
+    ver203/204 cedolino = ore fatte). Le supplementari restano sui giorni andati più oltre la quota del giorno (ver183) e il loro
+    totale è il surplus sulle ore mensili (ore lavorate + assenze retribuite + permessi + festività godute − B).
+  - **Lo scarto di B** (le ore mensili non sono «al passo», es. 15 h/sett. = 65,132 = 65 h e 8 min) non va più sull'ultima riga delle
+    ordinarie (era il «2,58» del 30): si scrive in testa al foglio, sotto il mese, in arancio, **«arrotondamento delle ore mensili: -2 min»**
+    (dicitura di Christian; il segno «−» nei caratteri di jsPDF non c'è, si scrive «-»). Il **TOTALE** delle ordinarie resta quello del
+    cedolino (giorni + arrotondamento). Se la differenza superasse 15 minuti la riga dice «differenza fra i giorni e le ordinarie a
+    cedolino: …» (dicitura di Claude: non dovrebbe capitare).
+  - **Due persone per foglio** A4 orizzontale, affiancate (138,5 mm ciascuna), ognuna con tabella dei giorni e schema del cedolino sotto;
+    carattere provato da 8 a 6 pt su una pagina di prova (jsPDF vero) e tenuto il più grande che ci sta. Se una persona non ci sta
+    nella mezza pagina va da sola a foglio intero, come nella ver203. Le parole («3,00 (3 h)») restano in ogni cella.
+  - **Provato**: `collaudo/ver208.cjs` **15/0** (confronto con la ver207 congelata: lì 4 persone = 4 pagine e il 30 a 2,58; qui 2 pagine,
+    il 30 a 3,00, la riga «-2 min», ogni giorno ordinarie + supplementari = ore scritte, TOTALE 65,13, surplus = supplementari; 19 h
+    senza riga; MAL; mese sotto B con le ore non lavorate da trattenere). Anteprima PNG mostrata a Christian.
 - 📶 **ver207 (22/11/2026, su `main` dal 22/11/2026: «Main») — LINEA CADUTA NON È «PERMESSI»** (Christian: «1,2,3 ok» alle questioni aperte del
   collaudo integrato del 21/11, B1-15). Il riquadrino del confronto con Fogli ore diceva sempre «confronto Fogli ore non disponibile
   (permessi)», anche con la linea caduta. Funzione nuova **`erroreTipo(e)`** (accanto a `consumoMassimaleMese`): `permission-denied`

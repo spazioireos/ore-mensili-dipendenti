@@ -557,7 +557,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver207";
+const APP_VER = "ver208";
 const APP_DATA = "22nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -3108,37 +3108,17 @@ function esportaPDFPaghe(state, pairs){
       ord.forEach(function(x){ if (resto <= 1e-9) return; const t = Math.min(resto, x.h - sRaw[x.i]); sRaw[x.i] += t; resto -= t; });
       const sDist = distPassi(sRaw, SUPP);
       rows.forEach(function(x, i){ x.s = sDist[i]; });
-      /* 2) ordinarie a cedolino. Prima le ore ordinarie VERE dei giorni lavorati (le ore meno le supplementari);
-         poi la differenza col cedolino: se il cedolino paga di più (mese corto, ore sotto l'orario non trattenute)
-         si mette sui giorni dell'orario rimasti senza niente (vuoti, poi AN), fino a una quota ciascuno; se paga
-         di meno (mese lungo) si toglie in proporzione dai giorni lavorati. Così nessun giorno porta ore assurde.
-         ver184: si distribuisce il valore AL PASSO e lo scarto delle ORE MESE va sull'ultima riga. */
-      const ORDc = TS.ordC, ORD = TS.ordCPasso;
-      const oV = rows.map(function(x){ return Math.max(0, x.h - x.s); });
-      const sV = oV.reduce(function(a, v){ return a + v; }, 0);
-      let D = ORD - sV;
-      if (D < 0 && sV > 0){ const k = ORD / sV; for (let i = 0; i < oV.length; i++) oV[i] = oV[i] * k; D = 0; }
-      if (D > 0){
-        /* ver195 (Christian, 20/11/2026: «AN = giorno lavorativo a 0 ore» → «Mai su AN»): la differenza va sui giorni
-           vuoti dell'orario e, se non bastano, in proporzione sui giorni lavorati (qui sotto). I giorni AN restano vuoti. */
-        [ function(x){ return x.base > 0 && x.h === 0 && x.ret.length === 0 && !x.nr && x.nota === ""; } ].forEach(function(cond){
-          if (D <= 0.00001) return;
-          const idx = []; rows.forEach(function(x, i){ if (cond(x)) idx.push(i); });
-          if (!idx.length) return;
-          const per = Math.min(q, D / idx.length);
-          idx.forEach(function(i){ oV[i] += per; }); D -= per * idx.length;
-        });
-        if (D > 0.00001){ const s2 = oV.reduce(function(a, v){ return a + v; }, 0); if (s2 > 0){ const k = (s2 + D) / s2; for (let i = 0; i < oV.length; i++) oV[i] = oV[i] * k; D = 0; } }
-      }
-      const oDist = distPassi(oV, ORD);
-      rows.forEach(function(x, i){ x.o = oDist[i]; });
-      const ordSenzaGiorni = (ORD > 0.004 && D > 0.00001);
-      /* lo scarto delle ORE MESE (pochi minuti, il valore del contratto non è al passo) sull'ULTIMA riga delle ordinarie */
-      const scarto = ORDc - ORD; let rigaScarto = -1;
-      if (Math.abs(scarto) > 1e-9){
-        for (let i = rows.length - 1; i >= 0; i--) if (rows[i].o > 0 && rows[i].o + scarto >= 0){ rigaScarto = i; break; }
-        if (rigaScarto >= 0) rows[rigaScarto].o += scarto;
-      }
+      /* 2) ordinarie a cedolino. ver208 (Christian, 22/11/2026: «30 resta 3,00 e i 2 minuti vanno su una riga a parte in
+         testa al foglio … Ogni giorno mostra quello che hai scritto e il totale torna con B» e «per le supplementari rispetta
+         per quanto possibile il mio inserimento a tabellone»): ogni giorno porta le ore SCRITTE nel Tabellone, divise fra
+         ordinarie e supplementari (ordinarie = ore del giorno − supplementari del giorno). Niente più ore spostate su giorni
+         vuoti o riproporzionate: la piccola differenza con le ordinarie a cedolino (le ore mensili B non sono «al passo»)
+         si scrive a parte, in testa al foglio, e il TOTALE della colonna resta quello del cedolino. */
+      const ORDc = TS.ordC;
+      rows.forEach(function(x){ x.o = Math.max(0, R2(x.h - x.s, 6)); });
+      const sommaGiorni = rows.reduce(function(a, x){ return a + x.o; }, 0);
+      const scarto = R2(ORDc - sommaGiorni, 6);
+      const scartoMin = Math.round(scarto * 60);
       /* 4) da trattenere sui giorni ASS.ING / ASP 0h; ver203: le ore non lavorate sotto le ore mensili (TS.trattNL)
          non hanno un giorno: si scrivono a parte, in testa alla pagina */
       const TR = TS.trattNR;
@@ -3151,7 +3131,7 @@ function esportaPDFPaghe(state, pairs){
         return [ x.label + (x.nota ? "  " + x.nota : ""), x.o > 0.004 ? fh(x.o) : vuoto, x.s > 0.004 ? fh(x.s) : vuoto, retT, nrT ];
       });
       const sumCol = function(fn){ return R2(rows.reduce(function(a, x){ return a + fn(x); }, 0), 3); };   /* ver185: totali a tre decimali (si scrivono così) */
-      const tO = sumCol(function(x){ return x.o; }), tS = sumCol(function(x){ return x.s; });
+      const tO = R2(ORDc, 3), tS = sumCol(function(x){ return x.s; });   /* ver208: il totale delle ordinarie è quello del cedolino (giorni + arrotondamento) */
       const tR = sumCol(function(x){ return x.retH.reduce(function(a, v){ return a + (v || 0); }, 0); }), tN = sumCol(function(x){ return x.nrH; });
       /* ver188 (Christian, 20/11/2026): tre dipendenti per pagina A4 orizzontale; intestazione solo con nominativo e
          mese; niente legende, niente riquadro «DA INSERIRE A CEDOLINO», niente segni † e *. I numeri non cambiano. */
@@ -3179,23 +3159,32 @@ function esportaPDFPaghe(state, pairs){
         const r2 = raw.map(v2); const diff = Math.round((v2(TS.monte) - r2.reduce(function(a, b){ return a + b; }, 0)) * 100) / 100;
         if (Math.abs(diff) > 0 && Math.abs(diff) <= 0.05){ const k = (TS.trattNL > 0.004) ? r2.length - 1 : 0; r2[k] = Math.round((r2[k] + diff) * 100) / 100; }
         idx.forEach(function(i, n){ sch[i][1] = ft(r2[n]); }); })();
-      /* ver203 (Christian: «2 no, riduci»): tabella dei giorni e schema nella STESSA pagina. Si stima l'altezza (stessa formula
-         della ver156) e si stringe il carattere della tabella dei giorni finché tutte e due ci stanno; se non bastasse, lo
-         schema va comunque su una pagina sua (sotto). */
-      const LARG = 281, SX = 8;
-      const x0 = SX;
+      /* ver208 (Christian, 22/11/2026: «su ogni A4 stiano per quanto possibile 3 persone» → con le parole in ogni cella
+         «2 per pagina, parole per intero»): DUE persone affiancate per foglio A4 orizzontale, ognuna con la sua tabella dei
+         giorni e il suo schema del cedolino sotto. Come nella ver203 si prova dal carattere più grande al più piccolo su una
+         pagina di prova (jsPDF vero) e si tiene il più grande con cui tabella e schema stanno nella mezza pagina. Se nessuno
+         basta, quella persona va da sola su un foglio intero, come nella ver203 (ed eventualmente lo schema su un foglio suo). */
+      const SX = 8, GAP = 4, MEZZA = 138.5, INTERA = 281;
       const rosse = []; rows.forEach(function(x, i){ if (x.rosso) rosse.push(i); });
-      const optT = function(fs, pad){ return {
-        startY: 19,
+      /* la riga dell'arrotondamento, in testa (dicitura di Christian: «arrotondamento delle ore mensili: −2 min»; il segno
+         «−» nei caratteri standard di jsPDF non esiste, quindi si scrive «-», come nella ver182) */
+      const arrTxt = (scartoMin === 0) ? "" : (Math.abs(scartoMin) <= 15
+        ? "arrotondamento delle ore mensili: " + (scartoMin > 0 ? "+" : "-") + Math.abs(scartoMin) + " min"
+        : "differenza fra i giorni e le ordinarie a cedolino: " + (scarto > 0 ? "+" : "-") + pdfHMx(Math.abs(scarto)));
+      const Y_T = 22;
+      const colT = function(W){ const k = W / INTERA; return (W < 200) ? [18, 26, 26, 38, 30.5] : [28*k, 55*k, 55*k, 77*k, 66*k]; };
+      const colS = function(W){ return (W < 200) ? [50, 44, 44.5] : [95, 75, 111]; };
+      const optT = function(fs, pad, x, W){ const c = colT(W); return {
+        startY: Y_T,
         head: [["Giorno", "Ordinarie", "Supplementari", "Assenze retribuite", "Non retribuite (ASS.ING / ASP 0h / SCIOP)"]],
         body: body,
         foot: [["TOTALE", ft(tO), ft(tS), ft(tR), ft(tN)]],
         styles:{ fontSize:fs, cellPadding:pad, valign:"middle", lineColor:[214,214,214], lineWidth:0.1, overflow:"linebreak" },
         headStyles:{ fillColor:[15,39,64], textColor:[255,255,255], fontSize:fs, fontStyle:"bold", halign:"center" },
         footStyles:{ fillColor:[234,240,250], textColor:[15,39,64], fontStyle:"bold", halign:"center" },
-        columnStyles:{ 0:{ halign:"left", cellWidth:28 }, 1:{ halign:"center", cellWidth:55 }, 2:{ halign:"center", cellWidth:55 }, 3:{ halign:"left", cellWidth:77 }, 4:{ halign:"left", cellWidth:66 } },
-        tableWidth: LARG,
-        margin:{ left:x0, right: 297 - x0 - LARG, top: 19, bottom: 6 },
+        columnStyles:{ 0:{ halign:"left", cellWidth:c[0] }, 1:{ halign:"center", cellWidth:c[1] }, 2:{ halign:"center", cellWidth:c[2] }, 3:{ halign:"left", cellWidth:c[3] }, 4:{ halign:"left", cellWidth:c[4] } },
+        tableWidth: W,
+        margin:{ left:x, right: 297 - x - W, top: Y_T, bottom: 6 },
         pageBreak: "avoid",
         didParseCell: function(data){
           if (data.section === "body" && rosse.indexOf(data.row.index) !== -1) data.cell.styles.fillColor = [252,238,238];
@@ -3203,19 +3192,15 @@ function esportaPDFPaghe(state, pairs){
           if (data.section === "body" && data.column.index === 4 && String(data.cell.raw || "") !== "") data.cell.styles.textColor = [154,52,18];
         }
       }; };
-      /* ver203 (21/11/2026, Christian: «dobbiamo dare però uno schema chiaro nel report per le dummies dell'ufficio paghe: ore
-         dovute, di cui ore effettuate/lavorate, di cui ferie, di cui festivi etc, poi ore supplementari 27%»): sotto la tabella dei
-         giorni (o su una pagina sua, se non c'è posto), lo schema del cedolino. Gli stessi numeri del TS e del box «Da inserire a
-         cedolino». La maggiorazione è quella del Costo orario: 27%, 15% sul minimo a 38 h/sett. Diciture di Claude. */
-      const FS_S = 9, PAD_S = 0.6;
-      const optS = function(y){ return {
+      /* ver203: lo schema del cedolino (stessi numeri del TS e del box «Da inserire a cedolino»; maggiorazione del Costo orario) */
+      const optS = function(y, fs, pad, x, W){ const c = colS(W); return {
         startY: y,
         head: [["SCHEMA DEL CEDOLINO", "Ore", "Note"]],
         body: sch,
-        styles:{ fontSize:FS_S, cellPadding:PAD_S, valign:"middle", lineColor:[214,214,214], lineWidth:0.1, overflow:"linebreak" },
-        headStyles:{ fillColor:[15,39,64], textColor:[255,255,255], fontSize:FS_S, fontStyle:"bold" },
-        columnStyles:{ 0:{ halign:"left", cellWidth:95 }, 1:{ halign:"center", cellWidth:75 }, 2:{ halign:"left", cellWidth:111 } },
-        tableWidth: LARG, margin:{ left:x0, right: 297 - x0 - LARG, bottom: 6 }, pageBreak: "avoid",
+        styles:{ fontSize:fs, cellPadding:pad, valign:"middle", lineColor:[214,214,214], lineWidth:0.1, overflow:"linebreak" },
+        headStyles:{ fillColor:[15,39,64], textColor:[255,255,255], fontSize:fs, fontStyle:"bold" },
+        columnStyles:{ 0:{ halign:"left", cellWidth:c[0] }, 1:{ halign:"center", cellWidth:c[1] }, 2:{ halign:"left", cellWidth:c[2] } },
+        tableWidth: W, margin:{ left:x, right: 297 - x - W, bottom: 6 }, pageBreak: "avoid",
         didParseCell: function(data){
           if (data.section !== "body") return;
           const l = String(data.row.raw[0] || "");
@@ -3224,41 +3209,51 @@ function esportaPDFPaghe(state, pairs){
           if (/^ORE SUPPLEMENTARI/.test(l) && TS.supp > 0.004) data.cell.styles.textColor = [176,42,42];
         }
       }; };
-      /* ver203 (Christian: «2 no, riduci»): tabella dei giorni e schema nella STESSA pagina. Si prova dal carattere più grande al
-         più piccolo: con jsPDF vero si disegna tutto su una pagina di prova e si misura (come la ver156), altrimenti si stima.
-         Si tiene la misura più grande con cui ci stanno tutti e due; se nessuna basta, lo schema va su una pagina sua. */
-      const PROVE = [[9,0.75],[8.5,0.6],[8,0.5],[7.5,0.45],[7,0.4],[6.5,0.3]];
       const altR = function(fs, pad){ return fs * 0.3528 * 1.18 + 2 * pad + 0.25; };
-      const altSch = (sch.length + 1) * altR(FS_S, PAD_S) + 1;
       const puoMis = !!(doc.addPage && doc.deletePage && doc.setPage && doc.internal && doc.internal.getNumberOfPages);
-      let FS_T = PROVE[PROVE.length-1][0], PAD_T = PROVE[PROVE.length-1][1];
-      const ciSta = PROVE.some(function(t){
-        let ok;
-        if (puoMis){
-          const p0 = doc.internal.getNumberOfPages();
-          doc.addPage(); doc.autoTable(optT(t[0], t[1]));
-          const yT = doc.lastAutoTable.finalY; let p1 = doc.internal.getNumberOfPages();
-          let yS = 999;
-          if (p1 === p0 + 1){ doc.autoTable(optS(yT + 3)); yS = doc.lastAutoTable.finalY; p1 = doc.internal.getNumberOfPages(); }
-          ok = (p1 === p0 + 1) && yS <= 205;
-          for (let k = doc.internal.getNumberOfPages(); k > p0; k--) doc.deletePage(k);
-          doc.setPage(p0);
-        } else ok = 19 + (rows.length + 2) * altR(t[0], t[1]) + 3 + altSch <= 203;
-        if (ok){ FS_T = t[0]; PAD_T = t[1]; }
+      /* prova una misura: tabella dei giorni + schema stanno in una pagina, larghi W? */
+      const prova = function(W, fs, pad, fsS, padS){
+        if (!puoMis) return Y_T + (rows.length + 2) * altR(fs, pad) * (W < 200 ? 1.6 : 1) + 3 + (sch.length + 1) * altR(fsS, padS) * (W < 200 ? 1.6 : 1) + 1 <= 203;
+        const p0 = doc.internal.getNumberOfPages();
+        doc.addPage(); doc.autoTable(optT(fs, pad, SX, W));
+        const yT = doc.lastAutoTable.finalY; let p1 = doc.internal.getNumberOfPages(); let yS = 999;
+        if (p1 === p0 + 1){ doc.autoTable(optS(yT + 3, fsS, padS, SX, W)); yS = doc.lastAutoTable.finalY; p1 = doc.internal.getNumberOfPages(); }
+        const ok = (p1 === p0 + 1) && yS <= 205;
+        for (let k = doc.internal.getNumberOfPages(); k > p0; k--) doc.deletePage(k);
+        doc.setPage(p0);
         return ok;
-      });
-      nuovaPagina();
+      };
+      const PROVE2 = [[8,0.5],[7.5,0.45],[7,0.4],[6.5,0.35],[6,0.3]];
+      let mis = null;
+      PROVE2.some(function(t){ if (prova(MEZZA, t[0], t[1], t[0], t[1])){ mis = { W:MEZZA, fs:t[0], pad:t[1], fsS:t[0], padS:t[1] }; return true; } return false; });
+      let schemaASe = false;
+      if (!mis){
+        /* non ci sta nella mezza pagina: da sola, a foglio intero (come la ver203) */
+        const PROVE = [[9,0.75],[8.5,0.6],[8,0.5],[7.5,0.45],[7,0.4],[6.5,0.3]];
+        PROVE.some(function(t){ if (prova(INTERA, t[0], t[1], 9, 0.6)){ mis = { W:INTERA, fs:t[0], pad:t[1], fsS:9, padS:0.6 }; return true; } return false; });
+        if (!mis){ mis = { W:INTERA, fs:6.5, pad:0.3, fsS:9, padS:0.6 }; schemaASe = true; }
+      }
+      let x0;
+      if (mis.W === MEZZA){
+        if (posto % 2 === 0) nuovaPagina();
+        x0 = SX + (posto % 2) * (MEZZA + GAP);
+        posto++;
+      } else {
+        nuovaPagina(); x0 = SX; posto = 0;        /* la prossima persona riparte da un foglio nuovo */
+      }
       prodotto = true;
-      posto++;
-      doc.setFontSize(13); doc.setFont(undefined, "bold"); doc.setTextColor(15,39,64);
-      doc.text(doc.splitTextToSize(dp.nome, LARG)[0], x0, 11);
-      doc.setFontSize(11); doc.setFont(undefined, "normal");
-      doc.text(MONTH_LABEL[m-1] + " " + anno, x0, 16);
-      doc.autoTable(optT(FS_T, PAD_T));
+      const intesta = function(sotto){
+        doc.setFontSize(13); doc.setFont(undefined, "bold"); doc.setTextColor(15,39,64);
+        doc.text(doc.splitTextToSize(dp.nome, mis.W)[0], x0, 11);
+        doc.setFontSize(11); doc.setFont(undefined, "normal");
+        doc.text(MONTH_LABEL[m-1] + " " + anno + (sotto || ""), x0, 16);
+        if (!sotto && arrTxt){ doc.setFontSize(9); doc.setTextColor(154,52,18); doc.text(doc.splitTextToSize(arrTxt, mis.W)[0], x0, 20.3); doc.setTextColor(15,39,64); }
+      };
+      intesta("");
+      doc.autoTable(optT(mis.fs, mis.pad, x0, mis.W));
       let ySch = doc.lastAutoTable.finalY + 3;
-      if (!ciSta){ doc.addPage(); doc.setFontSize(13); doc.setFont(undefined, "bold"); doc.setTextColor(15,39,64); doc.text(doc.splitTextToSize(dp.nome, LARG)[0], x0, 11);
-        doc.setFontSize(11); doc.setFont(undefined, "normal"); doc.text(MONTH_LABEL[m-1] + " " + anno + " — schema del cedolino", x0, 16); ySch = 21; }
-      doc.autoTable(optS(ySch));
+      if (schemaASe){ doc.addPage(); intesta(" — schema del cedolino"); ySch = 21; posto = 0; }
+      doc.autoTable(optS(ySch, mis.fsS, mis.padS, x0, mis.W));
     });
     if (dipsMese.length > 0 && senzaDati.length === dipsMese.length){
       nuovaPagina(); prodotto = true;
