@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver206 · 21nov26 — sul ramo di lavoro, da approvare** (su `main` la ver205, approvata da Christian il 21/11/2026 («Main») insieme alla ver204; prima su `main` la ver203, approvata il 21/11/2026: «main»; prima la ver202, approvata lo stesso giorno insieme alle ver199, ver200 e ver201: «MAIN»). ⚠️ La **ver198** fu fatta e **annullata** il 21/11/2026 («stai fermo alla ver197»: Christian aveva solo fatto una domanda); i suoi tre totali E/F/G e la sigla «NON ER» sono poi stati **chiesti esplicitamente** e stanno nella ver199. `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver207 · 22nov26 — sul ramo di lavoro, da approvare, insieme alla ver206** (su `main` la ver205, approvata da Christian il 21/11/2026 («Main») insieme alla ver204; prima su `main` la ver203, approvata il 21/11/2026: «main»; prima la ver202, approvata lo stesso giorno insieme alle ver199, ver200 e ver201: «MAIN»). ⚠️ La **ver198** fu fatta e **annullata** il 21/11/2026 («stai fermo alla ver197»: Christian aveva solo fatto una domanda); i suoi tre totali E/F/G e la sigla «NON ER» sono poi stati **chiesti esplicitamente** e stanno nella ver199. `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -37,6 +37,19 @@ Banca ore, tetto annuo, contratti e export.
   Corretto anche un difetto **preesistente** che la nuova navigazione rendeva visibile: nella
   testata, in vista Anagrafica, compariva "📅 undefined 2026" (perché `mese` è `null` fuori dalle
   viste mensili); ora mostra "📇 Anagrafica".
+- 📶 **ver207 (22/11/2026, sul ramo di lavoro) — LINEA CADUTA NON È «PERMESSI»** (Christian: «1,2,3 ok» alle questioni aperte del
+  collaudo integrato del 21/11, B1-15). Il riquadrino del confronto con Fogli ore diceva sempre «confronto Fogli ore non disponibile
+  (permessi)», anche con la linea caduta. Funzione nuova **`erroreTipo(e)`** (accanto a `consumoMassimaleMese`): `permission-denied`
+  → «… (permessi)» (come prima); `unavailable` / `deadline-exceeded` / «offline» → **«confronto Fogli ore non disponibile: non c'è
+  collegamento, riprova quando torna la linea.»**; il resto → «confronto Fogli ore non disponibile» senza causa. `foErr` ora è il tipo
+  (o `false`). ⚠️ **Dicitura adattata, scritta da Claude** (la seconda frase è quella della rev 14 di Fogli ore). **Nessun calcolo
+  toccato** (dati veri: C, Risultato, Tetto, TS, costo orario e `cedOre` identici alla ver206). **Provato**: interconnessioni `b1`
+  16/0 (B1-15 ora superato, B1-15b nuovo: con i permessi negati resta «(permessi)»; B1-10 parziale come sempre), `b2` 16/0 · `b6`
+  8/0 · `b8` 11/0 · `b10` 26/0 · `b5` 12/0; batteria `a01`…`a08` tutta a zero falliti, `ver206` 23/0.
+  🧹 **Le 22 prove invecchiate riallineate** («2 ok»), **senza toccare l'app**: `ver184` 65/0 (formato del report per le paghe in
+  ore,minuti senza «†», TOT al millesimo, box con «da trattenere 10,500», M33-M35 contro la versione di confronto `RIF`, di serie
+  ver206), `a07` 64/0 (il confronto dei testi contro `RIF` invece della ver182; misure e testata restano contro la ver182), `ver187`
+  32/0 (V29 contro la copia congelata `comune/.banco/dip206`; la differenza con la ver186 si stampa e basta).
 - 🎯 **ver206 (21/11/2026, sul ramo di lavoro) — IL CONSUMO DEI MASSIMALI MESE PER MESE** (Christian: «Esiste un riepilogativo con le
   ore erose suddivise di ogni mese da chi ha i massimali?» → no → proposta → «1b, 2a e 2b, 3b» → anteprima → «Nu\*»).
   - **Solo lettura, nessun calcolo nuovo**: `consumoMassimaleMese(state,dp,y,m)` (accanto a `consumoTetto`) dà `{ced, ero, h}`:

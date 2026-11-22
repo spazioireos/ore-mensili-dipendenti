@@ -46,6 +46,13 @@ node collaudo/ver183.cjs                  # collaudo della ver183 (27 controlli;
 | `ver204.cjs` | ver204: C = B nei mesi mensilizzati (ottobre 27 gg 85,673 → 82,500, Risultato +5,167 = supplementari a cedolino; novembre 25 gg 79,327 → 82,500, Risultato −2,500 = da trattenere; mese parziale 45,242 = soglia del cedolino; «COSA DEVE RISULTARE IN E» con D = 85 → 85,000; gennaio 26 gg, non mensilizzato e settembre 2026 identici; H, G, massimale, box e `cedOre` identici) e codice SCIOP (trattenuto per intero come ASS.ING, supplementari senza compensazione, erode: numerino, H = G = massimale 94,167; spento col clic non erode ma resta trattenuto; «sciop» battuto diventa SCIOP); 390px, zero errori (`python3 collaudo/rigenera.py ver203`). ⚠️ Dalla ver204 `ver203.cjs` T04/T06 leggono il Risultato su B | 24/0 |
 | `ver206.cjs` | ver206: 🎯 Massimali mese per mese nei Riepiloghi e nella Query personale (a cedolino + erosive = H, totali = Tetto annuo, nessun numero cambiato) | — |
 
+**22/11/2026, ver207** (linea caduta ≠ «permessi», nessun calcolo toccato) e **prove riallineate senza toccare l'app** (Christian:
+«2 ok»): `a01` 32/0 · `a02` 50/0 · `a03` 27/0 · `a04` 30/0 · `a05` 28/0 · `a06` 23/0 · `a07` **64/0** (il confronto dei testi ora contro
+`RIF`, di serie ver206) · `a08` 10/0 · `ver184` **65/0** (report per le paghe in ore,minuti senza «†», TOT al millesimo, box «da
+trattenere 10,500», M33-M35 contro `RIF`) · `ver187` **32/0** (V29 contro `comune/.banco/dip206`: `git show <commit ver206>:index.html >
+x.html; python3 comune/localizza.py x.html comune/.banco/dip206/index.html`) · `ver206` 23/0 (targhetta letta dal file). Dati veri:
+identici alla ver206.
+
 **21/11/2026, ver206** (🎯 Massimali mese per mese, solo lettura): `ver206` 23/0 · `ver204` 24/0 · `ver203` 19/0 · `ver202` 13/0 · `ver201` 10/0 · `ver199` 29/0 · `a01` 32/0 · `a02` 50/0 · `a03` 27/0 · `a04` 30/0 · `a05` 28/0 · `a06` 23/0 · `a07` 61/3 (i tre storici; ⚠️ attesa **aggiornata, non aggirata**: il riquadro nuovo dei Riepiloghi e il pulsante nuovo della Query si tolgono prima del confronto col testo della ver182, il resto resta identico) · `a08` 10/0. Dati veri (backup del 19/11): C, Risultato, Tetto, TS, costo orario e `cedOre` identici alla ver205; 42 mesi di massimale su 2 persone tornano esatti a H e a `consumoTetto`.
 
 **21/11/2026, ver202** (riga H, nessun calcolo toccato): `ver202` 13/0 · `ver201` 10/0 · `ver199` 29/0 · `ver197` 15/0 · `a01` 32/0 · `a02` 50/0 · `a03` 27/0 · `a04` 30/0 · `a05` 28/0 · `a06` 23/0 · `a08` 10/0 · `a07` 61/3 (storia come nella ver201: confronta il testo con la ver182, e la riga H aggiunge pezzi al Tabellone di ottobre 2026).

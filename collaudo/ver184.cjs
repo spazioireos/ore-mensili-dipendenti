@@ -6,6 +6,8 @@ const K=require('./a00-comune.cjs'); const R=K.contatore('ver184'); const T=R.T;
 const PC=process.argv[2]||'8344';
 const n=s=>parseFloat(String(s).replace(/\./g,'').replace(',','.'));
 const R2=(v,d)=>{ d=d==null?2:d; const p=Math.pow(10,d); return Math.round(Number((Math.abs(v)*p).toPrecision(12)))/p*(v<0?-1:1); };
+const hm=s=>{ const m=/^(\d+),(\d{2})$/.exec(String(s).trim()); return m?(+m[1])+(+m[2])/60:NaN; };   /* ver207: il TS scrive ore,minuti (ver189/194) */
+const RIF=process.env.RIF||'ver206';   /* ver207: versione di confronto per M33-M35 (prima la ver183, invecchiata dalle ver201/203/204) */
 const okPasso=v=>{ const a=Math.abs(v)*12, k=Math.round(a); return Math.abs(a-k)<0.07 && [0,2,3,4,6,8,9,10].indexOf(k%12)!==-1; };   /* su numeri a 2 decimali (,17 = 1/6) */
 /* --- dati inventati --- */
 function feriali(y,m,val,sab){ const g={}; const nd=new Date(y,m,0).getDate(); for(let d=1;d<=nd;d++){ const wd=new Date(y,m-1,d).getDay(); if(wd===0) continue; if(wd===6 && !sab) continue; g[d]=val; } return g; }
@@ -28,7 +30,7 @@ const motore=(pg)=>pg.evaluate(()=>{ const st=JSON.parse(localStorage.getItem('s
   const ott=[{y:2026,m:10}], sett=[{y:2026,m:9}];
   st.dipendenti.forEach(dp=>{ const T=(typeof tsMese==='function')?tsMese(st,dp,2026,10):null; const B=cedolinoBox(st,dp,2026,10); const d=datiCosto(st,dp,ott), d9=datiCosto(st,dp,sett);
     const rec10=getRecFrom(st,2026,10,dp.id);
-    o[dp.id]={ ts:T?{ordC:T.ordC,supp:T.supp,tratt:T.tratt,monte:T.monte,ass:T.assTot,ero:T.eroTot,ced:T.ced,ferie:T.ferie.ore,altre:T.altre.map(a=>[a.cod,a.ore]),perm:T.permTipi.map(a=>[a.cod,a.ore]),sotto:T.sotto}:null,
+    o[dp.id]={ ts:T?{ordC:T.ordC,supp:T.supp,tratt:T.tratt,trattNR:T.trattNR,monte:T.monte,ass:T.assTot,ero:T.eroTot,ced:T.ced,ferie:T.ferie.ore,altre:T.altre.map(a=>[a.cod,a.ore]),perm:T.permTipi.map(a=>[a.cod,a.ore]),sotto:T.sotto}:null,
       box:B?{ced:B.ced,ordC:B.ordC,supp:B.supp,monte:B.monte,tratt:B.tratt}:null, ced:(cedOrePubblica(st)['2026-10']||{})[dp.id],
       costo:{H38:R2(d.res.H38,2),J35:R2(d.res.J35,2),eh:d.oreMancanti?'nc':R2(d.res.orario,2),supp:R2(oreSuppPeriodo(st,dp,ott,null,null,0).ore,3)},
       costo9:{H38:R2(d9.res.H38,2),J35:R2(d9.res.J35,2),eh:d9.oreMancanti?'nc':R2(d9.res.orario,2)},
@@ -47,7 +49,7 @@ async function tsPdf(pg){ await K.vai(pg,'Ott'); await pg.getByRole('button',{na
   T('M02 «0,17» si legge 1/6 d\'ora: 31 × 0,17 = 5,1667 (non 5,27)', L.s31===5.1667, L.s31);
   T('M03 2,33 = 2 h 20 · 7,83 = 7 h 50 esatti; 7,66, 3,75 e 1,6666 restano come sono', Math.abs(L.p[0]-(2+1/3))<1e-12 && L.p[1]===7.66 && L.p[2]===3.75 && L.p[3]===1.6666 && Math.abs(L.p[4]-(7+5/6))<1e-12, JSON.stringify(L.p));
   const M=await motore(pg);
-  T('M04 un mese di 25 celle «0,17»: TOT 4,17 (25 × 10 min = 4 h 10)', M.x.tot11===4.17, M.x.tot11);
+  T('M04 un mese di 25 celle «0,17»: TOT 4,167 (25 × 10 min = 4 h 10; dalla ver205 il TOT è al millesimo)', M.x.tot11===4.167, M.x.tot11);
   /* ===== b) celle del Tabellone ===== */
   await K.vai(pg,'Ott');
   const C=(d)=>K.cella(pg,'PROVA CELLE',d);
@@ -96,32 +98,38 @@ async function tsPdf(pg){ await K.vai(pg,'Ott'); await pg.getByRole('button',{na
   T('M22 TS di ottobre: un foglio per ogni mensilizzato (3)', PS.pagine.length===3, PS.pagine.length);
   for(const [id,nome] of [['q','PROVA QUINDICI'],['c','PROVA CINQUE'],['s','PROVA SEI']]){
     const pag=PS.pagine.find(p=>p.indexOf(nome)!==-1)||''; const righe=pag.split('\n').filter(l=>/^\s*\d{1,2} (lun|mar|mer|gio|ven|sab|dom)\b/.test(l));
-    const celle=[]; let crocetta=0; righe.forEach(l=>{ const croce=/†/.test(l); if(croce) crocetta++; (l.match(/\d+,\d{3}/g)||[]).forEach((x,i)=>{ if(croce && i===0) return; celle.push(x); }); });
-    const fuori=celle.filter(x=>!okPasso(n(x)));
-    const tot=/TOTALE\s+([\d.,]+)(?: \*)?\s+([\d.,]+)\s+([\d.,]+)\s+([\d.,]+)/.exec(pag); const S=A[id].ts;
-    T('M23 '+nome+': '+celle.length+' celle del TS tutte ammesse (,00 ,17 ,25 ,33 ,50 ,67 ,75 ,83)', celle.length>20 && fuori.length===0, fuori.join(' '));
-    T('M24 '+nome+': TOTALE = componenti del TS (ordinarie '+R2(S.ordC)+' · suppl. '+R2(S.supp)+' · retribuite '+R2(S.ass)+' · trattenute '+R2(S.tratt)+')', tot && Math.abs(n(tot[1])-S.ordC)<0.006 && Math.abs(n(tot[2])-S.supp)<0.006 && Math.abs(n(tot[3])-S.ass)<0.006 && Math.abs(n(tot[4])-S.tratt)<0.006, tot&&tot.slice(1).join(' / '));
+    /* ver207 (riallineata): dalla ver188 niente «†» — lo scarto delle ore dovute sta sull'ultima riga con ordinarie —, dalla ver189/194
+       le righe sono in ore,minuti con le parole fra parentesi, il TOTALE in centesimi; dalla ver203 la colonna «Non retribuite»
+       porta solo ASS.ING / ASP 0h / SCIOP e le ore non lavorate trattenute stanno nello schema del cedolino. */
+    const conOrd=righe.filter(l=>/^\s*\d{1,2} \w{3}(?:\s+(?:AN|R|FESTNG))?\s+\d+,\d{2} \(/.test(l)); const ult=conOrd[conOrd.length-1]||'';
+    const celle=[]; righe.forEach(l=>{ (l.match(/\d+,\d{2}(?= \()/g)||[]).forEach((x,i)=>{ if(l===ult && i===0) return; celle.push(x); }); });
+    const fuori=celle.filter(x=>!okPasso(hm(x)));
+    const tot=/TOTALE\s+([\d.,]+) \([^)]*\)\s+([\d.,]+) \([^)]*\)\s+([\d.,]+) \([^)]*\)\s+([\d.,]+) \(/.exec(pag); const S=A[id].ts;
+    const trNR=(S.trattNR!=null)?S.trattNR:S.tratt;
+    T('M23 '+nome+': '+celle.length+' celle del TS tutte ammesse (in ore,minuti: 00 10 15 20 30 40 45 50)', celle.length>20 && fuori.length===0, fuori.join(' '));
+    T('M24 '+nome+': TOTALE = componenti del TS (ordinarie '+R2(S.ordC)+' · suppl. '+R2(S.supp)+' · retribuite '+R2(S.ass)+' · non retribuite '+R2(trNR)+')', tot && Math.abs(n(tot[1])-S.ordC)<0.006 && Math.abs(n(tot[2])-S.supp)<0.006 && Math.abs(n(tot[3])-S.ass)<0.006 && Math.abs(n(tot[4])-trNR)<0.006, tot&&tot.slice(1).join(' / '));
     T('M25 '+nome+': supplementari, retribuite e trattenute del totale sono al passo', tot && okPasso(n(tot[2])) && okPasso(n(tot[3])) && okPasso(n(tot[4])));
     T('M26 '+nome+': box = TS = cedOre = denominatore del Costo orario (ott) = '+R2(S.ced), Math.abs(A[id].box.ced-R2(S.ced,2))<0.0051 && Math.abs(A[id].ced-R2(S.ced,2))<0.001 && Math.abs(A[id].costo.H38-R2(S.ced,2))<0.001, JSON.stringify([A[id].box.ced,A[id].ced,A[id].costo.H38]));
     T('M27 '+nome+': supplementari del Costo orario = TS; consumo del Tetto = ced + erosive del TS', Math.abs(A[id].costo.supp-S.supp)<0.0006 && Math.abs(A[id].prod-R2(S.ced+S.ero,3))<0.0006, A[id].costo.supp+' / '+A[id].prod);
-    if(id==='q'){ T('M28 PROVA QUINDICI: ORE MESE 65,13 intatte (non 65,17), ordinarie 65,13 col «†» sull\'ultima riga e la nota dello scarto −0,04', /ORE CONTRATTUALI \(stipendio fisso\): 65,130 h/.test(pag) && crocetta===1 && /comprendono -0,037 h/.test(pag.replace(/\s+/g,' ')) && tot && n(tot[1])===65.13, 'croce '+crocetta+' · '+(tot&&tot[1]));
-      const conOrd=righe.filter(l=>/^\s*\d{1,2} \w{3}(?:\s+(?:AN|R|FESTNG))?\s+\d+,\d{3}/.test(l)); const ult=conOrd[conOrd.length-1]||''; const vu=n((/\s(\d+,\d{3}) †/.exec(ult)||[])[1]);
-      T('M29 PROVA QUINDICI: la riga con lo scarto («†») è l\'ultima con ordinarie e vale un passo ammesso meno 0,04 ('+(ult.trim().slice(0,30))+')', /†/.test(ult) && okPasso(R2(vu+0.0367,2)), ult.trim()); }
+    if(id==='q'){ T('M28 PROVA QUINDICI: ORE DOVUTE 65,13 intatte (non 65,17) e ordinarie 65,13 (dalla ver188 lo scarto sta sull\'ultima riga, senza «†» né nota)', /ORE DOVUTE \(ore mensili del contratto\)\s+65,13 \(/.test(pag) && tot && n(tot[1])===65.13, tot&&tot[1]);
+      const vu=hm((/\s(\d+,\d{2}) \(/.exec(ult)||[])[1]);
+      T('M29 PROVA QUINDICI: l\'ultima riga con ordinarie porta lo scarto e vale un passo ammesso meno 0,04 ('+(ult.trim().slice(0,30))+')', !okPasso(vu) && okPasso(R2(vu+0.0367,2)), ult.trim()); }
     if(id==='c'){ const flat=pag.replace(/\s+/g,' ');
-      T('M30 PROVA CINQUE (5 gg a sett., quota 3,80 fuori griglia): FERIE 2 gg = 7,67 · MAL 3 gg = 11,33 · EXF 1,25 · ASS.ING 3,83', /FERIE 2 gg = 7,667 h/.test(flat) && /MAL 3 gg = 11,333 h/.test(flat) && /permessi EXF 1,250 h/.test(flat) && /DA TRATTENERE: 3,833 h/.test(flat), flat.slice(flat.indexOf('DA INSERIRE'),flat.indexOf('DA INSERIRE')+420)); }
+      T('M30 PROVA CINQUE (5 gg a sett., quota 3,80 fuori griglia), schema del cedolino: ferie 7,67 (2 gg) · MAL 11,33 (3 gg) · permessi EXF 1,25 · ASS.ING 3,83', /di cui ferie 7,67 \([^)]*\) 2 gg/.test(flat) && /di cui MAL 11,33 \([^)]*\) 3 gg/.test(flat) && /di cui permessi retribuiti 1,25 \([^)]*\) EXF/.test(flat) && /da TRATTENERE: ASS\.ING \/ ASP 0h \/ SCIOP 3,83 \(/.test(flat), flat.slice(flat.indexOf('SCHEMA'),flat.indexOf('SCHEMA')+600)); }
     if(id==='s'){ const cg=(await K.carta(pg,nome).locator('.cong').first().innerText()).replace(/\s+/g,' '); const mm=/Risultato del mese: ([+\-]?[\d.,]+)/.exec(cg);
       T('M31 PROVA SEI: il Risultato del mese del Tabellone resta il VERO a 3 decimali ('+(mm&&mm[1])+'), il TS porta le supplementari al passo ('+R2(S.supp,2)+')', mm && /,\d{3}$/.test(mm[1]) && Math.abs(n(mm[1])-A.s.banca)<0.0006 && !okPasso(A.s.banca) && okPasso(R2(S.supp,2)) && Math.abs(A.s.banca-S.supp)<0.09, cg.slice(0,140)); }
   }
   /* box a video = TS */
   await K.vai(pg,'Ott'); const bx=(await K.carta(pg,'PROVA CINQUE').locator('.ced-box').innerText()).replace(/\s+/g,' ');
-  T('M32 box a video di PROVA CINQUE: ferie 7,67 · altre 11,33 · permessi 1,25 · da trattenere 3,83 (gli stessi numeri del TS)', /di cui ferie 7,667 h/.test(bx) && /altre assenze retribuite 11,333 h/.test(bx) && /permessi retribuiti 1,250 h/.test(bx) && /da trattenere 3,833 h/.test(bx), bx.slice(0,300));
+  T('M32 box a video di PROVA CINQUE: ferie 7,667 · altre 11,333 · permessi 1,250 · da trattenere 10,500 di cui ASS.ING 3,833 (gli stessi numeri del TS)', /di cui ferie 7,667 h/.test(bx) && /altre assenze retribuite 11,333 h/.test(bx) && /permessi retribuiti 1,250 h/.test(bx) && /da trattenere 10,500 h/.test(bx) && /SCIOP\) 3,833 h/.test(bx), bx.slice(0,300));   /* ver207: dalla ver203 «da trattenere» comprende le ore non lavorate (6,667) */
   /* ===== mesi non a cedolino mensilizzato: identici alla ver183 ===== */
   const V=await K.apri(br,{ver:'ver183',stato:ST}); const B=await motore(V.pg);
   const ugu=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
-  T('M33 PROVA ORARIO (non mensilizzato): TOT, Risultato del mese, Costo orario sett. e ott., righe del costo identici alla ver183', ugu([B.o.tot10,B.o.banca,B.o.costo,B.o.costo9,B.o.righe,B.o.box],[M.o.tot10,M.o.banca,M.o.costo,M.o.costo9,M.o.righe,M.o.box]), JSON.stringify(M.o.costo)+' vs '+JSON.stringify(B.o.costo));
-  T('M34 settembre 2026 (prima della base mensile) di PROVA QUINDICI: identico alla ver183', ugu([B.q.tot9,B.q.banca9,B.q.costo9,B.q.righe[0]],[M.q.tot9,M.q.banca9,M.q.costo9,M.q.righe[0]]));
-  T('M35 Risultato del mese (vero) di ottobre identico alla ver183 per i tre mensilizzati', ugu([B.q.banca,B.c.banca,B.s.banca],[M.q.banca,M.c.banca,M.s.banca]), [M.q.banca,M.c.banca,M.s.banca].join(' / '));
-  T('M36 25 celle «0,17»: la ver183 dava 4,25 (lettura decimale), la ver184 4,17', B.x.tot11===4.25 && M.x.tot11===4.17, B.x.tot11+' → '+M.x.tot11);
+  const VR=await K.apri(br,{ver:RIF,stato:ST}); const BR=await motore(VR.pg); await VR.ctx.close();   /* ver207: M33-M35 contro la versione di confronto */
+  T('M33 PROVA ORARIO (non mensilizzato): TOT, Risultato del mese, Costo orario sett. e ott., righe del costo identici alla '+RIF, ugu([BR.o.tot10,BR.o.banca,BR.o.costo,BR.o.costo9,BR.o.righe,BR.o.box],[M.o.tot10,M.o.banca,M.o.costo,M.o.costo9,M.o.righe,M.o.box]), JSON.stringify(M.o.costo)+' vs '+JSON.stringify(BR.o.costo));
+  T('M34 settembre 2026 (prima della base mensile) di PROVA QUINDICI: identico alla '+RIF, ugu([BR.q.tot9,BR.q.banca9,BR.q.costo9,BR.q.righe[0]],[M.q.tot9,M.q.banca9,M.q.costo9,M.q.righe[0]]));
+  T('M35 Risultato del mese (vero) di ottobre identico alla '+RIF+' per i tre mensilizzati', ugu([BR.q.banca,BR.c.banca,BR.s.banca],[M.q.banca,M.c.banca,M.s.banca]), [M.q.banca,M.c.banca,M.s.banca].join(' / '));
+  T('M36 25 celle «0,17»: la ver183 dava 4,25 (lettura decimale), oggi 4,167', B.x.tot11===4.25 && M.x.tot11===4.167, B.x.tot11+' → '+M.x.tot11);
   console.log('     ver183 → ver184 (ott): '+['q','c','s'].map(id=>id+': ordC '+(B[id].box&&B[id].box.ordC)+'→'+M[id].box.ordC+' supp '+(B[id].box&&B[id].box.supp)+'→'+M[id].box.supp+' tratt '+(B[id].box&&B[id].box.tratt)+'→'+M[id].box.tratt+' ced '+B[id].ced+'→'+M[id].ced).join(' | '));
   await V.ctx.close();
   /* ===== PARTE 2 ===== */

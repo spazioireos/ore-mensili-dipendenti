@@ -17,7 +17,7 @@ async function hTab(pg,ver,st){ const out={}; await K.annoA(pg,2026);
   let a=await K.apri(br,{ver:'ver205',stato:stato()}); const H205=await hTab(a.pg); await a.ctx.close();
   let b=await K.apri(br,{ver:'dip',stato:stato()}); const pg=b.pg; const H=await hTab(pg);
   R.T('Z01 riga H del Tabellone identica alla ver205 (9 schede-mese)', JSON.stringify(H)===JSON.stringify(H205), JSON.stringify(H));
-  R.T('Z02 targhetta ver206', /ver206/.test(await pg.locator('.app-rev').innerText()));
+  R.T('Z02 targhetta '+K.APPV, new RegExp(K.APPV).test(await pg.locator('.app-rev').innerText()));   /* ver207: la versione si legge dal file */
   /* 2) Riepiloghi */
   await K.vai(pg,'rep'); const sel=pg.locator('.toolbar select');
   await sel.nth(0).selectOption('9'); await sel.nth(1).selectOption('2026'); await sel.nth(2).selectOption('8'); await sel.nth(3).selectOption('2027'); await pg.waitForTimeout(500);

@@ -557,8 +557,8 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver206";
-const APP_DATA = "21nov26";
+const APP_VER = "ver207";
+const APP_DATA = "22nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
 const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
@@ -1482,6 +1482,15 @@ function consumoTetto(state,dp,anno,mese){                                 // so
    erosive. Solo LEGGE: il totale è prodottoMese (la riga H del Tabellone, quanto scende dal massimale); le ore a cedolino sono
    quelle del TS (ordinarie + supplementari) nei mesi a busta mensilizzata e le ore fatte negli altri; le erosive sono la
    differenza, così le due righe sommano esatte al totale. null = mese senza dati. */
+/* ver207 (22/11/2026, Christian: «1 ok» al collaudo integrato, B1-15): che tipo di errore è una lettura caduta.
+   «permessi» solo se lo dice Firestore (permission-denied); linea caduta (unavailable, deadline-exceeded, «offline») → «rete»;
+   il resto → «altro», senza attribuirgli una causa. */
+function erroreTipo(e){
+  const c = String((e && e.code) || "").toLowerCase(), m = String((e && e.message) || "").toLowerCase();
+  if (/permission/.test(c)) return "permessi";
+  if (/unavailable|deadline|network/.test(c) || /offline|network/.test(m)) return "rete";
+  return "altro";
+}
 function consumoMassimaleMese(state, dp, y, m){
   const rec = getRecFrom(state, y, m, dp.id);
   if (!recHasData(rec)) return null;
@@ -9315,9 +9324,9 @@ function App(){
         setFoData(res); setFoErr(false);
       }).catch(function(e){
         console.error("confronto Fogli ore non disponibile", e);
-        if (vivo) setFoErr(true);
+        if (vivo) setFoErr(erroreTipo(e));
       });
-    } catch (e){ console.error("confronto Fogli ore non disponibile", e); setFoErr(true); }
+    } catch (e){ console.error("confronto Fogli ore non disponibile", e); setFoErr(erroreTipo(e)); }
     return function(){ vivo = false; };
   }, [authState, anno, mese]);
   const foPerNome = foData || null;
@@ -9418,7 +9427,7 @@ function App(){
                 Dentro Fogli ore vedono ancora i numeri di prima: premi <b>📤 Pubblica i residui</b>.
               </div> : null}
             {mLocked ? <div className="lock-info">Questo mese è bloccato: le celle non sono modificabili. Premi "Sblocca mese" per riaprirlo.</div> : null}
-            {foErr ? <div style={{ background:"#f8fafc", border:"1px solid #e2e8f0", borderRadius:"8px", color:"#64748b", fontSize:"11px", padding:"4px 9px", margin:"6px 0", display:"inline-block" }}>confronto Fogli ore non disponibile (permessi)</div> : null}
+            {foErr ? <div style={{ background:"#f8fafc", border:"1px solid #e2e8f0", borderRadius:"8px", color:"#64748b", fontSize:"11px", padding:"4px 9px", margin:"6px 0", display:"inline-block" }}>{foErr === "permessi" ? "confronto Fogli ore non disponibile (permessi)" : foErr === "rete" ? "confronto Fogli ore non disponibile: non c'è collegamento, riprova quando torna la linea." : "confronto Fogli ore non disponibile"}</div> : null}
             {state.dipendenti.length === 0 ?
               <div style={{ padding:"30px", textAlign:"center", color:"#64748b" }}>Nessun dipendente. Aggiungine uno o importa il file Excel.</div>
               :

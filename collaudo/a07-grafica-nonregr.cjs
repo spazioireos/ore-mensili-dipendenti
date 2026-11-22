@@ -1,6 +1,9 @@
 /* A07 — grafica a 390 · 1280 · 1700 px su tutte le viste, e non regressione a video contro la ver182 congelata (dati INVENTATI).
    Prima: bash collaudo/prepara-banco.sh ver182 */
 const K=require('./a00-comune.cjs'); const R=K.contatore('a07-grafica-nonregr'); const T=R.T;
+/* ver207 (riallineata): il confronto dei TESTI si fa con la versione di confronto RIF (prima la ver182: dalla ver197 alla ver206
+   le scritte nuove volute lo facevano cadere sempre). Misure, scritte piccole, comandi e testata restano contro la ver182. */
+const RIF=process.env.RIF||'ver206';
 const VISTE=[['Tabellone ott 2026','Ott',2026],['Tabellone dic 2025','Dic',2025],['Riepiloghi','rep',2026],['Anagrafica','ana',2026],['Costo orario','costo',2026],['Query personale','query',2026]];
 async function giro(br,ver,w){ const {ctx,pg,E}=await K.apri(br,{ver,w}); const out={};
   for(const [nome,t,y] of VISTE){ await K.annoA(pg,y); await K.vai(pg,t); await pg.waitForTimeout(300);
@@ -9,7 +12,7 @@ async function giro(br,ver,w){ const {ctx,pg,E}=await K.apri(br,{ver,w}); const 
   const head=await pg.locator('.app-header').innerText(); await ctx.close(); return {out,E,head}; }
 (async()=>{ const br=await K.chromium.launch({args:['--no-sandbox']});
   for(const w of [390,1280,1700]){
-    const a=await giro(br,'dip',w), b=await giro(br,'ver182',w);
+    const a=await giro(br,'dip',w), b=await giro(br,'ver182',w), c=(w===1280)?await giro(br,RIF,w):null;
     for(const [nome] of VISTE){ const A=a.out[nome].m, B=b.out[nome].m;
       T('A07 '+w+'px '+nome+': nessuno scorrimento laterale', !A.lato, A.SW+'/'+A.W);
       T('A07 '+w+'px '+nome+': scritte <12,5px fuori dalle griglie non aumentate rispetto alla ver182 ('+A.piccole+' vs '+B.piccole+')', A.piccole<=B.piccole, A.esempi.join(' | '));
@@ -26,11 +29,11 @@ async function giro(br,ver,w){ const {ctx,pg,E}=await K.apri(br,{ver,w}); const 
       const dic=(t)=>t.replace(/🎯 Massimali — consumo mese per mese.*?(?=Ore lavorate vs teoriche)/g,'').replace(/🎯 Massimali /g,'').replace(/ORE CHE DEVONO RISULTARE NEL TOTALE TEORICO MENSILE PER AVERE LE ORE CONTRATTUALI/g,'ORE CORRETTE DA DARE').replace(/ore che devono risultare nel totale teorico mensile per avere le ore contrattuali/g,'ore corrette da dare').replace(/🎯 Erosione del massimale:.*?per salvare\./g,'').replace(/Devi riempire ancora per: \+?-?[\d.,]+/g,'').replace(/ · a cedolino supplementari [\d.,]+ h \(le ASS\.ING \/ ASP 0h non si compensano con le ore in più\)/g,'').replace(/\bNON ER\s*(?=\d)/g,'').replace(/\bN?E(?=\d)/g,'').replace(/\b[ABC]\) (?=ORE)/g,'').replace(/D\) ORE LAVORATE DA INSERIRE:/g,'').replace(/COSA DEVE RISULTARE IN E\s*—\s*scrivi D \(ore lavorate da inserire\) per calcolarlo/g,'').replace(/E\) Tot ore inserite a mano:/g,'TOT calcolato:').replace(/F\) Tot teorico con NON ER: [\d.,]+/g,'').replace(/G\) Tot teorico con ER:/g,'TOT teorico (assenze e festività godute erosive + permessi retribuiti):').replace(/\s+/g,' ').replace(/ORE MENSILI/g,'ORE MESE').replace(/ore mensili/g,'ore mese').replace(/ORE DA FAR RISULTARE NEL TOTALE PER AVERE LE ORE CONTRATTUALI/g,'ORE CORRETTE DA DARE').replace(/ORE CONTRATTUALI/g,'ORE MESE').replace(/ore contrattuali/g,'ore mese');
       const RX=/\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d+(?:,\d+)?/g;
       const pezzi=(t)=>({ parole:dic(t).split(RX), numeri:(dic(t).match(RX)||[]).map(x=>parseFloat(x.replace(/\./g,'').replace(',','.'))) });
-      if(w===1280){ const A2=pezzi(a.out[nome].testo), B2=pezzi(b.out[nome].testo); let dove='';
+      if(w===1280){ const A2=pezzi(a.out[nome].testo), B2=pezzi(c.out[nome].testo); let dove='';
         if(A2.parole.length!==B2.parole.length) dove='numero di pezzi '+A2.parole.length+' vs '+B2.parole.length;
         else { for(let k=0;k<A2.parole.length && !dove;k++){ if(A2.parole[k]!==B2.parole[k]) dove='parole: «'+A2.parole[k].slice(0,80)+'» vs «'+B2.parole[k].slice(0,80)+'»';
           else if(k<A2.numeri.length && Math.abs(A2.numeri[k]-B2.numeri[k])>0.0051) dove='numero dopo «'+A2.parole[k].slice(-40)+'»: '+A2.numeri[k]+' vs '+B2.numeri[k]; } }
-        T('A07 non regressione a video, '+nome+': testo della vista identico alla ver182 (a meno dei decimali e delle due diciture nuove)', !dove, dove); }
+        T('A07 non regressione a video, '+nome+': testo della vista identico alla '+RIF+' (a meno delle novità dichiarate)', !dove, dove); }
     }
     T('A07 '+w+'px zero errori di pagina (ver183)', a.E.length===0, a.E.join('|'));
     if(w===1280){ const ha=a.head.replace(/\s+/g,' '), hb=b.head.replace(/\s+/g,' ');

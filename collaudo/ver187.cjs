@@ -135,7 +135,12 @@ async function pubblica(pg,D){ const n0=D.length; await pg.locator('button.btn-y
   T('V28 ver186: BETA (agganciato senza massimale) veniva CANCELLATO e nessuno riceveva dip', !R6.W2 && Object.values(R6).every(x=>x.dip===undefined || x===R6.W4 || x===R6.W6 || x===R6.W8), JSON.stringify(R6.W2||null));
   const M6=await motore(B.pg);
   const diversi=Object.keys(M7).filter(k=>M7[k]!==M6[k]);
-  T('V29 costo orario (gen→ott 2026), ore a cedolino, Risultato del mese, box e TOT: identici alla ver186 per tutte le 8 schede', Object.keys(M7).length===8 && diversi.length===0, diversi.join(',')||'8/8 identici');
+  /* ver207 (riallineata): i numeri della ver186 sono cambiati di proposito con le ver201/203/204, quindi V29 confronta con la
+     versione di confronto RIF (copia congelata in comune/.banco/dip206, vedi LEGGIMI.md); la differenza con la ver186 si stampa e basta. */
+  console.log('     (informativo) schede diverse dalla ver186: '+(diversi.join(',')||'nessuna'));
+  const RIF=process.env.RIF||'dip206'; const BR=await apriDip(br,RIF,'rif-a'); const MR=await motore(BR.pg); await BR.ctx.close();
+  const diversiR=Object.keys(M7).filter(k=>M7[k]!==MR[k]);
+  T('V29 costo orario (gen→ott 2026), ore a cedolino, Risultato del mese, box e TOT: identici alla '+RIF+' per tutte le 8 schede', Object.keys(M7).length===8 && diversiR.length===0, diversiR.join(',')||'8/8 identici');
   T('V30 zero errori di pagina (ver186)', B.E.length===0, B.E.join('|'));
   await B.ctx.close(); await br.close(); R.fine();
 })();
