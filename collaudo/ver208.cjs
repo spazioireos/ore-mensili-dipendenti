@@ -11,9 +11,15 @@ let P=0,F=0; const T=(n,c,d)=>{(c?P++:F++);console.log((c?'  OK  ':'  NO  ')+n+(
 function nov3(){ const g={}; for(let d=1;d<=30;d++){ if(new Date(2026,10,d).getDay()!==0) g[d]='3'; } return g; }
 function novMal(){ const g=nov3(); g[10]='MAL'; g[11]='MAL'; g[20]='4,5'; return g; }
 function novPoche(){ const g={}; for(let d=1;d<=30;d++){ const wd=new Date(2026,10,d).getDay(); if(wd>=1&&wd<=5) g[d]='3'; } return g; }   /* 63 h a 15 h/sett: sotto B */
+function ott(fn){ const g={}; for(let d=1;d<=31;d++){ const wd=new Date(2026,9,d).getDay(); const v=fn(d,wd); if(v!=null) g[d]=v; } return g; }
+function ottSei(){ const g={}; const lav=[]; for(let d=1;d<=31;d++){ const wd=new Date(2026,9,d).getDay(); if(wd===0) continue; if(wd===6){ g[d]='AN'; continue; } lav.push(d); }
+  lav.forEach((d,i)=>{ g[d]= i<8 ? 'MAL' : (i%2 ? '5,25' : '4,75'); }); g[lav[lav.length-1]]='5'; return g; }
+function ottCinque(){ const g=ott((d,wd)=>(wd>=1&&wd<=5)?'3,25':null); g[5]='FERIE'; g[6]='FERIE'; g[7]='MAL'; g[8]='MAL'; g[9]='MAL'; g[12]='ASS.ING'; g[13]='3'; return g; }
 const dp=(id,nome,ore)=>({id,nome,oreSett:ore,livello:'D1',tipoContratto:'indeterminato',mensilizzato:true,mensilizzatoDal:'01/10/2026',dataAssunzione:'01/01/2020'});
-const ST={ anni:[2026], dipendenti:[dp('a','PROVA QUINDICI',15), dp('b','PROVA DICIANNOVE',19), dp('c','PROVA MALATTIA',15), dp('d','PROVA POCHE',15)],
-  dati:{'2026-11':{ a:{giorni:nov3()}, b:{giorni:nov3()}, c:{giorni:novMal()}, d:{giorni:novPoche()} }}, costoComune:{} };
+const ST={ anni:[2026], dipendenti:[dp('a','PROVA QUINDICI',15), dp('b','PROVA DICIANNOVE',19), dp('c','PROVA MALATTIA',15), dp('d','PROVA POCHE',15),
+  Object.assign(dp('e','PROVA SEI',19),{livello:'D2'}), Object.assign(dp('f','PROVA CINQUE',19),{ana:{ggSettCosto:'5'}}), dp('g','PROVA COMPENSA',18), dp('h','PROVA SOTTO',15)],
+  dati:{'2026-10':{ e:{giorni:ottSei()}, f:{giorni:ottCinque(), permessi:{13:{ore:1.25,tipo:'EXF'}}}, g:{giorni:Object.assign(ott((d,wd)=>wd!==0?'3':null),{12:'ASS.ING',13:'6'})}, h:{giorni:ott((d,wd)=>(wd>=1&&wd<=5)?'3':null)} },
+  '2026-11':{ a:{giorni:nov3()}, b:{giorni:nov3()}, c:{giorni:novMal()}, d:{giorni:novPoche()} }}, costoComune:{} };
 async function apri(br,url){ const ctx=await br.newContext({viewport:{width:1500,height:1100},acceptDownloads:true}); const pg=await ctx.newPage(); const E=[]; pg.on('pageerror',e=>E.push(e.message.slice(0,200)));
   await pg.addInitScript(x=>{ if(!sessionStorage.getItem('_s')){ localStorage.setItem('spazioireos_reportore_v1',JSON.stringify(x)); sessionStorage.setItem('_s','1'); } },ST); await pg.goto(url,{waitUntil:'domcontentloaded'}); await pg.waitForTimeout(4500);
   const pins=pg.locator('input[type=password]'); if(await pins.count()>=2){ await pins.nth(0).fill('1234'); await pins.nth(1).fill('1234'); await pg.getByRole('button',{name:/Crea PIN/i}).first().click(); await pg.waitForTimeout(1800); }
@@ -34,7 +40,7 @@ const giorni=(t)=>t.split('\n').filter(r=>/^\s*\d{1,2} (lun|mar|mer|gio|ven|sab|
     T('V01 ver207 congelata: il 30 novembre di PROVA QUINDICI esce 2,58 invece di 3,00 (il difetto)', /2,58 \(2 h e 58 min\)/.test(r30), r30.trim().slice(0,60));
     T('V02 ver207 congelata: una persona per pagina (4 persone → 4 pagine)', R.pagine===4, R.pagine); await ctx.close(); }
   const {ctx,pg,E}=await apri(br,'http://127.0.0.1:8300/dip/index.html');
-  const eng=await pg.evaluate(()=>{ const st=JSON.parse(localStorage.getItem('spazioireos_reportore_v1')); const o={}; st.dipendenti.forEach(dp=>{ const T=tsMese(st,dp,2026,11); const r=T.riga;
+  const eng=await pg.evaluate(()=>{ const st=JSON.parse(localStorage.getItem('spazioireos_reportore_v1')); const o={}; st.dipendenti.forEach(dp=>{ const T=tsMese(st,dp,2026,11); if(!T) return; const r=T.riga;
     o[dp.nome]={ ordC:T.ordC, supp:T.supp, monte:T.monte, rese:r.rese, ass:T.assTot, trattNL:T.trattNL }; }); return o; });
   const R=await pdf(pg,11,'v208');
   T('V03 due persone per pagina: 4 persone → 2 pagine A4 orizzontali', R.pagine===2, R.pagine);
@@ -57,5 +63,27 @@ const giorni=(t)=>t.split('\n').filter(r=>/^\s*\d{1,2} (lun|mar|mer|gio|ven|sab|
   const Po=metà[2], gP=giorni(Po);
   T('V14 PROVA POCHE (sotto B): niente supplementari, giorni come scritti, ore non lavorate da trattenere nello schema', gP.filter(x=>x.hh.length).every(x=>Math.abs(x.hh[0]-3)<0.01 && x.hh.length===1) && /da TRATTENERE: ore non/.test(Po) && eng['PROVA POCHE'].supp===0);
   T('V15 zero errori di pagina', E.length===0, E.join(' | '));
+  /* ottobre 2026: i casi delle prove vecchie (ver184 PROVA SEI e PROVA CINQUE, ver196 COMPENSA, ver183 SOTTO), letti a mezza pagina */
+  const eng10=await pg.evaluate(()=>{ const st=JSON.parse(localStorage.getItem('spazioireos_reportore_v1')); const o={}; st.dipendenti.forEach(dp=>{ const T=tsMese(st,dp,2026,10); if(!T) return;
+    o[dp.nome]={ ordC:T.ordC, supp:T.supp, ret:T.assTot, nr:T.trattNR, giorni:(getRecFrom(st,2026,10,dp.id).giorni||{}) }; }); return o; });
+  const R10=await pdf(pg,10,'v208');
+  const ok5=k=>[0,10,15,20,30,40,45,50].indexOf(k)!==-1;
+  let fogli=[]; for(let i=1;i<=R10.pagine;i++) fogli.push(R10.meta(i,0),R10.meta(i,421));
+  T('V16 ottobre: 4 mensilizzati con dati (+ chi ne ha) su '+R10.pagine+' fogli, due per foglio', R10.pagine===Math.ceil(fogli.filter(t=>/PROVA/.test(t)).length/2), R10.pagine);
+  for(const nome of ['PROVA SEI','PROVA CINQUE','PROVA COMPENSA','PROVA SOTTO']){
+    const t=fogli.find(x=>x.indexOf(nome)!==-1)||''; const e=eng10[nome]; if(!e||!t){ T('V17 '+nome+': c\'è', false); continue; }
+    const rr=giorni(t); let sO=0, sS=0, male=[], dif=[];
+    rr.forEach(x=>{ const toks=[...x.riga.matchAll(/(?<![A-Za-z]\s)(?<![A-Za-z])(\d+,\d{2}) \(/g)].map(m=>m[1]);
+      const scritto=String(e.giorni[x.d]==null?'':e.giorni[x.d]); const h=/^\d/.test(scritto)?parseFloat(scritto.replace(',','.')):0;
+      const v=toks.map(hm); if(v.length>2) male.push(x.d+':troppi'); if(v.length){ sO+=v[0]; if(v.length>1) sS+=v[1]; }
+      toks.forEach(tk=>{ if(!ok5(+tk.split(',')[1])) male.push(x.d+':'+tk); });
+      if(Math.abs(v.reduce((a,b)=>a+b,0)-h)>0.01) dif.push(x.d+':'+toks.join('+')+'≠'+scritto); });
+    const am=/arrotondamento delle ore mensili: ([+-]\d+) min/.exec(t); const arr=am?(+am[1])/60:0;
+    T('V17 '+nome+': ogni giorno ordinarie + supplementari = ore scritte nel Tabellone', dif.length===0, dif.slice(0,6).join(' '));
+    T('V18 '+nome+': ogni cella coi minuti ammessi (00 10 15 20 30 40 45 50)', male.length===0, male.slice(0,6).join(' '));
+    T('V19 '+nome+': giorni + arrotondamento = ordinarie a cedolino ('+e.ordC.toFixed(3)+'), supplementari = TS ('+e.supp.toFixed(3)+')', Math.abs(sO+arr-e.ordC)<0.0175 && Math.abs(sS-e.supp)<0.0175, 'ord '+sO.toFixed(3)+(am?' '+am[1]+' min':'')+' · supp '+sS.toFixed(3));
+  }
+  const tC=fogli.find(x=>x.indexOf('PROVA COMPENSA')!==-1)||''; const r12=giorni(tC).find(x=>x.d===12);
+  T('V20 PROVA COMPENSA: il 12 «ASS.ING 3,00 (3 h)» fra le non retribuite', r12 && /ASS\.ING 3,00 \(3 h\)/.test(r12.riga), r12&&r12.riga.trim());
   if (PNG){ sh('pdftoppm -png -r 70 -f 1 -l 1 '+JSON.stringify(R.out)+' '+JSON.stringify(PNG+'/report-paghe-ver208')); }
   await ctx.close(); console.log('\nver208: '+P+' superati, '+F+' falliti'); await br.close(); })();

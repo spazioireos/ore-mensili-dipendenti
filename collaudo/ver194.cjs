@@ -5,7 +5,7 @@
    Rifà sul formato nuovo i controlli numerici di ver183 (P6, P8, P9, P10, P11), che leggevano il formato vecchio.
    Prima: bash collaudo/prepara-banco.sh ver188. Poi: node collaudo/ver189.cjs */
 const { chromium } = (function(){ try { return require('playwright'); } catch(e) { return require('/opt/node-tools/node_modules/playwright'); } })();
-const fs=require('fs'), cp=require('child_process'); const sh=(c)=>cp.execSync(c,{encoding:'utf8'});
+const PM=require('./paghe-meta.cjs'); const fs=require('fs'), cp=require('child_process'); const sh=(c)=>cp.execSync(c,{encoding:'utf8'});
 const APPV=(fs.readFileSync(__dirname+'/../index.html','utf8').match(/const APP_VER = "(ver\d+)"/)||[])[1];
 let P=0,F=0; const T=(n,c,d)=>{(c?P++:F++);console.log((c?'  OK  ':'  NO  ')+n+(d!==undefined?'  -> '+d:''));};
 function ottA(){ const g={}; const giorni=[]; for(let d=1;d<=31;d++){ const wd=new Date(2026,9,d).getDay(); if(wd===0) continue; if(wd===6){ g[d]='AN'; continue; } giorni.push(d); }
@@ -32,7 +32,8 @@ async function pdf(pg,nomeBtn,mese){ const btn=pg.getByRole('button',{name:nomeB
   await btn.first().click(); await pg.waitForTimeout(700); const sel=pg.locator('.modal select'); await sel.nth(0).selectOption(String(mese)); await sel.nth(1).selectOption('2026');
   const dlP=pg.waitForEvent('download',{timeout:30000}).catch(()=>null); await pg.getByRole('button',{name:/^Genera /}).first().click(); const dl=await dlP; if(!dl) return {esiste:true,dl:null};
   const out=__dirname+'/out/'+mese+'-'+(dl.suggestedFilename()||'o.pdf'); await dl.saveAs(out); const pagine=+(/^Pages:\s+(\d+)/m.exec(sh('pdfinfo '+JSON.stringify(out)))||[0,0])[1];
-  const txt=sh('pdftotext -layout '+JSON.stringify(out)+' -'); return {esiste:true,dl,out,pagine,txt,flat:txt.replace(/\s+/g,' '),nome:dl.suggestedFilename()}; }
+  let txt=sh('pdftotext -layout '+JSON.stringify(out)+' -'); let pagine2=pagine; if(PM.ePaghe(dl.suggestedFilename())){ const M=PM.testoPaghe(out); txt=M.txt; pagine2=M.pagine; }   /* ver208: due persone per foglio */
+  return {esiste:true,dl,out,pagine:pagine2,txt,flat:txt.replace(/\s+/g,' '),nome:dl.suggestedFilename()}; }
 
 
 const num=s=>parseFloat(String(s).replace(/\./g,'').replace(',','.'));

@@ -40,7 +40,7 @@ const motore=(pg)=>pg.evaluate(()=>{ const st=JSON.parse(localStorage.getItem('s
   return o; });
 async function tsPdf(pg){ await K.vai(pg,'Ott'); await pg.getByRole('button',{name:'🖨️ Report PDF A4 per le paghe',exact:true}).click(); await pg.waitForTimeout(400);
   const s=pg.locator('.modal select'); await s.nth(0).selectOption('10'); await s.nth(1).selectOption('2026');
-  const f=await K.scarica(pg,()=>pg.locator('.modal .modal-actions button').last().click(),60000); const txt=K.sh('pdftotext -layout "'+f.f+'" -'); return {f:f.f,nome:f.nome,pagine:txt.split('\f').filter(x=>x.trim())}; }
+  const f=await K.scarica(pg,()=>pg.locator('.modal .modal-actions button').last().click(),60000); const txt=require('./paghe-meta.cjs').testoPaghe(f.f).txt; return {f:f.f,nome:f.nome,pagine:txt.split('\f').filter(x=>x.trim())}; }   /* ver208: mezze pagine */
 (async()=>{ const br=await K.chromium.launch({args:['--no-sandbox']});
   const {ctx,pg,E}=await K.apri(br,{stato:ST}); const toast=async()=> (await pg.locator('.toast').allInnerTexts()).join(' ');
   T('M01 targhetta '+K.APPV, (await pg.locator('.app-rev').first().innerText()).indexOf(K.APPV)!==-1);

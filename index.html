@@ -671,7 +671,11 @@ function alPassoOk(v){ const k = Math.round(Math.abs(Number(v) || 0) * 12); retu
    OGNI riga sia un valore ammesso e la SOMMA torni esatta. Si lavora in dodicesimi d'ora (5 minuti):
    ammessi i resti 0,2,3,4,6,8,9,10 (multipli di 10 e di 15 minuti). Programmazione dinamica sulla somma:
    fra tutte le scelte ammesse vicine al valore proporzionale, quella che si scosta meno in totale. */
-function distPassi(pesi, totale){
+function distPassi(pesi, totale, ammessa){
+  /* ver208: `ammessa(i, k)` facoltativa (k in dodicesimi d'ora): un vincolo in più sulla riga i. Se con il vincolo la somma
+     non si può fare esatta, si rifà senza (come prima). */
+  if (typeof ammessa === "function"){ const r = distPassi(pesi, totale, { f:ammessa }); if (r) return r; return distPassi(pesi, totale); }
+  const vinc = (ammessa && typeof ammessa.f === "function") ? ammessa.f : null;
   const n = pesi.length, out = new Array(n).fill(0);
   const T = Math.round(Math.abs(Number(totale) || 0) * 12);
   const S = pesi.reduce(function(a, w){ return a + (w > 0 ? w : 0); }, 0);
@@ -681,7 +685,7 @@ function distPassi(pesi, totale){
   for (let i = 0; i < n; i++){
     const w = pesi[i] > 0 ? pesi[i] : 0, x = w / S * T;
     const cand = [];
-    if (w > 0){ for (let k = Math.max(0, Math.floor(x) - 7); k <= Math.ceil(x) + 7; k++) if (OK.indexOf(k % 12) !== -1) cand.push(k); }
+    if (w > 0){ for (let k = Math.max(0, Math.floor(x) - 7); k <= Math.ceil(x) + 7; k++) if (OK.indexOf(k % 12) !== -1 && (!vinc || vinc(i, k))) cand.push(k); }
     else cand.push(0);
     const nx = {};
     Object.keys(dp).forEach(function(sk){
@@ -694,6 +698,7 @@ function distPassi(pesi, totale){
     });
     dp = nx;
   }
+  if (!dp[T] && vinc) return null;              /* ver208: col vincolo non si chiude: si rifà senza */
   if (!dp[T]){                                   /* non dovrebbe succedere: ripiego proporzionale */
     let rest = T, ultimo = -1;
     for (let i = 0; i < n; i++){ if (pesi[i] > 0){ out[i] = Math.floor((pesi[i] / S) * T); rest -= out[i]; ultimo = i; } }
@@ -3106,7 +3111,14 @@ function esportaPDFPaghe(state, pairs){
         .filter(function(x){ return x.h > 0; }).sort(function(a, b){ return (b.e - a.e) || (b.h - a.h) || (a.i - b.i); });
       ord.forEach(function(x){ if (resto <= 1e-9) return; const t = Math.min(resto, x.e); sRaw[x.i] += t; resto -= t; });
       ord.forEach(function(x){ if (resto <= 1e-9) return; const t = Math.min(resto, x.h - sRaw[x.i]); sRaw[x.i] += t; resto -= t; });
-      const sDist = distPassi(sRaw, SUPP);
+      /* ver208: le supplementari di un giorno sono scelte in modo che ANCHE le ordinarie del giorno (ore scritte − supplementari)
+         restino coi minuti ammessi: 4,45 scritte → 3,15 + 1,30, non 3,05 + 1,40. Se il giorno è già fuori griglia nel Tabellone,
+         basta che le supplementari non superino le sue ore. */
+      const OKm = [0,2,3,4,6,8,9,10];
+      const sDist = distPassi(sRaw, SUPP, function(i, k){ const hK = rows[i].h * 12, hk = Math.round(hK);
+        if (k > hK + 1e-6) return false;
+        if (Math.abs(hK - hk) > 1e-6 || OKm.indexOf(hk % 12) === -1) return true;
+        return OKm.indexOf((hk - k) % 12) !== -1; });
       rows.forEach(function(x, i){ x.s = sDist[i]; });
       /* 2) ordinarie a cedolino. ver208 (Christian, 22/11/2026: «30 resta 3,00 e i 2 minuti vanno su una riga a parte in
          testa al foglio … Ogni giorno mostra quello che hai scritto e il totale torna con B» e «per le supplementari rispetta

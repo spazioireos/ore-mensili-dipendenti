@@ -45,7 +45,9 @@ Banca ore, tetto annuo, contratti e export.
   - **Solo `esportaPDFPaghe`, nessun calcolo toccato** (TS, box, `cedOre`, Costo orario, massimale identici).
   - **Ogni giorno = le ore scritte nel Tabellone**: ordinarie del giorno = ore del giorno − supplementari del giorno. Tolti il
     riempimento dei giorni vuoti e il riproporzionamento (servivano quando il cedolino pagava più o meno delle ore fatte; dalla
-    ver203/204 cedolino = ore fatte). Le supplementari restano sui giorni andati più oltre la quota del giorno (ver183) e il loro
+    ver203/204 cedolino = ore fatte). Le supplementari di ogni giorno sono scelte in modo che anche le ordinarie del giorno
+    restino coi minuti ammessi (4,45 → 3,15 + 1,30, non 3,05 + 1,40: `distPassi` ha un terzo parametro facoltativo, un vincolo per
+    riga; senza, fa quello di prima). Le supplementari restano sui giorni andati più oltre la quota del giorno (ver183) e il loro
     totale è il surplus sulle ore mensili (ore lavorate + assenze retribuite + permessi + festività godute − B).
   - **Lo scarto di B** (le ore mensili non sono «al passo», es. 15 h/sett. = 65,132 = 65 h e 8 min) non va più sull'ultima riga delle
     ordinarie (era il «2,58» del 30): si scrive in testa al foglio, sotto il mese, in arancio, **«arrotondamento delle ore mensili: -2 min»**
@@ -55,9 +57,13 @@ Banca ore, tetto annuo, contratti e export.
   - **Due persone per foglio** A4 orizzontale, affiancate (138,5 mm ciascuna), ognuna con tabella dei giorni e schema del cedolino sotto;
     carattere provato da 8 a 6 pt su una pagina di prova (jsPDF vero) e tenuto il più grande che ci sta. Se una persona non ci sta
     nella mezza pagina va da sola a foglio intero, come nella ver203. Le parole («3,00 (3 h)») restano in ogni cella.
-  - **Provato**: `collaudo/ver208.cjs` **15/0** (confronto con la ver207 congelata: lì 4 persone = 4 pagine e il 30 a 2,58; qui 2 pagine,
+  - **Provato**: `collaudo/ver208.cjs` **29/0** (confronto con la ver207 congelata: lì 4 persone = 4 pagine e il 30 a 2,58; qui 2 pagine,
     il 30 a 3,00, la riga «-2 min», ogni giorno ordinarie + supplementari = ore scritte, TOTALE 65,13, surplus = supplementari; 19 h
-    senza riga; MAL; mese sotto B con le ore non lavorate da trattenere). Anteprima PNG mostrata a Christian.
+    senza riga; MAL; mese sotto B con le ore non lavorate da trattenere; i casi delle prove vecchie PROVA SEI, CINQUE, COMPENSA e SOTTO: giorni = ore scritte,
+    celle coi minuti ammessi, giorni + arrotondamento = ordinarie a cedolino). Batteria `a01`…`a08` a zero falliti (a06 aggiornato alle
+    mezze pagine), `ver199`…`ver206` a zero. ⚠️ Le prove vecchie del report (ver183, ver184 M24-M30, ver194, ver195 V05, ver196 Z05-Z07/Z13)
+    leggono il formato di prima e falliscono di proposito: vedi `collaudo/LEGGIMI.md`. ⚠️ `ver184` punto 5 (banco comune 8344) non
+    rieseguito: tocca l'accesso, non il report. Anteprima PNG mostrata a Christian.
 - 📶 **ver207 (22/11/2026, su `main` dal 22/11/2026: «Main») — LINEA CADUTA NON È «PERMESSI»** (Christian: «1,2,3 ok» alle questioni aperte del
   collaudo integrato del 21/11, B1-15). Il riquadrino del confronto con Fogli ore diceva sempre «confronto Fogli ore non disponibile
   (permessi)», anche con la linea caduta. Funzione nuova **`erroreTipo(e)`** (accanto a `consumoMassimaleMese`): `permission-denied`

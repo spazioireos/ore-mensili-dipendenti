@@ -3,7 +3,7 @@
    supplementari (Christian, 20/11/2026: «un Asp 0h o un Ass ing deve valere 3» → «Sì, nessuna compensazione»).
    Confronto con la ver195 congelata (.banco/ver195). Prima: python3 collaudo/rigenera.py ver195. Poi: node collaudo/ver196.cjs */
 const { chromium } = (function(){ try { return require('playwright'); } catch(e) { return require('/opt/node-tools/node_modules/playwright'); } })();
-const fs=require('fs'), cp=require('child_process'); const sh=(c)=>cp.execSync(c,{encoding:'utf8'});
+const PM=require('./paghe-meta.cjs'); const fs=require('fs'), cp=require('child_process'); const sh=(c)=>cp.execSync(c,{encoding:'utf8'});
 let P=0,F=0; const T=(n,c,d)=>{(c?P++:F++);console.log((c?'  OK  ':'  NO  ')+n+(d!==undefined?'  -> '+d:''));};
 function base(){ const g={}; for(let d=1;d<=31;d++){ if(new Date(2026,9,d).getDay()===0) continue; g[d]='3'; } return g; }
 const A=base(); A[12]='ASS.ING';
@@ -25,7 +25,8 @@ async function pdf(pg,nomeBtn,mese){ const btn=pg.getByRole('button',{name:nomeB
   await btn.first().click(); await pg.waitForTimeout(700); const sel=pg.locator('.modal select'); await sel.nth(0).selectOption(String(mese)); await sel.nth(1).selectOption('2026');
   const dlP=pg.waitForEvent('download',{timeout:30000}).catch(()=>null); await pg.getByRole('button',{name:/^Genera /}).first().click(); const dl=await dlP; if(!dl) return {esiste:true,dl:null};
   const out=__dirname+'/out/'+(pg.__tag||'')+mese+'-'+(dl.suggestedFilename()||'o.pdf'); await dl.saveAs(out); const pagine=+(/^Pages:\s+(\d+)/m.exec(sh('pdfinfo '+JSON.stringify(out)))||[0,0])[1];
-  const txt=sh('pdftotext -layout '+JSON.stringify(out)+' -'); return {esiste:true,dl,out,pagine,txt,flat:txt.replace(/\s+/g,' '),nome:dl.suggestedFilename()}; }
+  let txt=sh('pdftotext -layout '+JSON.stringify(out)+' -'); let pagine2=pagine; if(PM.ePaghe(dl.suggestedFilename())){ const M=PM.testoPaghe(out); txt=M.txt; pagine2=M.pagine; }   /* ver208: due persone per foglio */
+  return {esiste:true,dl,out,pagine:pagine2,txt,flat:txt.replace(/\s+/g,' '),nome:dl.suggestedFilename()}; }
 
 
 async function giro(br,url,tag){ const {ctx,pg,E}=await apri(br,url); pg.__tag=tag+'-'; const out={E};
