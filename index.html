@@ -557,8 +557,8 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver208";
-const APP_DATA = "22nov26";
+const APP_VER = "ver209";
+const APP_DATA = "23nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
 const MONTH_LABEL = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
@@ -3160,7 +3160,8 @@ function esportaPDFPaghe(state, pairs){
       if (TS.trattNR > 0.004) sch.push(["   di cui da TRATTENERE: ASS.ING / ASP 0h / SCIOP", ft(TS.trattNR), TS.nonRetr.map(function(z){ return z.cod + " " + z.gg + " gg"; }).join(" · ")]);
       if (TS.trattNL > 0.004) sch.push(["   di cui da TRATTENERE: ore non lavorate", ft(TS.trattNL), "mancano alle ore dovute"]);
       sch.push(["ORE SUPPLEMENTARI, maggiorate del " + magg, ft(TS.supp), TS.supp > 0.004 ? "da pagare in più: ore oltre le ore dovute" : "nessuna"]);
-      sch.push(["FESTIVITÀ NON GODUTE, a parte", ft(TS.nonGod.ore), TS.nonGod.gg ? TS.nonGod.gg + " gg (" + TS.nonGod.giorni.join(", ") + "), da pagare in più" : "nessuna"]);
+      /* ver209 (Christian, 23/11/2026: «Nel report paghe, in legenda, togli le note e togli l'ultima riga sulle festività»):
+         tolta la riga «FESTIVITÀ NON GODUTE, a parte» e, più sotto, la colonna «Note» dello schema. Nessun numero cambia. */
       /* i «di cui» devono sommare ESATTI alle ore dovute anche al centesimo: il centesimo che resta va sulla riga che assorbe lo
          scarto delle ore mensili (le ore non lavorate trattenute, se ci sono, altrimenti le ore lavorate) */
       (function(){ const idx = []; sch.forEach(function(r, i){ if (/^ {3}di cui/.test(r[0])) idx.push(i); });
@@ -3185,7 +3186,7 @@ function esportaPDFPaghe(state, pairs){
         : "differenza fra i giorni e le ordinarie a cedolino: " + (scarto > 0 ? "+" : "-") + pdfHMx(Math.abs(scarto)));
       const Y_T = 22;
       const colT = function(W){ const k = W / INTERA; return (W < 200) ? [18, 26, 26, 38, 30.5] : [28*k, 55*k, 55*k, 77*k, 66*k]; };
-      const colS = function(W){ return (W < 200) ? [50, 44, 44.5] : [95, 75, 111]; };
+      const colS = function(W){ return (W < 200) ? [94.5, 44] : [206, 75]; };   /* ver209: due colonne, senza «Note» */
       const optT = function(fs, pad, x, W){ const c = colT(W); return {
         startY: Y_T,
         head: [["Giorno", "Ordinarie", "Supplementari", "Assenze retribuite", "Non retribuite (ASS.ING / ASP 0h / SCIOP)"]],
@@ -3207,11 +3208,11 @@ function esportaPDFPaghe(state, pairs){
       /* ver203: lo schema del cedolino (stessi numeri del TS e del box «Da inserire a cedolino»; maggiorazione del Costo orario) */
       const optS = function(y, fs, pad, x, W){ const c = colS(W); return {
         startY: y,
-        head: [["SCHEMA DEL CEDOLINO", "Ore", "Note"]],
-        body: sch,
+        head: [["SCHEMA DEL CEDOLINO", "Ore"]],
+        body: sch.map(function(r){ return [r[0], r[1]]; }),
         styles:{ fontSize:fs, cellPadding:pad, valign:"middle", lineColor:[214,214,214], lineWidth:0.1, overflow:"linebreak" },
         headStyles:{ fillColor:[15,39,64], textColor:[255,255,255], fontSize:fs, fontStyle:"bold" },
-        columnStyles:{ 0:{ halign:"left", cellWidth:c[0] }, 1:{ halign:"center", cellWidth:c[1] }, 2:{ halign:"left", cellWidth:c[2] } },
+        columnStyles:{ 0:{ halign:"left", cellWidth:c[0] }, 1:{ halign:"center", cellWidth:c[1] } },
         tableWidth: W, margin:{ left:x, right: 297 - x - W, bottom: 6 }, pageBreak: "avoid",
         didParseCell: function(data){
           if (data.section !== "body") return;
