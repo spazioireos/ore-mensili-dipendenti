@@ -38,13 +38,16 @@ Banca ore, tetto annuo, contratti e export.
   testata, in vista Anagrafica, compariva "📅 undefined 2026" (perché `mese` è `null` fuori dalle
   viste mensili); ora mostra "📇 Anagrafica".
 - 🧹 **ver209 (23/11/2026, sul ramo di lavoro) — LO SCHEMA DEL CEDOLINO SENZA NOTE E SENZA LE FESTIVITÀ NON GODUTE** (Christian: «Nel report
-  paghe, in legenda, togli le note e togli l'ultima riga sulle festività»). Solo `esportaPDFPaghe`: lo schema sotto la tabella dei giorni
-  ha due colonne («SCHEMA DEL CEDOLINO» · «Ore», larghe 94,5 + 44 mm a mezza pagina, 206 + 75 a pagina intera) invece di tre, e la riga
-  «FESTIVITÀ NON GODUTE, a parte» non c'è più. ⚠️ **Nessun numero cambia** e le righe rimaste sono le stesse; si perdono solo le note (i
+  paghe, in legenda, togli le note e togli l'ultima riga sulle festività», poi «Togli la scritta Schema del cedolino»). Solo
+  `esportaPDFPaghe`: lo schema sotto la tabella dei giorni ha due colonne (intestazione vuota · «Ore», larghe 94,5 + 44 mm a mezza pagina,
+  206 + 75 a pagina intera) invece di tre, senza la scritta «SCHEMA DEL CEDOLINO», e la riga «FESTIVITÀ NON GODUTE, a parte» non c'è più. ⚠️ **Nessun numero cambia** e le righe rimaste sono le stesse; si perdono solo le note (i
   giorni delle ferie/festività, «mese parziale…», i codici delle trattenute, «da pagare in più»). ⚠️ Con lo schema più corto il carattere
   scelto dalla prova di misura può essere più grande (ottobre dei dati di prova): le righe vanno a capo diversamente, i numeri sono identici.
   Le festività non godute restano nel box «Da inserire a cedolino» del Tabellone e in `tsMese`/`cedOre` (non toccati).
-  **Provato**: `collaudo/ver209.cjs` **17/0** (confronto con la ver208 finale, ottobre e novembre). Anteprima PNG mostrata a Christian.
+  **Provato**: `collaudo/ver209.cjs` **17/0** (confronto con la ver208 finale, ottobre e novembre), `ver208` **29/0** (V05 legge ora
+  «ORE DOVUTE»; V10 accetta l'a-capo «65 h» / «e 8 min»: attese aggiornate, non aggirate), `a06` 23/0, batteria `a01`…`a08` a zero falliti,
+  `ver203` 19/0, `ver204` 24/0; `ver194` 33/9: i falliti sono Q7/Q7b/Q8, già dichiarati superati dalla ver208 (Q5 legge ora «ORE DOVUTE»).
+  Anteprima PNG mostrata a Christian.
 - 🖨️ **ver208 (22/11/2026, su `main` dal 22/11/2026: «Main») — IL REPORT PER LE PAGHE MOSTRA LE ORE SCRITTE, E DUE PERSONE PER FOGLIO**
   (Christian: «perché se su [una dipendente] ti ho scritto 3 ore il 30 novembre tu scrivi 2,58?» → «30 resta 3,00 e i 2 minuti vanno
   su una riga a parte in testa al foglio … Ogni giorno mostra quello che hai scritto e il totale torna con B», «per le supplementari
