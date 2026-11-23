@@ -557,7 +557,7 @@ function isAdminEmail(email){
 const LS_KEY = "spazioireos_reportore_v1";
 const LS_PIN = "spazioireos_reportore_pin";
 const LS_ZOOM = "spazioireos_reportore_zoom";   // preferenza di sola visualizzazione (mai nei dati/backup)
-const APP_VER = "ver209";
+const APP_VER = "ver210";
 const APP_DATA = "23nov26";
 const MONTH_ABBR = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
 const MENS_DAL_DEFAULT = "01/10/2026";   // decorrenza normale della mensilizzazione (decisione di Christian, 02/11/2026)
@@ -8409,7 +8409,22 @@ function dipOmonimi(st){
   catch (e){ return {}; }
 }
 /* lettura utenti di Fogli ore (uid -> "COGNOME NOME"), solo ruoli che compilano i fogli ore */
-function foLeggiUtenti(db, cache){
+/* ver210 (23/11/2026, analisi delle interconnessioni): l'elenco degli operatori e i dati di un mese letti da Fogli ore
+   restavano in memoria fino al ricaricamento della pagina: un mese chiuso in Fogli ore, ore nuove o un account nuovo non si
+   vedevano. Ora quello che si è letto vale 5 minuti; dopo, tornando su quel mese si rilegge. Se la rilettura non riesce si
+   tengono i dati di prima (come prima), invece di perderli. Nessun calcolo, nessuna dicitura toccati; in Fogli ore non si scrive. */
+const FO_SCADE_MS = 300000;
+function foFresco(cache, k){ return !!cache[k] && !!cache.__quando && (Date.now() - (cache.__quando[k] || 0)) < FO_SCADE_MS; }
+function foSegna(cache, k){ (cache.__quando || (cache.__quando = {}))[k] = Date.now(); }
+function foRileggi(cache, k, leggi){
+  const vecchio = cache[k];
+  if (vecchio && foFresco(cache, k)) return Promise.resolve(vecchio);
+  if (vecchio) delete cache[k];
+  return leggi().then(function(r){ foSegna(cache, k); return r; }).catch(function(e){ if (vecchio){ cache[k] = vecchio; return vecchio; } throw e; });
+}
+function foLeggiUtenti(db, cache){ return foRileggi(cache, "__users", function(){ return foLeggiUtentiVero(db, cache); }); }
+function foLeggiMese(db, cache, y, m){ return foRileggi(cache, "m" + y + "-" + m, function(){ return foLeggiMeseVero(db, cache, y, m); }); }
+function foLeggiUtentiVero(db, cache){
   if (cache.__users) return Promise.resolve(cache.__users);
   return db.collection("users").get().then(function(us){
     const map = {};
@@ -8462,7 +8477,7 @@ function foChiusuraMese(tsList){
 }
 /* lettura timesheets del mese: una query per anno (nessun indice composito) + filtro client su mese.
    Ritorna { "COGNOME NOME": aggregato }. */
-function foLeggiMese(db, cache, y, m){
+function foLeggiMeseVero(db, cache, y, m){
   const key = "m" + y + "-" + m;
   if (cache[key]) return Promise.resolve(cache[key]);
   return foLeggiUtenti(db, cache).then(function(utenti){

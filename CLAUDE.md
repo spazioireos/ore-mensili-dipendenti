@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver209 · 23nov26 — approvata da Christian e portata su `main` il 23/11/2026 («Main»)** (prima su `main` la ver208, approvata da Christian il 22/11/2026 («Main»); prima su `main` la ver207, approvata da Christian il 22/11/2026 («Main») insieme alla ver206; prima su `main` la ver205, approvata da Christian il 21/11/2026 («Main») insieme alla ver204; prima su `main` la ver203, approvata il 21/11/2026: «main»; prima la ver202, approvata lo stesso giorno insieme alle ver199, ver200 e ver201: «MAIN»). ⚠️ La **ver198** fu fatta e **annullata** il 21/11/2026 («stai fermo alla ver197»: Christian aveva solo fatto una domanda); i suoi tre totali E/F/G e la sigla «NON ER» sono poi stati **chiesti esplicitamente** e stanno nella ver199. `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver210 · 23nov26 — sul ramo di lavoro, da approvare** (su `main` la ver209, approvata da Christian il 23/11/2026: «Main»; prima su `main` la ver208, approvata da Christian il 22/11/2026 («Main»); prima su `main` la ver207, approvata da Christian il 22/11/2026 («Main») insieme alla ver206; prima su `main` la ver205, approvata da Christian il 21/11/2026 («Main») insieme alla ver204; prima su `main` la ver203, approvata il 21/11/2026: «main»; prima la ver202, approvata lo stesso giorno insieme alle ver199, ver200 e ver201: «MAIN»). ⚠️ La **ver198** fu fatta e **annullata** il 21/11/2026 («stai fermo alla ver197»: Christian aveva solo fatto una domanda); i suoi tre totali E/F/G e la sigla «NON ER» sono poi stati **chiesti esplicitamente** e stanno nella ver199. `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -37,6 +37,16 @@ Banca ore, tetto annuo, contratti e export.
   Corretto anche un difetto **preesistente** che la nuova navigazione rendeva visibile: nella
   testata, in vista Anagrafica, compariva "📅 undefined 2026" (perché `mese` è `null` fuori dalle
   viste mensili); ora mostra "📇 Anagrafica".
+- 🔁 **ver210 (23/11/2026, analisi delle interconnessioni chiesta da Christian; sul ramo di lavoro)**: l'elenco degli operatori e i
+  dati di un mese letti da Fogli ore (confronto, pastiglia della chiusura del mese, aggancio, 📤) restavano in memoria **fino al
+  ricaricamento**: un mese chiuso in Fogli ore mentre Dipendenti era aperto non si vedeva (misurato sulla ver209: pastiglia
+  «Mese non ancora chiuso» anche dopo la chiusura). Ora (`FO_SCADE_MS`, `foFresco`, `foSegna`, `foRileggi`; le funzioni vere si
+  chiamano `foLeggiUtentiVero` / `foLeggiMeseVero`, invariate) ciò che si è letto vale **5 minuti**; dopo, tornando su quel mese si
+  rilegge. Se la rilettura **non riesce** si tengono i dati di prima, senza messaggio d'errore (prima non c'era nessuna rilettura).
+  **Nessun calcolo, nessuna dicitura toccati**; in Fogli ore non si scrive niente. **Provato**: `collaudo/ver210.cjs` **13/0** (3 cicli
+  chiudi/rispondi/riapri in Fogli ore, confronto con la ver209 in `/dip209/`, rilettura caduta); interconnessioni b1 16/0 + B1-10
+  parziale (il test non aspetta i 5 minuti), b2 16/0 + B2-15 non verificabile (regole), b6 8/0, b8 11/0, b8b 9/0, b9 6/0, b10 26/0;
+  `ver187` 32/0.
 - 🧹 **ver209 (23/11/2026, su `main` dal 23/11/2026: «Main») — LO SCHEMA DEL CEDOLINO SENZA NOTE E SENZA LE FESTIVITÀ NON GODUTE** (Christian: «Nel report
   paghe, in legenda, togli le note e togli l'ultima riga sulle festività», poi «Togli la scritta Schema del cedolino»). Solo
   `esportaPDFPaghe`: lo schema sotto la tabella dei giorni ha due colonne (intestazione vuota · «Ore», larghe 94,5 + 44 mm a mezza pagina,

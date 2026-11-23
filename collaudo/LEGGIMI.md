@@ -85,3 +85,9 @@ La batteria storica (circa 40 script fino alla ver181) è andata persa con il co
 va ricostruita qui, un pezzo alla volta.
 | `a00-comune.cjs` | funzioni comuni agli script a01…a08 (seme inventato, PIN, cattura dei file) | — |
 | `a01-accesso-viste.cjs` … `a08-ritest-storici.cjs` | collaudo di Livello A del 19/11/2026: accesso e viste, Tabellone, dati/backup/import, Anagrafica, Costo orario, report ed export, grafica e non regressione, ritest ver176-183. Accettano `ver182` come argomento per il confronto | 32/32 · 47/50 · 26/27 · 26/30 · 27/28 · 22/22 · 64/64 · 10/10 (i falliti sono difetti preesistenti, identici sulla ver182) |
+
+## ver210 (23/11/2026, sul ramo di lavoro)
+
+`ver210.cjs` (banco comune 8340 con finta Firebase; confronto con la ver209 in `/dip209/`, fatta con `localizza.py` su
+`git show <commit ver209>:index.html`): le letture da Fogli ore valgono 5 minuti e poi si rifanno; rilettura caduta = dati di prima.
+Esito **13/0**. `ver187.cjs 8340` 32/0.
