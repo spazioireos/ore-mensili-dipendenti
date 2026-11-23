@@ -19,7 +19,7 @@ Banca ore, tetto annuo, contratti e export.
   quel campo deve passare da **`parseHour`**, che fa `parseFloat(s.replace(",","."))` e torna 0
   sui codici: `Number(v)` secco darebbe **NaN** su metà dei dati.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
-  targhetta `.app-rev` della testata. **Attuale: ver209 · 23nov26 — sul ramo di lavoro, da approvare** (su `main` la ver208, approvata da Christian il 22/11/2026 («Main»); prima su `main` la ver207, approvata da Christian il 22/11/2026 («Main») insieme alla ver206; prima su `main` la ver205, approvata da Christian il 21/11/2026 («Main») insieme alla ver204; prima su `main` la ver203, approvata il 21/11/2026: «main»; prima la ver202, approvata lo stesso giorno insieme alle ver199, ver200 e ver201: «MAIN»). ⚠️ La **ver198** fu fatta e **annullata** il 21/11/2026 («stai fermo alla ver197»: Christian aveva solo fatto una domanda); i suoi tre totali E/F/G e la sigla «NON ER» sono poi stati **chiesti esplicitamente** e stanno nella ver199. `APP_VER` finisce anche nei
+  targhetta `.app-rev` della testata. **Attuale: ver209 · 23nov26 — approvata da Christian e portata su `main` il 23/11/2026 («Main»)** (prima su `main` la ver208, approvata da Christian il 22/11/2026 («Main»); prima su `main` la ver207, approvata da Christian il 22/11/2026 («Main») insieme alla ver206; prima su `main` la ver205, approvata da Christian il 21/11/2026 («Main») insieme alla ver204; prima su `main` la ver203, approvata il 21/11/2026: «main»; prima la ver202, approvata lo stesso giorno insieme alle ver199, ver200 e ver201: «MAIN»). ⚠️ La **ver198** fu fatta e **annullata** il 21/11/2026 («stai fermo alla ver197»: Christian aveva solo fatto una domanda); i suoi tre totali E/F/G e la sigla «NON ER» sono poi stati **chiesti esplicitamente** e stanno nella ver199. `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
@@ -37,7 +37,7 @@ Banca ore, tetto annuo, contratti e export.
   Corretto anche un difetto **preesistente** che la nuova navigazione rendeva visibile: nella
   testata, in vista Anagrafica, compariva "📅 undefined 2026" (perché `mese` è `null` fuori dalle
   viste mensili); ora mostra "📇 Anagrafica".
-- 🧹 **ver209 (23/11/2026, sul ramo di lavoro) — LO SCHEMA DEL CEDOLINO SENZA NOTE E SENZA LE FESTIVITÀ NON GODUTE** (Christian: «Nel report
+- 🧹 **ver209 (23/11/2026, su `main` dal 23/11/2026: «Main») — LO SCHEMA DEL CEDOLINO SENZA NOTE E SENZA LE FESTIVITÀ NON GODUTE** (Christian: «Nel report
   paghe, in legenda, togli le note e togli l'ultima riga sulle festività», poi «Togli la scritta Schema del cedolino»). Solo
   `esportaPDFPaghe`: lo schema sotto la tabella dei giorni ha due colonne (intestazione vuota · «Ore», larghe 94,5 + 44 mm a mezza pagina,
   206 + 75 a pagina intera) invece di tre, senza la scritta «SCHEMA DEL CEDOLINO», e la riga «FESTIVITÀ NON GODUTE, a parte» non c'è più. ⚠️ **Nessun numero cambia** e le righe rimaste sono le stesse; si perdono solo le note (i
