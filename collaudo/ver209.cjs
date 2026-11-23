@@ -1,7 +1,9 @@
 /* Collaudo ver209 (dati INVENTATI): «🖨️ Report PDF A4 per le paghe», schema del cedolino senza la colonna «Note»
    e senza la riga «FESTIVITÀ NON GODUTE, a parte» (Christian, 23/11/2026: «Nel report paghe, in legenda, togli le note e
    togli l'ultima riga sulle festività»). Confronto con la ver208 congelata: stessi giorni, stessi numeri, stesse righe salvo quella.
-   Prima: python3 collaudo/rigenera.py ver208. Poi: node collaudo/ver209.cjs [cartella-png] */
+   ⚠️ La copia di confronto deve essere la ver208 FINALE (quella su main): rigenera.py ver208 prende il commit che la
+   introduce (9006098, intermedio, coi 3,05 + 2,10 poi corretti). Costruirla con git show origin/main:index.html (o il commit
+   68a3981) e scrivi() di rigenera.py. Poi: node collaudo/ver209.cjs [cartella-png] */
 const { chromium } = (function(){ try { return require('playwright'); } catch(e) { return require('/opt/node-tools/node_modules/playwright'); } })();
 const fs=require('fs'), cp=require('child_process'); const sh=(c)=>cp.execSync(c,{encoding:'utf8'});
 const PNG=process.argv[2]||'';
@@ -45,14 +47,18 @@ const schema=(t)=>{ const o={}; t.split('\n').forEach(r=>{ const m=/^\s*((?:ORE 
     const A=res.v208[mese], B=res.v209[mese];
     const ta=PM.testoPaghe(A.out).txt, tb=PM.testoPaghe(B.out).txt;
     T('S01 '+mese+': la ver208 aveva la colonna «Note» e la riga FESTIVITÀ NON GODUTE', /SCHEMA DEL CEDOLINO\s+Ore\s+Note/.test(ta) && /FESTIVIT. NON GODUTE/.test(ta));
-    T('S02 '+mese+': la ver209 non ha più la colonna «Note»', /SCHEMA DEL CEDOLINO\s+Ore/.test(tb) && !/SCHEMA DEL CEDOLINO\s+Ore\s+Note/.test(tb));
+    T('S02 '+mese+': la ver209 non ha più la colonna «Note» né la scritta «SCHEMA DEL CEDOLINO» (resta «Ore» sopra i numeri)', /ORE DOVUTE \(ore mensili del contratto\)/.test(tb) && !/SCHEMA DEL CEDOLINO/.test(tb) && !/\bNote\b/.test(tb) && /^\s+Ore\s*$/m.test(tb));
     T('S03 '+mese+': la ver209 non ha più la riga FESTIVITÀ NON GODUTE', !/FESTIVIT. NON GODUTE/.test(tb));
     T('S04 '+mese+': nessuna nota rimasta («da pagare in più», «lo stipendio fisso», «fino alle ore dovute»)', !/da pagare in pi|lo stipendio fisso del mese|fino alle ore dovute|mancano alle ore dovute/.test(tb));
-    const ga=giorni(ta).map(x=>x.d+' '+x.riga.replace(/\s+/g,' ').trim()).join('\n'), gb=giorni(tb).map(x=>x.d+' '+x.riga.replace(/\s+/g,' ').trim()).join('\n');
-    T('S05 '+mese+': le righe dei giorni sono identiche alla ver208', ga===gb && ga.length>0, ga.length+' / '+gb.length);
-    const sa=schema(ta), sb=schema(tb); delete sa['FESTIVITÀ NON GODUTE, a parte'];
-    const ka=Object.keys(sa).filter(k=>!/^FESTIVIT/.test(k)); const diff=ka.filter(k=>sa[k]!==sb[k]);
-    T('S06 '+mese+': ogni riga rimasta dello schema ha le stesse ore della ver208', ka.length>0 && diff.length===0, ka.length+' righe, diverse: '+diff.join(' | '));
+    /* i numeri dei giorni (non il testo: con lo schema più corto il carattere può essere più grande e le righe vanno a capo diversamente) */
+    const ga=JSON.stringify(giorni(ta).map(x=>[x.d,x.hh])), gb=JSON.stringify(giorni(tb).map(x=>[x.d,x.hh]));
+    T('S05 '+mese+': le ore dei giorni sono identiche alla ver208', ga===gb && ga.length>2, giorni(ta).length+' / '+giorni(tb).length+' righe');
+    /* le ore dello schema, persona per persona (mezza pagina per mezza pagina), tolta la riga delle festività non godute */
+    const ore=(t,senzaFest)=>t.split('\f').map(h=>{ const i=h.indexOf('ORE DOVUTE (ore mensili'); if(i<0) return null; let z=h.slice(i);
+      if(senzaFest){ const j=z.search(/FESTIVIT. NON GODUTE/); if(j>=0) z=z.slice(0,j); }
+      return [...z.matchAll(/(\d+,\d{2}) \(/g)].map(x=>x[1]).join(' '); }).filter(x=>x!==null);
+    const oa=ore(ta,true), ob=ore(tb,false);
+    T('S06 '+mese+': lo schema di ogni persona ha le stesse ore della ver208, tolte le festività non godute', oa.length>0 && JSON.stringify(oa)===JSON.stringify(ob), oa.length+' schemi');
     T('S07 '+mese+': ORE DOVUTE e ORE SUPPLEMENTARI ci sono ancora', /ORE DOVUTE/.test(tb) && /ORE SUPPLEMENTARI/.test(tb));
     T('S08 '+mese+': pagine non aumentate ('+A.pagine+' → '+B.pagine+')', B.pagine<=A.pagine);
     if (PNG){ sh('pdftoppm -png -r 70 -f 1 -l 1 '+JSON.stringify(B.out)+' '+JSON.stringify(PNG+'/ver209-'+mese)); }

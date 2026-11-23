@@ -49,7 +49,7 @@ const hm=s=>{ const m=/^(-?)(\d+),(\d{2})$/.exec(s); if(!m) return NaN; return (
   const mens=['PROVA CINQUE','PROVA INGIUST','PROVA MALATTIA','PROVA QUINDICI','PROVA SOTTO'];
   const pag=(R.txt||'').split('\f').filter(p=>p.trim());
   T('Q4 una persona per pagina, solo nominativo e mese in testa', pag.length===5 && mens.every((n,i)=>pag[i].indexOf(n)!==-1 && (pag[i].match(/PROVA \w+/g)||[]).length===1 && (pag[i].match(/Ottobre 2026/g)||[]).length===1), pag.map(p=>(p.match(/PROVA \w+/g)||[]).join(',')).join(' / '));
-  T('Q5 nessuna legenda, nessun riquadro «DA INSERIRE A CEDOLINO», nessun † o *; dalla ver203 lo «SCHEMA DEL CEDOLINO» per ogni persona', !/DA INSERIRE|ORE CONTRATTUALI|legenda|†|\*/i.test(R.txt) && (R.txt.match(/SCHEMA DEL CEDOLINO/g)||[]).length===5, (R.txt.match(/DA INSERIRE|ORE CONTRATTUALI|†|\*/g)||[]).join(','));
+  T('Q5 nessuna legenda, nessun riquadro «DA INSERIRE A CEDOLINO», nessun † o *; dalla ver203 lo «SCHEMA DEL CEDOLINO» per ogni persona', !/DA INSERIRE|ORE CONTRATTUALI|legenda|†|\*/i.test(R.txt) && (R.txt.match(/ORE DOVUTE \(ore mensili del contratto\)/g)||[]).length===5, (R.txt.match(/DA INSERIRE|ORE CONTRATTUALI|†|\*/g)||[]).join(','));
   const par=[...R.flat.matchAll(/(\d+),(\d{2}) \(((\d+) h)?( e )?((\d+) min)?\)/g)];
   T('Q5b ver194: ogni ora,minuti è seguita dalle sue parole giuste («3,50 (3 h e 50 min)», «4,00 (4 h)»)', par.length>100 && par.every(x=>(+(x[4]||0))===+x[1] && (+(x[7]||0))===+x[2]), par.length+' · '+par.slice(0,3).map(x=>x[0]).join(' · '));
   T('Q6 nessun numero a tre decimali (le ore non sono più in millesimi)', !/\d,\d{3}\b/.test(R.txt), (R.txt.match(/\d+,\d{3}\b/g)||[]).slice(0,5).join(' '));

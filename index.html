@@ -3208,7 +3208,7 @@ function esportaPDFPaghe(state, pairs){
       /* ver203: lo schema del cedolino (stessi numeri del TS e del box «Da inserire a cedolino»; maggiorazione del Costo orario) */
       const optS = function(y, fs, pad, x, W){ const c = colS(W); return {
         startY: y,
-        head: [["SCHEMA DEL CEDOLINO", "Ore"]],
+        head: [["", "Ore"]],   /* ver209: niente scritta «SCHEMA DEL CEDOLINO» (Christian, 23/11/2026: «Togli la scritta Schema del cedolino») */
         body: sch.map(function(r){ return [r[0], r[1]]; }),
         styles:{ fontSize:fs, cellPadding:pad, valign:"middle", lineColor:[214,214,214], lineWidth:0.1, overflow:"linebreak" },
         headStyles:{ fillColor:[15,39,64], textColor:[255,255,255], fontSize:fs, fontStyle:"bold" },

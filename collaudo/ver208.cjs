@@ -47,14 +47,14 @@ const giorni=(t)=>t.split('\n').filter(r=>/^\s*\d{1,2} (lun|mar|mer|gio|ven|sab|
   const metà=[R.meta(1,0),R.meta(1,421),R.meta(2,0),R.meta(2,421)];
   const nomi=['PROVA DICIANNOVE','PROVA MALATTIA','PROVA POCHE','PROVA QUINDICI'];   /* ordine alfabetico */
   T('V04 a sinistra e a destra le persone giuste, nell\'ordine', nomi.every((n,i)=>metà[i].indexOf(n)!==-1), metà.map(t=>(t.match(/PROVA \w+/)||['?'])[0]).join(' · '));
-  T('V05 ogni metà ha la sua tabella dei giorni e il suo schema del cedolino', metà.every(t=>/TOTALE/.test(t) && /SCHEMA DEL CEDOLINO/.test(t) && giorni(t).length===30), metà.map(t=>giorni(t).length).join(','));
+  T('V05 ogni metà ha la sua tabella dei giorni e il suo schema del cedolino', metà.every(t=>/TOTALE/.test(t) && /ORE DOVUTE \(ore mensili del contratto\)/.test(t) && giorni(t).length===30), metà.map(t=>giorni(t).length).join(','));
   T('V06 le parole restano per intero in ogni cella («3,00 (3 h)»)', metà.every(t=>/3,00 \(3 h\)/.test(t)));
   const Q=metà[3], gQ=giorni(Q), r30=gQ.find(x=>x.d===30);
   T('V07 PROVA QUINDICI: il 30 novembre resta 3,00', r30 && /^3,00 \(3 h\)/.test(r30.riga.trim()), r30 && r30.riga.trim().slice(0,40));
   T('V08 PROVA QUINDICI: in testa «arrotondamento delle ore mensili: -2 min»', /arrotondamento delle ore mensili: -2 min/.test(Q), (Q.match(/arrotondamento[^\n]*/)||['—'])[0]);
   T('V09 PROVA QUINDICI: ogni giorno ordinarie + supplementari = le ore scritte (3,00)', gQ.filter(x=>x.hh.length).every(x=>Math.abs(x.hh.reduce((a,b)=>a+b,0)-3)<0.01) && gQ.filter(x=>x.hh.length).length===25);
   const e=eng['PROVA QUINDICI'];
-  T('V10 PROVA QUINDICI: TOTALE ordinarie = ordinarie a cedolino (B, 65,13), supplementari = surplus sulle ore mensili', /65,13 \(65,08 = 65 h e/.test((Q.split('\n').filter(r=>/TOTALE/.test(r))[0]||'')+' '+Q.split('\n')[Q.split('\n').findIndex(r=>/TOTALE/.test(r))-1]) && Math.abs(e.ordC-e.monte)<0.001 && Math.abs(e.supp-(e.rese+e.ass-e.monte))<0.09, 'ordC '+e.ordC.toFixed(3)+' · B '+e.monte.toFixed(3)+' · supp '+e.supp.toFixed(3)+' · rese '+e.rese);
+  T('V10 PROVA QUINDICI: TOTALE ordinarie = ordinarie a cedolino (B, 65,13), supplementari = surplus sulle ore mensili', /65,13 \(65,08 = 65 h/.test((Q.split('\n').filter(r=>/TOTALE/.test(r))[0]||'')+' '+Q.split('\n')[Q.split('\n').findIndex(r=>/TOTALE/.test(r))-1]) && Math.abs(e.ordC-e.monte)<0.001 && Math.abs(e.supp-(e.rese+e.ass-e.monte))<0.09, 'ordC '+e.ordC.toFixed(3)+' · B '+e.monte.toFixed(3)+' · supp '+e.supp.toFixed(3)+' · rese '+e.rese);
   const Dn=metà[0];
   T('V11 PROVA DICIANNOVE (B 82,50 tondo): nessuna riga di arrotondamento', !/arrotondamento/.test(Dn) && !/differenza fra i giorni/.test(Dn));
   const gD=giorni(Dn); T('V12 PROVA DICIANNOVE: ogni giorno somma alle ore scritte', gD.filter(x=>x.hh.length).every(x=>Math.abs(x.hh.reduce((a,b)=>a+b,0)-3)<0.01));
