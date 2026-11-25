@@ -21,6 +21,13 @@ Banca ore, tetto annuo, contratti e export.
 - **Numero di revisione**: costanti `APP_VER` e `APP_DATA` in cima al codice, mostrate nella
   targhetta `.app-rev` della testata. **Attuale: ver210 · 23nov26 — approvata da Christian e portata su `main` il 23/11/2026 («main»)** (prima su `main` la ver209, approvata da Christian il 23/11/2026: «Main»; prima su `main` la ver208, approvata da Christian il 22/11/2026 («Main»); prima su `main` la ver207, approvata da Christian il 22/11/2026 («Main») insieme alla ver206; prima su `main` la ver205, approvata da Christian il 21/11/2026 («Main») insieme alla ver204; prima su `main` la ver203, approvata il 21/11/2026: «main»; prima la ver202, approvata lo stesso giorno insieme alle ver199, ver200 e ver201: «MAIN»). ⚠️ La **ver198** fu fatta e **annullata** il 21/11/2026 («stai fermo alla ver197»: Christian aveva solo fatto una domanda); i suoi tre totali E/F/G e la sigla «NON ER» sono poi stati **chiesti esplicitamente** e stanno nella ver199. `APP_VER` finisce anche nei
   nomi dei file esportati: incrementarla, non affiancarle un secondo numero.
+- 📌 **PROMEMORIA PERMANENTE (Christian, 25/11/2026: «È perfetto così e ricordamelo ogni volta»)**: ogni volta che si parla
+  delle ore di USOINT, del Riepilogo operatori, dei Riepiloghi o del cedolino, **ricordare a Christian** che per i **mensilizzati
+  da ottobre 2026** USOINT legge le **ore pagate a cedolino** (ordinarie + supplementari, `cedOre`), calcolate da Dipendenti a
+  ogni 💾 con lo **stesso conto** dello schema del «🖨️ Report PDF A4 per le paghe» (non legge il PDF); per gli altri e per i mesi
+  prima di ottobre 2026 somma le celle del Tabellone. Dalla ver203 la differenza con le ore scritte è al più qualche minuto
+  (esempio di ottobre 2026: 80,49 contro 80,50). Decisione del 15/11/2026 («in usoint devono andare le ore pagate come da cedolino»),
+  **confermata il 25/11/2026: non cambiarla e non riproporla.**
 - **Tutto il dipendente si gestisce dalla scheda ANAGRAFICA** (da ver62, 31/10/2026). La
   finestrella "Modifica dipendente" (`DipModal`) **è stata eliminata**: era un doppione per
   livello, ore settimanali, tipo di contratto e date, e l'unico posto per cinque cose che ora
