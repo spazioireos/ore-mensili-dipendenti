@@ -31,8 +31,12 @@ def scrivi(nome, src):
 scrivi('dip', io.open(os.path.join(REPO,'index.html'),encoding='utf-8').read())
 ver = sys.argv[1] if len(sys.argv)>1 else ''
 if ver:
-    log = subprocess.run(['git','-C',REPO,'log','--format=%H','-S','const APP_VER = "%s"'%ver,'--','index.html'],capture_output=True,text=True).stdout.split()
-    if not log: sys.exit('versione %s non trovata nella storia git' % ver)
-    ref = log[-1]   # il commit che ha introdotto quella versione
-    src = subprocess.run(['git','-C',REPO,'show',ref+':index.html'],capture_output=True,text=True).stdout
+    # 25/11/2026: si prende l'ULTIMO commit che contiene quella versione (la stesura finale), non il primo che la introduce:
+    # la ver208 ha due commit e il primo («in prova») faceva fallire ver209.cjs S05 su un confronto sbagliato.
+    tutti = subprocess.run(['git','-C',REPO,'log','--format=%H','--','index.html'],capture_output=True,text=True).stdout.split()
+    ref = None
+    for c in tutti:
+        src = subprocess.run(['git','-C',REPO,'show',c+':index.html'],capture_output=True,text=True).stdout
+        if ('const APP_VER = "%s"' % ver) in src: ref = c; break
+    if not ref: sys.exit('versione %s non trovata nella storia git' % ver)
     scrivi(ver, src)
